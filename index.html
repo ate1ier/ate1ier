@@ -178,6 +178,7 @@
     padding: 24px 20px;
     display: flex;
     justify-content: center;
+    position: relative;
   }
   #page-inner { width: 100%; max-width: 1400px; }
   #page-inner.wide { max-width: 1800px; }
@@ -195,6 +196,26 @@
     overflow: hidden;
   }
   #nav.collapsed { width: 60px; }
+  .global-session-badge {
+    position: absolute;
+    top: 14px;
+    right: 16px;
+    z-index: 5;
+    display: none;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 20px;
+    background: var(--elevated);
+    border: 1px solid var(--hairline);
+    font-size: 12px;
+    color: var(--text-dim);
+    white-space: nowrap;
+  }
+  .global-session-badge.visible { display: inline-flex; }
+  @media (max-width: 720px) {
+    .global-session-badge { top: 10px; right: 10px; font-size: 11px; padding: 5px 10px; }
+  }
   .nav-collapse-btn {
     background: none;
     border: 1px solid var(--hairline);
@@ -1420,7 +1441,7 @@
 </head>
 <body>
 <div id="layout">
-  <div id="page-area"><div id="page-inner"></div></div>
+  <div id="page-area"><div id="page-inner"></div><div class="global-session-badge" id="global-session-badge" title="자동 로그아웃까지 남은 시간"></div></div>
   <div id="nav"></div>
 </div>
 
@@ -1622,6 +1643,10 @@
   // 마스터 계정이 다른 계정을 "들어가서 보기" 했을 때, 원래(마스터) 계정으로
   // 돌아올 수 있도록 원래 세션을 잠깐 보관해두는 키.
   const MASTER_ORIGIN_KEY = "personal-app:master-origin";
+  // 로그인한 시각을 기록해두는 키. 이 시각으로부터 SESSION_DURATION_MS가
+  // 지나면 자동으로 로그아웃시킨다.
+  const LOGIN_AT_KEY = "personal-app:login-at";
+  const SESSION_DURATION_MS = 5 * 60 * 60 * 1000; // 5시간
 
   const HAS_SUBTLE_CRYPTO = !!(window.crypto && window.crypto.subtle);
   // 예전(salt 없는 단순 해시) 방식 — 신규 계정에는 쓰지 않고, 예전에 만든
@@ -1676,6 +1701,35 @@
   }
   function clearMasterOrigin() {
     try { localStorage.removeItem(MASTER_ORIGIN_KEY); } catch (e) {}
+  }
+  function getLoginAt() {
+    try { return localStorage.getItem(LOGIN_AT_KEY); } catch (e) { return null; }
+  }
+  function setLoginAt(timestamp) {
+    try { localStorage.setItem(LOGIN_AT_KEY, String(timestamp)); } catch (e) {}
+  }
+  function clearLoginAt() {
+    try { localStorage.removeItem(LOGIN_AT_KEY); } catch (e) {}
+  }
+  // 자동 로그아웃까지 남은 시간(ms)을 계산한다. 로그인 시각 기록이 없으면 0으로 본다.
+  function getSessionRemainingMs() {
+    const loginAt = Number(getLoginAt());
+    if (!loginAt) return 0;
+    return SESSION_DURATION_MS - (Date.now() - loginAt);
+  }
+  function formatRemainingTime(ms) {
+    if (ms <= 0) return "0분";
+    const totalMinutes = Math.floor(ms / 60000);
+    const h = Math.floor(totalMinutes / 60);
+    const m = totalMinutes % 60;
+    if (h > 0) return `${h}시간 ${m}분`;
+    return `${m}분`;
+  }
+  function updateSessionRemainingDisplay() {
+    const el = document.getElementById("global-session-badge");
+    if (!el) return;
+    el.textContent = `⏳ 자동 로그아웃까지 ${formatRemainingTime(getSessionRemainingMs())}`;
+    el.classList.add("visible");
   }
   // 마스터 계정이 다른 계정으로 들어가서 볼 때 쓰는 함수.
   // 지금 세션(마스터)을 origin으로 저장해두고, 세션을 대상 계정으로 바꾼다.
@@ -1750,6 +1804,7 @@
   async function logout() {
     clearSession();
     clearMasterOrigin();
+    clearLoginAt();
     await flushCloudWrites();
     location.reload();
   }
@@ -1846,6 +1901,7 @@
             return;
           }
           setSession(account.id);
+          setLoginAt(Date.now());
           await flushCloudWrites();
           location.reload();
         };
@@ -1869,6 +1925,7 @@
           accountsList.push(newAccount);
           saveAccounts(accountsList);
           setSession(newAccount.id);
+          setLoginAt(Date.now());
           await flushCloudWrites();
           location.reload();
         };
@@ -1880,7 +1937,17 @@
 
   // 세션 확인: 로그인 상태가 아니면 로그인 화면만 그리고 나머지 앱 코드는 실행하지 않는다.
   const _session = getSession();
-  const _account = _session ? findAccountById(_session) : null;
+  let _account = _session ? findAccountById(_session) : null;
+  // 로그인한 지 5시간이 지났으면 자동으로 로그아웃 처리한다.
+  if (_account) {
+    const _loginAt = Number(getLoginAt());
+    if (!_loginAt || Date.now() - _loginAt >= SESSION_DURATION_MS) {
+      clearSession();
+      clearMasterOrigin();
+      clearLoginAt();
+      _account = null;
+    }
+  }
   if (!_account) {
     renderLoginScreen();
     return;
@@ -5477,6 +5544,7 @@
     if (masterReturnBtn) {
       masterReturnBtn.onclick = () => masterReturnToOrigin();
     }
+    if (!CURRENT_ACCOUNT_IS_MASTER) updateSessionRemainingDisplay();
   }
 
   /* ===================== 마스터 계정: 계정 관리 페이지 ===================== */
@@ -5624,6 +5692,19 @@
   saveScheduleData();
 
   renderApp();
+
+  // 로그인 후 5시간이 지나면 자동으로 로그아웃시키고, 그 전까지는 남은 시간을
+  // 주기적으로 갱신해서 보여준다.
+  if (!CURRENT_ACCOUNT_IS_MASTER) {
+    updateSessionRemainingDisplay();
+    setInterval(() => {
+      if (getSessionRemainingMs() <= 0) {
+        logout();
+        return;
+      }
+      updateSessionRemainingDisplay();
+    }, 15000);
+  }
 })();
 </script>
 </body>
