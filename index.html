@@ -1024,7 +1024,7 @@
   .agent-row-name { font-size: 15.5px; color: var(--text); flex-shrink: 0; }
   .agent-row-ldap { font-size: 14px; color: var(--text-dim); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-  .agent-summary { font-size: 13px; color: var(--text-dim); margin-bottom: 14px; }
+  .agent-summary { font-size: 13px; color: var(--text-dim); margin-bottom: 14px; white-space: nowrap; overflow-x: auto; }
   .agent-controls { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
   .agent-search-input { width: 100%; }
   .agent-filter-row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
@@ -1661,6 +1661,20 @@
     const salt = genSalt();
     const passwordHash = await hashPassword(newPassword, salt);
     list[idx] = { ...list[idx], salt, passwordHash };
+    saveAccounts(list);
+    return { ok: true };
+  }
+  // 마스터가 다른 계정의 이름(아이디)을 바꾼다. 이미 쓰이고 있는 이름으로는 바꿀 수 없다.
+  function renameAccount(accountId, newUsername) {
+    const trimmed = (newUsername || "").trim();
+    if (!trimmed) return { ok: false, reason: "계정 이름을 입력해주세요." };
+    const list = loadAccounts();
+    const idx = list.findIndex((a) => a.id === accountId);
+    if (idx === -1) return { ok: false, reason: "계정을 찾을 수 없어요." };
+    const norm = trimmed.toLowerCase();
+    const dup = list.find((a) => a.id !== accountId && a.username.toLowerCase() === norm);
+    if (dup) return { ok: false, reason: "이미 사용 중인 계정 이름이에요." };
+    list[idx] = { ...list[idx], username: trimmed };
     saveAccounts(list);
     return { ok: true };
   }
@@ -5402,7 +5416,7 @@
   /* ===================== 마스터 계정: 계정 관리 페이지 ===================== */
   function renderMasterPage(root) {
     if (!CURRENT_ACCOUNT_IS_MASTER) { setPage("home"); return; }
-    const uiState = { resettingId: null, error: "" };
+    const uiState = { resettingId: null, renamingId: null, error: "", renameError: "" };
 
     function draw() {
       const accounts = loadAccounts().slice().sort((a, b) => (a.createdAt || "").localeCompare(b.createdAt || ""));
@@ -5410,6 +5424,7 @@
         const isSelf = a.id === CURRENT_ACCOUNT_ID;
         const created = a.createdAt ? esc(a.createdAt.slice(0, 10)) : "-";
         const isResetting = uiState.resettingId === a.id;
+        const isRenaming = uiState.renamingId === a.id;
         return `
           <div class="agent-row master-account-row">
             <div class="agent-row-main" style="cursor:default;">
@@ -5417,10 +5432,20 @@
               <span class="agent-row-ldap">가입일 ${created}</span>
             </div>
             <div class="agent-row-badges">
+              <button class="ghost-btn ${isRenaming ? "active" : ""}" data-action="master-rename" data-id="${a.id}">${isRenaming ? "취소" : "이름 수정"}</button>
               <button class="ghost-btn ${isResetting ? "active" : ""}" data-action="master-reset" data-id="${a.id}">${isResetting ? "취소" : "비밀번호 초기화"}</button>
               <button class="ghost-btn" data-action="master-enter" data-id="${a.id}" ${isSelf ? "disabled" : ""}>이 계정으로 들어가기</button>
               <button class="ghost-btn danger" data-action="master-delete" data-id="${a.id}" ${isSelf ? "disabled" : ""}>삭제</button>
             </div>
+            ${isRenaming ? `
+              <form class="login-form master-rename-form" data-rename-form="${a.id}" style="width:100%; margin-top:10px;">
+                <label class="login-field"><span>새 계정 이름</span>
+                  <input class="add-input" id="rename-username-${a.id}" type="text" autocomplete="off" placeholder="계정 이름" value="${esc(a.username)}">
+                </label>
+                ${uiState.renameError ? `<div class="login-error">${esc(uiState.renameError)}</div>` : ""}
+                <button type="submit" class="primary-btn login-submit">이름 저장</button>
+              </form>
+            ` : ""}
             ${isResetting ? `
               <form class="login-form master-reset-form" data-reset-form="${a.id}" style="width:100%; margin-top:10px;">
                 <label class="login-field"><span>새 비밀번호</span>
@@ -5470,6 +5495,28 @@
           uiState.error = "";
           uiState.resettingId = uiState.resettingId === id ? null : id;
           draw();
+        };
+      });
+      root.querySelectorAll("[data-action='master-rename']").forEach((btn) => {
+        btn.onclick = () => {
+          const id = btn.getAttribute("data-id");
+          uiState.renameError = "";
+          uiState.renamingId = uiState.renamingId === id ? null : id;
+          draw();
+        };
+      });
+      root.querySelectorAll("[data-rename-form]").forEach((form) => {
+        form.onsubmit = (e) => {
+          e.preventDefault();
+          const id = form.getAttribute("data-rename-form");
+          const newUsername = document.getElementById(`rename-username-${id}`).value;
+          const result = renameAccount(id, newUsername);
+          if (!result.ok) { uiState.renameError = result.reason || "이름을 바꾸지 못했어요."; draw(); return; }
+          uiState.renamingId = null;
+          uiState.renameError = "";
+          if (id === CURRENT_ACCOUNT_ID) { location.reload(); return; }
+          draw();
+          flash(`계정 이름을 "${newUsername.trim()}"(으)로 바꿨어요.`);
         };
       });
       root.querySelectorAll("[data-reset-form]").forEach((form) => {
