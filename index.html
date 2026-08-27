@@ -359,6 +359,36 @@
     .nav-master-mode-sub { display: none; }
   }
 
+  /* ---------- 모바일 전역 최적화 ---------- */
+  @media (max-width: 720px) {
+    /* iOS Safari는 입력창 글자 크기가 16px보다 작으면 탭할 때 화면을 자동으로 확대시켜버려서
+       사용성이 크게 떨어진다. 모바일에서는 모든 입력 요소 글자 크기를 16px 이상으로 고정한다. */
+    input, select, textarea { font-size: 16px !important; }
+    .badge, .badge-btn, .agent-filter-btn, .agent-sort-select { font-size: 12.5px !important; }
+
+    #page-area { padding: 14px 10px 84px; }
+    .card { padding: 18px 16px; border-radius: 14px; }
+    .login-card { padding: 24px 18px; }
+
+    /* 손가락 터치 기준으로 버튼 최소 크기를 넉넉하게 확보 */
+    .icon-btn { width: 40px; height: 40px; }
+    .schedule-month-btn { width: 34px; height: 34px; }
+    .ghost-btn, .primary-btn, .cancel-btn { padding: 10px 14px; }
+  }
+  @media (max-width: 600px) {
+    #nav {
+      justify-content: space-between;
+      padding: 6px 6px;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    #nav .nav-text, #nav .theme-picker-label, #nav .theme-picker-chevron { display: none; }
+    .nav-btn { padding: 9px 10px; font-size: 19px; flex-shrink: 0; }
+    .nav-btn.active::before { left: 4px; right: 4px; }
+    .theme-toggle-wrap { flex-shrink: 0; }
+    .theme-picker-btn { padding: 8px; gap: 0; }
+  }
+
   /* ---------- 홈(메인) 페이지 ---------- */
   .home-grid {
     display: grid;
@@ -534,6 +564,28 @@
   }
   @media (max-width: 900px) {
     .shell { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 600px) {
+    .cal-title { font-size: 24px; }
+    .cal-title .year { font-size: 16px; }
+    .icon-btn { width: 34px; height: 34px; font-size: 15px; }
+    .today-btn { height: 34px; padding: 0 10px; font-size: 13.5px; }
+    .grid { gap: 4px; }
+    .cell { min-height: 76px; padding: 5px 4px; border-radius: 8px; gap: 2px; }
+    .day-num { font-size: 12.5px; width: 20px; height: 20px; }
+    .holiday-label { font-size: 9px; }
+    .chip { font-size: 10px; padding: 1px 4px; }
+    .chip-more { font-size: 10px; }
+    .weekday-row span { font-size: 11px; padding-bottom: 6px; }
+    .side-date { font-size: 22px; }
+    .entry .text { font-size: 14.5px; }
+    .type-row { gap: 5px; }
+    .type-btn { padding: 8px 0; }
+    .add-row { flex-wrap: wrap; }
+    .time-input { width: 100%; }
+    .text-input { width: 100%; }
+    .submit-btn { width: 100%; height: 40px; }
+    .range-row { flex-wrap: wrap; }
   }
 
   .card {
@@ -811,6 +863,13 @@
   .todo-due-input {
     background: var(--elevated); border: 1px solid var(--hairline); color: var(--text);
     border-radius: 8px; padding: 0 10px; font-size: 13px; color-scheme: var(--native-color-scheme, dark); flex: 0 0 132px;
+  }
+  @media (max-width: 600px) {
+    .todo-add-row { flex-wrap: wrap; }
+    .todo-add-row .add-input { flex: 1 1 100%; min-width: 0; }
+    .todo-due-input { flex: 1 1 auto; height: 38px; }
+    .note-body { padding: 0 10px 12px 14px; }
+    .interview-textarea, .note-content { font-size: 16px; }
   }
 
   /* ---------- 업무 정리 페이지 ---------- */
@@ -1182,6 +1241,9 @@
   .schedule-bulk-result { font-size: 12.5px; color: var(--text-dim); line-height: 1.6; white-space: pre-wrap; }
 
   .schedule-table-wrap { overflow: hidden; border: 1px solid var(--hairline); border-radius: 12px; width: 100%; }
+  @media (max-width: 720px) {
+    .schedule-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  }
   .schedule-scale-inner { transform-origin: top left; }
   .schedule-table { border-collapse: collapse; font-size: 12.5px; white-space: nowrap; }
   .schedule-table th, .schedule-table td {
@@ -4691,6 +4753,10 @@
     inner.style.width = "auto";
     inner.style.height = "auto";
     wrap.style.height = "auto";
+    // 모바일 화면에서는 표를 억지로 축소해서 글씨를 읽을 수 없게 만드는 대신,
+    // 표를 원래 크기 그대로 두고 가로 스크롤(스크린 좌우로 넘기기)로 보게 한다.
+    // (고정된 인원 정보 열이 sticky로 남아있어 스크롤해도 어떤 상담사인지 계속 보임)
+    if (window.innerWidth <= 720) return;
     const naturalW = table.offsetWidth;
     const naturalH = table.offsetHeight;
     const availW = wrap.clientWidth;
