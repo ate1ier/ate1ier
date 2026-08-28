@@ -10,54 +10,62 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <style>
   :root {
-    --bg: #17181b;
-    --panel: #1e1f23;
-    --elevated: #292a2f;
-    --hairline: #3a3b41;
-    --text: #f0f0ef;
-    --text-dim: #b7b8bf;
-    --text-faint: #7c7d84;
-    --accent: #ec6fae;
-    --accent-dim: #ec6fae2e;
-    --accent-text: #2a1420;
-    --green: #47a7c2;
-    --green-dim: #47a7c22e;
-    --red: #e2685f;
-    --red-dim: #e2685f2e;
-    --blue: #5b9bd9;
-    --blue-dim: #5b9bd92e;
-    --orange: #d98a3d;
-    --orange-dim: #d98a3d2e;
-    --salmon: #e08a72;
-    --salmon-dim: #e08a722e;
-    --yellow: #b98f3a;
-    --yellow-dim: #b98f3a2e;
-    --teal: #3fa9a0;
-    --teal-dim: #3fa9a02e;
-    --purple: #9576d9;
-    --purple-dim: #9576d92e;
-    --pink: #d9769c;
-    --pink-dim: #d9769c2e;
-    --indigo: #c977da;
-    --indigo-dim: #c977da2e;
-    --edu: #5fbf86;
-    --edu-dim: #5fbf862e;
-    --weekend-tint: #1c1d20;
+    --bg: #1e1e1e;
+    --panel: #262626;
+    --elevated: #323232;
+    --hairline: #3f3f42;
+    --text: #f2f2f2;
+    --text-dim: #b8b8bc;
+    --text-faint: #8a8a8e;
+    --accent: #0a84ff;
+    --accent-dim: #0a84ff2e;
+    --accent-text: #ffffff;
+    --green: #30d158;
+    --green-dim: #30d1582e;
+    --red: #ff453a;
+    --red-dim: #ff453a2e;
+    --blue: #64d2ff;
+    --blue-dim: #64d2ff2e;
+    --orange: #ff9f0a;
+    --orange-dim: #ff9f0a2e;
+    --salmon: #ff6961;
+    --salmon-dim: #ff69612e;
+    --yellow: #ffd60a;
+    --yellow-dim: #ffd60a2e;
+    --teal: #40c8e0;
+    --teal-dim: #40c8e02e;
+    --purple: #bf5af2;
+    --purple-dim: #bf5af22e;
+    --pink: #ff375f;
+    --pink-dim: #ff375f2e;
+    --indigo: #5e5ce6;
+    --indigo-dim: #5e5ce62e;
+    --edu: #32d74b;
+    --edu-dim: #32d74b2e;
+    --weekend-tint: #232324;
     --native-color-scheme: dark;
+    --mac-radius: 10px;
+    --mac-radius-lg: 14px;
+    --mac-vibrancy: rgba(40, 40, 42, 0.72);
+    --mac-vibrancy-hairline: rgba(255, 255, 255, 0.08);
+    --mac-shadow: 0 8px 24px rgba(0, 0, 0, 0.35), 0 1px 0 rgba(255, 255, 255, 0.04) inset;
   }
   html[data-theme="light"] {
-    --bg: #eef0f2;
-    --panel: #f7f8fa;
-    --elevated: #e4e6ea;
-    --hairline: #d3d6db;
-    --text: #24262b;
-    --text-dim: #4d5057;
-    --text-faint: #646770;
-    --accent: #7c5cd1;
-    --accent-dim: #7c5cd126;
+    --bg: #ececee;
+    --panel: #ffffff;
+    --elevated: #f2f2f5;
+    --hairline: #d9d9de;
+    --text: #1d1d1f;
+    --text-dim: #55555a;
+    --text-faint: #7c7c82;
+    --accent: #007aff;
+    --accent-dim: #007aff1f;
     --accent-text: #ffffff;
-    --weekend-tint: #e6e8ec;
+    --weekend-tint: #e4e4e8;
     --native-color-scheme: light;
+    --mac-vibrancy: rgba(255, 255, 255, 0.62);
+    --mac-vibrancy-hairline: rgba(0, 0, 0, 0.06);
+    --mac-shadow: 0 8px 24px rgba(0, 0, 0, 0.12), 0 1px 0 rgba(255, 255, 255, 0.4) inset;
   }
   /* ---- 그레이 모드: 채도를 낮춘 중립 톤 ---- */
   html[data-theme="gray"] {
@@ -137,6 +145,9 @@
   /* ---- light / gray / pastel-* 6개 테마는 상태색(오프·연차·대휴 등)이 모두 같다 ---- */
   html[data-theme="light"], html[data-theme="gray"], html[data-theme="pastel-blue"],
   html[data-theme="pastel-green"], html[data-theme="pastel-peach"], html[data-theme="pastel-lavender"] {
+    --mac-vibrancy: rgba(255, 255, 255, 0.62);
+    --mac-vibrancy-hairline: rgba(0, 0, 0, 0.06);
+    --mac-shadow: 0 8px 24px rgba(0, 0, 0, 0.12), 0 1px 0 rgba(255, 255, 255, 0.4) inset;
     --green: #2c7f96;
     --green-dim: #2c7f9626;
     --red: #c94f4f;
@@ -167,10 +178,10 @@
     background: var(--bg);
     color: var(--text);
     color-scheme: var(--native-color-scheme, dark);
-    font-family: 'KoPub Dotum', system-ui, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro KR', 'Apple SD Gothic Neo', 'Malgun Gothic', 'KoPub Dotum', system-ui, sans-serif;
     font-weight: 400;
-    -webkit-text-stroke: 0.35px currentColor;
-    text-stroke: 0.35px currentColor;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
   }
   body { display: block; }
   button, input, textarea { font-family: inherit; }
@@ -196,10 +207,12 @@
   #page-inner.wide { max-width: 1800px; }
 
   #nav {
-    width: 148px;
+    width: 158px;
     flex-shrink: 0;
-    border-left: 1px solid var(--hairline);
-    background: var(--panel);
+    border-left: 1px solid var(--mac-vibrancy-hairline);
+    background: var(--mac-vibrancy);
+    backdrop-filter: blur(24px) saturate(1.8);
+    -webkit-backdrop-filter: blur(24px) saturate(1.8);
     display: flex;
     flex-direction: column;
     align-items: stretch;
@@ -276,25 +289,23 @@
     border: none;
     color: var(--text-dim);
     text-align: left;
-    font-size: 15.5px;
+    font-size: 14.5px;
     letter-spacing: -0.005em;
-    padding: 12px 22px;
+    padding: 9px 14px;
+    margin: 1.5px 10px;
+    border-radius: 8px;
     cursor: pointer;
-    transition: color 0.15s ease;
+    transition: color 0.12s ease, background 0.12s ease;
+    width: calc(100% - 20px);
   }
   .icon-emo { display: inline-block; vertical-align: -3px; flex-shrink: 0; }
-  .nav-btn:hover { color: var(--text); }
-  .nav-btn.active { color: var(--text); }
-  .nav-btn.active::before {
-    content: "";
-    position: absolute;
-    left: 0;
-    top: 10px;
-    bottom: 10px;
-    width: 2px;
+  .nav-btn:hover { color: var(--text); background: var(--mac-vibrancy-hairline); }
+  .nav-btn.active {
+    color: #ffffff;
     background: var(--accent);
-    border-radius: 2px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.15);
   }
+  .nav-btn.active::before { content: none; }
   .nav-spacer { flex: 1; }
   .nav-master-mode {
     margin: 0 8px 14px;
@@ -320,9 +331,11 @@
     z-index: 45;
     padding: 4px;
     margin: 0;
-    border: 1px solid var(--hairline);
-    border-radius: 10px;
-    background: var(--panel);
+    border: 1px solid var(--mac-vibrancy-hairline);
+    border-radius: 12px;
+    background: var(--mac-vibrancy);
+    backdrop-filter: blur(20px) saturate(1.8);
+    -webkit-backdrop-filter: blur(20px) saturate(1.8);
     box-shadow: 0 10px 28px #00000045;
   }
   .theme-toggle-wrap .theme-picker-btn { width: auto; }
@@ -361,8 +374,9 @@
   .theme-picker-btn.open .theme-picker-chevron { transform: rotate(180deg); }
 
   .theme-menu {
-    position: fixed; z-index: 60; background: var(--elevated); border: 1px solid var(--hairline);
-    border-radius: 14px; padding: 6px; display: flex; flex-direction: column; gap: 1px;
+    position: fixed; z-index: 60; background: var(--mac-vibrancy); border: 1px solid var(--mac-vibrancy-hairline);
+    backdrop-filter: blur(20px) saturate(1.8); -webkit-backdrop-filter: blur(20px) saturate(1.8);
+    border-radius: 12px; padding: 6px; display: flex; flex-direction: column; gap: 1px;
     box-shadow: 0 14px 36px #00000055; min-width: 180px;
   }
   .theme-menu-item {
@@ -378,12 +392,192 @@
   .theme-menu-name { flex: 1; white-space: nowrap; }
   .theme-menu-check { color: var(--accent); font-weight: 700; flex-shrink: 0; }
 
+  /* ---------- 데스크톱: 평소엔 숨겨진 macOS 독(Dock) + 가운데 하단 펼치기 버튼 ---------- */
+  .dock-toggle-btn { display: none; }
+  #theme-toggle-root .theme-toggle-wrap { position: fixed; right: 14px; bottom: 78px; z-index: 46; }
+  @media (min-width: 721px) {
+    #theme-toggle-root .theme-toggle-wrap { bottom: 18px; }
+    #page-area { padding-bottom: 56px; }
+    .dock-toggle-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: fixed;
+      left: 50%;
+      bottom: 14px;
+      transform: translateX(-50%);
+      z-index: 41;
+      width: 46px;
+      height: 20px;
+      padding: 0;
+      border: 1px solid var(--mac-vibrancy-hairline);
+      border-radius: 10px;
+      background: var(--mac-vibrancy);
+      backdrop-filter: blur(20px) saturate(1.8);
+      -webkit-backdrop-filter: blur(20px) saturate(1.8);
+      box-shadow: 0 8px 22px rgba(0, 0, 0, 0.35);
+      color: var(--text-faint);
+      cursor: pointer;
+      transition: color 0.12s ease;
+    }
+    .dock-toggle-btn:hover { color: var(--text); }
+    .dock-toggle-btn svg { transition: transform 0.2s ease; }
+    .dock-toggle-btn.open svg { transform: rotate(180deg); }
+
+    #nav {
+      position: fixed;
+      left: 50%;
+      bottom: 40px;
+      z-index: 40;
+      width: auto;
+      max-width: min(96vw, 900px);
+      flex-direction: row;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      row-gap: 8px;
+      column-gap: 16px;
+      padding: 26px 22px;
+      border-radius: 28px;
+      border: 1px solid var(--mac-vibrancy-hairline);
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4), 0 1px 0 rgba(255, 255, 255, 0.06) inset;
+      opacity: 0;
+      transform: translateX(-50%) translateY(10px) scale(0.96);
+      pointer-events: none;
+      transition: opacity 0.16s ease, transform 0.18s cubic-bezier(.2, 1.2, .4, 1);
+    }
+    #nav.dock-open {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0) scale(1);
+      pointer-events: auto;
+    }
+    #nav.collapsed { width: auto; }
+    #nav .nav-label-top,
+    #nav .nav-spacer,
+    #nav .nav-collapse-btn,
+    #nav .theme-toggle-wrap {
+      display: none;
+    }
+    /* 아이콘 아래에 작은 캡션을 붙여서, 사이드바가 펼쳐졌을 때 보이던
+       계정 이름 / 로그아웃까지 남은 시간 / 메뉴 이름을 이 독(dock)에서도 알 수 있게 한다.
+       모든 항목(메뉴 아이콘 / 계정 / 로그아웃)의 세로 높이를 동일하게 맞춰서,
+       독 안에서 아이콘들이 전부 같은 가운데 선에 나란히 놓이도록 한다. */
+    #nav .nav-btn {
+      width: auto;
+      margin: 0;
+      padding: 12px 20px;
+      border-radius: 18px;
+      white-space: nowrap;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 5px;
+      transition: color 0.12s ease, background 0.12s ease, transform 0.15s cubic-bezier(.2,1.4,.4,1);
+    }
+    /* 사이드바를 예전에 "접기" 해둔 적이 있으면 #nav에 .collapsed가 남아있어
+       라벨이 강제로 숨겨지므로, 이 독(dock)에서는 항상 보이도록 덮어쓴다 */
+    #nav .nav-btn .nav-text,
+    #nav .nav-account-name .nav-text,
+    #nav.collapsed .nav-btn .nav-text,
+    #nav.collapsed .nav-account-name .nav-text,
+    #nav.collapsed .nav-logout-btn .nav-text {
+      display: block !important;
+      font-size: 11.5px;
+      color: var(--text-faint);
+    }
+    #nav .nav-btn.active .nav-text { color: #ffffff; }
+    #nav .nav-btn:hover { transform: translateY(-4px) scale(1.06); background: var(--mac-vibrancy-hairline); }
+    #nav .nav-btn.active:hover { transform: translateY(-4px) scale(1.06); }
+
+    /* 아이콘 자체 크기를 더 키운다 (기본 15px → 28px) */
+    #nav .nav-btn .icon-emo,
+    #nav .nav-account-name .icon-emo,
+    #nav .nav-logout-btn .icon-emo {
+      width: 28px;
+      height: 28px;
+    }
+
+    #nav .nav-account {
+      flex-direction: row;
+      align-items: center;
+      gap: 20px;
+      padding: 0 4px;
+    }
+    #nav .nav-account-name {
+      max-width: 96px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      padding: 12px 6px;
+    }
+    #nav .nav-account-name .nav-text {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 96px;
+    }
+    /* 로그아웃 버튼(아이콘+라벨)은 다른 아이콘들과 정확히 같은 높이를 갖도록 하고,
+       자동 로그아웃 남은 시간 + 연장 버튼은 그 흐름 밖(절대 위치)으로 빼서 캡션처럼 붙인다.
+       이렇게 하면 로그아웃 항목도 다른 아이콘들과 똑같은 높이가 되어, 독 세로 가운데 선에
+       모든 아이콘이 완벽히 정렬된다. */
+    #nav .nav-logout-wrap {
+      position: relative;
+      display: flex;
+    }
+    #nav .nav-session-row {
+      position: absolute;
+      top: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      margin-top: 5px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      white-space: nowrap;
+    }
+    #nav .global-session-badge { font-size: 10px; padding: 2px 8px; }
+    #nav .nav-session-extend-btn { font-size: 10px; padding: 1px 7px; }
+    #nav .nav-logout-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      padding: 12px 8px;
+      border-radius: 14px;
+    }
+    /* 계정/로그아웃 묶음과 메뉴 아이콘들 사이를 나누는 세로 구분선.
+       로그아웃 버튼 바로 오른쪽, 메뉴 아이콘들 바로 왼쪽에 위치하며,
+       독의 세로 길이에 맞춰 위아래 끝까지 늘어난다 */
+    #nav .nav-divider {
+      display: block;
+      width: 1px;
+      height: auto;
+      align-self: stretch;
+      margin: 0 2px;
+      background: var(--mac-vibrancy-hairline);
+    }
+    #nav .nav-master-banner,
+    #nav .nav-master-mode {
+      flex-direction: row;
+      align-items: center;
+      margin: 0 4px;
+      padding: 6px 10px;
+      white-space: nowrap;
+    }
+    #nav .nav-master-mode-sub,
+    #nav .nav-master-banner span { display: none; }
+    #nav .nav-master-return-btn { width: auto; }
+  }
+
   @media (max-width: 720px) {
     #layout { flex-direction: column-reverse; }
     #nav {
       width: 100%;
       flex-direction: row;
-      align-items: center;
+      align-items: flex-start;
       border-left: none;
       border-top: 1px solid var(--hairline);
       padding: 10px 14px;
@@ -392,14 +586,9 @@
     #nav.collapsed { width: 100%; }
     .nav-collapse-btn { display: none; }
     .nav-label-top, .nav-divider { display: none; }
-    .nav-btn { padding: 10px 16px; }
+    .nav-btn { width: auto; padding: 10px 16px; }
     .nav-btn.active::before { left: 8px; right: 8px; top: auto; bottom: 0; width: auto; height: 2px; }
     .nav-spacer { display: none; }
-    .theme-toggle-wrap {
-      position: static; padding: 0; margin: 0 0 0 auto; border: none;
-      box-shadow: none; background: none; border-radius: 0; width: auto;
-    }
-    .theme-picker-btn { width: auto; }
     .nav-master-banner { margin: 0; padding: 4px 8px; flex-direction: row; align-items: center; gap: 6px; }
     .nav-master-banner span { display: inline; max-width: 110px; }
     .nav-master-return-btn { width: auto; }
@@ -426,13 +615,69 @@
   @media (max-width: 600px) {
     #nav {
       justify-content: space-between;
-      padding: 6px 6px;
+      padding: 8px 10px;
+      gap: 14px;
       overflow-x: auto;
       -webkit-overflow-scrolling: touch;
     }
-    #nav .nav-text, #nav .theme-picker-label, #nav .theme-picker-chevron { display: none; }
-    .nav-btn { padding: 9px 10px; font-size: 19px; flex-shrink: 0; }
+    /* 테마 선택 버튼의 글자 라벨만 계속 숨겨서 공간을 아낀다 */
+    #nav .theme-picker-label, #nav .theme-picker-chevron { display: none; }
+
+    /* 아이콘 아래에 작은 글씨로 캡션을 붙여서, 사이드바가 펼쳐졌을 때 보이던
+       계정 이름 / 로그아웃까지 남은 시간 / 메뉴 이름을 여기서도 바로 알 수 있게 한다 */
+    .nav-btn, .nav-account-name, .nav-logout-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      margin: 0;
+      flex-shrink: 0;
+    }
+    .nav-btn { padding: 9px 13px; font-size: 18px; }
+    /* 사이드바를 예전에 "접기" 해둔 적이 있으면 #nav에 .collapsed가 남아있어
+       라벨이 강제로 숨겨지므로, 이 화면(아이콘 바)에서는 항상 보이도록 덮어쓴다 */
+    .nav-btn .nav-text,
+    .nav-account-name .nav-text,
+    .nav-logout-btn .nav-text,
+    #nav.collapsed .nav-btn .nav-text,
+    #nav.collapsed .nav-account-name .nav-text,
+    #nav.collapsed .nav-logout-btn .nav-text {
+      display: block !important;
+      font-size: 10px;
+      line-height: 1.15;
+      color: var(--text-faint);
+      white-space: nowrap;
+    }
+    .nav-btn.active .nav-text { color: #ffffff; }
     .nav-btn.active::before { left: 4px; right: 4px; }
+
+    /* 아이콘 자체 크기를 키운다 (기본 15px → 22px) */
+    .nav-btn .icon-emo,
+    .nav-account-name .icon-emo,
+    .nav-logout-btn .icon-emo {
+      width: 22px;
+      height: 22px;
+    }
+
+    .nav-account {
+      flex-direction: row;
+      align-items: flex-start;
+      gap: 16px;
+      padding: 9px 0 0;
+    }
+    /* 로그아웃 버튼(아이콘+라벨)을 위, 남은 시간+연장 버튼을 캡션처럼 아래에 배치 */
+    .nav-logout-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+    }
+    .nav-logout-wrap .nav-logout-btn { order: 1; }
+    .nav-logout-wrap .nav-session-row { order: 2; }
+    .nav-session-row { display: flex; align-items: center; gap: 4px; }
+    .global-session-badge { font-size: 9.5px; padding: 1px 6px; }
+    .nav-session-extend-btn { font-size: 9.5px; padding: 1px 6px; }
+
     .theme-toggle-wrap { flex-shrink: 0; }
     .theme-picker-btn { padding: 5px; gap: 0; }
   }
@@ -557,7 +802,8 @@
   }
   .login-card {
     width: 100%; max-width: 380px; background: var(--panel); border: 1px solid var(--hairline);
-    border-radius: 18px; padding: 32px 28px;
+    border-radius: var(--mac-radius-lg); padding: 32px 28px;
+    box-shadow: var(--mac-shadow);
   }
   .login-title { font-size: 24px; letter-spacing: -0.01em; margin-bottom: 6px; }
   .login-sub { font-size: 13px; color: var(--text-faint); margin-bottom: 22px; line-height: 1.5; }
@@ -594,6 +840,9 @@
     padding: 2px 6px; border-radius: 6px; white-space: nowrap;
   }
   .nav-logout-btn:hover { color: var(--red); background: var(--red-dim); }
+  /* 사이드바에서는 로그아웃 버튼 + 남은 시간 줄이 기존처럼 nav-account의 직계 자식인 것처럼 보이도록
+     레이아웃에 관여하지 않는다. 독(dock)/좁은 화면 모드에서만 이 래퍼를 실제 세로 그룹으로 사용한다. */
+  .nav-logout-wrap { display: contents; }
   .nav-session-row { display: flex; align-items: center; gap: 6px; }
   .nav-session-extend-btn {
     background: none; border: 1px solid var(--hairline); color: var(--accent); font-size: 11px; cursor: pointer;
@@ -652,8 +901,9 @@
   .card {
     background: var(--panel);
     border: 1px solid var(--hairline);
-    border-radius: 18px;
+    border-radius: var(--mac-radius-lg);
     padding: 26px 28px;
+    box-shadow: var(--mac-shadow);
   }
 
   .cal-header {
@@ -671,22 +921,22 @@
     background: var(--elevated);
     border: 1px solid var(--hairline);
     color: var(--text);
-    border-radius: 9px;
-    width: 38px; height: 38px;
+    border-radius: 8px;
+    width: 32px; height: 32px;
     display: flex; align-items: center; justify-content: center;
     cursor: pointer;
-    font-size: 17.5px;
-    transition: background 0.15s ease, transform 0.15s ease;
+    font-size: 15.5px;
+    transition: background 0.12s ease, transform 0.08s ease;
   }
-  .icon-btn:hover { background: #2f2d29; }
+  .icon-btn:hover { background: var(--hairline); }
   .icon-btn:active { transform: scale(0.94); }
   .today-btn {
-    background: transparent;
+    background: var(--elevated);
     border: 1px solid var(--hairline);
     color: var(--text-dim);
-    border-radius: 9px;
-    padding: 0 16px; height: 38px;
-    font-size: 16px;
+    border-radius: 8px;
+    padding: 0 14px; height: 32px;
+    font-size: 14px;
     cursor: pointer;
     transition: border-color 0.15s ease, color 0.15s ease;
   }
@@ -948,13 +1198,13 @@
     background: var(--elevated);
     border: 1px solid var(--hairline);
     color: var(--text-dim);
-    border-radius: 9px;
-    padding: 9px 14px;
-    font-size: 14px;
+    border-radius: 7px;
+    padding: 8px 14px;
+    font-size: 13.5px;
     cursor: pointer;
-    transition: border-color 0.15s ease, color 0.15s ease;
+    transition: border-color 0.12s ease, color 0.12s ease, background 0.12s ease;
   }
-  .ghost-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .ghost-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
 
   .inline-form {
     background: var(--panel);
@@ -1233,15 +1483,18 @@
 
   .primary-btn {
     background: var(--accent); border: none; color: var(--accent-text);
-    border-radius: 8px; padding: 9px 16px; font-size: 14px; cursor: pointer;
-    transition: filter 0.15s ease;
+    border-radius: 7px; padding: 8px 16px; font-size: 13.5px; font-weight: 500; cursor: pointer;
+    transition: filter 0.12s ease, transform 0.08s ease;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.15);
   }
-  .primary-btn:hover { filter: brightness(1.1); }
+  .primary-btn:hover { filter: brightness(1.08); }
+  .primary-btn:active { transform: scale(0.97); }
   .cancel-btn {
-    background: none; border: 1px solid var(--hairline); color: var(--text-faint);
-    border-radius: 8px; padding: 9px 14px; font-size: 14px; cursor: pointer;
+    background: var(--elevated); border: 1px solid var(--hairline); color: var(--text-dim);
+    border-radius: 7px; padding: 8px 14px; font-size: 13.5px; cursor: pointer;
+    transition: background 0.12s ease, color 0.12s ease;
   }
-  .cancel-btn:hover { color: var(--text); }
+  .cancel-btn:hover { color: var(--text); background: var(--hairline); }
 
   /* ---------- 면담일지 ---------- */
   .badge.type-regular { color: var(--blue); background: var(--blue-dim); }
@@ -1420,7 +1673,8 @@
   .sch-staff-btn.danger:hover { color: var(--red); }
 
   .sch-menu {
-    position: fixed; z-index: 50; background: var(--elevated); border: 1px solid var(--hairline);
+    position: fixed; z-index: 50; background: var(--mac-vibrancy); border: 1px solid var(--mac-vibrancy-hairline);
+    backdrop-filter: blur(20px) saturate(1.8); -webkit-backdrop-filter: blur(20px) saturate(1.8);
     border-radius: 10px; padding: 6px; display: flex; flex-direction: column; gap: 2px;
     box-shadow: 0 8px 24px #00000066; min-width: 108px;
   }
@@ -1440,7 +1694,8 @@
     display: flex; align-items: center; justify-content: center; padding: 24px;
   }
   .sch-preview-box {
-    background: var(--panel); border: 1px solid var(--hairline); border-radius: 14px;
+    background: var(--mac-vibrancy); border: 1px solid var(--mac-vibrancy-hairline); border-radius: 14px;
+    backdrop-filter: blur(28px) saturate(1.8); -webkit-backdrop-filter: blur(28px) saturate(1.8);
     width: min(92vw, 1100px); max-height: 92vh; display: flex; flex-direction: column;
     box-shadow: 0 20px 60px #00000080; overflow: hidden;
   }
@@ -1481,6 +1736,35 @@
 
 
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+  /* ---------- macOS 스타일 마감 ---------- */
+  * { scrollbar-width: thin; scrollbar-color: var(--hairline) transparent; }
+  *::-webkit-scrollbar { width: 10px; height: 10px; }
+  *::-webkit-scrollbar-track { background: transparent; }
+  *::-webkit-scrollbar-thumb {
+    background: var(--hairline); border-radius: 8px; border: 2px solid transparent; background-clip: padding-box;
+  }
+  *::-webkit-scrollbar-thumb:hover { background: var(--text-faint); background-clip: padding-box; }
+
+  .add-input, .todo-due-input, .agent-sort-select, .agent-filter-btn,
+  .type-btn, .note-content, .interview-textarea, .inline-form input[type="text"],
+  .inline-form select, .add-input, .range-row .date-input {
+    border-radius: 7px !important;
+  }
+  .add-input:focus-visible, .note-content:focus-visible, .interview-textarea:focus-visible,
+  .todo-due-input:focus-visible, .inline-form input:focus-visible, .inline-form select:focus-visible {
+    outline: 3px solid var(--accent-dim);
+    outline-offset: 0;
+    border-color: var(--accent);
+  }
+
+  .login-tabs { border-radius: 9px; }
+  .login-tab { border-radius: 7px; font-weight: 500; }
+  .login-tab.active { box-shadow: 0 1px 3px rgba(0,0,0,0.18); }
+
+  .badge, .badge-btn { font-weight: 500; }
+
+  ::selection { background: var(--accent); color: #ffffff; }
 </style>
 </head>
 <body>
@@ -1488,6 +1772,10 @@
   <div id="page-area"><div id="page-inner"></div></div>
   <div id="nav"></div>
 </div>
+<div id="theme-toggle-root"></div>
+<button class="dock-toggle-btn" id="dock-toggle-btn" type="button" aria-haspopup="true" aria-expanded="false" aria-label="메뉴 열기" title="메뉴 열기">
+  <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 5l5 4 5-4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+</button>
 
 <script>
 (async function () {
@@ -1635,6 +1923,61 @@
   function setNavCollapsed(v) {
     try { localStorage.setItem(NAV_COLLAPSED_KEY, v ? "1" : "0"); } catch (e) { /* 저장 실패해도 화면 전환은 그대로 동작 */ }
     renderNav();
+  }
+
+  // 데스크톱 화면에서는 메뉴(독)를 평소엔 숨겨두고, 가운데 하단의 작은 버튼을 눌러야 펼쳐지게 한다.
+  function isDockOpen() {
+    const nav = document.getElementById("nav");
+    return !!(nav && nav.classList.contains("dock-open"));
+  }
+  function dockOutsideHandler(e) {
+    const nav = document.getElementById("nav");
+    const btn = document.getElementById("dock-toggle-btn");
+    if (nav && !nav.contains(e.target) && !(btn && btn.contains(e.target))) closeDock();
+  }
+  function openDock() {
+    const nav = document.getElementById("nav");
+    const btn = document.getElementById("dock-toggle-btn");
+    if (nav) nav.classList.add("dock-open");
+    if (btn) { btn.classList.add("open"); btn.setAttribute("aria-expanded", "true"); btn.title = "메뉴 닫기"; btn.setAttribute("aria-label", "메뉴 닫기"); }
+    setTimeout(() => document.addEventListener("mousedown", dockOutsideHandler, true), 0);
+  }
+  function closeDock() {
+    const nav = document.getElementById("nav");
+    const btn = document.getElementById("dock-toggle-btn");
+    if (nav) nav.classList.remove("dock-open");
+    if (btn) { btn.classList.remove("open"); btn.setAttribute("aria-expanded", "false"); btn.title = "메뉴 열기"; btn.setAttribute("aria-label", "메뉴 열기"); }
+    document.removeEventListener("mousedown", dockOutsideHandler, true);
+  }
+  function toggleDock() {
+    if (isDockOpen()) closeDock(); else openDock();
+  }
+  const dockToggleBtn = document.getElementById("dock-toggle-btn");
+  if (dockToggleBtn) {
+    dockToggleBtn.onclick = (e) => { e.stopPropagation(); toggleDock(); };
+  }
+
+  // 다크/라이트 등 화면 테마 선택 버튼: 내비게이션(독)과 별개로 항상 화면 오른쪽 아래에 떠 있다.
+  function renderThemeToggle() {
+    const root = document.getElementById("theme-toggle-root");
+    if (!root) return;
+    root.innerHTML = `
+      <div class="theme-toggle-wrap">
+        <button class="theme-picker-btn" id="nav-theme-toggle" type="button" aria-haspopup="true" aria-expanded="false" aria-label="화면 테마 선택" title="화면 테마 선택">
+          <span class="theme-picker-dot" style="background:${themeMeta(getCurrentTheme()).bg};"></span>
+          <span class="theme-picker-label">${themeMeta(getCurrentTheme()).label}</span>
+          <svg class="theme-picker-chevron" width="8" height="8" viewBox="0 0 10 10" aria-hidden="true"><path d="M1 3.5l4 4 4-4" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </div>
+    `;
+    const themeBtn = document.getElementById("nav-theme-toggle");
+    if (themeBtn) {
+      themeBtn.onclick = (e) => {
+        e.stopPropagation();
+        if (document.getElementById("theme-menu")) { closeThemeMenu(); return; }
+        openThemeMenu(themeBtn);
+      };
+    }
   }
 
   // 테마 선택 팝오버(사이드바 하단의 테마 버튼을 누르면 뜨는 목록)
@@ -1791,9 +2134,10 @@
   }
   function updateSessionRemainingDisplay() {
     const el = document.getElementById("global-session-badge");
-    if (!el) return;
-    el.innerHTML = `${ICON_CLOCK} ${formatRemainingTime(getSessionRemainingMs())}`;
-    el.classList.add("visible");
+    if (el) {
+      el.innerHTML = `${ICON_CLOCK} ${formatRemainingTime(getSessionRemainingMs())}`;
+      el.classList.add("visible");
+    }
   }
   // 마스터 계정이 다른 계정으로 들어가서 볼 때 쓰는 함수.
   // 지금 세션(마스터)을 origin으로 저장해두고, 세션을 대상 계정으로 바꾼다.
@@ -5068,8 +5412,6 @@
         <span class="item"><span class="swatch" style="background:${cFaint};"></span>퇴사</span>
       </div>
       ${buildScheduleTableHtml(tableFilter)}
-      <div class="schedule-log-title" style="color:${cText};">이번 달 지각·결근 기록</div>
-      ${buildScheduleLogHtml(tableFilter)}
     `;
     document.body.appendChild(wrapper);
 
@@ -5640,12 +5982,14 @@
       ${!CURRENT_ACCOUNT_IS_MASTER ? `<div class="nav-label-top">메뉴</div>` : ""}
       <div class="nav-account">
         <span class="nav-account-name">${ICON_USER} <span class="nav-text">${esc(CURRENT_ACCOUNT_NAME)}${CURRENT_ACCOUNT_IS_MASTER ? ' <span class="badge sm master">마스터</span>' : ""}</span></span>
-        ${!CURRENT_ACCOUNT_IS_MASTER ? `
-        <div class="nav-session-row nav-text">
-          <span class="global-session-badge" id="global-session-badge" title="자동 로그아웃까지 남은 시간"></span>
-          <button class="nav-session-extend-btn" id="nav-session-extend-btn" type="button" title="로그인 시간을 5시간으로 연장">연장</button>
-        </div>` : ""}
-        <button class="nav-logout-btn" id="nav-logout-btn" title="로그아웃">${ICON_LOGOUT}<span class="nav-text"> 로그아웃</span></button>
+        <div class="nav-logout-wrap">
+          ${!CURRENT_ACCOUNT_IS_MASTER ? `
+          <div class="nav-session-row nav-text">
+            <span class="global-session-badge" id="global-session-badge" title="자동 로그아웃까지 남은 시간"></span>
+            <button class="nav-session-extend-btn" id="nav-session-extend-btn" type="button" title="로그인 시간을 5시간으로 연장">연장</button>
+          </div>` : ""}
+          <button class="nav-logout-btn" id="nav-logout-btn" title="로그아웃">${ICON_LOGOUT}<span class="nav-text"> 로그아웃</span></button>
+        </div>
       </div>
       <div class="nav-divider"></div>
       ${MASTER_ORIGIN_ACCOUNT ? `
@@ -5668,29 +6012,15 @@
         <button class="nav-btn ${state.page === "schedule" ? "active" : ""}" data-nav="schedule" title="월별 스케줄">${ICON_CHART} <span class="nav-text">월별 스케줄</span></button>
       `}
       <div class="nav-spacer"></div>
-      <div class="theme-toggle-wrap">
-        <button class="theme-picker-btn" id="nav-theme-toggle" type="button" aria-haspopup="true" aria-expanded="false" aria-label="화면 테마 선택" title="화면 테마 선택">
-          <span class="theme-picker-dot" style="background:${themeMeta(getCurrentTheme()).bg};"></span>
-          <span class="theme-picker-label">${themeMeta(getCurrentTheme()).label}</span>
-          <svg class="theme-picker-chevron" width="8" height="8" viewBox="0 0 10 10" aria-hidden="true"><path d="M1 3.5l4 4 4-4" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        </button>
-      </div>
     `;
+    renderThemeToggle();
     const collapseBtn = document.getElementById("nav-collapse-toggle");
     if (collapseBtn) {
       collapseBtn.onclick = () => setNavCollapsed(!getNavCollapsed());
     }
     nav.querySelectorAll("[data-nav]").forEach((btn) => {
-      btn.onclick = () => setPage(btn.getAttribute("data-nav"));
+      btn.onclick = () => { setPage(btn.getAttribute("data-nav")); closeDock(); };
     });
-    const themeBtn = document.getElementById("nav-theme-toggle");
-    if (themeBtn) {
-      themeBtn.onclick = (e) => {
-        e.stopPropagation();
-        if (document.getElementById("theme-menu")) { closeThemeMenu(); return; }
-        openThemeMenu(themeBtn);
-      };
-    }
     const logoutBtn = document.getElementById("nav-logout-btn");
     if (logoutBtn) {
       logoutBtn.onclick = () => {
