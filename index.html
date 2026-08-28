@@ -36,6 +36,10 @@
     --teal-dim: #3fa9a02e;
     --purple: #9576d9;
     --purple-dim: #9576d92e;
+    --pink: #d9769c;
+    --pink-dim: #d9769c2e;
+    --indigo: #6f8fd9;
+    --indigo-dim: #6f8fd92e;
     --weekend-tint: #1c1d20;
     --native-color-scheme: dark;
   }
@@ -147,6 +151,10 @@
     --teal-dim: #227d7526;
     --purple: #7454b5;
     --purple-dim: #7454b526;
+    --pink: #b5548f;
+    --pink-dim: #b5548f26;
+    --indigo: #4f6bb5;
+    --indigo-dim: #4f6bb526;
   }
   * { box-sizing: border-box; }
   html, body {
@@ -197,25 +205,21 @@
   }
   #nav.collapsed { width: 60px; }
   .global-session-badge {
-    position: absolute;
-    top: 14px;
-    right: 16px;
-    z-index: 5;
     display: none;
     align-items: center;
-    gap: 6px;
-    padding: 6px 12px;
+    gap: 4px;
+    padding: 3px 10px;
     border-radius: 20px;
     background: var(--elevated);
     border: 1px solid var(--hairline);
-    font-size: 12px;
-    color: var(--text-dim);
+    font-size: 11px;
+    color: var(--text-faint);
     white-space: nowrap;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .global-session-badge.visible { display: inline-flex; }
-  @media (max-width: 720px) {
-    .global-session-badge { top: 10px; right: 10px; font-size: 11px; padding: 5px 10px; }
-  }
   .nav-collapse-btn {
     background: none;
     border: 1px solid var(--hairline);
@@ -241,14 +245,14 @@
   #nav.collapsed .theme-picker-label,
   #nav.collapsed .theme-picker-chevron,
   #nav.collapsed .nav-master-banner,
-  #nav.collapsed .nav-master-mode { display: none; }
+  #nav.collapsed .nav-master-mode,
+  #nav.collapsed .global-session-badge { display: none; }
   #nav.collapsed .nav-divider { margin: 0 14px 14px; }
   #nav.collapsed .nav-btn { text-align: center; padding: 12px 4px; }
   #nav.collapsed .nav-btn.active::before { left: 6px; }
   #nav.collapsed .nav-account { padding: 0 6px 10px; }
   #nav.collapsed .nav-logout-btn { padding: 4px; }
-  #nav.collapsed .theme-toggle-wrap { padding: 14px 8px 0; }
-  #nav.collapsed .theme-picker-btn { justify-content: center; padding: 8px; gap: 0; }
+  #nav.collapsed .theme-picker-btn { justify-content: center; padding: 5px 3px; gap: 0; }
 
   .nav-label-top {
     font-size: 18px;
@@ -274,6 +278,7 @@
     cursor: pointer;
     transition: color 0.15s ease;
   }
+  .icon-emo { display: inline-block; vertical-align: -3px; flex-shrink: 0; }
   .nav-btn:hover { color: var(--text); }
   .nav-btn.active { color: var(--text); }
   .nav-btn.active::before {
@@ -305,28 +310,43 @@
     font-size: 11px; color: var(--text-dim); line-height: 1.3; white-space: nowrap;
   }
   .theme-toggle-wrap {
-    padding: 14px 22px 0;
-    margin-top: 14px;
-    border-top: 1px solid var(--hairline);
+    position: fixed;
+    right: 18px;
+    bottom: 18px;
+    z-index: 45;
+    padding: 4px;
+    margin: 0;
+    border: 1px solid var(--hairline);
+    border-radius: 10px;
+    background: var(--panel);
+    box-shadow: 0 10px 28px #00000045;
+  }
+  .theme-toggle-wrap .theme-picker-btn { width: auto; }
+  #nav.collapsed .theme-toggle-wrap {
+    padding: 4px 0;
+    right: 0;
+    width: 60px;
+    display: flex;
+    justify-content: center;
   }
   .theme-picker-btn {
     width: 100%;
     display: flex;
     align-items: center;
-    gap: 9px;
+    gap: 5px;
     background: var(--elevated);
     border: 1px solid var(--hairline);
-    border-radius: 12px;
-    padding: 8px 10px;
+    border-radius: 9px;
+    padding: 4px 6px;
     cursor: pointer;
     color: var(--text-dim);
-    font-size: 13px;
+    font-size: 11px;
     transition: border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
   }
   .theme-picker-btn:hover { color: var(--text); border-color: var(--accent); }
   .theme-picker-btn.open { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); color: var(--text); }
   .theme-picker-dot {
-    width: 16px; height: 16px; border-radius: 50%; flex-shrink: 0;
+    width: 11px; height: 11px; border-radius: 50%; flex-shrink: 0;
     box-shadow: inset 0 0 0 2px #ffffff40, 0 0 0 1px #00000022;
   }
   .theme-picker-label {
@@ -371,7 +391,10 @@
     .nav-btn { padding: 10px 16px; }
     .nav-btn.active::before { left: 8px; right: 8px; top: auto; bottom: 0; width: auto; height: 2px; }
     .nav-spacer { display: none; }
-    .theme-toggle-wrap { padding: 0; margin: 0 0 0 auto; border-top: none; width: auto; }
+    .theme-toggle-wrap {
+      position: static; padding: 0; margin: 0 0 0 auto; border: none;
+      box-shadow: none; background: none; border-radius: 0; width: auto;
+    }
     .theme-picker-btn { width: auto; }
     .nav-master-banner { margin: 0; padding: 4px 8px; flex-direction: row; align-items: center; gap: 6px; }
     .nav-master-banner span { display: inline; max-width: 110px; }
@@ -407,7 +430,7 @@
     .nav-btn { padding: 9px 10px; font-size: 19px; flex-shrink: 0; }
     .nav-btn.active::before { left: 4px; right: 4px; }
     .theme-toggle-wrap { flex-shrink: 0; }
-    .theme-picker-btn { padding: 8px; gap: 0; }
+    .theme-picker-btn { padding: 5px; gap: 0; }
   }
 
   /* ---------- 홈(메인) 페이지 ---------- */
@@ -421,7 +444,7 @@
     grid-template-columns: 1.1fr 1fr 1fr;
     align-items: stretch;
   }
-  .home-grid.has-status-col .home-col > .card:last-child { flex: 1; }
+  .home-grid.has-status-col .home-col-status > .card:last-child { flex: 1; }
   @media (max-width: 1200px) {
     .home-grid.has-status-col { grid-template-columns: 1fr 1fr; }
     .home-grid.has-status-col .home-col-status { grid-column: 1 / -1; }
@@ -491,6 +514,12 @@
   .home-staff-row .flag.absent { color: var(--red); background: var(--red-dim); }
   .home-staff-row .flag.off { color: var(--blue); background: var(--blue-dim); }
   .home-staff-row.is-off { opacity: 0.6; }
+  .home-more-btn {
+    display: block; width: 100%; margin-top: 8px; padding: 7px 0;
+    background: none; border: 1px dashed var(--hairline); border-radius: 9px;
+    color: var(--text-faint); font-size: 12.5px; cursor: pointer;
+  }
+  .home-more-btn:hover { color: var(--accent); border-color: var(--accent); }
 
   .home-entry-list { display: flex; flex-direction: column; gap: 8px; }
   .home-entry-row {
@@ -561,6 +590,13 @@
     padding: 2px 6px; border-radius: 6px; white-space: nowrap;
   }
   .nav-logout-btn:hover { color: var(--red); background: var(--red-dim); }
+  .nav-session-row { display: flex; align-items: center; gap: 6px; }
+  .nav-session-extend-btn {
+    background: none; border: 1px solid var(--hairline); color: var(--accent); font-size: 11px; cursor: pointer;
+    padding: 2px 8px; border-radius: 999px; white-space: nowrap; flex-shrink: 0;
+    transition: border-color 0.15s ease, background 0.15s ease;
+  }
+  .nav-session-extend-btn:hover { border-color: var(--accent); background: var(--accent-dim); }
   .nav-master-banner {
     margin: 0 22px 14px; padding: 8px 8px; border-radius: 8px;
     background: var(--accent-dim); border: 1px solid var(--accent);
@@ -1278,6 +1314,7 @@
   .schedule-table td.sch-info { text-align: left; color: var(--text-dim); background: var(--panel); }
   .schedule-table td.sch-empty { text-align: center; color: var(--text-faint); padding: 24px; }
   .schedule-table td.sch-nickname { color: var(--text); font-weight: 600; text-align: center; }
+  .schedule-table td.sch-col-name, .schedule-table td.sch-col-empno { text-align: center; }
   .schedule-table td.sch-count { text-align: center; color: var(--text-dim); background: var(--panel); }
   .schedule-table tr.sch-group-row td {
     background: var(--elevated); color: var(--accent); font-weight: 600; text-align: left; position: relative;
@@ -1328,15 +1365,15 @@
   }
   .schedule-table .sch-col-nickname { left: 0; width: 88px; min-width: 88px; max-width: 88px; }
   .schedule-table .sch-col-name { left: 88px; width: 56px; min-width: 56px; max-width: 56px; }
-  .schedule-table .sch-col-empno { left: 144px; width: 64px; min-width: 64px; max-width: 64px; }
-  .schedule-table .sch-col-hiredate { left: 208px; width: 88px; min-width: 88px; max-width: 88px; }
-  .schedule-table .sch-col-workhours { left: 296px; width: 88px; min-width: 88px; max-width: 88px; }
-  .schedule-table .sch-col-work { left: 384px; width: 46px; min-width: 46px; max-width: 46px; }
-  .schedule-table .sch-col-off { left: 430px; width: 46px; min-width: 46px; max-width: 46px; }
-  .schedule-table .sch-col-annual { left: 476px; width: 46px; min-width: 46px; max-width: 46px; }
-  .schedule-table .sch-col-daehyu { left: 522px; width: 46px; min-width: 46px; max-width: 46px; }
+  .schedule-table .sch-col-empno { left: 144px; width: 80px; min-width: 80px; max-width: 80px; }
+  .schedule-table .sch-col-hiredate { left: 224px; width: 88px; min-width: 88px; max-width: 88px; }
+  .schedule-table .sch-col-workhours { left: 312px; width: 88px; min-width: 88px; max-width: 88px; }
+  .schedule-table .sch-col-work { left: 400px; width: 46px; min-width: 46px; max-width: 46px; }
+  .schedule-table .sch-col-off { left: 446px; width: 46px; min-width: 46px; max-width: 46px; }
+  .schedule-table .sch-col-annual { left: 492px; width: 46px; min-width: 46px; max-width: 46px; }
+  .schedule-table .sch-col-daehyu { left: 538px; width: 46px; min-width: 46px; max-width: 46px; }
   .schedule-table .sch-col-absent {
-    left: 568px; width: 46px; min-width: 46px; max-width: 46px;
+    left: 584px; width: 46px; min-width: 46px; max-width: 46px;
     box-shadow: 4px 0 6px -4px #00000080;
   }
   .schedule-table tbody td[colspan] { box-shadow: none; }
@@ -1365,6 +1402,8 @@
   .sch-cell.st-half { background: var(--salmon-dim); color: var(--salmon); }
   .sch-cell.st-gonghyu { background: var(--teal-dim); color: var(--teal); }
   .sch-cell.st-gongga { background: var(--purple-dim); color: var(--purple); }
+  .sch-cell.st-maternity { background: var(--pink-dim); color: var(--pink); }
+  .sch-cell.st-special { background: var(--indigo-dim); color: var(--indigo); }
   .sch-cell.st-late { background: var(--yellow-dim); color: var(--yellow); font-weight: 600; }
   .sch-cell.st-absent { background: var(--red-dim); color: var(--red); font-weight: 600; }
   .sch-cell.st-resigned { background: var(--hairline); color: var(--text-faint); }
@@ -1441,12 +1480,32 @@
 </head>
 <body>
 <div id="layout">
-  <div id="page-area"><div id="page-inner"></div><div class="global-session-badge" id="global-session-badge" title="자동 로그아웃까지 남은 시간"></div></div>
+  <div id="page-area"><div id="page-inner"></div></div>
   <div id="nav"></div>
 </div>
 
 <script>
 (async function () {
+  /* ---- 심플한 라인 아이콘 세트 (이모티콘 대체) ---- */
+  const ICON_HOME = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.3 8.2 8 3.2l5.7 5"/><path d="M3.6 6.8V13h3.1v-4h2.6v4h3.1V6.8"/></svg>`;
+  const ICON_CALENDAR = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="3.4" width="11" height="10.2" rx="1.6"/><path d="M2.5 6.6h11M5.6 2v2.4M10.4 2v2.4"/></svg>`;
+  const ICON_NOTE = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4.3 2.6h5l2.4 2.4v8.4h-7.4z"/><path d="M9.3 2.6V5h2.4"/><path d="M6 8.4h4M6 10.8h4"/></svg>`;
+  const ICON_USERS = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2.1"/><path d="M2.4 13c0-2.1 1.6-3.6 3.6-3.6s3.6 1.5 3.6 3.6"/><circle cx="11.3" cy="6.4" r="1.7"/><path d="M9.9 9.6c1.7.2 3 1.5 3 3.4"/></svg>`;
+  const ICON_CLIPBOARD = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.6" y="3" width="8.8" height="11.2" rx="1.4"/><path d="M6.2 3V2.4a1 1 0 0 1 1-1h1.6a1 1 0 0 1 1 1V3"/><path d="M5.8 7.4h4.4M5.8 10h4.4"/></svg>`;
+  const ICON_CHART = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.4 13.6h11.2"/><rect x="3.8" y="8.4" width="2.1" height="4.3"/><rect x="7" y="5.6" width="2.1" height="7.1"/><rect x="10.2" y="9.8" width="2.1" height="2.9"/></svg>`;
+  const ICON_LOGOUT = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.8 13.2H4.4A1.4 1.4 0 0 1 3 11.8V4.2A1.4 1.4 0 0 1 4.4 2.8h2.4"/><path d="M9.6 5.4 13 8l-3.4 2.6"/><path d="M13 8H6.4"/></svg>`;
+  const ICON_USER = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="5.6" r="2.6"/><path d="M3 13.2c0-2.6 2.2-4.4 5-4.4s5 1.8 5 4.4"/></svg>`;
+  const ICON_SHIELD = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2.2 12.8 4v3.9c0 3.4-2.1 5.7-4.8 6.5-2.7-.8-4.8-3.1-4.8-6.5V4z"/></svg>`;
+  const ICON_MOON = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12.8 9.9A5.1 5.1 0 1 1 6.1 3.2a4.1 4.1 0 0 0 6.7 6.7z"/></svg>`;
+  const ICON_SUN = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="2.7"/><path d="M8 1.8v1.5M8 12.7v1.5M14.2 8h-1.5M3.3 8H1.8M12.3 3.7l-1.1 1.1M4.8 11.2l-1.1 1.1M12.3 12.3l-1.1-1.1M4.8 4.8l-1.1-1.1"/></svg>`;
+  const ICON_PIN = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2.4 12 6l-1.9 1.9v3.5L8 13.6l-2.1-2.2V7.9L4 6z"/></svg>`;
+  const ICON_CHECK = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2.6" y="2.6" width="10.8" height="10.8" rx="2.4"/><path d="M5 8.2 7 10.1 11 5.9"/></svg>`;
+  const ICON_LOCK = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.6" y="7.2" width="8.8" height="6.4" rx="1.4"/><path d="M5.4 7.2V5.2a2.6 2.6 0 0 1 5.2 0v2"/></svg>`;
+  const ICON_TRASH = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3.4 5h9.2"/><path d="M6.4 5V3.7c0-.4.3-.7.7-.7h1.8c.4 0 .7.3.7.7V5"/><path d="M4.8 5l.6 7.9c0 .5.5.9 1 .9h3.2c.5 0 .9-.4 1-.9L11.2 5"/><path d="M6.8 7.3v3.9M9.2 7.3v3.9"/></svg>`;
+  const ICON_CAMERA = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6h2.1l1-1.5h4.8l1 1.5h2.1v6.6H2.5z"/><circle cx="8" cy="9.5" r="2.1"/></svg>`;
+  const ICON_DOWNLOAD = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2.5v7.2"/><path d="M5.2 7.1 8 9.9l2.8-2.8"/><path d="M3.2 13h9.6"/></svg>`;
+  const ICON_BELL = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11.2V7.4a4 4 0 0 1 8 0v3.8l1.1 1.5H2.9z"/><path d="M6.6 13.4a1.5 1.5 0 0 0 2.8 0"/></svg>`;
+  const ICON_CLOCK = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="5.6"/><path d="M8 4.8V8l2.4 1.4"/></svg>`;
   /* ===================== ☁️ 클라우드 동기화 (Supabase) =====================
      계정 목록과 각 계정의 데이터(할일/메모/상담사/면담일지/스케줄/캘린더)를
      Supabase의 kv_store 테이블에도 함께 저장해서, 다른 기기·다른 사람도
@@ -1536,13 +1595,13 @@
   const THEME_KEY = "app-theme-mode";
   // 각 테마의 미리보기용 색(배경/포인트색)과 라벨. CSS의 실제 변수값과 맞춰서 관리한다.
   const THEME_LIST = [
-    { id: "dark", label: "다크", emoji: "🌙", bg: "#17181b", accent: "#ec6fae" },
-    { id: "light", label: "라이트", emoji: "☀️", bg: "#eef0f2", accent: "#7c5cd1" },
-    { id: "gray", label: "그레이", emoji: "⬜", bg: "#e7e8ea", accent: "#52606d" },
-    { id: "pastel-blue", label: "스카이 블루", emoji: "🩵", bg: "#e9f1fb", accent: "#3b78c9" },
-    { id: "pastel-green", label: "세이지 민트", emoji: "🌿", bg: "#e9f5ee", accent: "#3f9463" },
-    { id: "pastel-peach", label: "피치", emoji: "🍑", bg: "#fdeee6", accent: "#d97a4d" },
-    { id: "pastel-lavender", label: "라벤더", emoji: "💜", bg: "#f0ecfa", accent: "#8462cf" },
+    { id: "dark", label: "다크", bg: "#17181b", accent: "#ec6fae" },
+    { id: "light", label: "라이트", bg: "#eef0f2", accent: "#7c5cd1" },
+    { id: "gray", label: "그레이", bg: "#e7e8ea", accent: "#52606d" },
+    { id: "pastel-blue", label: "스카이 블루", bg: "#e9f1fb", accent: "#3b78c9" },
+    { id: "pastel-green", label: "세이지 민트", bg: "#e9f5ee", accent: "#3f9463" },
+    { id: "pastel-peach", label: "피치", bg: "#fdeee6", accent: "#d97a4d" },
+    { id: "pastel-lavender", label: "라벤더", bg: "#f0ecfa", accent: "#8462cf" },
   ];
   function themeMeta(id) { return THEME_LIST.find((t) => t.id === id) || THEME_LIST[0]; }
   function isValidTheme(id) { return THEME_LIST.some((t) => t.id === id); }
@@ -1728,7 +1787,7 @@
   function updateSessionRemainingDisplay() {
     const el = document.getElementById("global-session-badge");
     if (!el) return;
-    el.textContent = `⏳ 자동 로그아웃까지 ${formatRemainingTime(getSessionRemainingMs())}`;
+    el.innerHTML = `${ICON_CLOCK} ${formatRemainingTime(getSessionRemainingMs())}`;
     el.classList.add("visible");
   }
   // 마스터 계정이 다른 계정으로 들어가서 볼 때 쓰는 함수.
@@ -2298,7 +2357,7 @@
     let upcomingHtml = "";
     if (upcoming.length > 0) {
       upcomingHtml = `<div class="upcoming">
-        <div class="upcoming-title">📋 다가오는 일정</div>
+        <div class="upcoming-title">${ICON_CLIPBOARD} 다가오는 일정</div>
         <div class="upcoming-list">
           ${upcoming.map((item) => {
             const isRange = item.rangeStart && item.rangeEnd && item.rangeStart !== item.rangeEnd;
@@ -2613,7 +2672,7 @@
     return `
       <div class="card todo-card">
         <div class="todo-header">
-          <div class="todo-title">✅ To-Do List</div>
+          <div class="todo-title">${ICON_CHECK} To-Do List</div>
           <div class="todo-count">${remaining}개 남음</div>
         </div>
         <div class="status" id="todo-status"></div>
@@ -2898,7 +2957,7 @@
     if (pinnedNotes.length > 0) {
       pinnedHtml = `
         <div class="pinned-block">
-          <div class="pinned-title">📌 고정된 메모 <span class="pinned-count">(${pinnedNotes.length}/5)</span></div>
+          <div class="pinned-title">${ICON_PIN} 고정된 메모 <span class="pinned-count">(${pinnedNotes.length}/5)</span></div>
           <div class="folder-body" style="padding:0;">
             ${pinnedNotes.map((n) => renderNoteRow(n, "pinned")).join("")}
           </div>
@@ -3061,7 +3120,7 @@
     editingId: null,
     searchQuery: "",
     filterType: "all", // "all" | "voice" | "chat" | "day" | "night"
-    sortBy: "custom", // "custom" | "name" | "type" | "created"
+    sortBy: "shift", // "shift" | "custom" | "name" | "type" | "chat" | "night" | "created"
     interviewMode: "list", // "list" | "add" | "edit" — 상담사 상세의 면담 이력 섹션용
     interviewEditingId: null,
   };
@@ -3175,9 +3234,37 @@
   function agentNightRank(a) {
     return a.group === "night" ? 0 : 1;
   }
+  // 기본 정렬(주간→야간, 그 안에서 채팅→유선, 그 중에서도 근무 시작 시각 순)을 위한 순위들.
+  function agentGroupRank(a) {
+    return a.group === "night" ? 1 : 0;
+  }
+  function agentShiftTypeRank(a) {
+    const types = a.workTypes || [];
+    if (types.indexOf("채팅") !== -1) return 0;
+    if (types.indexOf("유선") !== -1) return 1;
+    return 2;
+  }
+  // 근무시간(예: "09:00-18:00") 문자열에서 시작 시각을 분 단위로 추출한다.
+  // 형식을 찾을 수 없으면 맨 뒤로 보내기 위해 아주 큰 값을 반환한다.
+  function agentStartMinutes(a) {
+    const wh = a.timezone || "";
+    const m = wh.match(/(\d{1,2}):(\d{2})/);
+    if (!m) return Infinity;
+    return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+  }
   function sortAgentList(list, sortBy) {
     const arr = [...list];
-    if (sortBy === "name") {
+    if (sortBy === "shift") {
+      arr.sort((a, b) => {
+        const g = agentGroupRank(a) - agentGroupRank(b);
+        if (g !== 0) return g;
+        const t = agentShiftTypeRank(a) - agentShiftTypeRank(b);
+        if (t !== 0) return t;
+        const s = agentStartMinutes(a) - agentStartMinutes(b);
+        if (s !== 0) return s;
+        return a.name.localeCompare(b.name, "ko");
+      });
+    } else if (sortBy === "name") {
       arr.sort((a, b) => a.name.localeCompare(b.name, "ko"));
     } else if (sortBy === "type") {
       arr.sort((a, b) => {
@@ -3205,7 +3292,7 @@
     if (!types || types.length === 0) return `<span class="agent-field-empty">-</span>`;
     return types.map((t) => `<span class="badge ${t === "유선" ? "voice" : "chat"}">${esc(t)}</span>`).join("");
   }
-  function scheduleGroupLabel(group) { return group === "night" ? "🌙 야간" : "☀️ 주간"; }
+  function scheduleGroupLabel(group) { return group === "night" ? `${ICON_MOON} 야간` : `${ICON_SUN} 주간`; }
   function scheduleGroupBadgeHtml(group) {
     return `<span class="badge ${group === "night" ? "night" : "day"}">${scheduleGroupLabel(group)}</span>`;
   }
@@ -3311,8 +3398,8 @@
         </div>
         <div class="agent-form-label">근무 조
           <div class="agent-radio-row">
-            <label class="agent-radio"><input type="radio" name="agent-input-group" id="agent-input-group-day" value="day" ${group === "day" ? "checked" : ""}> ☀️ 주간</label>
-            <label class="agent-radio"><input type="radio" name="agent-input-group" id="agent-input-group-night" value="night" ${group === "night" ? "checked" : ""}> 🌙 야간</label>
+            <label class="agent-radio"><input type="radio" name="agent-input-group" id="agent-input-group-day" value="day" ${group === "day" ? "checked" : ""}> ${ICON_SUN} 주간</label>
+            <label class="agent-radio"><input type="radio" name="agent-input-group" id="agent-input-group-night" value="night" ${group === "night" ? "checked" : ""}> ${ICON_MOON} 야간</label>
           </div>
         </div>
         <label class="agent-form-label">시간대
@@ -3342,7 +3429,7 @@
     if (pinnedAgents.length > 0) {
       pinnedHtml = `
         <div class="pinned-block">
-          <div class="pinned-title">📌 고정된 인원 <span class="pinned-count">(${pinnedCount}/${AGENT_PIN_LIMIT})</span></div>
+          <div class="pinned-title">${ICON_PIN} 고정된 인원 <span class="pinned-count">(${pinnedCount}/${AGENT_PIN_LIMIT})</span></div>
           <div class="agent-list">${pinnedAgents.map((a) => renderAgentRow(a, "pinned", draggable)).join("")}</div>
         </div>
       `;
@@ -3435,6 +3522,7 @@
           <button type="button" class="agent-filter-btn ${agentsUi.filterType === "working" ? "active" : ""}" data-filter="working">재직만</button>
           <button type="button" class="agent-filter-btn ${agentsUi.filterType === "resigned" ? "active" : ""}" data-filter="resigned">퇴사만</button>
           <select class="agent-sort-select" id="agent-sort-select">
+            <option value="shift" ${agentsUi.sortBy === "shift" ? "selected" : ""}>기본순(주간→야간·업무·시간순)</option>
             <option value="custom" ${agentsUi.sortBy === "custom" ? "selected" : ""}>사용자 지정(드래그)</option>
             <option value="name" ${agentsUi.sortBy === "name" ? "selected" : ""}>이름순</option>
             <option value="type" ${agentsUi.sortBy === "type" ? "selected" : ""}>업무구분별</option>
@@ -3688,6 +3776,10 @@
     typeFilter: "all", // "all" | "정기" | "수시" | "경고"
   };
 
+  const homeUi = {
+    interviewAlertExpanded: false, // 홈 화면의 "면담 필요 알림" 목록을 펼쳐서 볼지 여부
+  };
+
   function renderInterviewFormFields(v, lockAgentId, idPrefix) {
     const activeAgents = agentsData.slice().sort((a, b) => a.name.localeCompare(b.name, "ko"));
     return `
@@ -3932,7 +4024,7 @@
     return `
       <div class="agent-interview-section">
         <div class="agent-interview-header">
-          <div class="agent-interview-title">🗒️ 면담 이력</div>
+          <div class="agent-interview-title">${ICON_CLIPBOARD} 면담 이력</div>
           ${agentsUi.interviewMode === "list" ? `<button class="ghost-btn" id="btn-agent-interview-add">＋ 면담 기록 추가</button>` : ""}
         </div>
         ${bodyHtml}
@@ -4118,6 +4210,8 @@
     if (tok === "반차") return { status: "HALF", attendance: null };
     if (tok === "공휴") return { status: "GONGHYU", attendance: null };
     if (tok === "공가") return { status: "GONGGA", attendance: null };
+    if (tok === "육휴" || tok === "육아휴직") return { status: "MATERNITY", attendance: null };
+    if (tok === "특휴" || tok === "특별휴가") return { status: "SPECIAL", attendance: null };
     if (tok === "지각") return { status: "WORK", attendance: "LATE" };
     if (tok === "결근") return { status: "WORK", attendance: "ABSENT" };
     if (tok === "퇴사") return { status: "RESIGNED", attendance: null };
@@ -4180,6 +4274,8 @@
     HALF: { label: "반차", cls: "st-half" },
     GONGHYU: { label: "공휴", cls: "st-gonghyu" },
     GONGGA: { label: "공가", cls: "st-gongga" },
+    MATERNITY: { label: "육휴", cls: "st-maternity" },
+    SPECIAL: { label: "특휴", cls: "st-special" },
     RESIGNED: { label: "퇴사", cls: "st-resigned" },
   };
 
@@ -4210,18 +4306,22 @@
     return record.status === "WORK" && record.attendance !== "ABSENT";
   }
 
-  // 이번 달 근무/오프/연차/대휴/결근 일수를 인원별로 집계
+  // 이번 달 근무/오프/연차/대휴/결근 일수를 인원별로 집계.
+  // "오프" 합계는 스케줄상 오프뿐 아니라 대휴·공휴·육휴·특휴까지 모두 포함해서 셈한다.
+  // (대휴는 별도 열에도 단독으로 계속 표시되므로 DAEHYU 값 자체는 그대로 둔다)
   function scheduleStaffMonthCounts(staffId, year, monthIndex) {
     const numDays = scheduleDaysInMonth(year, monthIndex);
     const counts = { WORK: 0, OFF: 0, ANNUAL: 0, DAEHYU: 0, ABSENT: 0 };
+    // "오프" 합계에 함께 포함시킬 휴무성 상태 목록 (대휴는 아래에서 DAEHYU로 별도 집계도 함께 함)
+    const OFF_GROUP_STATUSES = ["OFF", "DAEHYU", "GONGHYU", "MATERNITY", "SPECIAL"];
     for (let d = 1; d <= numDays; d++) {
       const dateKey = scheduleDateKey(year, monthIndex, d);
       const record = getScheduleRecord(staffId, dateKey);
       if (record.status === "WORK" && record.attendance === "ABSENT") counts.ABSENT += 1;
       else if (record.status === "WORK") counts.WORK += 1;
-      else if (record.status === "OFF") counts.OFF += 1;
       else if (record.status === "ANNUAL") counts.ANNUAL += 1;
       else if (record.status === "DAEHYU") counts.DAEHYU += 1;
+      if (OFF_GROUP_STATUSES.indexOf(record.status) !== -1) counts.OFF += 1;
     }
     return counts;
   }
@@ -4381,14 +4481,14 @@
       if (adminStaff.length === 0) {
         bodyHtml = `<tr><td class="sch-info sch-empty" colspan="${10 + numDays}">등록된 관리자가 없어요.</td></tr>`;
       } else {
-        bodyHtml += `<tr class="sch-group-row sch-group-row--static"><td colspan="${10 + numDays}">🛡️ 관리자 (${adminStaff.length}명)</td></tr>`;
+        bodyHtml += `<tr class="sch-group-row sch-group-row--static"><td colspan="${10 + numDays}">${ICON_SHIELD} 관리자 (${adminStaff.length}명)</td></tr>`;
         bodyHtml += adminStaff.map(staffRowHtml).join("");
         bodyHtml += summaryRowHtml("관리자 인원", adminStaff, null);
       }
     } else if (filterMode === "DAY" || filterMode === "NIGHT") {
       // "주간 저장" / "야간 저장": 관리자는 빼고 해당 조만 보여준다.
       const staffList = filterMode === "DAY" ? dayStaff : nightStaff;
-      const groupTitle = filterMode === "DAY" ? `☀️ 아침조 / 주간 (${staffList.length}명)` : `🌙 야간조 (${staffList.length}명)`;
+      const groupTitle = filterMode === "DAY" ? `${ICON_SUN} 아침조 / 주간 (${staffList.length}명)` : `${ICON_MOON} 야간조 (${staffList.length}명)`;
       if (staffList.length === 0) {
         bodyHtml = `<tr><td class="sch-info sch-empty" colspan="${10 + numDays}">등록된 인원이 없어요.</td></tr>`;
       } else {
@@ -4407,12 +4507,12 @@
         bodyHtml = `<tr><td class="sch-info sch-empty" colspan="${10 + numDays}">${typeName} 담당 인원이 없어요.</td></tr>`;
       } else {
         if (dayTyped.length > 0) {
-          bodyHtml += `<tr class="sch-group-row"><td colspan="${10 + numDays}">☀️ 주간 · ${typeName} (${dayTyped.length}명)</td></tr>`;
+          bodyHtml += `<tr class="sch-group-row"><td colspan="${10 + numDays}">${ICON_SUN} 주간 · ${typeName} (${dayTyped.length}명)</td></tr>`;
           bodyHtml += dayTyped.map(staffRowHtml).join("");
           bodyHtml += summaryRowHtml(`${typeName} 인원`, dayTyped, typeName);
         }
         if (nightTyped.length > 0) {
-          bodyHtml += `<tr class="sch-group-row"><td colspan="${10 + numDays}">🌙 야간 · ${typeName} (${nightTyped.length}명)</td></tr>`;
+          bodyHtml += `<tr class="sch-group-row"><td colspan="${10 + numDays}">${ICON_MOON} 야간 · ${typeName} (${nightTyped.length}명)</td></tr>`;
           bodyHtml += nightTyped.map(staffRowHtml).join("");
           bodyHtml += summaryRowHtml(`${typeName} 인원`, nightTyped, typeName);
         }
@@ -4424,18 +4524,18 @@
       bodyHtml = `<tr><td class="sch-info sch-empty" colspan="${10 + numDays}">등록된 인원이 없어요. "상담사 관리"에서 상담사를 등록하면 자동으로 표시돼요.</td></tr>`;
     } else {
       if (adminStaff.length > 0) {
-        bodyHtml += `<tr class="sch-group-row sch-group-row--static"><td colspan="${10 + numDays}">🛡️ 관리자 (${adminStaff.length}명)</td></tr>`;
+        bodyHtml += `<tr class="sch-group-row sch-group-row--static"><td colspan="${10 + numDays}">${ICON_SHIELD} 관리자 (${adminStaff.length}명)</td></tr>`;
         bodyHtml += adminStaff.map(staffRowHtml).join("");
         bodyHtml += summaryRowHtml("관리자 인원", adminStaff, null);
       }
       if (dayStaff.length > 0) {
-        bodyHtml += `<tr class="sch-group-row"><td colspan="${10 + numDays}">☀️ 아침조 / 주간 (${dayStaff.length}명)</td></tr>`;
+        bodyHtml += `<tr class="sch-group-row"><td colspan="${10 + numDays}">${ICON_SUN} 아침조 / 주간 (${dayStaff.length}명)</td></tr>`;
         bodyHtml += subGroupsHtml(dayStaff);
         bodyHtml += summaryRowHtml("채팅 인원", dayStaff, "채팅");
         bodyHtml += summaryRowHtml("유선 인원", dayStaff, "유선");
       }
       if (nightStaff.length > 0) {
-        bodyHtml += `<tr class="sch-group-row"><td colspan="${10 + numDays}">🌙 야간조 (${nightStaff.length}명)</td></tr>`;
+        bodyHtml += `<tr class="sch-group-row"><td colspan="${10 + numDays}">${ICON_MOON} 야간조 (${nightStaff.length}명)</td></tr>`;
         bodyHtml += subGroupsHtml(nightStaff);
         bodyHtml += summaryRowHtml("채팅 인원", nightStaff, "채팅");
         bodyHtml += summaryRowHtml("유선 인원", nightStaff, "유선");
@@ -4532,6 +4632,8 @@
         "반차": "C2603F",
         "공휴": "227D75",
         "공가": "7454B5",
+        "육휴": "B5548F",
+        "특휴": "4F6BB5",
         "지각": "8A6A1F",
         "결근": "C94F4F",
       };
@@ -4713,19 +4815,19 @@
         let nightChatSummaryRow = null, nightVoiceSummaryRow = null;
 
         if (adminStaff.length > 0) {
-          addLabelRow(`🛡️ 관리자 (${adminStaff.length}명)`);
+          addLabelRow(`${ICON_SHIELD} 관리자 (${adminStaff.length}명)`);
           const start = ws.rowCount + 1;
           adminStaff.forEach(addStaffRow);
           addSummaryRow("관리자 인원", [{ start, end: ws.rowCount }]);
         }
         if (dayStaff.length > 0) {
-          addLabelRow(`☀️ 아침조 / 주간 (${dayStaff.length}명)`);
+          addLabelRow(`${ICON_SUN} 아침조 / 주간 (${dayStaff.length}명)`);
           const ranges = addSubGroups(dayStaff);
           dayChatSummaryRow = addSummaryRow("채팅 인원", ranges.chat ? [ranges.chat] : []);
           dayVoiceSummaryRow = addSummaryRow("유선 인원", ranges.voice ? [ranges.voice] : []);
         }
         if (nightStaff.length > 0) {
-          addLabelRow(`🌙 야간조 (${nightStaff.length}명)`);
+          addLabelRow(`${ICON_MOON} 야간조 (${nightStaff.length}명)`);
           const ranges = addSubGroups(nightStaff);
           nightChatSummaryRow = addSummaryRow("채팅 인원", ranges.chat ? [ranges.chat] : []);
           nightVoiceSummaryRow = addSummaryRow("유선 인원", ranges.voice ? [ranges.voice] : []);
@@ -4749,7 +4851,7 @@
       console.error(err);
       flashScheduleStatus("엑셀 파일을 만들지 못했어요.");
     } finally {
-      if (btn) { btn.disabled = false; btn.textContent = "📊 엑셀로 다운로드"; }
+      if (btn) { btn.disabled = false; btn.innerHTML = ICON_CHART + " 엑셀로 다운로드"; }
     }
   }
 
@@ -4904,6 +5006,8 @@
     const cSalmon = themeColor("--salmon");
     const cTeal = themeColor("--teal");
     const cPurple = themeColor("--purple");
+    const cPink = themeColor("--pink");
+    const cIndigo = themeColor("--indigo");
     const cYellow = themeColor("--yellow");
     const cRed = themeColor("--red");
     const cFaint = themeColor("--text-faint");
@@ -4932,6 +5036,8 @@
         <span class="item"><span class="swatch" style="background:${cSalmon};"></span>반차</span>
         <span class="item"><span class="swatch" style="background:${cTeal};"></span>공휴</span>
         <span class="item"><span class="swatch" style="background:${cPurple};"></span>공가</span>
+        <span class="item"><span class="swatch" style="background:${cPink};"></span>육휴</span>
+        <span class="item"><span class="swatch" style="background:${cIndigo};"></span>특휴</span>
         <span class="item"><span class="swatch" style="background:${cYellow};"></span>지각</span>
         <span class="item"><span class="swatch" style="background:${cRed};"></span>결근</span>
         <span class="item"><span class="swatch" style="background:${cFaint};"></span>퇴사</span>
@@ -4944,7 +5050,7 @@
 
     function cleanup(label) {
       if (wrapper.parentNode) document.body.removeChild(wrapper);
-      if (btn) { btn.disabled = false; btn.textContent = "📸 이미지로 저장 ▾"; }
+      if (btn) { btn.disabled = false; btn.innerHTML = ICON_CAMERA + " 이미지로 저장 ▾"; }
       if (label) flashScheduleStatus(label);
     }
 
@@ -4994,6 +5100,8 @@
       ["HALF", null, "반차"],
       ["GONGHYU", null, "공휴"],
       ["GONGGA", null, "공가"],
+      ["MATERNITY", null, "육휴"],
+      ["SPECIAL", null, "특휴"],
       ["WORK", "LATE", "지각"],
       ["WORK", "ABSENT", "결근"],
       ["RESIGNED", null, "퇴사"],
@@ -5100,7 +5208,7 @@
     menu.className = "sch-menu";
     menu.innerHTML = SCHEDULE_DELETE_SCOPES.map((o, idx) => {
       const divider = idx === 1 ? `<div class="sch-menu-divider"></div>` : "";
-      return `${divider}<button type="button" class="${o.danger ? "sch-menu-danger" : ""}" data-scope="${o.key}">${o.danger ? "🗑 " : ""}${o.label}</button>`;
+      return `${divider}<button type="button" class="${o.danger ? "sch-menu-danger" : ""}" data-scope="${o.key}">${o.danger ? ICON_TRASH + " " : ""}${o.label}</button>`;
     }).join("");
     document.body.appendChild(menu);
     const top = Math.min(rect.bottom + 4, window.innerHeight - menu.offsetHeight - 8);
@@ -5144,7 +5252,7 @@
         </div>
         <div class="sch-preview-actions">
           <button type="button" class="ghost-btn" id="sch-preview-cancel">닫기</button>
-          <button type="button" class="primary-btn" id="sch-preview-download">⬇️ 이미지 다운로드</button>
+          <button type="button" class="primary-btn" id="sch-preview-download">${ICON_DOWNLOAD} 이미지 다운로드</button>
         </div>
       </div>
     `;
@@ -5182,7 +5290,7 @@
     menu.id = "sch-menu";
     menu.className = "sch-menu";
     menu.innerHTML = SCHEDULE_CAPTURE_MODES.map((o) =>
-      `<button type="button" data-capture-mode="${o.key}">📸 ${o.label}</button>`
+      `<button type="button" data-capture-mode="${o.key}">${ICON_CAMERA} ${o.label}</button>`
     ).join("");
     document.body.appendChild(menu);
     const top = Math.min(rect.bottom + 4, window.innerHeight - menu.offsetHeight - 8);
@@ -5217,11 +5325,11 @@
         <div class="schedule-title">월별 상담사 스케줄</div>
         <div class="schedule-month-nav">
           <button class="schedule-month-btn" id="sch-prev-month">‹</button>
-          <div class="schedule-month-label">${scheduleMonthLabel()}${scheduleIsMonthLocked(scheduleUi.year, scheduleUi.monthIndex) ? ' <span class="sch-locked-badge">🔒 확정됨</span>' : ""}</div>
+          <div class="schedule-month-label">${scheduleMonthLabel()}${scheduleIsMonthLocked(scheduleUi.year, scheduleUi.monthIndex) ? ' <span class="sch-locked-badge">${ICON_LOCK} 확정됨</span>' : ""}</div>
           <button class="schedule-month-btn" id="sch-next-month">›</button>
-          <button class="ghost-btn ${scheduleBulkPasteOpen ? "active" : ""}" id="sch-bulk-btn" style="margin-left:8px;">📋 일괄 붙여넣기</button>
-          <button class="ghost-btn" id="sch-capture-btn">📸 이미지로 저장 ▾</button>
-          <button class="ghost-btn" id="sch-excel-btn">📊 엑셀로 다운로드</button>
+          <button class="ghost-btn ${scheduleBulkPasteOpen ? "active" : ""}" id="sch-bulk-btn" style="margin-left:8px;">${ICON_CLIPBOARD} 일괄 붙여넣기</button>
+          <button class="ghost-btn" id="sch-capture-btn">${ICON_CAMERA} 이미지로 저장 ▾</button>
+          <button class="ghost-btn" id="sch-excel-btn">${ICON_CHART} 엑셀로 다운로드</button>
         </div>
       </div>
       <div class="status" id="schedule-status"></div>
@@ -5230,14 +5338,14 @@
         "상담사 관리"에서 재직 상태가 "근무중"인 인원만 이번 달·앞으로의 스케줄에 자동으로 반영되고, "퇴사"로 표시된 인원은 스케줄에서 빠져요.<br>
         각 조 안에서는 채팅 담당, 유선 담당 순으로 정렬돼요.<br>
         "상담사 관리"에서 관리자로 등록된 인원은 표 맨 위에 별도 "관리자" 항목으로 표시되고, 주간·야간 조나 채팅·유선 인원 집계에는 포함되지 않아요. 대신 관리자 인원만 따로 집계돼요.<br>
-        이미 지나간 달(🔒 확정됨)은 그 시점 인원 구성으로 고정되어, 이후 "상담사 관리"에서 인원이 바뀌어도 지난 달 스케줄에는 영향을 주지 않아요. 이번 달과 앞으로의 달은 계속 "상담사 관리"의 최신 인원이 실시간으로 반영돼요.<br>
-        셀을 클릭하면 근무/오프/연차/대휴/반차/공휴/공가/지각/결근/퇴사를 바로 바꿀 수 있어요. 지각은 출근 인원에 포함되고, 결근은 제외돼요.
+        이미 지나간 달(확정됨)은 그 시점 인원 구성으로 고정되어, 이후 "상담사 관리"에서 인원이 바뀌어도 지난 달 스케줄에는 영향을 주지 않아요. 이번 달과 앞으로의 달은 계속 "상담사 관리"의 최신 인원이 실시간으로 반영돼요.<br>
+        셀을 클릭하면 근무/오프/연차/대휴/반차/공휴/공가/육휴/특휴/지각/결근/퇴사를 바로 바꿀 수 있어요. 지각은 출근 인원에 포함되고, 결근은 제외돼요.
       </div>
       ${scheduleBulkPasteOpen ? `
         <div class="schedule-bulk-panel">
           <div class="schedule-bulk-desc">
             한 줄에 <b>이름</b>을 쓰고 이어서 <b>1일부터 말일까지의 값</b>을 공백(탭도 가능)으로 구분해서 붙여넣으세요. 공백이 나올 때마다 다음 날짜로 넘어가요. 인원 여러 명은 줄바꿈으로 구분해서 한 번에 붙여넣을 수 있어요.<br>
-            인식되는 값: <b>1</b>(근무), <b>휴일 / 오프 / 휴무</b>(오프), <b>연차</b>, <b>대휴</b>, <b>반차</b>, <b>공휴</b>, <b>공가</b>, <b>지각</b>, <b>결근</b>, <b>퇴사</b>. 값 개수가 이번 달 일수보다 적으면 앞에서부터만 반영되고, 많으면 초과분은 무시돼요.
+            인식되는 값: <b>1</b>(근무), <b>휴일 / 오프 / 휴무</b>(오프), <b>연차</b>, <b>대휴</b>, <b>반차</b>, <b>공휴</b>, <b>공가</b>, <b>육휴</b>, <b>특휴</b>, <b>지각</b>, <b>결근</b>, <b>퇴사</b>. 값 개수가 이번 달 일수보다 적으면 앞에서부터만 반영되고, 많으면 초과분은 무시돼요.
           </div>
           <textarea class="add-input schedule-bulk-textarea" id="sch-bulk-textarea" placeholder="이기욱	휴일	1	휴일	휴일	1	휴일	1	1	1	휴일	1	1	1	대휴	1	1	1	1	휴일	1	1	1	대휴	1	1	1	휴일	1	1	1"></textarea>
           <div class="schedule-bulk-actions">
@@ -5254,12 +5362,14 @@
         <span class="item"><span class="swatch" style="background:var(--salmon);"></span>반차</span>
         <span class="item"><span class="swatch" style="background:var(--teal);"></span>공휴</span>
         <span class="item"><span class="swatch" style="background:var(--purple);"></span>공가</span>
+        <span class="item"><span class="swatch" style="background:var(--pink);"></span>육휴</span>
+        <span class="item"><span class="swatch" style="background:var(--indigo);"></span>특휴</span>
         <span class="item"><span class="swatch" style="background:var(--yellow);"></span>지각</span>
         <span class="item"><span class="swatch" style="background:var(--red);"></span>결근</span>
         <span class="item"><span class="swatch" style="background:var(--text-faint);"></span>퇴사</span>
       </div>
       <div class="schedule-table-toolbar">
-        <button class="ghost-btn sch-delete-btn-small" id="sch-delete-btn">🗑️ 일정 삭제</button>
+        <button class="ghost-btn sch-delete-btn-small" id="sch-delete-btn">${ICON_TRASH} 일정 삭제</button>
       </div>
       <div id="schedule-table-area"><div class="schedule-table-wrap"><div class="schedule-scale-inner">${buildScheduleTableHtml()}</div></div></div>
       <div class="schedule-log-title">이번 달 지각·결근 기록</div>
@@ -5331,8 +5441,8 @@
     const lateList = working.filter((s) => s.record.attendance === "LATE");
     const absentList = staffToday.filter((s) => s.record.status === "WORK" && s.record.attendance === "ABSENT");
     const offList = staffToday.filter((s) => s.record.status !== "WORK");
-    const dayWorking = working.filter((s) => s.group !== "night");
-    const nightWorking = working.filter((s) => s.group === "night");
+    const dayWorking = sortStaffByType(working.filter((s) => s.group !== "night"));
+    const nightWorking = sortStaffByType(working.filter((s) => s.group === "night"));
 
     function staffRowHtml(s) {
       const flags = [];
@@ -5357,8 +5467,8 @@
       scheduleSectionHtml = `<div class="home-empty">등록된 상담사가 없어요. "상담사 관리"에서 추가해보세요.</div>`;
     } else {
       const parts = [];
-      if (dayWorking.length) parts.push(`<div class="staff-group-label">☀️ 주간 근무 (${dayWorking.length}명)</div><div class="home-staff-list">${dayWorking.map(staffRowHtml).join("")}</div>`);
-      if (nightWorking.length) parts.push(`<div class="staff-group-label">🌙 야간 근무 (${nightWorking.length}명)</div><div class="home-staff-list">${nightWorking.map(staffRowHtml).join("")}</div>`);
+      if (dayWorking.length) parts.push(`<div class="staff-group-label">${ICON_SUN} 주간 근무 (${dayWorking.length}명)</div><div class="home-staff-list">${dayWorking.map(staffRowHtml).join("")}</div>`);
+      if (nightWorking.length) parts.push(`<div class="staff-group-label">${ICON_MOON} 야간 근무 (${nightWorking.length}명)</div><div class="home-staff-list">${nightWorking.map(staffRowHtml).join("")}</div>`);
       if (absentList.length) parts.push(`<div class="staff-group-label">결근</div><div class="home-staff-list">${absentList.map(staffRowHtml).join("")}</div>`);
       if (parts.length === 0) parts.push(`<div class="home-empty">오늘 근무 인원이 없어요.</div>`);
       scheduleSectionHtml = parts.join("");
@@ -5411,14 +5521,22 @@
       return { agent: a, lastDate };
     }).filter((x) => !x.lastDate || x.lastDate < addDaysISO(iso, -NO_INTERVIEW_DAYS))
       .sort((x, y) => (x.lastDate || "").localeCompare(y.lastDate || ""));
+    const INTERVIEW_ALERT_VISIBLE = 5;
+    const interviewAlertHasMore = staleInterviewAgents.length > INTERVIEW_ALERT_VISIBLE;
+    const interviewAlertShown = homeUi.interviewAlertExpanded
+      ? staleInterviewAgents
+      : staleInterviewAgents.slice(0, INTERVIEW_ALERT_VISIBLE);
     const staleInterviewHtml = staleInterviewAgents.length === 0
       ? `<div class="home-empty">최근 ${NO_INTERVIEW_DAYS}일 내 면담 기록이 없는 상담사가 없어요.</div>`
-      : `<div class="home-staff-list">${staleInterviewAgents.slice(0, 8).map((x) => `
+      : `<div class="home-staff-list">${interviewAlertShown.map((x) => `
           <div class="home-staff-row">
             <span class="name">${esc(x.agent.name)}</span>
             <span class="spacer"></span>
             <span class="flag late">${x.lastDate ? `마지막 면담 ${x.lastDate}` : "면담 기록 없음"}</span>
-          </div>`).join("")}</div>`;
+          </div>`).join("")}</div>${interviewAlertHasMore ? `
+          <button class="home-more-btn" id="btn-interview-alert-toggle" type="button">
+            ${homeUi.interviewAlertExpanded ? "접기 ▲" : `전체 ${staleInterviewAgents.length}명 보기 ▾`}
+          </button>` : ""}`;
 
     root.innerHTML = `
       <div class="card home-hero">
@@ -5442,27 +5560,27 @@
       <div class="home-grid has-status-col" style="margin-top:20px;">
         <div class="home-col home-col-status">
           <div class="card">
-            <div class="home-section-title"><h3>👥 오늘 근무 현황</h3><button class="home-section-link" data-nav="schedule">스케줄 보기 ›</button></div>
+            <div class="home-section-title"><h3>${ICON_USERS} 오늘 근무 현황</h3><button class="home-section-link" data-nav="schedule">스케줄 보기 ›</button></div>
             ${scheduleSectionHtml}
           </div>
         </div>
         <div class="home-col">
           <div class="card">
-            <div class="home-section-title"><h3>📅 오늘 일정</h3><button class="home-section-link" data-nav="calendar">캘린더 보기 ›</button></div>
+            <div class="home-section-title"><h3>${ICON_CALENDAR} 오늘 일정</h3><button class="home-section-link" data-nav="calendar">캘린더 보기 ›</button></div>
             ${entriesHtml}
           </div>
           <div class="card">
-            <div class="home-section-title"><h3>⏰ 면담 필요 알림</h3><button class="home-section-link" data-nav="interviews">면담일지 보기 ›</button></div>
+            <div class="home-section-title"><h3>${ICON_BELL} 면담 필요 알림</h3><button class="home-section-link" data-nav="interviews">면담일지 보기 ›</button></div>
             ${staleInterviewHtml}
           </div>
         </div>
         <div class="home-col">
           <div class="card">
-            <div class="home-section-title"><h3>✅ 할 일</h3></div>
+            <div class="home-section-title"><h3>${ICON_CHECK} 할 일</h3></div>
             ${todoHtml}
           </div>
           <div class="card">
-            <div class="home-section-title"><h3>📌 고정 메모</h3><button class="home-section-link" data-nav="notes">업무 정리 보기 ›</button></div>
+            <div class="home-section-title"><h3>${ICON_PIN} 고정 메모</h3><button class="home-section-link" data-nav="notes">업무 정리 보기 ›</button></div>
             ${notesHtml}
           </div>
         </div>
@@ -5475,6 +5593,13 @@
     root.querySelectorAll("[data-note-nav]").forEach((el) => {
       el.onclick = () => setPage(el.getAttribute("data-note-nav"));
     });
+    const interviewAlertToggleBtn = document.getElementById("btn-interview-alert-toggle");
+    if (interviewAlertToggleBtn) {
+      interviewAlertToggleBtn.onclick = () => {
+        homeUi.interviewAlertExpanded = !homeUi.interviewAlertExpanded;
+        renderHomePage(root);
+      };
+    }
   }
 
   function renderNav() {
@@ -5487,35 +5612,40 @@
       </button>
       ${!CURRENT_ACCOUNT_IS_MASTER ? `<div class="nav-label-top">메뉴</div>` : ""}
       <div class="nav-account">
-        <span class="nav-account-name">👤 <span class="nav-text">${esc(CURRENT_ACCOUNT_NAME)}${CURRENT_ACCOUNT_IS_MASTER ? ' <span class="badge sm master">마스터</span>' : ""}</span></span>
-        <button class="nav-logout-btn" id="nav-logout-btn" title="로그아웃">🚪<span class="nav-text"> 로그아웃</span></button>
+        <span class="nav-account-name">${ICON_USER} <span class="nav-text">${esc(CURRENT_ACCOUNT_NAME)}${CURRENT_ACCOUNT_IS_MASTER ? ' <span class="badge sm master">마스터</span>' : ""}</span></span>
+        ${!CURRENT_ACCOUNT_IS_MASTER ? `
+        <div class="nav-session-row nav-text">
+          <span class="global-session-badge" id="global-session-badge" title="자동 로그아웃까지 남은 시간"></span>
+          <button class="nav-session-extend-btn" id="nav-session-extend-btn" type="button" title="로그인 시간을 5시간으로 연장">연장</button>
+        </div>` : ""}
+        <button class="nav-logout-btn" id="nav-logout-btn" title="로그아웃">${ICON_LOGOUT}<span class="nav-text"> 로그아웃</span></button>
       </div>
       <div class="nav-divider"></div>
       ${MASTER_ORIGIN_ACCOUNT ? `
         <div class="nav-master-banner">
-          <span>🛡️ 마스터 계정</span>
+          <span>${ICON_SHIELD} 마스터 계정</span>
           <button class="nav-master-return-btn" id="nav-master-return-btn" type="button">마스터로 복귀</button>
         </div>
       ` : ""}
       ${CURRENT_ACCOUNT_IS_MASTER ? `
         <div class="nav-master-mode">
-          <span class="nav-master-mode-title">🛡️ 관리자 모드</span>
+          <span class="nav-master-mode-title">${ICON_SHIELD} 관리자 모드</span>
           <span class="nav-master-mode-sub">계정 관리 전용</span>
         </div>
       ` : `
-        <button class="nav-btn ${state.page === "home" ? "active" : ""}" data-nav="home" title="홈">🏠 <span class="nav-text">홈</span></button>
-        <button class="nav-btn ${state.page === "calendar" ? "active" : ""}" data-nav="calendar" title="캘린더">📅 <span class="nav-text">캘린더</span></button>
-        <button class="nav-btn ${state.page === "notes" ? "active" : ""}" data-nav="notes" title="업무 정리">📝 <span class="nav-text">업무 정리</span></button>
-        <button class="nav-btn ${state.page === "agents" ? "active" : ""}" data-nav="agents" title="상담사 관리">👥 <span class="nav-text">상담사 관리</span></button>
-        <button class="nav-btn ${state.page === "interviews" ? "active" : ""}" data-nav="interviews" title="면담일지">🗒️ <span class="nav-text">면담일지</span></button>
-        <button class="nav-btn ${state.page === "schedule" ? "active" : ""}" data-nav="schedule" title="월별 스케줄">📊 <span class="nav-text">월별 스케줄</span></button>
+        <button class="nav-btn ${state.page === "home" ? "active" : ""}" data-nav="home" title="홈">${ICON_HOME} <span class="nav-text">홈</span></button>
+        <button class="nav-btn ${state.page === "calendar" ? "active" : ""}" data-nav="calendar" title="캘린더">${ICON_CALENDAR} <span class="nav-text">캘린더</span></button>
+        <button class="nav-btn ${state.page === "notes" ? "active" : ""}" data-nav="notes" title="업무 정리">${ICON_NOTE} <span class="nav-text">업무 정리</span></button>
+        <button class="nav-btn ${state.page === "agents" ? "active" : ""}" data-nav="agents" title="상담사 관리">${ICON_USERS} <span class="nav-text">상담사 관리</span></button>
+        <button class="nav-btn ${state.page === "interviews" ? "active" : ""}" data-nav="interviews" title="면담일지">${ICON_CLIPBOARD} <span class="nav-text">면담일지</span></button>
+        <button class="nav-btn ${state.page === "schedule" ? "active" : ""}" data-nav="schedule" title="월별 스케줄">${ICON_CHART} <span class="nav-text">월별 스케줄</span></button>
       `}
       <div class="nav-spacer"></div>
       <div class="theme-toggle-wrap">
         <button class="theme-picker-btn" id="nav-theme-toggle" type="button" aria-haspopup="true" aria-expanded="false" aria-label="화면 테마 선택" title="화면 테마 선택">
           <span class="theme-picker-dot" style="background:${themeMeta(getCurrentTheme()).bg};"></span>
           <span class="theme-picker-label">${themeMeta(getCurrentTheme()).label}</span>
-          <svg class="theme-picker-chevron" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M1 3.5l4 4 4-4" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <svg class="theme-picker-chevron" width="8" height="8" viewBox="0 0 10 10" aria-hidden="true"><path d="M1 3.5l4 4 4-4" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>
       </div>
     `;
@@ -5538,6 +5668,13 @@
     if (logoutBtn) {
       logoutBtn.onclick = () => {
         if (window.confirm("로그아웃할까요?")) logout();
+      };
+    }
+    const extendBtn = document.getElementById("nav-session-extend-btn");
+    if (extendBtn) {
+      extendBtn.onclick = () => {
+        setLoginAt(Date.now());
+        updateSessionRemainingDisplay();
       };
     }
     const masterReturnBtn = document.getElementById("nav-master-return-btn");
