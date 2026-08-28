@@ -2372,11 +2372,10 @@
 
   const state = {
     // 마스터 계정은 다른 페이지를 볼 필요가 없으므로 항상 "계정 관리" 페이지만 보여준다.
-    page: CURRENT_ACCOUNT_IS_MASTER
-      ? "master"
-      : (function () {
-          try { return localStorage.getItem(acctKey("personal-app:page")) || "home"; } catch (e) { return "home"; }
-        })(),
+    // 마스터가 아닌 계정은 (로그인 직후든, 세션이 유지된 채 브라우저를 껐다 켰든)
+    // 앱을 새로 열 때마다 항상 "홈" 화면을 메인으로 보여준다. 이전에 보던
+    // 페이지를 기억해서 복원하지 않는다.
+    page: CURRENT_ACCOUNT_IS_MASTER ? "master" : "home",
   };
 
   function setPage(p) {
@@ -2387,8 +2386,9 @@
       scheduleUi.year = today.getFullYear();
       scheduleUi.monthIndex = today.getMonth();
     }
+    // 이제 마지막으로 보던 페이지를 저장/복원하지 않으므로(항상 홈에서 시작),
+    // localStorage에 따로 기록하지 않는다.
     state.page = p;
-    try { localStorage.setItem(acctKey("personal-app:page"), p); } catch (e) {}
     renderApp();
   }
 
