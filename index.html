@@ -20,8 +20,8 @@
     --accent: #ec6fae;
     --accent-dim: #ec6fae2e;
     --accent-text: #2a1420;
-    --green: #5fbf86;
-    --green-dim: #5fbf862e;
+    --green: #47a7c2;
+    --green-dim: #47a7c22e;
     --red: #e2685f;
     --red-dim: #e2685f2e;
     --blue: #5b9bd9;
@@ -38,8 +38,10 @@
     --purple-dim: #9576d92e;
     --pink: #d9769c;
     --pink-dim: #d9769c2e;
-    --indigo: #6f8fd9;
-    --indigo-dim: #6f8fd92e;
+    --indigo: #c977da;
+    --indigo-dim: #c977da2e;
+    --edu: #5fbf86;
+    --edu-dim: #5fbf862e;
     --weekend-tint: #1c1d20;
     --native-color-scheme: dark;
   }
@@ -135,8 +137,8 @@
   /* ---- light / gray / pastel-* 6개 테마는 상태색(오프·연차·대휴 등)이 모두 같다 ---- */
   html[data-theme="light"], html[data-theme="gray"], html[data-theme="pastel-blue"],
   html[data-theme="pastel-green"], html[data-theme="pastel-peach"], html[data-theme="pastel-lavender"] {
-    --green: #2f9e63;
-    --green-dim: #2f9e6326;
+    --green: #2c7f96;
+    --green-dim: #2c7f9626;
     --red: #c94f4f;
     --red-dim: #c94f4f26;
     --blue: #3778b0;
@@ -153,8 +155,10 @@
     --purple-dim: #7454b526;
     --pink: #b5548f;
     --pink-dim: #b5548f26;
-    --indigo: #4f6bb5;
-    --indigo-dim: #4f6bb526;
+    --indigo: #a554b6;
+    --indigo-dim: #a554b626;
+    --edu: #2f9e63;
+    --edu-dim: #2f9e6326;
   }
   * { box-sizing: border-box; }
   html, body {
@@ -1404,6 +1408,7 @@
   .sch-cell.st-gongga { background: var(--purple-dim); color: var(--purple); }
   .sch-cell.st-maternity { background: var(--pink-dim); color: var(--pink); }
   .sch-cell.st-special { background: var(--indigo-dim); color: var(--indigo); }
+  .sch-cell.st-education { background: var(--edu-dim); color: var(--edu); }
   .sch-cell.st-late { background: var(--yellow-dim); color: var(--yellow); font-weight: 600; }
   .sch-cell.st-absent { background: var(--red-dim); color: var(--red); font-weight: 600; }
   .sch-cell.st-resigned { background: var(--hairline); color: var(--text-faint); }
@@ -3119,7 +3124,7 @@
     mode: "view", // "view" | "add" | "edit"
     editingId: null,
     searchQuery: "",
-    filterType: "all", // "all" | "voice" | "chat" | "day" | "night"
+    filterTypes: new Set(), // 비어있으면 "전체". "voice"|"chat"|"day"|"night"|"working"|"resigned" 중복 선택(AND 조합) 가능
     sortBy: "shift", // "shift" | "custom" | "name" | "type" | "chat" | "night" | "created"
     interviewMode: "list", // "list" | "add" | "edit" — 상담사 상세의 면담 이력 섹션용
     interviewEditingId: null,
@@ -3206,13 +3211,21 @@
     if (!needle) return true;
     return (a.name || "").toLowerCase().indexOf(needle) !== -1 || (a.ldap || "").toLowerCase().indexOf(needle) !== -1;
   }
-  function agentMatchesFilter(a, filterType) {
+  function agentMatchesFilterType(a, filterType) {
     if (filterType === "voice") return (a.workTypes || []).indexOf("유선") !== -1;
     if (filterType === "chat") return (a.workTypes || []).indexOf("채팅") !== -1;
     if (filterType === "day") return a.group !== "night";
     if (filterType === "night") return a.group === "night";
     if (filterType === "working") return a.status !== "RESIGNED";
     if (filterType === "resigned") return a.status === "RESIGNED";
+    return true;
+  }
+  // filterTypes: Set(문자열). 비어있으면 전체 통과. 여러 개면 모두 만족(AND)해야 통과 — 버튼 중복 선택 지원.
+  function agentMatchesFilter(a, filterTypes) {
+    if (!filterTypes || filterTypes.size === 0) return true;
+    for (const ft of filterTypes) {
+      if (!agentMatchesFilterType(a, ft)) return false;
+    }
     return true;
   }
   function agentTypeRank(a) {
@@ -3454,7 +3467,7 @@
     const listArea = document.getElementById("agent-list-area");
     if (!listArea) return;
 
-    const filtered = agentsData.filter((a) => agentMatchesSearch(a, agentsUi.searchQuery) && agentMatchesFilter(a, agentsUi.filterType));
+    const filtered = agentsData.filter((a) => agentMatchesSearch(a, agentsUi.searchQuery) && agentMatchesFilter(a, agentsUi.filterTypes));
     const pinnedAgents = sortAgentList(filtered.filter((a) => a.pinned), agentsUi.sortBy);
     const listAgents = sortAgentList(filtered.filter((a) => !a.pinned), agentsUi.sortBy);
     const draggable = agentsUi.sortBy === "custom";
@@ -3492,7 +3505,7 @@
   function renderAgentsPage(root) {
     const selected = agentsData.find((a) => a.id === agentsUi.selectedId) || null;
 
-    const filtered = agentsData.filter((a) => agentMatchesSearch(a, agentsUi.searchQuery) && agentMatchesFilter(a, agentsUi.filterType));
+    const filtered = agentsData.filter((a) => agentMatchesSearch(a, agentsUi.searchQuery) && agentMatchesFilter(a, agentsUi.filterTypes));
     const pinnedAgents = sortAgentList(filtered.filter((a) => a.pinned), agentsUi.sortBy);
     const listAgents = sortAgentList(filtered.filter((a) => !a.pinned), agentsUi.sortBy);
     const draggable = agentsUi.sortBy === "custom";
@@ -3514,13 +3527,13 @@
       <div class="agent-controls">
         <input type="text" class="add-input agent-search-input" id="agent-search-input" placeholder="이름 또는 LDAP 검색" value="${esc(agentsUi.searchQuery)}" autocomplete="off">
         <div class="agent-filter-row">
-          <button type="button" class="agent-filter-btn ${agentsUi.filterType === "all" ? "active" : ""}" data-filter="all">전체</button>
-          <button type="button" class="agent-filter-btn ${agentsUi.filterType === "voice" ? "active" : ""}" data-filter="voice">유선만</button>
-          <button type="button" class="agent-filter-btn ${agentsUi.filterType === "chat" ? "active" : ""}" data-filter="chat">채팅만</button>
-          <button type="button" class="agent-filter-btn ${agentsUi.filterType === "day" ? "active" : ""}" data-filter="day">주간만</button>
-          <button type="button" class="agent-filter-btn ${agentsUi.filterType === "night" ? "active" : ""}" data-filter="night">야간만</button>
-          <button type="button" class="agent-filter-btn ${agentsUi.filterType === "working" ? "active" : ""}" data-filter="working">재직만</button>
-          <button type="button" class="agent-filter-btn ${agentsUi.filterType === "resigned" ? "active" : ""}" data-filter="resigned">퇴사만</button>
+          <button type="button" class="agent-filter-btn ${agentsUi.filterTypes.size === 0 ? "active" : ""}" data-filter="all">전체</button>
+          <button type="button" class="agent-filter-btn ${agentsUi.filterTypes.has("voice") ? "active" : ""}" data-filter="voice">유선만</button>
+          <button type="button" class="agent-filter-btn ${agentsUi.filterTypes.has("chat") ? "active" : ""}" data-filter="chat">채팅만</button>
+          <button type="button" class="agent-filter-btn ${agentsUi.filterTypes.has("day") ? "active" : ""}" data-filter="day">주간만</button>
+          <button type="button" class="agent-filter-btn ${agentsUi.filterTypes.has("night") ? "active" : ""}" data-filter="night">야간만</button>
+          <button type="button" class="agent-filter-btn ${agentsUi.filterTypes.has("working") ? "active" : ""}" data-filter="working">재직만</button>
+          <button type="button" class="agent-filter-btn ${agentsUi.filterTypes.has("resigned") ? "active" : ""}" data-filter="resigned">퇴사만</button>
           <select class="agent-sort-select" id="agent-sort-select">
             <option value="shift" ${agentsUi.sortBy === "shift" ? "selected" : ""}>기본순(주간→야간·업무·시간순)</option>
             <option value="custom" ${agentsUi.sortBy === "custom" ? "selected" : ""}>사용자 지정(드래그)</option>
@@ -3626,7 +3639,14 @@
     }
     root.querySelectorAll("[data-filter]").forEach((btn) => {
       btn.onclick = () => {
-        agentsUi.filterType = btn.getAttribute("data-filter");
+        const key = btn.getAttribute("data-filter");
+        if (key === "all") {
+          agentsUi.filterTypes.clear();
+        } else if (agentsUi.filterTypes.has(key)) {
+          agentsUi.filterTypes.delete(key);
+        } else {
+          agentsUi.filterTypes.add(key);
+        }
         renderApp();
       };
     });
@@ -4212,6 +4232,7 @@
     if (tok === "공가") return { status: "GONGGA", attendance: null };
     if (tok === "육휴" || tok === "육아휴직") return { status: "MATERNITY", attendance: null };
     if (tok === "특휴" || tok === "특별휴가") return { status: "SPECIAL", attendance: null };
+    if (tok === "교육") return { status: "EDUCATION", attendance: null };
     if (tok === "지각") return { status: "WORK", attendance: "LATE" };
     if (tok === "결근") return { status: "WORK", attendance: "ABSENT" };
     if (tok === "퇴사") return { status: "RESIGNED", attendance: null };
@@ -4276,6 +4297,7 @@
     GONGGA: { label: "공가", cls: "st-gongga" },
     MATERNITY: { label: "육휴", cls: "st-maternity" },
     SPECIAL: { label: "특휴", cls: "st-special" },
+    EDUCATION: { label: "교육", cls: "st-education" },
     RESIGNED: { label: "퇴사", cls: "st-resigned" },
   };
 
@@ -4628,12 +4650,13 @@
       const STATUS_BASE = {
         "오프": "3778B0",
         "연차": "B9791E",
-        "대휴": "2F9E63",
+        "대휴": "2C7F96",
         "반차": "C2603F",
         "공휴": "227D75",
         "공가": "7454B5",
         "육휴": "B5548F",
-        "특휴": "4F6BB5",
+        "특휴": "A554B6",
+        "교육": "2F9E63",
         "지각": "8A6A1F",
         "결근": "C94F4F",
       };
@@ -5008,6 +5031,7 @@
     const cPurple = themeColor("--purple");
     const cPink = themeColor("--pink");
     const cIndigo = themeColor("--indigo");
+    const cEdu = themeColor("--edu");
     const cYellow = themeColor("--yellow");
     const cRed = themeColor("--red");
     const cFaint = themeColor("--text-faint");
@@ -5038,6 +5062,7 @@
         <span class="item"><span class="swatch" style="background:${cPurple};"></span>공가</span>
         <span class="item"><span class="swatch" style="background:${cPink};"></span>육휴</span>
         <span class="item"><span class="swatch" style="background:${cIndigo};"></span>특휴</span>
+        <span class="item"><span class="swatch" style="background:${cEdu};"></span>교육</span>
         <span class="item"><span class="swatch" style="background:${cYellow};"></span>지각</span>
         <span class="item"><span class="swatch" style="background:${cRed};"></span>결근</span>
         <span class="item"><span class="swatch" style="background:${cFaint};"></span>퇴사</span>
@@ -5102,6 +5127,7 @@
       ["GONGGA", null, "공가"],
       ["MATERNITY", null, "육휴"],
       ["SPECIAL", null, "특휴"],
+      ["EDUCATION", null, "교육"],
       ["WORK", "LATE", "지각"],
       ["WORK", "ABSENT", "결근"],
       ["RESIGNED", null, "퇴사"],
@@ -5339,13 +5365,13 @@
         각 조 안에서는 채팅 담당, 유선 담당 순으로 정렬돼요.<br>
         "상담사 관리"에서 관리자로 등록된 인원은 표 맨 위에 별도 "관리자" 항목으로 표시되고, 주간·야간 조나 채팅·유선 인원 집계에는 포함되지 않아요. 대신 관리자 인원만 따로 집계돼요.<br>
         이미 지나간 달(확정됨)은 그 시점 인원 구성으로 고정되어, 이후 "상담사 관리"에서 인원이 바뀌어도 지난 달 스케줄에는 영향을 주지 않아요. 이번 달과 앞으로의 달은 계속 "상담사 관리"의 최신 인원이 실시간으로 반영돼요.<br>
-        셀을 클릭하면 근무/오프/연차/대휴/반차/공휴/공가/육휴/특휴/지각/결근/퇴사를 바로 바꿀 수 있어요. 지각은 출근 인원에 포함되고, 결근은 제외돼요.
+        셀을 클릭하면 근무/오프/연차/대휴/반차/공휴/공가/육휴/특휴/교육/지각/결근/퇴사를 바로 바꿀 수 있어요. 지각은 출근 인원에 포함되고, 결근은 제외돼요.
       </div>
       ${scheduleBulkPasteOpen ? `
         <div class="schedule-bulk-panel">
           <div class="schedule-bulk-desc">
             한 줄에 <b>이름</b>을 쓰고 이어서 <b>1일부터 말일까지의 값</b>을 공백(탭도 가능)으로 구분해서 붙여넣으세요. 공백이 나올 때마다 다음 날짜로 넘어가요. 인원 여러 명은 줄바꿈으로 구분해서 한 번에 붙여넣을 수 있어요.<br>
-            인식되는 값: <b>1</b>(근무), <b>휴일 / 오프 / 휴무</b>(오프), <b>연차</b>, <b>대휴</b>, <b>반차</b>, <b>공휴</b>, <b>공가</b>, <b>육휴</b>, <b>특휴</b>, <b>지각</b>, <b>결근</b>, <b>퇴사</b>. 값 개수가 이번 달 일수보다 적으면 앞에서부터만 반영되고, 많으면 초과분은 무시돼요.
+            인식되는 값: <b>1</b>(근무), <b>휴일 / 오프 / 휴무</b>(오프), <b>연차</b>, <b>대휴</b>, <b>반차</b>, <b>공휴</b>, <b>공가</b>, <b>육휴</b>, <b>특휴</b>, <b>교육</b>, <b>지각</b>, <b>결근</b>, <b>퇴사</b>. 값 개수가 이번 달 일수보다 적으면 앞에서부터만 반영되고, 많으면 초과분은 무시돼요.
           </div>
           <textarea class="add-input schedule-bulk-textarea" id="sch-bulk-textarea" placeholder="이기욱	휴일	1	휴일	휴일	1	휴일	1	1	1	휴일	1	1	1	대휴	1	1	1	1	휴일	1	1	1	대휴	1	1	1	휴일	1	1	1"></textarea>
           <div class="schedule-bulk-actions">
@@ -5364,6 +5390,7 @@
         <span class="item"><span class="swatch" style="background:var(--purple);"></span>공가</span>
         <span class="item"><span class="swatch" style="background:var(--pink);"></span>육휴</span>
         <span class="item"><span class="swatch" style="background:var(--indigo);"></span>특휴</span>
+        <span class="item"><span class="swatch" style="background:var(--edu);"></span>교육</span>
         <span class="item"><span class="swatch" style="background:var(--yellow);"></span>지각</span>
         <span class="item"><span class="swatch" style="background:var(--red);"></span>결근</span>
         <span class="item"><span class="swatch" style="background:var(--text-faint);"></span>퇴사</span>
