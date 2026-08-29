@@ -2442,119 +2442,6 @@
     };
   }
 
-  /* ---- 필드 단위 실시간 자동 병합 ----
-     같은 JSON 덩어리 안에서도 서로 다른 항목(예: 다른 상담사, 다른 날짜 칸)을 고쳤다면
-     굳이 "덩어리 전체 충돌"로 취급하지 않고 자동으로 합쳐서 화면에 바로 반영한다.
-     _syncedSnapshot: 이 브라우저가 서버와 마지막으로 "합의된 상태"라고 알고 있는 값(3-way
-       병합의 기준점 = base). 하이드레이트 성공 / 내 저장 성공 / 원격 변경 병합 직후마다 갱신한다.
-     정말로 똑같은 항목을 두 사람이 동시에 고친 경우(진짜 충돌)만 예외적으로 "지금 화면에 있는
-     값"을 우선한다 — 어차피 그 사람이 다시 저장을 시도하면 자연스럽게 서버에 반영되기 때문. */
-  const _syncedSnapshot = {};
-  function _trySnapshotParse(raw) {
-    if (raw == null) return null;
-    try { return JSON.parse(raw); } catch (e) { return undefined; } // undefined = JSON이 아닌 값(병합 대상 아님)
-  }
-  function _deepEqual(a, b) {
-    if (a === b) return true;
-    if (a === null || b === null || typeof a !== "object" || typeof b !== "object") return false;
-    if (Array.isArray(a) !== Array.isArray(b)) return false;
-    if (Array.isArray(a)) {
-      if (a.length !== b.length) return false;
-      for (let i = 0; i < a.length; i++) { if (!_deepEqual(a[i], b[i])) return false; }
-      return true;
-    }
-    const ka = Object.keys(a), kb = Object.keys(b);
-    if (ka.length !== kb.length) return false;
-    for (const k of ka) { if (!Object.prototype.hasOwnProperty.call(b, k) || !_deepEqual(a[k], b[k])) return false; }
-    return true;
-  }
-  function _isPlainObj(v) { return v !== null && typeof v === "object" && !Array.isArray(v); }
-  // 배열은 항목마다 id가 있을 때만 안전하게 병합한다 (id 기준으로 추가/삭제/수정을 각각 판단).
-  // id가 없는 배열이면 잘못 합칠 위험이 있으니 안전하게 로컬(지금 화면) 값을 그대로 둔다.
-  function _mergeArraysById(base, remote, local) {
-    const idOk = (arr) => Array.isArray(arr) && arr.every((x) => x && typeof x === "object" && "id" in x);
-    if (!idOk(base) || !idOk(remote) || !idOk(local)) return local;
-    const baseMap = new Map(base.map((x) => [x.id, x]));
-    const remoteMap = new Map(remote.map((x) => [x.id, x]));
-    const localMap = new Map(local.map((x) => [x.id, x]));
-    const order = [];
-    const seen = new Set();
-    local.forEach((x) => { if (!seen.has(x.id)) { seen.add(x.id); order.push(x.id); } });
-    remote.forEach((x) => { if (!seen.has(x.id)) { seen.add(x.id); order.push(x.id); } });
-    const out = [];
-    order.forEach((id) => {
-      const inBase = baseMap.has(id), inRemote = remoteMap.has(id), inLocal = localMap.has(id);
-      const b = baseMap.get(id), r = remoteMap.get(id), l = localMap.get(id);
-      if (!inRemote && !inLocal) return; // 양쪽 다 없음
-      if (!inBase) {
-        // base에 없던 새 항목: 한쪽 또는 양쪽에서 새로 추가한 것이므로 항상 포함한다.
-        if (inRemote && inLocal) { out.push(_deepEqual(r, l) ? r : _merge3(undefined, r, l)); return; }
-        out.push(inRemote ? r : l);
-        return;
-      }
-      if (!inRemote) { // base에 있었는데 원격에서 삭제됨
-        if (_deepEqual(l, b)) return; // 로컬이 손대지 않았으면 삭제를 존중
-        out.push(l); // 로컬이 그 사이 수정했다면 되살림
-        return;
-      }
-      if (!inLocal) { // base에 있었는데 이 화면(로컬)에서 삭제됨
-        if (_deepEqual(r, b)) return; // 원격이 손대지 않았으면 이 화면의 삭제를 존중
-        return; // 원격이 그 사이 수정했더라도, 이 화면에서 명시적으로 지운 걸 우선한다
-      }
-      out.push(_merge3(b, r, l)); // 셋 다 존재 -> 필드 단위로 계속 병합
-    });
-    return out;
-  }
-  function _merge3(base, remote, local) {
-    if (_deepEqual(remote, local)) return remote;
-    if (base !== undefined && _deepEqual(remote, base)) return local; // 원격은 안 바뀜 → 로컬 변경 유지
-    if (base !== undefined && _deepEqual(local, base)) return remote; // 로컬은 안 바뀜 → 원격 변경 반영
-    if (Array.isArray(remote) && Array.isArray(local)) {
-      return _mergeArraysById(Array.isArray(base) ? base : [], remote, local);
-    }
-    if (_isPlainObj(remote) && _isPlainObj(local)) {
-      const b = _isPlainObj(base) ? base : {};
-      const keys = new Set([...Object.keys(b), ...Object.keys(remote), ...Object.keys(local)]);
-      const out = {};
-      keys.forEach((k) => { out[k] = _merge3(b[k], remote[k], local[k]); });
-      return out;
-    }
-    // 정말로 같은 항목을 동시에 다르게 고친 경우: 지금 화면에 보이는 값을 우선한다.
-    return local;
-  }
-  // 각 데이터 영역(스케줄/QA/메모 등)이 자기 자신을 등록해서, 원격 변경이 들어왔을 때
-  // 병합된 결과를 자신의 화면 상태 변수에 반영하는 방법을 알려준다.
-  const _liveMergeTargets = [];
-  function registerLiveMergeTarget(test, apply, pages) {
-    _liveMergeTargets.push({ test, apply, pages: pages || [] });
-  }
-  // 병합된 내용을 상태 변수에 반영한 뒤, 지금 화면을 다시 그려도 안전한지 확인한다.
-  // 입력 중(포커스가 입력창)이거나, 스케줄 표를 드래그로 선택 중이거나, 모달이 떠 있으면
-  // 미뤘다가 안전해지는 시점(포커스 벗어남 / 주기적 재확인)에 반영한다.
-  const _pendingLiveRefresh = new Set();
-  function _liveRefreshSafeNow() {
-    const ae = document.activeElement;
-    const tag = ae && ae.tagName;
-    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || (ae && ae.isContentEditable)) return false;
-    if (typeof scheduleSelectDragging !== "undefined" && scheduleSelectDragging) return false;
-    if (document.querySelector(".manual-modal-overlay, .sch-preview-overlay")) return false;
-    return true;
-  }
-  function _flushLiveRefreshIfSafe() {
-    if (!_pendingLiveRefresh.size || !_liveRefreshSafeNow()) return;
-    _pendingLiveRefresh.clear();
-    renderApp();
-  }
-  function _scheduleLiveRefresh(pages) {
-    (pages || []).forEach((p) => _pendingLiveRefresh.add(p));
-    if (_liveRefreshSafeNow()) { _pendingLiveRefresh.clear(); renderApp(); }
-  }
-  setInterval(_flushLiveRefreshIfSafe, 2000);
-  document.addEventListener("focusout", () => { setTimeout(_flushLiveRefreshIfSafe, 0); }, true);
-  // 계정 목록은 화면마다 매번 새로 불러오는 구조라 따로 반영할 상태 변수가 없다.
-  // (병합된 결과는 이미 localStorage에 반영되고, 다음에 목록을 불러올 때 자동으로 쓰인다.)
-  registerLiveMergeTarget((key) => key.indexOf(ACCOUNTS_KEY) !== -1, () => {}, ["master"]);
-
   async function _doCloudPush(key, value, force) {
     try {
       const newTs = new Date().toISOString();
@@ -2585,7 +2472,6 @@
       _renderConflictBanner();
       _knownServerUpdatedAt[key] = newTs;
       _ourWriteTimestamps[key] = newTs;
-      _syncedSnapshot[key] = _trySnapshotParse(value); // 이 값이 이제 서버와 합의된 새 기준점(base)
       notifyCloudSyncSettle(true);
     } catch (e) {
       /* 네트워크 문제로 실패해도 로컬 저장은 이미 되어 있어 화면은 그대로 동작 */
@@ -2608,7 +2494,6 @@
     try {
       await cloud.from("kv_store").delete().eq("key", key);
       delete _knownServerUpdatedAt[key];
-      delete _syncedSnapshot[key];
       _conflictedKeys.delete(key);
       _renderConflictBanner();
       notifyCloudSyncSettle(true);
@@ -2636,7 +2521,6 @@
       data.forEach((row) => {
         try { _origSetItem(row.key, row.value); } catch (e) {}
         _knownServerUpdatedAt[row.key] = row.updated_at;
-        _syncedSnapshot[row.key] = _trySnapshotParse(row.value);
       });
     } catch (e) { /* 오프라인 등으로 실패하면 이전에 이 브라우저에 남아있던 값으로 동작 */ }
   }
@@ -2652,10 +2536,10 @@
   };
   await cloudHydrate();
 
-  /* ---- 실시간 구독: 다른 사람(또는 다른 탭)이 저장하면 새로고침 없이도 바로 반영한다.
-     이 화면에서 손대지 않은 항목이면 즉시 자동으로 병합해서 실시간으로 보여주고,
-     정말로 똑같은 항목을 동시에 고친 경우에만 예외적으로 배너로 알린다. 내가 방금 보낸
-     저장이 그대로 돌아온 경우(에코)는 처리하지 않는다. */
+  /* ---- 실시간 구독: 다른 사람(또는 다른 탭)이 저장하면 새로고침 없이도 바로 알려준다.
+     화면을 그 자리에서 억지로 다시 그리면 지금 입력 중이던 내용이 튈 수 있어서,
+     "바뀌었어요 + 새로고침" 배너로 알리는 정도로만 개입한다. 내가 방금 보낸 저장이
+     그대로 돌아온 경우(에코)는 알림에서 제외한다. */
   if (cloud) {
     cloud
       .channel("kv_store_live")
@@ -2667,39 +2551,13 @@
           if (!row || !row.key || !isCloudSynced(row.key)) return;
           if (payload.eventType === "DELETE") {
             delete _knownServerUpdatedAt[row.key];
-            delete _syncedSnapshot[row.key];
             return;
           }
           if (_ourWriteTimestamps[row.key] === row.updated_at) return; // 내가 방금 쓴 것의 에코
           _knownServerUpdatedAt[row.key] = row.updated_at;
-          if (localStorage.getItem(row.key) === row.value) { // 이미 같은 내용이면 기준점만 갱신
-            _syncedSnapshot[row.key] = _trySnapshotParse(row.value);
-            return;
-          }
-          const target = _liveMergeTargets.find((t) => t.test(row.key));
-          if (!target) {
-            // 이 키는 병합 로직이 없음 (예: 계정 목록) → 기존처럼 배너로 알림
-            _remoteChangedKeys.add(row.key);
-            _renderRemoteUpdateBanner();
-            return;
-          }
-          try {
-            const base = _syncedSnapshot[row.key];
-            const remoteVal = JSON.parse(row.value);
-            const localRaw = localStorage.getItem(row.key);
-            const localVal = localRaw != null ? JSON.parse(localRaw) : remoteVal;
-            const merged = base === undefined ? remoteVal : _merge3(base, remoteVal, localVal);
-            const mergedStr = JSON.stringify(merged);
-            _syncedSnapshot[row.key] = merged;
-            if (mergedStr === localRaw) return; // 병합해도 지금 화면과 내용이 같음
-            _origSetItem(row.key, mergedStr); // 클라우드로 다시 쏘지 않고 로컬에만 반영
-            target.apply(merged, row.key);
-            _scheduleLiveRefresh(target.pages);
-          } catch (e) {
-            // 병합 중 문제가 생기면 안전하게 기존 배너 방식으로 대체한다
-            _remoteChangedKeys.add(row.key);
-            _renderRemoteUpdateBanner();
-          }
+          if (localStorage.getItem(row.key) === row.value) return; // 이미 같은 내용이면 알릴 필요 없음
+          _remoteChangedKeys.add(row.key);
+          _renderRemoteUpdateBanner();
         }
       )
       .subscribe();
@@ -4079,11 +3937,6 @@
   }
 
   loadMonth(cal.year, cal.monthIndex);
-  registerLiveMergeTarget(
-    (key) => key.indexOf("personal-calendar:") !== -1 && key.indexOf("personal-calendar:todos") === -1,
-    (merged, key) => { if (key === monthKey(cal.year, cal.monthIndex)) cal.monthData = (merged && typeof merged === "object") ? merged : {}; },
-    ["calendar", "home"]
-  );
 
   /* ===================== 할 일(To-do) 모듈 ===================== */
   const TODO_KEY = acctKey("personal-calendar:todos");
@@ -4097,11 +3950,6 @@
     } catch (e) { return []; }
   }
   let todos = loadTodos();
-  registerLiveMergeTarget(
-    (key) => key.indexOf("personal-calendar:todos") !== -1,
-    (merged) => { todos = Array.isArray(merged) ? merged : []; },
-    ["home", "calendar"]
-  );
 
   let todoStatusTimer = null;
   function flashTodoStatus(msg) {
@@ -4240,11 +4088,6 @@
     } catch (e) { return defaultNotesData(); }
   }
   const notesData = loadNotesData();
-  registerLiveMergeTarget(
-    (key) => key.indexOf("personal-notes:data") !== -1,
-    (merged) => { undoRestoreObjectInPlace(notesData, merged); },
-    ["notes"]
-  );
 
   let notesStatusTimer = null;
   function flashNotesStatus(msg) {
@@ -4627,11 +4470,6 @@
     } catch (e) { return []; }
   }
   let agentsData = loadAgentsData();
-  registerLiveMergeTarget(
-    (key) => key.indexOf("personal-agents:data") !== -1,
-    (merged) => { agentsData = Array.isArray(merged) ? merged : []; },
-    ["agents", "schedule", "qa", "home"]
-  );
 
   const agentsUi = {
     selectedId: null,
@@ -5273,14 +5111,6 @@
   let qaData = loadQAData();
   // 월별 스케줄과 동일한 방식의 "월별 잠금". 잠긴 달은 점수 입력이 막힌다.
   if (!qaData.monthLocks || typeof qaData.monthLocks !== "object") qaData.monthLocks = {};
-  registerLiveMergeTarget(
-    (key) => key.indexOf("personal-qa:data") !== -1,
-    (merged) => {
-      qaData = (merged && typeof merged === "object" && merged.scores) ? merged : { scores: {} };
-      if (!qaData.monthLocks || typeof qaData.monthLocks !== "object") qaData.monthLocks = {};
-    },
-    ["qa"]
-  );
 
   let qaStatusTimer = null;
   function flashQAStatus(msg) {
@@ -5824,11 +5654,6 @@
     } catch (e) { return []; }
   }
   let interviewsData = loadInterviewsData();
-  registerLiveMergeTarget(
-    (key) => key.indexOf("personal-interviews:data") !== -1,
-    (merged) => { interviewsData = Array.isArray(merged) ? merged : []; },
-    ["interviews", "agents"]
-  );
 
   let interviewStatusTimer = null;
   function flashInterviewStatus(msg, elId) {
@@ -6377,11 +6202,6 @@
   // 되돌리기(undo)로 스냅샷을 복원한 뒤 이 함수를 호출해 scheduleData를 다시 읽어들인다.
   function reloadScheduleData() { scheduleData = normalizeScheduleData(loadScheduleData()); }
   let scheduleData = normalizeScheduleData(loadScheduleData());
-  registerLiveMergeTarget(
-    (key) => key.indexOf("personal-schedule:data") !== -1,
-    (merged) => { scheduleData = normalizeScheduleData(merged && typeof merged === "object" ? merged : {}); },
-    ["schedule"]
-  );
 
   // "YYYY-MM" 형태의 달 키. 과거 달을 고정(확정)하고 식별하는 데 쓴다.
   function scheduleMonthKey(year, monthIndex) { return `${year}-${pad2(monthIndex + 1)}`; }
