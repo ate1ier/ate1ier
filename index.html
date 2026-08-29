@@ -1948,9 +1948,19 @@
     background: var(--panel); border: 1px solid var(--hairline); border-radius: 14px;
     padding: 12px 10px; text-align: center;
   }
-  .qa-stat-item .qa-stat-num { font-size: 20px; letter-spacing: -0.01em; color: var(--text); }
-  .qa-stat-item .qa-stat-num.empty { color: var(--text-faint); font-size: 15px; }
+  .qa-stat-item .qa-stat-num { font-size: 20px; line-height: 24px; letter-spacing: -0.01em; color: var(--text); }
+  .qa-stat-item .qa-stat-num.empty {
+    color: var(--text-faint); font-size: 15px; line-height: 24px;
+    /* 전역 .empty 규칙(패딩/배경/테두리/여백/기울임체)이 여기로 새어 들어와
+       "데이터 없음" 칸만 알약 모양으로 부풀어 오르며 카드 세로 정렬이 어긋나던 문제를 바로잡는다.
+       + 글자 크기가 작아 줄 높이가 달라지는 것도 line-height를 숫자 칸과 동일하게 고정해서 맞춘다. */
+    font-style: normal; padding: 0; margin-bottom: 0; background: none; border: none; border-radius: 0;
+  }
   .qa-stat-item .qa-stat-label { font-size: 11.5px; color: var(--text-faint); margin-top: 4px; }
+  .qa-stat-diff { font-weight: 600; }
+  .qa-stat-diff.up { color: var(--green); }
+  .qa-stat-diff.down { color: var(--red); }
+  .qa-stat-diff.flat { color: var(--text-faint); }
   .qa-stat-item.accent { border-color: var(--accent); background: var(--accent-dim-soft); }
   .qa-stat-item.accent .qa-stat-num { color: var(--accent); }
   .qa-table-wrap { overflow-x: auto; border: 1px solid var(--hairline); border-radius: 16px; background: var(--panel); }
@@ -4503,11 +4513,20 @@
     return `<span class="qa-diff ${cls}">${sign} ${Math.abs(diff).toFixed(1)}</span>`;
   }
 
-  function qaStatItemHtml(label, value, accent) {
+  function qaStatDiff(cur, prev) {
+    if (cur === null || prev === null || prev === undefined) return null;
+    const diff = cur - prev;
+    if (Math.abs(diff) < 0.05) return { cls: "flat", sign: "±", abs: 0 };
+    return { cls: diff > 0 ? "up" : "down", sign: diff > 0 ? "▲" : "▼", abs: Math.abs(diff) };
+  }
+
+  function qaStatItemHtml(label, value, prevValue, accent) {
     const isEmpty = value === null;
+    const d = qaStatDiff(value, prevValue);
+    const diffHtml = d ? ` <span class="qa-stat-diff ${d.cls}">${d.sign} ${d.abs.toFixed(1)}</span>` : "";
     return `<div class="qa-stat-item${accent ? " accent" : ""}">
       <div class="qa-stat-num${isEmpty ? " empty" : ""}">${isEmpty ? "데이터 없음" : value.toFixed(1)}</div>
-      <div class="qa-stat-label">${esc(label)}</div>
+      <div class="qa-stat-label">${esc(label)}${diffHtml}</div>
     </div>`;
   }
 
@@ -4572,6 +4591,8 @@
     const agentsList = qaWorkingAgents();
     const { year, monthIndex } = qaUi;
     const stats = qaComputeStats(agentsList, year, monthIndex);
+    const prevYm = qaPrevMonth(year, monthIndex);
+    const prevStats = qaComputeStats(agentsList, prevYm.year, prevYm.monthIndex);
     const locked = qaIsMonthLocked(year, monthIndex);
 
     root.innerHTML = `
@@ -4587,15 +4608,15 @@
       </div>
       <div class="status" id="qa-status"></div>
       <div class="qa-stat-grid">
-        ${qaStatItemHtml("전체 평균", stats.total, true)}
-        ${qaStatItemHtml("유선 점수 평균", stats.voice)}
-        ${qaStatItemHtml("채팅 점수 평균", stats.chat)}
-        ${qaStatItemHtml("주간 점수 평균", stats.day)}
-        ${qaStatItemHtml("야간 점수 평균", stats.night)}
-        ${qaStatItemHtml("주간 채팅 평균", stats.dayChat)}
-        ${qaStatItemHtml("주간 유선 평균", stats.dayVoice)}
-        ${qaStatItemHtml("야간 채팅 평균", stats.nightChat)}
-        ${qaStatItemHtml("야간 유선 평균", stats.nightVoice)}
+        ${qaStatItemHtml("전체 평균", stats.total, prevStats.total, true)}
+        ${qaStatItemHtml("유선 점수 평균", stats.voice, prevStats.voice)}
+        ${qaStatItemHtml("채팅 점수 평균", stats.chat, prevStats.chat)}
+        ${qaStatItemHtml("주간 점수 평균", stats.day, prevStats.day)}
+        ${qaStatItemHtml("야간 점수 평균", stats.night, prevStats.night)}
+        ${qaStatItemHtml("주간 채팅 평균", stats.dayChat, prevStats.dayChat)}
+        ${qaStatItemHtml("주간 유선 평균", stats.dayVoice, prevStats.dayVoice)}
+        ${qaStatItemHtml("야간 채팅 평균", stats.nightChat, prevStats.nightChat)}
+        ${qaStatItemHtml("야간 유선 평균", stats.nightVoice, prevStats.nightVoice)}
       </div>
       ${buildQATableHtml(agentsList, year, monthIndex, false)}
     `;
@@ -4727,6 +4748,8 @@
     const cAccent = themeColor("--accent");
     const cAccentSoft = themeColor("--accent-dim-soft");
     const cFaint = themeColor("--text-faint");
+    const cGreen = themeColor("--green");
+    const cRed = themeColor("--red");
 
     const { year, monthIndex } = qaUi;
     const agentsList = qaFilterAgentsByMode(qaWorkingAgents(), captureMode);
@@ -4736,30 +4759,35 @@
     // 캡처용 통계 카드 한 칸. 화면용 .qa-stat-grid는 CSS grid를 쓰지만, html2canvas가
     // fit-content 래퍼 안에서 grid 너비를 안정적으로 못 잡는 경우가 있어 캡처본은
     // 고정 너비 flex 카드로 따로 그린다.
-    function qaCaptureStatCard(label, value, accent) {
+    function qaCaptureStatCard(label, value, prevValue, accent) {
       const isEmpty = value === null;
       const numColor = isEmpty ? cFaint : (accent ? cAccent : cText);
+      const d = qaStatDiff(value, prevValue);
+      const diffColor = d ? (d.cls === "up" ? cGreen : d.cls === "down" ? cRed : cFaint) : null;
+      const diffHtml = d ? ` <span style="color:${diffColor};font-weight:600;">${d.sign} ${d.abs.toFixed(1)}</span>` : "";
       return `
         <div style="flex:0 0 130px;width:130px;box-sizing:border-box;background:${accent ? cAccentSoft : cPanel};border:1px solid ${accent ? cAccent : cHairline};border-radius:14px;padding:12px 10px;text-align:center;">
-          <div style="font-size:${isEmpty ? "15px" : "20px"};letter-spacing:-0.01em;color:${numColor};">${isEmpty ? "데이터 없음" : value.toFixed(1)}</div>
-          <div style="font-size:11.5px;color:${cFaint};margin-top:4px;">${esc(label)}</div>
+          <div style="font-size:${isEmpty ? "15px" : "20px"};line-height:24px;letter-spacing:-0.01em;color:${numColor};">${isEmpty ? "데이터 없음" : value.toFixed(1)}</div>
+          <div style="font-size:11.5px;color:${cFaint};margin-top:4px;">${esc(label)}${diffHtml}</div>
         </div>
       `;
     }
 
     // "전체 저장"일 때만 상단 평균 통계도 표 위에 같이 캡처되게 한다.
     const stats = qaComputeStats(agentsList, year, monthIndex);
+    const capturePrevYm = qaPrevMonth(year, monthIndex);
+    const prevStats = qaComputeStats(agentsList, capturePrevYm.year, capturePrevYm.monthIndex);
     const statsHtml = captureMode === "ALL" ? `
       <div class="qa-capture-stats" style="display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-bottom:18px;">
-        ${qaCaptureStatCard("전체 평균", stats.total, true)}
-        ${qaCaptureStatCard("유선 점수 평균", stats.voice)}
-        ${qaCaptureStatCard("채팅 점수 평균", stats.chat)}
-        ${qaCaptureStatCard("주간 점수 평균", stats.day)}
-        ${qaCaptureStatCard("야간 점수 평균", stats.night)}
-        ${qaCaptureStatCard("주간 채팅 평균", stats.dayChat)}
-        ${qaCaptureStatCard("주간 유선 평균", stats.dayVoice)}
-        ${qaCaptureStatCard("야간 채팅 평균", stats.nightChat)}
-        ${qaCaptureStatCard("야간 유선 평균", stats.nightVoice)}
+        ${qaCaptureStatCard("전체 평균", stats.total, prevStats.total, true)}
+        ${qaCaptureStatCard("유선 점수 평균", stats.voice, prevStats.voice)}
+        ${qaCaptureStatCard("채팅 점수 평균", stats.chat, prevStats.chat)}
+        ${qaCaptureStatCard("주간 점수 평균", stats.day, prevStats.day)}
+        ${qaCaptureStatCard("야간 점수 평균", stats.night, prevStats.night)}
+        ${qaCaptureStatCard("주간 채팅 평균", stats.dayChat, prevStats.dayChat)}
+        ${qaCaptureStatCard("주간 유선 평균", stats.dayVoice, prevStats.dayVoice)}
+        ${qaCaptureStatCard("야간 채팅 평균", stats.nightChat, prevStats.nightChat)}
+        ${qaCaptureStatCard("야간 유선 평균", stats.nightVoice, prevStats.nightVoice)}
       </div>
     ` : "";
 
