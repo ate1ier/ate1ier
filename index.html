@@ -79,94 +79,8 @@
     --weekend-tint: #eeeef1;
     --native-color-scheme: light;
   }
-  /* ---- 그레이 모드: 채도를 낮춘 중립 톤 ---- */
-  html[data-theme="gray"] {
-    --bg: #e7e8ea;
-    --panel: #f2f3f4;
-    --elevated: #dcdde0;
-    --hairline: rgba(0, 0, 0, 0.10);
-    --hairline-strong: rgba(0, 0, 0, 0.16);
-    --text: #292a2d;
-    --text-dim: #494a4e;
-    --text-faint: #606266;
-    --accent: #52606d;
-    --accent-dim: #52606d26;
-    --accent-dim-soft: #52606d0a;
-    --accent-text: #ffffff;
-    --weekend-tint: #dbdce0;
-    --native-color-scheme: light;
-  }
-  /* ---- 파스텔 스카이블루 ---- */
-  html[data-theme="pastel-blue"] {
-    --bg: #e9f1fb;
-    --panel: #f5f9fd;
-    --elevated: #dbeaf7;
-    --hairline: rgba(30, 60, 100, 0.14);
-    --hairline-strong: rgba(30, 60, 100, 0.22);
-    --text: #1f2a37;
-    --text-dim: #435264;
-    --text-faint: #576b80;
-    --accent: #3b78c9;
-    --accent-dim: #3b78c926;
-    --accent-dim-soft: #3b78c90a;
-    --accent-text: #ffffff;
-    --weekend-tint: #d9e9f8;
-    --native-color-scheme: light;
-  }
-  /* ---- 파스텔 세이지민트 ---- */
-  html[data-theme="pastel-green"] {
-    --bg: #e9f5ee;
-    --panel: #f4faf6;
-    --elevated: #daeee2;
-    --hairline: rgba(30, 80, 50, 0.14);
-    --hairline-strong: rgba(30, 80, 50, 0.22);
-    --text: #1f2e24;
-    --text-dim: #44564a;
-    --text-faint: #5d6d63;
-    --accent: #3f9463;
-    --accent-dim: #3f946326;
-    --accent-dim-soft: #3f94630a;
-    --accent-text: #ffffff;
-    --weekend-tint: #d9edde;
-    --native-color-scheme: light;
-  }
-  /* ---- 파스텔 피치 ---- */
-  html[data-theme="pastel-peach"] {
-    --bg: #fdeee6;
-    --panel: #fff6f1;
-    --elevated: #f8ded0;
-    --hairline: rgba(120, 60, 20, 0.14);
-    --hairline-strong: rgba(120, 60, 20, 0.22);
-    --text: #3a2a20;
-    --text-dim: #60493b;
-    --text-faint: #776155;
-    --accent: #d97a4d;
-    --accent-dim: #d97a4d26;
-    --accent-dim-soft: #d97a4d0a;
-    --accent-text: #ffffff;
-    --weekend-tint: #f7dcc7;
-    --native-color-scheme: light;
-  }
-  /* ---- 파스텔 라벤더 ---- */
-  html[data-theme="pastel-lavender"] {
-    --bg: #f0ecfa;
-    --panel: #f8f5fd;
-    --elevated: #e4daf6;
-    --hairline: rgba(70, 40, 110, 0.14);
-    --hairline-strong: rgba(70, 40, 110, 0.22);
-    --text: #2c2438;
-    --text-dim: #514661;
-    --text-faint: #695e7c;
-    --accent: #8462cf;
-    --accent-dim: #8462cf26;
-    --accent-dim-soft: #8462cf0a;
-    --accent-text: #ffffff;
-    --weekend-tint: #e6d9f5;
-    --native-color-scheme: light;
-  }
-  /* ---- light / gray / pastel-* 6개 테마는 상태색(오프·연차·대휴 등)이 모두 같다 ---- */
-  html[data-theme="light"], html[data-theme="gray"], html[data-theme="pastel-blue"],
-  html[data-theme="pastel-green"], html[data-theme="pastel-peach"], html[data-theme="pastel-lavender"] {
+  /* ---- light 테마는 상태색(오프·연차·대휴 등)이 다크와 다르게 밝은 배경용으로 조정된다 ---- */
+  html[data-theme="light"] {
     --mac-vibrancy: rgba(255, 255, 255, 0.58);
     --mac-vibrancy-hairline: rgba(0, 0, 0, 0.07);
     --mac-glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.6);
@@ -2658,11 +2572,6 @@
   const THEME_LIST = [
     { id: "dark", label: "다크", bg: "#232327", accent: "#ec6fae" },
     { id: "light", label: "라이트", bg: "#fcfcfd", accent: "#7c5cd1" },
-    { id: "gray", label: "그레이", bg: "#e7e8ea", accent: "#52606d" },
-    { id: "pastel-blue", label: "스카이 블루", bg: "#e9f1fb", accent: "#3b78c9" },
-    { id: "pastel-green", label: "세이지 민트", bg: "#e9f5ee", accent: "#3f9463" },
-    { id: "pastel-peach", label: "피치", bg: "#fdeee6", accent: "#d97a4d" },
-    { id: "pastel-lavender", label: "라벤더", bg: "#f0ecfa", accent: "#8462cf" },
   ];
   function themeMeta(id) { return THEME_LIST.find((t) => t.id === id) || THEME_LIST[0]; }
   function isValidTheme(id) { return THEME_LIST.some((t) => t.id === id); }
