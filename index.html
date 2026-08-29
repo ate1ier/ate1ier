@@ -505,12 +505,15 @@
   #theme-toggle-root .theme-toggle-wrap { position: fixed; right: 14px; bottom: 78px; z-index: 46; }
   #manual-toggle-root .manual-toggle-wrap { position: fixed; right: 14px; bottom: 124px; z-index: 46; }
   #undo-toggle-root .undo-toggle-wrap { position: fixed; right: 14px; bottom: 170px; z-index: 46; }
-  #backup-toggle-root .manual-toggle-wrap { position: fixed; right: 14px; bottom: 216px; z-index: 46; }
+  #refresh-toggle-root .manual-toggle-wrap { position: fixed; right: 14px; bottom: 216px; z-index: 46; }
+  /* 데이터 백업 버튼은 오른쪽 하단 스택에서 빼서 화면 왼쪽 위 고정 위치로 옮긴다 */
+  #backup-toggle-root .manual-toggle-wrap { position: fixed; left: 14px; top: 14px; right: auto; bottom: auto; z-index: 46; }
   @media (min-width: 721px) {
     #theme-toggle-root .theme-toggle-wrap { bottom: 18px; }
     #manual-toggle-root .manual-toggle-wrap { bottom: 64px; }
     #undo-toggle-root .undo-toggle-wrap { bottom: 110px; }
-    #backup-toggle-root .manual-toggle-wrap { bottom: 156px; }
+    #refresh-toggle-root .manual-toggle-wrap { bottom: 156px; }
+    #backup-toggle-root .manual-toggle-wrap { left: 16px; top: 16px; }
     .undo-toast { bottom: 154px; }
     #page-area { padding-bottom: 56px; }
     .dock-toggle-btn {
@@ -2212,6 +2215,7 @@
 <div id="theme-toggle-root"></div>
 <div id="manual-toggle-root"></div>
 <div id="undo-toggle-root"></div>
+<div id="refresh-toggle-root"></div>
 <div id="backup-toggle-root"></div>
 <button class="dock-toggle-btn" id="dock-toggle-btn" type="button" aria-haspopup="true" aria-expanded="false" aria-label="메뉴 열기" title="메뉴 열기">
   <svg width="18" height="18" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 5l5 4 5-4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -2246,6 +2250,7 @@
   const ICON_UNDO = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4.6v3.4h3.4"/><path d="M4.6 8A5 5 0 1 1 6 11.7"/></svg>`;
   const ICON_UPLOAD = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 9.7V2.5"/><path d="M5.2 5.3 8 2.5l2.8 2.8"/><path d="M3.2 13h9.6"/></svg>`;
   const ICON_BACKUP = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.6 4.4c0-1 2.4-1.8 5.4-1.8s5.4.8 5.4 1.8-2.4 1.8-5.4 1.8-5.4-.8-5.4-1.8Z"/><path d="M2.6 4.4V8c0 1 2.4 1.8 5.4 1.8s5.4-.8 5.4-1.8V4.4"/><path d="M2.6 8v3.6c0 1 2.4 1.8 5.4 1.8s5.4-.8 5.4-1.8V8"/></svg>`;
+  const ICON_REFRESH = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 8A5 5 0 1 1 11.4 4.3"/><path d="M13 2.6V6h-3.4"/></svg>`;
   /* ===================== ☁️ 클라우드 동기화 (Supabase) =====================
      계정 목록과 각 계정의 데이터(할일/메모/상담사/면담일지/스케줄/캘린더)를
      Supabase의 kv_store 테이블에도 함께 저장해서, 다른 기기·다른 사람도
@@ -2869,6 +2874,24 @@
     const backupBtn = document.getElementById("nav-backup-toggle");
     if (backupBtn) backupBtn.onclick = () => openBackupModal();
   }
+
+  // 새로고침 버튼: 백업 버튼이 있던 오른쪽 아래 자리에 항상 떠 있는 고정 버튼으로 표시.
+  // 다른 사람이 다른 기기/탭에서 저장한 내용을 서버에서 다시 받아오기 위한 용도로,
+  // 누른 시점에 보고 있던 페이지(홈/상담사 관리 등)는 그대로 유지된다.
+  function renderRefreshToggle() {
+    const root = document.getElementById("refresh-toggle-root");
+    if (!root) return;
+    root.innerHTML = `
+      <div class="manual-toggle-wrap">
+        <button class="theme-picker-btn" id="nav-refresh-toggle" type="button" aria-label="최신 내용으로 새로고침" title="최신 내용으로 새로고침">
+          ${ICON_REFRESH}
+          <span class="theme-picker-label">새로고침</span>
+        </button>
+      </div>
+    `;
+    const refreshBtn = document.getElementById("nav-refresh-toggle");
+    if (refreshBtn) refreshBtn.onclick = () => performServerRefresh();
+  }
   function closeBackupModal() {
     const existing = document.getElementById("backup-modal-overlay");
     if (existing) existing.remove();
@@ -3360,13 +3383,36 @@
   // 계정별로 데이터를 분리하기 위해 저장 키 앞에 이 접두어를 붙인다.
   function acctKey(key) { return `acct:${CURRENT_ACCOUNT_ID}:${key}`; }
 
+  // 화면 오른쪽 아래 "새로고침" 버튼을 누르면, 다른 사람/다른 기기에서 바뀐 내용을
+  // 서버에서 다시 받아오기 위해 페이지를 실제로 다시 불러온다(location.reload()).
+  // 다만 이 경우에는 평소처럼 "홈"으로 돌아가지 않고, 누르기 직전에 보고 있던
+  // 페이지를 그대로 유지해야 하므로, 새로고침 직전에 sessionStorage에 현재 페이지를
+  // 잠깐 남겨두고 새로 불러온 뒤 한 번만 복원하고 지운다.
+  const REFRESH_RESTORE_PAGE_KEY = "app:refresh-restore-page";
+  const VALID_PAGES = ["home", "calendar", "agents", "notes", "interviews", "qa", "schedule"];
+  let _refreshRestorePage = null;
+  try {
+    const saved = sessionStorage.getItem(REFRESH_RESTORE_PAGE_KEY);
+    sessionStorage.removeItem(REFRESH_RESTORE_PAGE_KEY);
+    if (saved && VALID_PAGES.indexOf(saved) !== -1) _refreshRestorePage = saved;
+  } catch (e) {}
+
   const state = {
     // 마스터 계정은 다른 페이지를 볼 필요가 없으므로 항상 "계정 관리" 페이지만 보여준다.
     // 마스터가 아닌 계정은 (로그인 직후든, 세션이 유지된 채 브라우저를 껐다 켰든)
     // 앱을 새로 열 때마다 항상 "홈" 화면을 메인으로 보여준다. 이전에 보던
-    // 페이지를 기억해서 복원하지 않는다.
-    page: CURRENT_ACCOUNT_IS_MASTER ? "master" : "home",
+    // 페이지를 기억해서 복원하지 않는다. 예외적으로, "새로고침" 버튼을 눌러서
+    // 다시 불러온 경우에는 누르기 직전 페이지를 그대로 복원한다.
+    page: CURRENT_ACCOUNT_IS_MASTER ? "master" : (_refreshRestorePage || "home"),
   };
+
+  // "새로고침" 버튼 클릭 핸들러: 지금 보던 페이지를 기억해두고 나서 새로 불러온다.
+  // cloudHydrate()가 페이지를 새로 불러올 때 다시 실행되므로, 서버에 가장 최근에
+  // 저장된 내용으로 자연스럽게 갱신된다.
+  function performServerRefresh() {
+    try { sessionStorage.setItem(REFRESH_RESTORE_PAGE_KEY, state.page); } catch (e) {}
+    location.reload();
+  }
 
   function setPage(p) {
     // 마스터 계정은 계정 관리 페이지 외에는 이동하지 않는다.
@@ -8363,6 +8409,7 @@
     renderThemeToggle();
     renderManualToggle();
     renderUndoToggle();
+    renderRefreshToggle();
     renderBackupToggle();
     nav.querySelectorAll("[data-nav]").forEach((btn) => {
       btn.onclick = () => { setPage(btn.getAttribute("data-nav")); closeDock(); };
