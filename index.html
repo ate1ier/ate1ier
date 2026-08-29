@@ -378,7 +378,8 @@
   .theme-menu-check { color: var(--accent); font-weight: 700; flex-shrink: 0; }
 
   /* 사용설명서 버튼: 테마(다크/라이트) 버튼과 같은 자리, 그 바로 위에 항상 떠 있다 */
-  .manual-toggle-wrap {
+  /* 되돌리기(실행 취소) 버튼도 같은 스타일로, 사용설명서 버튼 바로 위에 쌓는다 */
+  .manual-toggle-wrap, .undo-toggle-wrap {
     position: fixed;
     right: 18px;
     bottom: 66px;
@@ -392,15 +393,95 @@
     -webkit-backdrop-filter: blur(26px) saturate(2);
     box-shadow: var(--mac-shadow-float);
   }
-  .manual-toggle-wrap .theme-picker-btn { width: auto; }
+  .manual-toggle-wrap .theme-picker-btn, .undo-toggle-wrap .theme-picker-btn { width: auto; }
+  .theme-picker-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* ---------- ↩️ 되돌리기(실행 취소) 결과 토스트: 되돌리기 버튼 위에 잠깐 떴다가 사라짐 ---------- */
+  .undo-toast {
+    position: fixed;
+    right: 14px;
+    bottom: 214px;
+    z-index: 201;
+    padding: 8px 14px;
+    border-radius: var(--mac-radius);
+    background: var(--mac-vibrancy);
+    backdrop-filter: blur(20px) saturate(1.6);
+    -webkit-backdrop-filter: blur(20px) saturate(1.6);
+    border: 1px solid var(--mac-vibrancy-hairline);
+    box-shadow: var(--mac-shadow-float);
+    color: var(--text-dim);
+    font-size: 12.5px;
+    font-weight: 600;
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+    pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    white-space: nowrap;
+    max-width: 260px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .undo-toast.visible { opacity: 1; transform: translateY(0) scale(1); }
+  .undo-toast--empty { color: var(--text-faint); }
+  @media (max-width: 720px) { .undo-toast { right: 12px; bottom: 214px; font-size: 12px; } }
+
+  /* ---------- ☁️ 클라우드 동기화 상태 토스트 (오른쪽 상단, 잠깐 떴다가 사라짐) ---------- */
+  .cloud-sync-toast {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 14px 9px 12px;
+    border-radius: var(--mac-radius);
+    background: var(--mac-vibrancy);
+    backdrop-filter: blur(20px) saturate(1.6);
+    -webkit-backdrop-filter: blur(20px) saturate(1.6);
+    border: 1px solid var(--mac-vibrancy-hairline);
+    box-shadow: var(--mac-shadow-float);
+    color: var(--text-dim);
+    font-size: 12.5px;
+    font-weight: 600;
+    letter-spacing: -0.1px;
+    opacity: 0;
+    transform: translateY(-10px) scale(0.98);
+    pointer-events: none;
+    transition: opacity 0.22s ease, transform 0.22s ease;
+    white-space: nowrap;
+  }
+  .cloud-sync-toast.visible { opacity: 1; transform: translateY(0) scale(1); }
+  .cloud-sync-toast .icon-emo { flex-shrink: 0; }
+  .cloud-sync-toast.saved { color: var(--green); }
+  .cloud-sync-toast.error { color: var(--red); }
+  .cloud-sync-toast.syncing { color: var(--text-dim); }
+  .cloud-sync-spinner {
+    width: 13px;
+    height: 13px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    border: 2px solid var(--hairline-strong);
+    border-top-color: var(--accent);
+    animation: cloud-sync-spin 0.7s linear infinite;
+  }
+  @keyframes cloud-sync-spin { to { transform: rotate(360deg); } }
+  @media (max-width: 720px) {
+    .cloud-sync-toast { top: 12px; right: 12px; padding: 8px 12px 8px 10px; font-size: 12px; }
+  }
 
   /* ---------- 데스크톱: 평소엔 숨겨진 macOS 독(Dock) + 가운데 하단 펼치기 버튼 ---------- */
   .dock-toggle-btn { display: none; }
   #theme-toggle-root .theme-toggle-wrap { position: fixed; right: 14px; bottom: 78px; z-index: 46; }
   #manual-toggle-root .manual-toggle-wrap { position: fixed; right: 14px; bottom: 124px; z-index: 46; }
+  #undo-toggle-root .undo-toggle-wrap { position: fixed; right: 14px; bottom: 170px; z-index: 46; }
+  #backup-toggle-root .manual-toggle-wrap { position: fixed; right: 14px; bottom: 216px; z-index: 46; }
   @media (min-width: 721px) {
     #theme-toggle-root .theme-toggle-wrap { bottom: 18px; }
     #manual-toggle-root .manual-toggle-wrap { bottom: 64px; }
+    #undo-toggle-root .undo-toggle-wrap { bottom: 110px; }
+    #backup-toggle-root .manual-toggle-wrap { bottom: 156px; }
+    .undo-toast { bottom: 154px; }
     #page-area { padding-bottom: 56px; }
     .dock-toggle-btn {
       display: flex;
@@ -990,6 +1071,31 @@
     .manual-modal-box { width: 100%; max-height: 92vh; }
     .manual-modal-head { padding: 12px 14px; }
     .manual-modal-body { padding: 12px; }
+  }
+
+  /* ---------- 데이터 백업/복원 팝업 ---------- */
+  .backup-modal-box { width: min(96vw, 640px); }
+  .backup-modal-desc {
+    margin: 0 0 18px; font-size: 13.5px; line-height: 1.6; color: var(--text-dim);
+    padding: 12px 14px; background: var(--elevated); border: 1px solid var(--hairline); border-radius: var(--mac-radius);
+  }
+  .backup-modal-desc b { color: var(--text); font-weight: 600; }
+  .backup-section { margin-bottom: 18px; }
+  .backup-section:last-of-type { margin-bottom: 10px; }
+  .backup-section-title { font-size: 13px; font-weight: 600; color: var(--text-faint); margin-bottom: 10px; letter-spacing: 0.02em; }
+  .backup-all-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .backup-cat-list { display: flex; flex-direction: column; gap: 8px; }
+  .backup-cat-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+    padding: 10px 12px; border: 1px solid var(--hairline); border-radius: var(--mac-radius); background: var(--elevated);
+  }
+  .backup-cat-label { display: flex; align-items: center; gap: 7px; font-size: 14px; color: var(--text); }
+  .backup-cat-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+  .backup-cat-actions .ghost-btn { padding: 6px 11px; font-size: 12.5px; }
+  .backup-modal-status { min-height: 16px; margin-top: 4px; }
+  .backup-modal-status.error { color: var(--red); }
+  @media (max-width: 480px) {
+    .backup-cat-row { flex-direction: column; align-items: flex-start; }
   }
 
   .card {
@@ -1644,8 +1750,26 @@
   .agent-picker-info-item-label { font-size: 11px; letter-spacing: 0.05em; color: var(--text-faint); text-transform: uppercase; }
   .agent-picker-info-item-value { font-size: 13.5px; color: var(--text); }
   .agent-interview-section { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--hairline); }
-  .agent-interview-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
+  .agent-interview-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
   .agent-interview-title { font-size: 15.5px; font-weight: 600; }
+  .agent-interview-header-actions { display: flex; align-items: center; gap: 8px; }
+
+  /* ---------- 상담사 상세: 최근 QA 점수 미리보기 ---------- */
+  .agent-qa-preview-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+  .agent-qa-cell {
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    padding: 12px 8px; border: 1px solid var(--hairline); border-radius: var(--mac-radius);
+    background: var(--elevated);
+  }
+  .agent-qa-cell-label { font-size: 11.5px; color: var(--text-faint); }
+  .agent-qa-cell-value { font-size: 19px; font-weight: 700; letter-spacing: -0.01em; }
+  .agent-qa-cell-value.empty { font-size: 13.5px; font-weight: 500; color: var(--text-faint); }
+  .agent-qa-cell-diff { font-size: 11.5px; }
+  @media (max-width: 480px) {
+    .agent-qa-preview-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+    .agent-qa-cell { padding: 9px 4px; }
+    .agent-qa-cell-value { font-size: 16px; }
+  }
 
   /* ---------- 월별 스케줄 페이지 ---------- */
   .schedule-top {
@@ -1719,7 +1843,15 @@
   .schedule-table th, .schedule-table td {
     border: 1px solid var(--hairline); padding: 5px 8px; text-align: center; background: var(--panel);
   }
-  .sch-cell { background: var(--sch-cell-bg); }
+  .sch-cell { background: var(--sch-cell-bg); position: relative; }
+  /* 메모가 남겨진 스케줄 셀 오른쪽 상단에 작게 표시되는 삼각형 표시.
+     이미지로 저장(html2canvas 캡처)할 때는 buildScheduleTableHtml(...,true)로 아예 마크업을
+     만들지 않으므로, 캡처 이미지에는 표시되지 않는다. */
+  .sch-memo-dot {
+    position: absolute; top: 0; right: 0; width: 0; height: 0;
+    border-style: solid; border-width: 0 7px 7px 0; border-color: transparent var(--orange) transparent transparent;
+    pointer-events: none;
+  }
   .schedule-table thead th {
     background: var(--panel); color: var(--text-dim); font-weight: 500; position: sticky; top: 0; z-index: 1;
   }
@@ -1763,6 +1895,10 @@
     -moz-appearance: textfield;
   }
   .sch-required-input:focus { border-color: var(--accent); }
+  .sch-required-input:disabled,
+  .sch-required-input--locked {
+    opacity: 0.5; cursor: not-allowed; background: var(--hairline);
+  }
   .sch-required-input::-webkit-outer-spin-button,
   .sch-required-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
   .schedule-table tr.sch-diff-row td {
@@ -1858,6 +1994,10 @@
   .sch-cell.st-late { background: var(--yellow-dim); color: var(--yellow); font-weight: 600; }
   .sch-cell.st-absent { background: var(--red-dim); color: var(--red); font-weight: 600; }
   .sch-cell.st-resigned { background: var(--hairline); color: var(--text-faint); }
+  .sch-cell--selected { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .sch-cell--selected::after {
+    content: ""; position: absolute; inset: 0; background: var(--accent-dim-soft); pointer-events: none;
+  }
   .sch-staff-btn {
     background: none; border: none; color: var(--text-faint); cursor: pointer; font-size: 12px;
     padding: 1px 4px; border-radius: 6px;
@@ -1880,6 +2020,9 @@
   .sch-menu button.sch-menu-danger { color: var(--red); }
   .sch-menu button.sch-menu-danger:hover { background: var(--red-dim); color: var(--red); }
   .sch-menu .sch-menu-divider { height: 1px; background: var(--hairline); margin: 4px 2px; }
+  .sch-menu .sch-menu-title {
+    font-size: 11.5px; color: var(--text-faint); padding: 4px 10px 6px; font-weight: 600;
+  }
 
   /* 이미지로 저장: 실제 다운로드 전에 먼저 보여주는 미리보기 모달 */
   .sch-preview-overlay {
@@ -1915,6 +2058,10 @@
     display: flex; justify-content: flex-end; gap: 8px; padding: 14px 18px;
     border-top: 1px solid var(--hairline); flex-shrink: 0;
   }
+  .sch-preview-actions .ghost-btn.danger { margin-right: auto; }
+  .sch-memo-box { width: min(420px, 92vw); }
+  .sch-memo-body { display: block; }
+  .sch-memo-textarea { width: 100%; min-height: 110px; resize: vertical; box-sizing: border-box; }
 
   .schedule-log-title { font-size: 15px; margin: 20px 0 10px; color: var(--text); }
   .sch-log-list { display: flex; flex-direction: column; gap: 6px; }
@@ -1979,6 +2126,7 @@
   .qa-table tbody tr { background: var(--panel); transition: background 0.12s ease; }
   .qa-table tbody tr:last-child td { border-bottom: none; }
   .qa-table tbody tr:hover { background: var(--accent-dim-soft); }
+  .qa-table tbody tr.qa-row-highlight { background: var(--accent-dim); transition: background 1.8s ease; }
   .qa-table td.qa-col-name { color: var(--text); font-weight: 600; }
   .qa-table td.qa-col-ldap { color: var(--text-dim); }
   .qa-table td.qa-empty { text-align: center; color: var(--text-faint); padding: 24px; background: var(--panel); }
@@ -2033,6 +2181,8 @@
 </div>
 <div id="theme-toggle-root"></div>
 <div id="manual-toggle-root"></div>
+<div id="undo-toggle-root"></div>
+<div id="backup-toggle-root"></div>
 <button class="dock-toggle-btn" id="dock-toggle-btn" type="button" aria-haspopup="true" aria-expanded="false" aria-label="메뉴 열기" title="메뉴 열기">
   <svg width="18" height="18" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 5l5 4 5-4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
 </button>
@@ -2063,6 +2213,9 @@
   const ICON_BELL = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11.2V7.4a4 4 0 0 1 8 0v3.8l1.1 1.5H2.9z"/><path d="M6.6 13.4a1.5 1.5 0 0 0 2.8 0"/></svg>`;
   const ICON_CLOCK = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="5.6"/><path d="M8 4.8V8l2.4 1.4"/></svg>`;
   const ICON_CHEVRON_RIGHT = `<svg class="icon-emo" viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.4 10.6 8 6 12.6"/></svg>`;
+  const ICON_UNDO = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4.6v3.4h3.4"/><path d="M4.6 8A5 5 0 1 1 6 11.7"/></svg>`;
+  const ICON_UPLOAD = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 9.7V2.5"/><path d="M5.2 5.3 8 2.5l2.8 2.8"/><path d="M3.2 13h9.6"/></svg>`;
+  const ICON_BACKUP = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.6 4.4c0-1 2.4-1.8 5.4-1.8s5.4.8 5.4 1.8-2.4 1.8-5.4 1.8-5.4-.8-5.4-1.8Z"/><path d="M2.6 4.4V8c0 1 2.4 1.8 5.4 1.8s5.4-.8 5.4-1.8V4.4"/><path d="M2.6 8v3.6c0 1 2.4 1.8 5.4 1.8s5.4-.8 5.4-1.8V8"/></svg>`;
   /* ===================== ☁️ 클라우드 동기화 (Supabase) =====================
      계정 목록과 각 계정의 데이터(할일/메모/상담사/면담일지/스케줄/캘린더)를
      Supabase의 kv_store 테이블에도 함께 저장해서, 다른 기기·다른 사람도
@@ -2107,36 +2260,99 @@
     if (!_pendingCloudWrites.size) return;
     await Promise.allSettled(Array.from(_pendingCloudWrites));
   }
+
+  /* ---- 동기화 상태 토스트: 오른쪽 상단에 "동기화 중… / 저장됨 / 동기화 실패"를
+     잠깐 띄웠다가 자동으로 사라지게 한다. 저장이 연속으로 여러 번 일어나도
+     토스트가 여러 개 쌓이지 않도록 하나의 요소를 재사용한다. */
+  let _syncToastHideTimer = null;
+  let _syncToastSettleTimer = null;
+  let _syncHadError = false;
+  function _syncToastEl() {
+    let el = document.getElementById("cloud-sync-toast");
+    if (!el) {
+      el = document.createElement("div");
+      el.id = "cloud-sync-toast";
+      el.className = "cloud-sync-toast";
+      document.body.appendChild(el);
+    }
+    return el;
+  }
+  function _showSyncToast(status) {
+    clearTimeout(_syncToastHideTimer);
+    const el = _syncToastEl();
+    el.classList.remove("syncing", "saved", "error");
+    el.classList.add(status, "visible");
+    const iconHtml = status === "syncing"
+      ? `<span class="cloud-sync-spinner"></span>`
+      : status === "saved"
+        ? ICON_CHECK
+        : `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="5.6"/><path d="M8 5.2v3.4"/><path d="M8 11v.1"/></svg>`;
+    const label = status === "syncing" ? "동기화 중…" : status === "saved" ? "저장됨" : "동기화 실패";
+    el.innerHTML = `${iconHtml}<span>${label}</span>`;
+    if (status !== "syncing") {
+      _syncToastHideTimer = setTimeout(() => { el.classList.remove("visible"); }, status === "error" ? 4000 : 1800);
+    }
+  }
+  // 클라우드 저장 요청이 시작될 때 호출: 즉시 "동기화 중…" 표시
+  function notifyCloudSyncStart() {
+    if (!cloud) return;
+    clearTimeout(_syncToastSettleTimer);
+    _showSyncToast("syncing");
+  }
+  // 클라우드 저장 요청이 끝날 때 호출: 다른 요청이 이어서 들어올 수 있으니 짧게
+  // 기다렸다가, 더 진행 중인 요청이 없으면 최종 결과(저장됨/실패)를 보여준다.
+  function notifyCloudSyncSettle(ok) {
+    if (!cloud) return;
+    if (!ok) _syncHadError = true;
+    clearTimeout(_syncToastSettleTimer);
+    _syncToastSettleTimer = setTimeout(() => {
+      if (_pendingCloudWrites.size > 0) return;
+      _showSyncToast(_syncHadError ? "error" : "saved");
+      _syncHadError = false;
+    }, 300);
+  }
+
   async function cloudPush(key, value) {
     if (!isCloudSynced(key)) return;
+    notifyCloudSyncStart();
     const p = (async () => {
       try {
         await cloud.from("kv_store").upsert({ key, value, updated_at: new Date().toISOString() });
-      } catch (e) { /* 네트워크 문제로 실패해도 로컬 저장은 이미 되어 있어 화면은 그대로 동작 */ }
+        notifyCloudSyncSettle(true);
+      } catch (e) {
+        /* 네트워크 문제로 실패해도 로컬 저장은 이미 되어 있어 화면은 그대로 동작 */
+        notifyCloudSyncSettle(false);
+      }
     })();
     return _trackCloudWrite(p);
   }
   async function cloudDelete(key) {
     if (!isCloudSynced(key)) return;
+    notifyCloudSyncStart();
     const p = (async () => {
-      try { await cloud.from("kv_store").delete().eq("key", key); } catch (e) {}
+      try { await cloud.from("kv_store").delete().eq("key", key); notifyCloudSyncSettle(true); }
+      catch (e) { notifyCloudSyncSettle(false); }
     })();
     return _trackCloudWrite(p);
   }
+  // localStorage.setItem / removeItem을 감싸기 전에 먼저 원본 함수를 바인딩해둔다.
+  // cloudHydrate()가 클라우드에서 값을 끌어올 때 이 "원본" 함수로 직접 저장해야,
+  // 방금 받아온 값을 다시 클라우드로 그대로 되쏘는(불필요한 업서트 + 페이지를 열 때마다
+  // "동기화 중…" 토스트가 잠깐 뜨는) 낭비를 막을 수 있다.
+  const _origSetItem = localStorage.setItem.bind(localStorage);
+  const _origRemoveItem = localStorage.removeItem.bind(localStorage);
   async function cloudHydrate() {
     if (!cloud) return;
     try {
       const { data, error } = await cloud.from("kv_store").select("key,value");
       if (error || !data) return;
       data.forEach((row) => {
-        try { localStorage.setItem(row.key, row.value); } catch (e) {}
+        try { _origSetItem(row.key, row.value); } catch (e) {}
       });
     } catch (e) { /* 오프라인 등으로 실패하면 이전에 이 브라우저에 남아있던 값으로 동작 */ }
   }
   // localStorage.setItem / removeItem을 감싸서, 로컬 저장은 그대로 즉시 처리하고
   // 필요한 키만 조용히 Supabase에도 함께 저장/삭제한다 (실패해도 화면엔 영향 없음).
-  const _origSetItem = localStorage.setItem.bind(localStorage);
-  const _origRemoveItem = localStorage.removeItem.bind(localStorage);
   localStorage.setItem = function (key, value) {
     _origSetItem(key, value);
     cloudPush(key, value);
@@ -2146,6 +2362,90 @@
     cloudDelete(key);
   };
   await cloudHydrate();
+
+  /* ===================== ↩️ 실행 취소(Undo) =====================
+     스케줄 셀 상태 변경 · 일괄 적용 · 일괄 붙여넣기 · 일괄 삭제, 그리고 메모·폴더·
+     상담사·면담일지·할일·캘린더 일정의 "삭제"처럼 되돌리기 어려운 조작을 하기 직전에
+     관련 localStorage 값을 스냅샷으로 남겨두고, Ctrl+Z(맥은 Cmd+Z) 또는 화면 오른쪽
+     아래 "되돌리기" 버튼으로 바로 직전 동작 하나를 되돌릴 수 있게 한다. 최근 30개까지
+     기억한다. 메모 본문·셀 메모처럼 계속 타이핑하는 값은 스냅샷을 남기지 않는다 —
+     글자 하나하나가 되돌리기 대상이 되면 오히려 불편하기 때문이다. */
+  const UNDO_STACK_LIMIT = 30;
+  const undoStack = [];
+  // const로 선언된 state 객체(notesData 등)는 재할당할 수 없으니, 내용을 비우고
+  // 새로 불러온 값으로 다시 채워 넣는 방식으로 복원한다.
+  function undoRestoreObjectInPlace(obj, fresh) {
+    Object.keys(obj).forEach((k) => delete obj[k]);
+    Object.assign(obj, fresh);
+  }
+  function undoSnapshotKeys(keys) {
+    return (Array.isArray(keys) ? keys : [keys]).map((key) => {
+      let value = null;
+      try { value = localStorage.getItem(key); } catch (e) {}
+      return { key, value };
+    });
+  }
+  // label: 되돌리기 버튼/토스트에 보여줄 동작 이름.
+  // keys: 이 동작으로 바뀌는 localStorage 키(문자열 하나 또는 배열).
+  // reloadFn: 스냅샷을 localStorage에 되돌려놓은 뒤, 화면이 참조하는 메모리상의
+  //           state 변수(scheduleData, notesData 등)를 다시 읽어들이는 함수.
+  function recordUndo(label, keys, reloadFn) {
+    undoStack.push({ label, snaps: undoSnapshotKeys(keys), reloadFn });
+    if (undoStack.length > UNDO_STACK_LIMIT) undoStack.shift();
+    renderUndoToggle();
+  }
+  function performUndo() {
+    const entry = undoStack.pop();
+    if (!entry) { renderUndoToggle(); flashUndoToast("되돌릴 작업이 없어요", true); return; }
+    entry.snaps.forEach(({ key, value }) => {
+      try {
+        if (value === null) localStorage.removeItem(key);
+        else localStorage.setItem(key, value);
+      } catch (e) {}
+    });
+    entry.reloadFn();
+    renderApp();
+    flashUndoToast(`"${entry.label}" 되돌림`);
+  }
+  let undoToastHideTimer = null;
+  function flashUndoToast(msg, isEmpty) {
+    const el = document.getElementById("undo-toast");
+    if (!el) return;
+    el.textContent = msg;
+    el.classList.toggle("undo-toast--empty", !!isEmpty);
+    el.classList.add("visible");
+    clearTimeout(undoToastHideTimer);
+    undoToastHideTimer = setTimeout(() => el.classList.remove("visible"), 2200);
+  }
+  // 입력창에 포커스가 있을 때는 브라우저 기본 Ctrl+Z(텍스트 입력 취소)를 그대로 두고,
+  // 그 외의 경우에만 앱의 되돌리기를 실행한다.
+  document.addEventListener("keydown", (e) => {
+    const k = e.key ? e.key.toLowerCase() : "";
+    if (k !== "z" || !(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey) return;
+    const active = document.activeElement;
+    const tag = (active && active.tagName) || "";
+    if (tag === "INPUT" || tag === "TEXTAREA" || (active && active.isContentEditable)) return;
+    e.preventDefault();
+    performUndo();
+  });
+  // 되돌리기 버튼: 테마·사용설명서 버튼과 같은 자리, 그 위에 항상 떠 있다.
+  function renderUndoToggle() {
+    const root = document.getElementById("undo-toggle-root");
+    if (!root) return;
+    const has = undoStack.length > 0;
+    const lastLabel = has ? undoStack[undoStack.length - 1].label : "";
+    root.innerHTML = `
+      <div class="undo-toggle-wrap">
+        <button class="theme-picker-btn" id="nav-undo-toggle" type="button" ${has ? "" : "disabled"}
+          aria-label="되돌리기" title="${has ? `되돌리기 — ${esc(lastLabel)} (Ctrl+Z)` : "되돌릴 작업이 없어요"}">
+          ${ICON_UNDO}<span class="theme-picker-label">되돌리기</span>
+        </button>
+      </div>
+      <div class="undo-toast" id="undo-toast"></div>
+    `;
+    const btn = document.getElementById("nav-undo-toggle");
+    if (btn) btn.onclick = () => performUndo();
+  }
 
   /* ===================== 테마(다크/라이트/그레이/파스텔) ===================== */
   const THEME_KEY = "app-theme-mode";
@@ -2248,6 +2548,226 @@
     `;
     const manualBtn = document.getElementById("nav-manual-toggle");
     if (manualBtn) manualBtn.onclick = () => openManualModal();
+  }
+
+  /* ===================== 데이터 백업/복원 =====================
+     상담사 정보 · 스케줄 · 면담일지 · QA 점수 · 메모 · 캘린더처럼
+     "acct:{계정id}:" 접두어가 붙어 저장되는 이 계정 소유의 데이터를
+     JSON 파일로 내보내고 다시 불러올 수 있게 한다.
+     가져오기는 파일 안에 어떤 계정 이름이 적혀 있었든 상관없이 항상
+     "지금 로그인한 계정"의 접두어로 다시 저장한다 — 그래야 다른 계정에서
+     내보낸 백업이라도 가져오는 즉시 지금 계정 소유가 되고, 다른 계정의
+     데이터에는 절대 영향을 주지 않는다. */
+  const BACKUP_CATEGORIES = [
+    { key: "calendar", label: "캘린더 · 할 일", icon: ICON_CALENDAR, keyPrefixes: ["personal-calendar:"] },
+    { key: "notes", label: "업무 정리(메모)", icon: ICON_NOTE, keyPrefixes: ["personal-notes:"] },
+    { key: "agents", label: "상담사 관리", icon: ICON_USERS, keyPrefixes: ["personal-agents:"] },
+    { key: "interviews", label: "면담일지", icon: ICON_CLIPBOARD, keyPrefixes: ["personal-interviews:"] },
+    { key: "qa", label: "품질 관리(QA)", icon: ICON_QA, keyPrefixes: ["personal-qa:"] },
+    { key: "schedule", label: "월별 스케줄", icon: ICON_CHART, keyPrefixes: ["personal-schedule:"] },
+  ];
+  function backupAllPrefixes() {
+    return BACKUP_CATEGORIES.reduce((acc, c) => acc.concat(c.keyPrefixes), []);
+  }
+  // 지금 로그인한 계정 소유의 키만 모아서, "acct:{id}:" 접두어를 뗀 상대 키 기준으로 돌려준다.
+  function collectAccountStorageEntries(prefixFilter) {
+    const acctPrefix = `acct:${CURRENT_ACCOUNT_ID}:`;
+    const entries = {};
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (!k || k.indexOf(acctPrefix) !== 0) continue;
+        const rel = k.slice(acctPrefix.length);
+        if (prefixFilter && !prefixFilter.some((p) => rel.indexOf(p) === 0)) continue;
+        const v = localStorage.getItem(k);
+        if (v !== null) entries[rel] = v;
+      }
+    } catch (e) { /* localStorage 접근 실패 시 빈 결과로 진행 */ }
+    return entries;
+  }
+  function buildBackupPayload(categoryKey) {
+    const cat = categoryKey === "all" ? null : BACKUP_CATEGORIES.find((c) => c.key === categoryKey);
+    const entries = collectAccountStorageEntries(cat ? cat.keyPrefixes : backupAllPrefixes());
+    return {
+      app: "업무 종합 관리",
+      backupVersion: 1,
+      exportedAt: new Date().toISOString(),
+      accountName: CURRENT_ACCOUNT_NAME,
+      category: categoryKey,
+      categoryLabel: cat ? cat.label : "전체 데이터",
+      data: entries,
+    };
+  }
+  function backupFilenameStamp() {
+    const d = new Date();
+    return `${d.getFullYear()}${pad2(d.getMonth() + 1)}${pad2(d.getDate())}-${pad2(d.getHours())}${pad2(d.getMinutes())}`;
+  }
+  function sanitizeFilenamePart(s) {
+    return String(s).replace(/[\\/:*?"<>|]/g, "_");
+  }
+  function downloadBackup(categoryKey) {
+    const payload = buildBackupPayload(categoryKey);
+    const json = JSON.stringify(payload, null, 2);
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `백업_${sanitizeFilenamePart(CURRENT_ACCOUNT_NAME)}_${sanitizeFilenamePart(payload.categoryLabel)}_${backupFilenameStamp()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    flashBackupStatus(`"${payload.categoryLabel}" 백업 파일을 내려받았어요.`);
+  }
+  function readBackupFile(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        try { resolve(JSON.parse(reader.result)); }
+        catch (e) { reject(e); }
+      };
+      reader.onerror = () => reject(reader.error);
+      reader.readAsText(file, "utf-8");
+    });
+  }
+  // restrictCategory가 있으면 그 카테고리에 속한 키만 반영하고(다른 카테고리 값은
+  // 파일 안에 섞여 있어도 무시), 없으면(=전체 가져오기) 알려진 모든 카테고리의
+  // 키를 반영한다. 백업 파일에 적힌 계정 이름 등은 참고용일 뿐 저장에는 쓰지
+  // 않고, 항상 "지금 로그인한 계정" 접두어로만 써서 다른 계정에는 영향이 없다.
+  async function applyBackupPayload(payload, restrictCategory) {
+    if (!payload || typeof payload !== "object" || !payload.data || typeof payload.data !== "object") {
+      return { ok: false, reason: "올바른 백업 파일이 아니에요." };
+    }
+    const allowedPrefixes = restrictCategory
+      ? ((BACKUP_CATEGORIES.find((c) => c.key === restrictCategory) || {}).keyPrefixes || [])
+      : backupAllPrefixes();
+    const acctPrefix = `acct:${CURRENT_ACCOUNT_ID}:`;
+    let count = 0;
+    Object.keys(payload.data).forEach((relKey) => {
+      if (!allowedPrefixes.some((p) => relKey.indexOf(p) === 0)) return;
+      const value = payload.data[relKey];
+      if (typeof value !== "string") return;
+      try { localStorage.setItem(acctPrefix + relKey, value); count += 1; } catch (e) {}
+    });
+    if (count === 0) return { ok: false, reason: "이 백업 파일에서 가져올 수 있는 데이터를 찾지 못했어요." };
+    await flushCloudWrites();
+    return { ok: true, count };
+  }
+
+  // 백업 버튼: 사용설명서 버튼 바로 위에 항상 떠 있는 고정 버튼으로 표시.
+  function renderBackupToggle() {
+    const root = document.getElementById("backup-toggle-root");
+    if (!root) return;
+    root.innerHTML = `
+      <div class="manual-toggle-wrap">
+        <button class="theme-picker-btn" id="nav-backup-toggle" type="button" aria-haspopup="dialog" aria-label="데이터 백업/복원 열기" title="데이터 백업/복원">
+          ${ICON_BACKUP}
+          <span class="theme-picker-label">데이터 백업</span>
+        </button>
+      </div>
+    `;
+    const backupBtn = document.getElementById("nav-backup-toggle");
+    if (backupBtn) backupBtn.onclick = () => openBackupModal();
+  }
+  function closeBackupModal() {
+    const existing = document.getElementById("backup-modal-overlay");
+    if (existing) existing.remove();
+  }
+  function flashBackupStatus(msg, isError) {
+    const el = document.getElementById("backup-modal-status");
+    if (!el) return;
+    el.textContent = msg;
+    el.classList.toggle("error", !!isError);
+  }
+  function backupCategoryRowHtml(cat) {
+    return `
+      <div class="backup-cat-row">
+        <div class="backup-cat-label">${cat.icon} ${esc(cat.label)}</div>
+        <div class="backup-cat-actions">
+          <button type="button" class="ghost-btn" data-backup-export="${cat.key}">${ICON_DOWNLOAD} 내보내기</button>
+          <button type="button" class="ghost-btn" data-backup-import="${cat.key}">${ICON_UPLOAD} 가져오기</button>
+        </div>
+      </div>
+    `;
+  }
+  // 파일 선택창을 열기 직전에 "이번 가져오기가 어느 카테고리 대상인지"를 여기에
+  // 담아두고, 파일이 선택되면 이 값을 기준으로 어떤 키만 반영할지 정한다.
+  let backupImportRestrict = null;
+  function openBackupModal() {
+    closeBackupModal();
+    const overlay = document.createElement("div");
+    overlay.id = "backup-modal-overlay";
+    overlay.className = "manual-modal-overlay";
+    overlay.innerHTML = `
+      <div class="manual-modal-box backup-modal-box" role="dialog" aria-modal="true" aria-label="데이터 백업/복원">
+        <div class="manual-modal-head">
+          <span>${ICON_BACKUP} 데이터 백업/복원</span>
+          <button type="button" class="manual-modal-close" id="backup-modal-close-x" aria-label="닫기">✕</button>
+        </div>
+        <div class="manual-modal-body">
+          <p class="backup-modal-desc">
+            상담사 정보 · 월별 스케줄 · 면담일지 · QA 점수 · 업무 정리(메모) · 캘린더 등
+            <b>"${esc(CURRENT_ACCOUNT_NAME)}"</b> 계정의 데이터를 JSON 파일로 내려받거나 다시 불러올 수 있어요.
+            가져오기는 파일이 원래 어느 계정에서 만들어졌든 상관없이 항상 <b>지금 로그인한 이 계정에만</b>
+            적용되고, 다른 계정의 데이터에는 전혀 영향을 주지 않아요.
+          </p>
+          <div class="backup-section">
+            <div class="backup-section-title">전체 데이터</div>
+            <div class="backup-all-actions">
+              <button type="button" class="primary-btn" id="backup-export-all">${ICON_DOWNLOAD} 전체 백업 다운로드</button>
+              <button type="button" class="ghost-btn" id="backup-import-all">${ICON_UPLOAD} 전체 백업 가져오기</button>
+            </div>
+          </div>
+          <div class="backup-section">
+            <div class="backup-section-title">카테고리별 백업</div>
+            <div class="backup-cat-list">${BACKUP_CATEGORIES.map(backupCategoryRowHtml).join("")}</div>
+          </div>
+          <div class="status backup-modal-status" id="backup-modal-status"></div>
+          <input type="file" accept="application/json" id="backup-file-input" style="display:none;">
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    overlay.onclick = (e) => { if (e.target === overlay) closeBackupModal(); };
+    document.getElementById("backup-modal-close-x").onclick = () => closeBackupModal();
+
+    const fileInput = document.getElementById("backup-file-input");
+    fileInput.onchange = async () => {
+      const file = fileInput.files && fileInput.files[0];
+      fileInput.value = "";
+      if (!file) return;
+      const restrict = backupImportRestrict;
+      const restrictLabel = restrict
+        ? ((BACKUP_CATEGORIES.find((c) => c.key === restrict) || {}).label || restrict)
+        : "전체 데이터";
+      let payload;
+      try { payload = await readBackupFile(file); }
+      catch (e) { flashBackupStatus("파일을 읽을 수 없어요. 올바른 백업 JSON 파일인지 확인해주세요.", true); return; }
+      const proceed = window.confirm(
+        `"${restrictLabel}" 데이터를 이 백업 파일 내용으로 덮어쓸까요?\n(지금 로그인한 계정 "${CURRENT_ACCOUNT_NAME}"에만 적용되고, 다른 계정에는 영향이 없어요)`
+      );
+      if (!proceed) return;
+      flashBackupStatus("가져오는 중…");
+      const result = await applyBackupPayload(payload, restrict);
+      if (!result.ok) { flashBackupStatus(result.reason, true); return; }
+      flashBackupStatus(`${result.count}개 항목을 가져왔어요. 화면을 새로고침할게요…`);
+      setTimeout(() => location.reload(), 700);
+    };
+
+    document.getElementById("backup-export-all").onclick = () => downloadBackup("all");
+    document.getElementById("backup-import-all").onclick = () => {
+      backupImportRestrict = null;
+      fileInput.click();
+    };
+    overlay.querySelectorAll("[data-backup-export]").forEach((btn) => {
+      btn.onclick = () => downloadBackup(btn.getAttribute("data-backup-export"));
+    });
+    overlay.querySelectorAll("[data-backup-import]").forEach((btn) => {
+      btn.onclick = () => {
+        backupImportRestrict = btn.getAttribute("data-backup-import");
+        fileInput.click();
+      };
+    });
   }
 
   // 테마 선택 팝오버(사이드바 하단의 테마 버튼을 누르면 뜨는 목록)
@@ -3194,6 +3714,13 @@
   function deleteEntry(id) {
     const entry = findEntry(id);
     if (!entry) return;
+    // 여러 달에 걸친 일정이면 관련된 모든 달의 저장 키를 함께 스냅샷해둔다.
+    const touchedMonthKeys = new Set([monthKey(cal.year, cal.monthIndex)]);
+    forEachRangeDay(entry, (y, m) => { touchedMonthKeys.add(monthKey(y, m)); });
+    const undoYear = cal.year, undoMonthIndex = cal.monthIndex;
+    recordUndo("일정 삭제", Array.from(touchedMonthKeys), () => {
+      if (cal.year === undoYear && cal.monthIndex === undoMonthIndex) loadMonth(cal.year, cal.monthIndex);
+    });
     forEachRangeDay(entry, (y, m, dayKey) => {
       if (y === cal.year && m === cal.monthIndex) {
         const list = (cal.monthData[dayKey] || []).filter((it) => it.id !== id);
@@ -3250,6 +3777,8 @@
     saveTodos();
   }
   function deleteTodo(id) {
+    if (!todos.some((t) => t.id === id)) return;
+    recordUndo("할 일 삭제", TODO_KEY, () => { todos = loadTodos(); });
     todos = todos.filter((t) => t.id !== id);
     saveTodos();
   }
@@ -3391,6 +3920,7 @@
     saveNotesData();
   }
   function deleteFolder(id) {
+    recordUndo("폴더 삭제", NOTES_KEY, () => undoRestoreObjectInPlace(notesData, loadNotesData()));
     const orphaned = notesData.folderOrder[id] || [];
     notesData.folderOrder[UNFILED] = (notesData.folderOrder[UNFILED] || []).concat(orphaned);
     orphaned.forEach((noteId) => { if (notesData.notes[noteId]) notesData.notes[noteId].folderId = null; });
@@ -3412,6 +3942,7 @@
   function deleteNote(id) {
     const note = notesData.notes[id];
     if (!note) return;
+    recordUndo("메모 삭제", NOTES_KEY, () => undoRestoreObjectInPlace(notesData, loadNotesData()));
     const key = note.folderId || UNFILED;
     if (notesData.folderOrder[key]) notesData.folderOrder[key] = notesData.folderOrder[key].filter((x) => x !== id);
     notesData.pinnedOrder = notesData.pinnedOrder.filter((x) => x !== id);
@@ -3782,6 +4313,11 @@
     saveAgentsData();
   }
   function deleteAgent(id) {
+    // 상담사를 지울 때 그 사람의 면담 기록도 함께 정리되므로, 두 저장소를 함께 스냅샷해둔다.
+    recordUndo("상담사 삭제", [AGENTS_KEY, INTERVIEWS_KEY], () => {
+      agentsData = loadAgentsData();
+      interviewsData = loadInterviewsData();
+    });
     agentsData = agentsData.filter((a) => a.id !== id);
     if (agentsUi.selectedId === id) agentsUi.selectedId = null;
     saveAgentsData();
@@ -4014,6 +4550,7 @@
         <span class="agent-field-label">재직 상태</span>
         <span class="agent-field-value">${agent.status === "RESIGNED" ? '<span class="badge resigned">퇴사</span>' : '<span class="badge working">근무중</span>'}</span>
       </div>
+      ${renderAgentQAPreview(agent)}
       ${renderAgentInterviewSection(agent)}
     `;
   }
@@ -4392,6 +4929,10 @@
     year: today.getFullYear(),
     monthIndex: today.getMonth(), // 0-based. 실시간 기준 당월로 시작한다.
   };
+  // 상담사 상세에서 "품질 관리로 이동"을 눌렀을 때, 이동한 화면에서 그 인원의 행을
+  // 한 번 강조해서 보여주기 위한 값. 렌더링 후 바로 비워서 다음 화면 갱신부터는
+  // 강조가 남지 않게 한다.
+  let qaHighlightAgentId = null;
 
   function qaMonthKey(year, monthIndex) { return `${year}-${pad2(monthIndex + 1)}`; }
   function qaMonthLabel() { return `${qaUi.year}년 ${qaUi.monthIndex + 1}월`; }
@@ -4513,6 +5054,40 @@
     return `<span class="qa-diff ${cls}">${sign} ${Math.abs(diff).toFixed(1)}</span>`;
   }
 
+  // ----- 상담사 상세 카드용 "최근 QA 점수" 미리보기 -----
+  // 이번 달 포함 최근 3개월 점수를 관리자→월별 스케줄 이동 없이 바로 보여준다.
+  // QA 관리 대상이 아닌 관리자 계정은 표시하지 않는다.
+  function renderAgentQAPreview(agent) {
+    if (agent.isAdmin) return "";
+    const months = [];
+    for (let i = 0; i < 3; i++) {
+      let m = today.getMonth() - i;
+      let y = today.getFullYear();
+      while (m < 0) { m += 12; y -= 1; }
+      months.push({ year: y, monthIndex: m });
+    }
+    const cellsHtml = months.map(({ year, monthIndex }, idx) => {
+      const val = getQAScore(agent.id, year, monthIndex);
+      const label = idx === 0 ? "이번 달" : `${monthIndex + 1}월`;
+      return `
+        <div class="agent-qa-cell">
+          <div class="agent-qa-cell-label">${esc(label)}</div>
+          <div class="agent-qa-cell-value${val === null ? " empty" : ""}">${val === null ? "데이터 없음" : val.toFixed(1)}</div>
+          <div class="agent-qa-cell-diff">${qaDiffHtml(agent, year, monthIndex)}</div>
+        </div>
+      `;
+    }).join("");
+    return `
+      <div class="agent-interview-section agent-qa-preview">
+        <div class="agent-interview-header">
+          <div class="agent-interview-title">${ICON_QA} 최근 QA 점수</div>
+          <button class="ghost-btn" data-action="agent-goto-qa" data-id="${agent.id}">${ICON_CHEVRON_RIGHT} 품질 관리로 이동</button>
+        </div>
+        <div class="agent-qa-preview-grid">${cellsHtml}</div>
+      </div>
+    `;
+  }
+
   function qaStatDiff(cur, prev) {
     if (cur === null || prev === null || prev === undefined) return null;
     const diff = cur - prev;
@@ -4569,8 +5144,9 @@
               const scoreCell = forCapture
                 ? `<td>${val === null ? "-" : val.toFixed(1)}</td>`
                 : qaScoreCellHtml(a, year, monthIndex);
+              const highlight = !forCapture && qaHighlightAgentId === a.id;
               return `
-                <tr>
+                <tr data-qa-row-agent="${a.id}" class="${highlight ? "qa-row-highlight" : ""}">
                   <td class="qa-col-name">${esc(a.name)}</td>
                   <td class="qa-col-ldap">${esc(a.ldap || "-")}</td>
                   <td>${esc(a.timezone || "-")}</td>
@@ -4620,6 +5196,18 @@
       </div>
       ${buildQATableHtml(agentsList, year, monthIndex, false)}
     `;
+
+    // 상담사 상세에서 "품질 관리로 이동"으로 넘어온 경우, 그 인원의 행으로
+    // 스크롤하고 한 번만 강조 표시한다.
+    if (qaHighlightAgentId) {
+      const targetId = qaHighlightAgentId;
+      qaHighlightAgentId = null;
+      const row = root.querySelector(`[data-qa-row-agent="${CSS.escape(targetId)}"]`);
+      if (row) {
+        row.scrollIntoView({ behavior: "smooth", block: "center" });
+        setTimeout(() => row.classList.remove("qa-row-highlight"), 2200);
+      }
+    }
 
     document.getElementById("qa-prev-month").onclick = () => qaShiftMonth(-1);
     document.getElementById("qa-next-month").onclick = () => qaShiftMonth(1);
@@ -4892,6 +5480,8 @@
     saveInterviewsData();
   }
   function deleteInterview(id) {
+    if (!interviewsData.some((r) => r.id === id)) return;
+    recordUndo("면담 기록 삭제", INTERVIEWS_KEY, () => { interviewsData = loadInterviewsData(); });
     interviewsData = interviewsData.filter((r) => r.id !== id);
     saveInterviewsData();
   }
@@ -5301,7 +5891,10 @@
       <div class="agent-interview-section">
         <div class="agent-interview-header">
           <div class="agent-interview-title">${ICON_CLIPBOARD} 면담 이력</div>
-          ${agentsUi.interviewMode === "list" ? `<button class="ghost-btn" id="btn-agent-interview-add">＋ 면담 기록 추가</button>` : ""}
+          <div class="agent-interview-header-actions">
+            ${agentsUi.interviewMode === "list" ? `<button class="ghost-btn" id="btn-agent-interview-add">＋ 면담 기록 추가</button>` : ""}
+            <button class="ghost-btn" data-action="agent-goto-interviews" data-id="${agent.id}">${ICON_CHEVRON_RIGHT} 면담일지 전체보기</button>
+          </div>
         </div>
         ${bodyHtml}
       </div>
@@ -5318,6 +5911,24 @@
         renderApp();
       };
     }
+    // 상담사 상세 → 면담일지 전체 화면으로 이동하면서, 이 상담사 이름으로 미리 검색해둔다.
+    root.querySelectorAll("[data-action='agent-goto-interviews']").forEach((btn) => {
+      btn.onclick = () => {
+        interviewsUi.searchQuery = agent.name;
+        interviewsUi.typeFilter = "all";
+        interviewsUi.mode = "list";
+        setPage("interviews");
+      };
+    });
+    // 상담사 상세 → 품질 관리 화면으로 이동하면서, 이 상담사가 있는 달로 맞춰준다.
+    root.querySelectorAll("[data-action='agent-goto-qa']").forEach((btn) => {
+      btn.onclick = () => {
+        qaUi.year = today.getFullYear();
+        qaUi.monthIndex = today.getMonth();
+        qaHighlightAgentId = agent.id;
+        setPage("qa");
+      };
+    });
     root.querySelectorAll("[data-action='agent-edit-interview']").forEach((btn) => {
       btn.onclick = () => {
         agentsUi.interviewMode = "edit";
@@ -5377,13 +5988,20 @@
         }
       }
     } catch (e) {}
-    return { staff: [], records: {}, staffHistory: {}, lastSyncMonthKey: null, requiredHeadcount: {}, monthLocks: {} };
+    return { staff: [], records: {}, staffHistory: {}, lastSyncMonthKey: null, requiredHeadcount: {}, monthLocks: {}, memos: {} };
   }
-  let scheduleData = loadScheduleData();
-  if (!scheduleData.requiredHeadcount) scheduleData.requiredHeadcount = {};
-  // 사용자가 직접 켜고 끄는 "월별 잠금". 잠긴 달은 셀 클릭·일괄 붙여넣기·삭제·필요인력 입력 등
-  // 데이터를 바꾸는 조작이 전부 막혀서 실수로 수정되는 걸 막아준다. 다시 버튼을 눌러 풀면 그대로 수정 가능.
-  if (!scheduleData.monthLocks || typeof scheduleData.monthLocks !== "object") scheduleData.monthLocks = {};
+  function normalizeScheduleData(d) {
+    if (!d.requiredHeadcount) d.requiredHeadcount = {};
+    // 셀(인원×날짜)마다 남길 수 있는 메모. key는 scheduleRecordKey와 같은 형식(staffId|dateKey).
+    if (!d.memos || typeof d.memos !== "object") d.memos = {};
+    // 사용자가 직접 켜고 끄는 "월별 잠금". 잠긴 달은 셀 클릭·일괄 붙여넣기·삭제·필요인력 입력 등
+    // 데이터를 바꾸는 조작이 전부 막혀서 실수로 수정되는 걸 막아준다. 다시 버튼을 눌러 풀면 그대로 수정 가능.
+    if (!d.monthLocks || typeof d.monthLocks !== "object") d.monthLocks = {};
+    return d;
+  }
+  // 되돌리기(undo)로 스냅샷을 복원한 뒤 이 함수를 호출해 scheduleData를 다시 읽어들인다.
+  function reloadScheduleData() { scheduleData = normalizeScheduleData(loadScheduleData()); }
+  let scheduleData = normalizeScheduleData(loadScheduleData());
 
   // "YYYY-MM" 형태의 달 키. 과거 달을 고정(확정)하고 식별하는 데 쓴다.
   function scheduleMonthKey(year, monthIndex) { return `${year}-${pad2(monthIndex + 1)}`; }
@@ -5477,6 +6095,10 @@
     Object.keys(scheduleData.records).forEach((key) => {
       const staffId = key.split("|")[0];
       if (!validIds[staffId]) delete scheduleData.records[key];
+    });
+    Object.keys(scheduleData.memos).forEach((key) => {
+      const staffId = key.split("|")[0];
+      if (!validIds[staffId]) delete scheduleData.memos[key];
     });
   }
 
@@ -5580,6 +6202,7 @@
       return;
     }
 
+    recordUndo("스케줄 일괄 붙여넣기", SCHEDULE_KEY, reloadScheduleData);
     let matchedLines = 0;
     let filledCells = 0;
     const unmatchedNames = [];
@@ -5666,6 +6289,7 @@
   }
   function setScheduleRecord(staffId, dateKey, patch) {
     if (scheduleIsDateLocked(dateKey)) { flashScheduleStatus("잠긴 달이에요. 잠금을 해제한 뒤 수정해주세요."); return; }
+    recordUndo("스케줄 셀 변경", SCHEDULE_KEY, reloadScheduleData);
     const key = scheduleRecordKey(staffId, dateKey);
     const cur = scheduleData.records[key] || { status: "WORK", attendance: null };
     const next = Object.assign({}, cur, patch);
@@ -5673,6 +6297,21 @@
       delete scheduleData.records[key]; // 기본값이면 굳이 저장하지 않음
     } else {
       scheduleData.records[key] = next;
+    }
+    saveScheduleData();
+  }
+  // ----- 셀 메모 (엑셀의 "메모/노트"처럼, 스케줄 상태와 별개로 짧은 텍스트를 남긴다) -----
+  function getScheduleMemo(staffId, dateKey) {
+    return scheduleData.memos[scheduleRecordKey(staffId, dateKey)] || "";
+  }
+  function setScheduleMemo(staffId, dateKey, text) {
+    if (scheduleIsDateLocked(dateKey)) { flashScheduleStatus("잠긴 달이에요. 잠금을 해제한 뒤 수정해주세요."); return; }
+    const key = scheduleRecordKey(staffId, dateKey);
+    const trimmed = (text || "").trim();
+    if (trimmed === "") {
+      delete scheduleData.memos[key];
+    } else {
+      scheduleData.memos[key] = trimmed;
     }
     saveScheduleData();
   }
@@ -5765,7 +6404,7 @@
   // hideRequiredRows: true면 "필요인력"/"대비"/"인력 대비 편성" 3행 묶음(입력칸 포함)을 아예 빼고 그린다.
   // (이미지로 저장할 때 켜서 씀. 이 행에는 <input>이 들어있어 캡처 대상에서 빼는 게 더 안전하고,
   //  캡처 이미지 안에 사용자가 직접 편집하는 입력용 요소가 노출되지 않게 한다.)
-  function buildScheduleTableHtml(filterMode, hideSummaryCols, hideRequiredRows) {
+  function buildScheduleTableHtml(filterMode, hideSummaryCols, hideRequiredRows, hideMemoMarks) {
     const { year, monthIndex } = scheduleUi;
     const numDays = scheduleDaysInMonth(year, monthIndex);
     const days = [];
@@ -5799,12 +6438,16 @@
         return `<th class="${cls}${colHiddenCls(d)}">${WEEKDAYS[wd]}</th>`;
       }).join("");
 
+    let scheduleRowCounter = 0; // 드래그 선택의 사각형 범위 계산에 쓰는, 렌더링될 때마다 매겨지는 행 순번
     function staffRowHtml(s) {
+      const rowIdx = scheduleRowCounter++;
       const cells = days.map((d) => {
         const dateKey = scheduleDateKey(year, monthIndex, d);
         const record = getScheduleRecord(s.id, dateKey);
         const disp = scheduleCellDisplay(record);
-        return `<td class="sch-cell ${disp.cls}${colHiddenCls(d)}" data-staff-id="${s.id}" data-date="${dateKey}">${disp.label}</td>`;
+        const memo = getScheduleMemo(s.id, dateKey);
+        const memoDot = (memo && !hideMemoMarks) ? `<span class="sch-memo-dot" title="${esc(memo)}"></span>` : "";
+        return `<td class="sch-cell ${disp.cls}${colHiddenCls(d)}" data-staff-id="${s.id}" data-date="${dateKey}" data-row-idx="${rowIdx}" data-day="${d}" title="${esc(memo)}">${disp.label}${memoDot}</td>`;
       }).join("");
       const counts = scheduleStaffMonthCounts(s.id, year, monthIndex);
       const summaryCells = hideSummaryCols ? "" : `
@@ -5837,10 +6480,14 @@
     }
 
     // "필요인력" 행: 사용자가 직접 숫자를 입력하는 칸(인풋). groupKey는 "DAY"/"NIGHT", type은 "채팅"/"유선".
+    // 이 달이 잠겨 있으면(확정됨) 다른 스케줄 셀과 마찬가지로 입력칸 자체를 비활성화해서
+    // 클릭·타이핑 자체가 안 먹게 한다. (예전에는 blur 시점에만 저장을 막아서, 입력은 계속
+    // 가능해 보이는데 실제로는 저장이 안 되는 것처럼 보이는 문제가 있었다.)
+    const monthLocked = scheduleIsMonthLocked(year, monthIndex);
     function requiredHeadcountRowHtml(groupKey, type, label) {
       const cells = days.map((d) => {
         const val = getRequiredHeadcount(year, monthIndex, groupKey, type, d);
-        return `<td class="sch-required-cell${colHiddenCls(d)}"><input type="number" class="sch-required-input" min="0" step="1" inputmode="numeric" data-required-group="${groupKey}" data-required-type="${esc(type)}" data-required-day="${d}" value="${val === null ? "" : val}" placeholder="-"></td>`;
+        return `<td class="sch-required-cell${colHiddenCls(d)}"><input type="number" class="sch-required-input${monthLocked ? " sch-required-input--locked" : ""}" min="0" step="1" inputmode="numeric" data-required-group="${groupKey}" data-required-type="${esc(type)}" data-required-day="${d}" value="${val === null ? "" : val}" placeholder="-"${monthLocked ? " disabled title=\"잠긴 달이에요. 잠금을 해제한 뒤 수정해주세요.\"" : ""}></td>`;
       }).join("");
       return `<tr class="sch-required-row"><td class="sch-info" colspan="${infoColCount}">${label}</td>${cells}</tr>`;
     }
@@ -6216,6 +6863,13 @@
           if (fillArgb) {
             cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: fillArgb } };
             cell.font = { bold: label === "지각" || label === "결근", color: { argb: STATUS_TEXT[label] || COLOR.nickname } };
+          }
+          // 화면에서 남긴 셀 메모는 엑셀에서 "메모(노트)"로 그대로 들어간다 (셀에 빨간 삼각형 표시,
+          // 마우스를 올리면 내용이 보임). 이미지 저장(html2canvas 캡처)과 달리 엑셀에는 항상 반영된다.
+          const dayNum = days[i];
+          const memo = getScheduleMemo(s.id, scheduleDateKey(year, monthIndex, dayNum));
+          if (memo) {
+            cell.note = { texts: [{ text: memo }], margins: { insetmode: "auto" } };
           }
         });
         return r;
@@ -6611,7 +7265,7 @@
         <span class="item"><span class="swatch" style="background:${cRed};"></span>결근</span>
         <span class="item"><span class="swatch" style="background:${cFaint};"></span>퇴사</span>
       </div>
-      ${buildScheduleTableHtml(tableFilter, true, true)}
+      ${buildScheduleTableHtml(tableFilter, true, true, true)}
     `;
     document.body.appendChild(wrapper);
 
@@ -6648,11 +7302,136 @@
     const existing = document.getElementById("sch-menu");
     if (existing) existing.remove();
     document.removeEventListener("mousedown", scheduleMenuOutsideHandler, true);
+    scheduleClearSelection();
   }
   function scheduleMenuOutsideHandler(e) {
     const menu = document.getElementById("sch-menu");
     if (menu && !menu.contains(e.target)) closeScheduleMenu();
   }
+  // ----- 스케줄 셀 드래그로 여러 칸 선택 후 한 번에 상태 적용 -----
+  // 마우스로 셀을 누른 채 다른 셀 위로 드래그하면(행·열 사각형 범위) 선택되고,
+  // 뗄 때 상태 선택 메뉴가 한 번만 뜬다. 드래그 없이 그냥 클릭하면 기존처럼
+  // 그 칸 하나만 다루는 메뉴(openScheduleMenu)가 뜬다.
+  let scheduleSelectDragging = false;
+  let scheduleSelectMoved = false;
+  let scheduleSelectAnchor = null; // { rowIdx, day }
+  let scheduleSelectCurrent = null; // { rowIdx, day }
+
+  function scheduleSelectionRectCells(root, anchor, current) {
+    if (!root || !anchor || !current) return [];
+    const minRow = Math.min(anchor.rowIdx, current.rowIdx);
+    const maxRow = Math.max(anchor.rowIdx, current.rowIdx);
+    const minDay = Math.min(anchor.day, current.day);
+    const maxDay = Math.max(anchor.day, current.day);
+    return Array.from(root.querySelectorAll(".sch-cell")).filter((cell) => {
+      const rowIdx = Number(cell.getAttribute("data-row-idx"));
+      const day = Number(cell.getAttribute("data-day"));
+      return rowIdx >= minRow && rowIdx <= maxRow && day >= minDay && day <= maxDay;
+    });
+  }
+  function scheduleApplySelectionHighlight() {
+    const root = document.getElementById("schedule-table-area");
+    if (!root) return;
+    const selected = new Set(scheduleSelectionRectCells(root, scheduleSelectAnchor, scheduleSelectCurrent));
+    root.querySelectorAll(".sch-cell").forEach((cell) => {
+      cell.classList.toggle("sch-cell--selected", selected.has(cell));
+    });
+  }
+  function scheduleClearSelection() {
+    scheduleSelectDragging = false;
+    scheduleSelectMoved = false;
+    scheduleSelectAnchor = null;
+    scheduleSelectCurrent = null;
+    const root = document.getElementById("schedule-table-area");
+    if (root) root.querySelectorAll(".sch-cell--selected").forEach((cell) => cell.classList.remove("sch-cell--selected"));
+  }
+  // 선택된 여러 칸에 상태를 한 번에 적용한다. 칸마다 저장하지 않고 한 번만 저장/동기화한다.
+  function scheduleApplyBulk(cells, patch) {
+    if (cells.length) recordUndo(`셀 ${cells.length}개 일괄 변경`, SCHEDULE_KEY, reloadScheduleData);
+    cells.forEach((cell) => {
+      const staffId = cell.getAttribute("data-staff-id");
+      const dateKey = cell.getAttribute("data-date");
+      const key = scheduleRecordKey(staffId, dateKey);
+      const cur = scheduleData.records[key] || { status: "WORK", attendance: null };
+      const next = Object.assign({}, cur, patch);
+      if (next.status === "WORK" && !next.attendance) delete scheduleData.records[key];
+      else scheduleData.records[key] = next;
+    });
+    saveScheduleData();
+  }
+  const SCHEDULE_STATUS_OPTIONS = [
+    ["WORK", null, "근무"],
+    ["OFF", null, "오프"],
+    ["ANNUAL", null, "연차"],
+    ["DAEHYU", null, "대휴"],
+    ["HALF", null, "반차"],
+    ["GONGHYU", null, "공휴"],
+    ["GONGGA", null, "공가"],
+    ["MATERNITY", null, "육휴"],
+    ["SPECIAL", null, "특휴"],
+    ["EDUCATION", null, "교육"],
+    ["WORK", "LATE", "지각"],
+    ["WORK", "ABSENT", "결근"],
+    ["RESIGNED", null, "퇴사"],
+  ];
+  function openScheduleBulkMenu(cells, evt) {
+    // 선택 범위 안에 잠긴 달의 날짜가 하나라도 있으면 전체를 막는다 (개별 셀 잠금 규칙과 동일).
+    const lockedFound = cells.some((cell) => scheduleIsDateLocked(cell.getAttribute("data-date")));
+    if (lockedFound) {
+      flashScheduleStatus("선택한 범위에 잠긴 달이 포함돼 있어요. 잠금을 해제한 뒤 다시 선택해주세요.");
+      scheduleClearSelection();
+      return;
+    }
+    closeScheduleMenu();
+    cells.forEach((cell) => cell.classList.add("sch-cell--selected")); // closeScheduleMenu가 지운 하이라이트를 다시 표시
+    const menu = document.createElement("div");
+    menu.id = "sch-menu";
+    menu.className = "sch-menu";
+    menu.innerHTML = `<div class="sch-menu-title">${cells.length}칸 선택됨</div>` +
+      SCHEDULE_STATUS_OPTIONS.map((o) =>
+        `<button type="button" data-status="${o[0]}" data-attendance="${o[1] || ""}">${o[2]}</button>`
+      ).join("") +
+      `<button type="button" class="sch-menu-reset" data-reset="1">기본값(근무)으로</button>`;
+    document.body.appendChild(menu);
+    const clientX = evt ? evt.clientX : window.innerWidth / 2;
+    const clientY = evt ? evt.clientY : window.innerHeight / 2;
+    const top = Math.min(clientY + 4, window.innerHeight - menu.offsetHeight - 8);
+    const left = Math.min(clientX, window.innerWidth - menu.offsetWidth - 8);
+    menu.style.top = `${Math.max(8, top)}px`;
+    menu.style.left = `${Math.max(8, left)}px`;
+    function applyAndClose(status, attendance) {
+      scheduleApplyBulk(cells, { status, attendance: attendance || null });
+      closeScheduleMenu();
+      updateScheduleTableArea();
+      flashScheduleStatus(`${cells.length}칸에 적용했어요.`);
+    }
+    menu.querySelectorAll("button[data-status]").forEach((btn) => {
+      btn.onclick = () => applyAndClose(btn.getAttribute("data-status"), btn.getAttribute("data-attendance"));
+    });
+    const resetBtn = menu.querySelector("[data-reset]");
+    if (resetBtn) resetBtn.onclick = () => applyAndClose("WORK", null);
+    setTimeout(() => document.addEventListener("mousedown", scheduleMenuOutsideHandler, true), 0);
+  }
+  // 마우스를 뗄 때(문서 전체 기준): 드래그해서 여러 칸을 옮겨다녔으면 일괄 적용 메뉴를 띄우고,
+  // 그냥 제자리에서 뗐으면(=클릭) 아무 것도 하지 않고 이어서 그 칸의 onclick이 기존 방식대로 처리한다.
+  function scheduleSelectionMouseUpHandler(e) {
+    if (!scheduleSelectDragging) return;
+    const root = document.getElementById("schedule-table-area");
+    const wasMoved = scheduleSelectMoved;
+    const anchor = scheduleSelectAnchor;
+    const current = scheduleSelectCurrent;
+    scheduleSelectDragging = false;
+    if (wasMoved && root) {
+      const cells = scheduleSelectionRectCells(root, anchor, current);
+      if (cells.length > 1) {
+        openScheduleBulkMenu(cells, e);
+        return;
+      }
+    }
+    scheduleClearSelection();
+  }
+  document.addEventListener("mouseup", scheduleSelectionMouseUpHandler);
+
   function openScheduleMenu(anchorEl, staffId, dateKey) {
     if (scheduleIsDateLocked(dateKey)) {
       flashScheduleStatus("잠긴 달이에요. 잠금을 해제한 뒤 수정해주세요.");
@@ -6663,24 +7442,17 @@
     const menu = document.createElement("div");
     menu.id = "sch-menu";
     menu.className = "sch-menu";
-    const options = [
-      ["WORK", null, "근무"],
-      ["OFF", null, "오프"],
-      ["ANNUAL", null, "연차"],
-      ["DAEHYU", null, "대휴"],
-      ["HALF", null, "반차"],
-      ["GONGHYU", null, "공휴"],
-      ["GONGGA", null, "공가"],
-      ["MATERNITY", null, "육휴"],
-      ["SPECIAL", null, "특휴"],
-      ["EDUCATION", null, "교육"],
-      ["WORK", "LATE", "지각"],
-      ["WORK", "ABSENT", "결근"],
-      ["RESIGNED", null, "퇴사"],
-    ];
+    const options = SCHEDULE_STATUS_OPTIONS;
+    const hasMemo = !!getScheduleMemo(staffId, dateKey);
+    const memoLabel = hasMemo ? `${ICON_NOTE || ""} 메모 수정` : `${ICON_NOTE || ""} 메모 추가`;
+    const memoDeleteBtnHtml = hasMemo ? `<button type="button" class="sch-menu-danger" data-memo-delete="1">${ICON_TRASH || ""} 메모 삭제</button>` : "";
     menu.innerHTML = options.map((o) =>
       `<button type="button" data-status="${o[0]}" data-attendance="${o[1] || ""}">${o[2]}</button>`
-    ).join("") + `<button type="button" class="sch-menu-reset" data-reset="1">기본값(근무)으로</button>`;
+    ).join("")
+      + `<div class="sch-menu-divider"></div>`
+      + `<button type="button" data-memo="1">${memoLabel}</button>`
+      + memoDeleteBtnHtml
+      + `<button type="button" class="sch-menu-reset" data-reset="1">기본값(근무)으로</button>`;
     document.body.appendChild(menu);
     const top = Math.min(rect.bottom + 4, window.innerHeight - menu.offsetHeight - 8);
     const left = Math.min(rect.left, window.innerWidth - menu.offsetWidth - 8);
@@ -6693,6 +7465,21 @@
         updateScheduleTableArea();
       };
     });
+    const memoBtn = menu.querySelector("[data-memo]");
+    if (memoBtn) {
+      memoBtn.onclick = () => {
+        closeScheduleMenu();
+        openScheduleMemoModal(staffId, dateKey);
+      };
+    }
+    const memoDeleteBtn = menu.querySelector("[data-memo-delete]");
+    if (memoDeleteBtn) {
+      memoDeleteBtn.onclick = () => {
+        setScheduleMemo(staffId, dateKey, "");
+        closeScheduleMenu();
+        updateScheduleTableArea();
+      };
+    }
     const resetBtn = menu.querySelector("[data-reset]");
     if (resetBtn) {
       resetBtn.onclick = () => {
@@ -6704,9 +7491,91 @@
     setTimeout(() => document.addEventListener("mousedown", scheduleMenuOutsideHandler, true), 0);
   }
 
+  // ----- 셀 메모 입력 모달 -----
+  function closeScheduleMemoModal() {
+    const existing = document.getElementById("sch-memo-overlay");
+    if (existing) existing.remove();
+    document.removeEventListener("keydown", scheduleMemoEscHandler, true);
+  }
+  function scheduleMemoEscHandler(e) {
+    if (e.key === "Escape") closeScheduleMemoModal();
+  }
+  function openScheduleMemoModal(staffId, dateKey) {
+    if (scheduleIsDateLocked(dateKey)) {
+      flashScheduleStatus("잠긴 달이에요. 잠금을 해제한 뒤 수정해주세요.");
+      return;
+    }
+    closeScheduleMemoModal();
+    const staff = getStaffListForMonth(scheduleUi.year, scheduleUi.monthIndex).find((s) => s.id === staffId) || scheduleData.staff.find((s) => s.id === staffId);
+    const current = getScheduleMemo(staffId, dateKey);
+    const overlay = document.createElement("div");
+    overlay.id = "sch-memo-overlay";
+    overlay.className = "sch-preview-overlay";
+    overlay.innerHTML = `
+      <div class="sch-preview-box sch-memo-box">
+        <div class="sch-preview-head">
+          <span>${esc(staff ? staff.name : "")} · ${esc(dateKey)} 메모</span>
+          <button type="button" class="sch-preview-close" id="sch-memo-close-x" aria-label="닫기">✕</button>
+        </div>
+        <div class="sch-preview-body sch-memo-body">
+          <textarea class="add-input sch-memo-textarea" id="sch-memo-textarea" placeholder="이 날짜에 남길 메모를 입력하세요">${esc(current)}</textarea>
+        </div>
+        <div class="sch-preview-actions">
+          ${current ? `<button type="button" class="ghost-btn danger" id="sch-memo-delete">삭제</button>` : ""}
+          <button type="button" class="ghost-btn" id="sch-memo-cancel">취소</button>
+          <button type="button" class="primary-btn" id="sch-memo-save">저장</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    overlay.onclick = (e) => { if (e.target === overlay) closeScheduleMemoModal(); };
+    document.getElementById("sch-memo-close-x").onclick = () => closeScheduleMemoModal();
+    document.getElementById("sch-memo-cancel").onclick = () => closeScheduleMemoModal();
+    const deleteBtn = document.getElementById("sch-memo-delete");
+    if (deleteBtn) {
+      deleteBtn.onclick = () => {
+        setScheduleMemo(staffId, dateKey, "");
+        closeScheduleMemoModal();
+        updateScheduleTableArea();
+      };
+    }
+    document.getElementById("sch-memo-save").onclick = () => {
+      const val = document.getElementById("sch-memo-textarea").value;
+      setScheduleMemo(staffId, dateKey, val);
+      closeScheduleMemoModal();
+      updateScheduleTableArea();
+    };
+    setTimeout(() => {
+      document.addEventListener("keydown", scheduleMemoEscHandler, true);
+      const ta = document.getElementById("sch-memo-textarea");
+      if (ta) { ta.focus(); ta.select(); }
+    }, 0);
+  }
+
   function attachScheduleTableHandlers(root) {
     root.querySelectorAll(".sch-cell").forEach((cell) => {
-      cell.onclick = () => openScheduleMenu(cell, cell.getAttribute("data-staff-id"), cell.getAttribute("data-date"));
+      // 클릭(드래그 없이 눌렀다 뗌)만 기존처럼 그 칸 하나의 메뉴를 연다.
+      // 드래그로 여러 칸을 선택한 경우의 처리는 mousedown/mouseenter + 문서 전체 mouseup에서 한다.
+      cell.onclick = () => {
+        if (scheduleSelectMoved) return;
+        openScheduleMenu(cell, cell.getAttribute("data-staff-id"), cell.getAttribute("data-date"));
+      };
+      cell.onmousedown = (e) => {
+        if (e.button !== 0) return; // 왼쪽 버튼만
+        scheduleSelectDragging = true;
+        scheduleSelectMoved = false;
+        scheduleSelectAnchor = { rowIdx: Number(cell.getAttribute("data-row-idx")), day: Number(cell.getAttribute("data-day")) };
+        scheduleSelectCurrent = scheduleSelectAnchor;
+        e.preventDefault(); // 드래그 중 글자 선택(파랗게 칠해지는 것) 방지
+      };
+      cell.onmouseenter = () => {
+        if (!scheduleSelectDragging) return;
+        const rowIdx = Number(cell.getAttribute("data-row-idx"));
+        const day = Number(cell.getAttribute("data-day"));
+        if (rowIdx !== scheduleSelectAnchor.rowIdx || day !== scheduleSelectAnchor.day) scheduleSelectMoved = true;
+        scheduleSelectCurrent = { rowIdx, day };
+        scheduleApplySelectionHighlight();
+      };
     });
     root.querySelectorAll(".sch-required-input").forEach((input) => {
       // 입력칸을 벗어날 때(blur) 또는 Enter 시 저장. 매 타이핑마다 전체를 다시 그리지 않아
@@ -6777,10 +7646,11 @@
       return;
     }
     const ok = window.confirm(
-      `${scheduleMonthLabel()} "${label}" 일정을 모두 삭제할까요?\n대상 인원 ${targetStaff.length}명 · 이 달의 모든 날짜가 기본값(근무)으로 되돌아가고, 되돌릴 수 없어요.`
+      `${scheduleMonthLabel()} "${label}" 일정을 모두 삭제할까요?\n대상 인원 ${targetStaff.length}명 · 이 달의 모든 날짜가 기본값(근무)으로 되돌아가요. (Ctrl+Z로 되돌리기 가능)`
     );
     if (!ok) return;
 
+    recordUndo(`${label} 일괄 삭제`, SCHEDULE_KEY, reloadScheduleData);
     const numDays = scheduleDaysInMonth(year, monthIndex);
     let cleared = 0;
     targetStaff.forEach((s) => {
@@ -7055,6 +7925,11 @@
     fitScheduleTable();
     syncScheduleLogWidth();
     watchScheduleTableSize();
+    // renderSchedulePage()는 월 이동·잠금 토글·일괄 붙여넣기 등으로 화면을 다시 그릴 때마다
+    // 반복 호출된다. 매번 새 리스너를 쌓아두면 resize 이벤트마다 중복 계산이 계속 늘어나므로,
+    // 등록 전에 이전 리스너를 먼저 제거해서 항상 딱 1개씩만 걸려 있도록 한다.
+    window.removeEventListener("resize", fitScheduleTable);
+    window.removeEventListener("resize", syncScheduleLogWidth);
     window.addEventListener("resize", fitScheduleTable);
     window.addEventListener("resize", syncScheduleLogWidth);
     // 웹폰트(KoPub Dotum)가 표를 처음 그릴 때 아직 로딩 중이면 실제 너비보다 좁게
@@ -7287,6 +8162,8 @@
     `;
     renderThemeToggle();
     renderManualToggle();
+    renderUndoToggle();
+    renderBackupToggle();
     nav.querySelectorAll("[data-nav]").forEach((btn) => {
       btn.onclick = () => { setPage(btn.getAttribute("data-nav")); closeDock(); };
     });
@@ -7657,6 +8534,7 @@
           "재직 중인 인원만 자동으로 표시되고, 퇴사 처리된 인원은 스케줄에서 빠져요. 관리자는 표 맨 위에 따로 표시돼요.",
           "월 이동 버튼으로 지난 달·다음 달 스케줄도 확인할 수 있어요.",
           "일괄 붙여넣기로 여러 인원의 스케줄을 한 번에 입력할 수 있어요.",
+          "셀을 드래그해서 여러 칸을 한 번에 선택한 뒤, 메뉴에서 상태를 골라 한 번에 적용할 수 있어요.",
           "이미지로 저장하거나 엑셀 파일로 다운로드할 수 있어요.",
           "셀을 클릭하면 근무/오프/연차 등 다양한 상태로 바로 바꿀 수 있어요. 지각은 출근 인원에 포함, 결근은 제외돼요.",
           "지난 달은 자동으로 '확정됨' 상태로 잠기고 그 시점 인원 구성이 고정돼요. '잠금 해제' 버튼으로 다시 열어 수정할 수 있어요.",
