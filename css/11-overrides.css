@@ -1,0 +1,28 @@
+  /* ---------- macOS 스타일 마감 ---------- */
+  * { scrollbar-width: thin; scrollbar-color: var(--hairline) transparent; }
+  *::-webkit-scrollbar { width: 10px; height: 10px; }
+  *::-webkit-scrollbar-track { background: transparent; }
+  *::-webkit-scrollbar-thumb {
+    background: var(--hairline); border-radius: 12px; border: 2px solid transparent; background-clip: padding-box;
+  }
+  *::-webkit-scrollbar-thumb:hover { background: var(--text-faint); background-clip: padding-box; }
+
+  .add-input, .todo-due-input, .agent-sort-select, .agent-filter-btn,
+  .type-btn, .note-content, .interview-textarea, .inline-form input[type="text"],
+  .inline-form select, .add-input, .range-row .date-input {
+    border-radius: 10px !important;
+  }
+  .add-input:focus-visible, .note-content:focus-visible, .interview-textarea:focus-visible,
+  .todo-due-input:focus-visible, .inline-form input:focus-visible, .inline-form select:focus-visible {
+    outline: 3px solid var(--accent-dim);
+    outline-offset: 0;
+    border-color: var(--accent);
+  }
+
+  .login-tabs { border-radius: 12px; }
+  .login-tab { border-radius: 10px; font-weight: 500; }
+  .login-tab.active { box-shadow: 0 1px 3px rgba(0,0,0,0.18); }
+
+  .badge, .badge-btn { font-weight: 500; }
+
+  ::selection { background: var(--accent); color: #ffffff; }

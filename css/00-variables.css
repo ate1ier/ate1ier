@@ -1,0 +1,121 @@
+  :root {
+    --bg: #1e1e22;
+    --panel: #29292e;
+    --elevated: #343439;
+    --hairline: rgba(255, 255, 255, 0.09);
+    --hairline-strong: rgba(255, 255, 255, 0.14);
+    --text: #f5f5f6;
+    --text-dim: #c2c2c7;
+    --text-faint: #93939a;
+    --accent: #0a84ff;
+    --accent-dim: #0a84ff2e;
+    --accent-dim-soft: #0a84ff0c;
+    --accent-text: #ffffff;
+    --green: #30d158;
+    --green-dim: #30d1582e;
+    --red: #ff453a;
+    --red-dim: #ff453a2e;
+    --blue: #64d2ff;
+    --blue-dim: #64d2ff2e;
+    --orange: #ff9f0a;
+    --orange-dim: #ff9f0a2e;
+    --salmon: #ff6961;
+    --salmon-dim: #ff69612e;
+    --yellow: #ffd60a;
+    --yellow-dim: #ffd60a2e;
+    --teal: #40c8e0;
+    --teal-dim: #40c8e02e;
+    --purple: #bf5af2;
+    --purple-dim: #bf5af22e;
+    --pink: #ff375f;
+    --pink-dim: #ff375f2e;
+    --indigo: #5e5ce6;
+    --indigo-dim: #5e5ce62e;
+    --edu: #32d74b;
+    --edu-dim: #32d74b2e;
+    --weekend-tint: #29292d;
+    --sch-cell-bg: #313136;
+    --native-color-scheme: dark;
+    /* ---- 반경 스케일: 최신 macOS(리퀴드 글래스)처럼 더 둥글고 큼직하게 ---- */
+    --radius-xs: 8px;
+    --radius-sm: 12px;
+    --mac-radius: 14px;
+    --mac-radius-lg: 22px;
+    --radius-xl: 28px;
+    --mac-vibrancy: rgba(46, 46, 51, 0.66);
+    --mac-vibrancy-hairline: rgba(255, 255, 255, 0.12);
+    --mac-glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+    --mac-shadow: 0 24px 60px rgba(0, 0, 0, 0.30), 0 1px 0 rgba(255, 255, 255, 0.04) inset;
+    --mac-shadow-sm: 0 6px 18px rgba(0, 0, 0, 0.22);
+    --mac-shadow-float: 0 18px 44px rgba(0, 0, 0, 0.38), 0 1px 0 rgba(255, 255, 255, 0.08) inset;
+    /* ---- 페이지 상단 제목(면담일지/업무 정리/상담사 관리 등)에 공통으로 쓰는 값 ---- */
+    --page-title-size: 24px;
+    --page-title-weight: 600;
+  }
+  html[data-theme="light"] {
+    --bg: #fcfcfd;
+    --panel: #ffffff;
+    --elevated: #f4f4f7;
+    --hairline: rgba(0, 0, 0, 0.08);
+    --hairline-strong: rgba(0, 0, 0, 0.13);
+    --text: #1d1d1f;
+    --text-dim: #55555a;
+    --text-faint: #7c7c82;
+    --accent: #007aff;
+    --accent-dim: #007aff1f;
+    --accent-dim-soft: #007aff08;
+    --accent-text: #ffffff;
+    --weekend-tint: #eeeef1;
+    --native-color-scheme: light;
+  }
+  /* ---- light 테마는 상태색(오프·연차·대휴 등)이 다크와 다르게 밝은 배경용으로 조정된다 ---- */
+  html[data-theme="light"] {
+    --mac-vibrancy: rgba(255, 255, 255, 0.58);
+    --mac-vibrancy-hairline: rgba(0, 0, 0, 0.07);
+    --mac-glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+    --mac-shadow: 0 20px 48px rgba(0, 0, 0, 0.10), 0 1px 0 rgba(255, 255, 255, 0.5) inset;
+    --mac-shadow-sm: 0 6px 16px rgba(0, 0, 0, 0.08);
+    --mac-shadow-float: 0 16px 36px rgba(0, 0, 0, 0.16), 0 1px 0 rgba(255, 255, 255, 0.5) inset;
+    --green: #2c7f96;
+    --green-dim: #2c7f9626;
+    --red: #c94f4f;
+    --red-dim: #c94f4f26;
+    --blue: #3778b0;
+    --blue-dim: #3778b026;
+    --orange: #b9791e;
+    --orange-dim: #b9791e26;
+    --salmon: #c2603f;
+    --salmon-dim: #c2603f26;
+    --yellow: #8a6a1f;
+    --yellow-dim: #8a6a1f26;
+    --teal: #227d75;
+    --teal-dim: #227d7526;
+    --purple: #7454b5;
+    --purple-dim: #7454b526;
+    --pink: #b5548f;
+    --pink-dim: #b5548f26;
+    --indigo: #a554b6;
+    --indigo-dim: #a554b626;
+    --edu: #2f9e63;
+    --edu-dim: #2f9e6326;
+    --sch-cell-bg: var(--bg);
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--bg);
+    color: var(--text);
+    color-scheme: var(--native-color-scheme, dark);
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro KR', 'Apple SD Gothic Neo', 'Malgun Gothic', 'KoPub Dotum', system-ui, sans-serif;
+    font-weight: 400;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  body { display: block; }
+  button, input, textarea { font-family: inherit; }
+  button:focus-visible, input:focus-visible, textarea:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+

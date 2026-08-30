@@ -1,0 +1,310 @@
+  /* ---------- 월별 스케줄 페이지 ---------- */
+  .schedule-top {
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 10px; margin-bottom: 6px;
+  }
+  .schedule-title { font-size: var(--page-title-size); font-weight: var(--page-title-weight); letter-spacing: -0.01em; }
+  .schedule-month-nav { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .schedule-table-toolbar { display: flex; justify-content: flex-end; margin-bottom: 6px; }
+  .sch-delete-btn-small { font-size: 12px; padding: 4px 10px; }
+  .schedule-month-btn {
+    background: var(--elevated); border: 1px solid var(--hairline); color: var(--text-dim);
+    border-radius: 12px; width: 30px; height: 30px; cursor: pointer; font-size: 14px;
+  }
+  .schedule-month-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .schedule-month-label { font-size: 16px; color: var(--text); min-width: 96px; text-align: center; }
+  .sch-locked-badge { font-size: 11.5px; color: var(--text-faint); background: var(--elevated); border: 1px solid var(--hairline); border-radius: 999px; padding: 2px 8px; margin-left: 6px; white-space: nowrap; }
+  .sch-lock-toggle-btn.locked { border-color: var(--red); color: var(--red); background: var(--red-dim); }
+  .sch-lock-toggle-btn.locked:hover { border-color: var(--red); color: var(--red); background: var(--red-dim); }
+  .schedule-legend {
+    display: flex; flex-wrap: wrap; gap: 10px 16px; margin-bottom: 14px; font-size: 12.5px; color: var(--text-dim);
+  }
+  .schedule-legend .item { display: flex; align-items: center; gap: 5px; }
+  .schedule-legend .swatch { width: 12px; height: 12px; border-radius: 6px; flex-shrink: 0; }
+
+  .schedule-bulk-panel {
+    border: 1px solid var(--hairline); border-radius: 16px; padding: 14px 16px; margin-bottom: 16px;
+    background: var(--elevated); display: flex; flex-direction: column; gap: 10px;
+  }
+  .schedule-bulk-desc { font-size: 12.5px; color: var(--text-faint); line-height: 1.6; }
+  .schedule-bulk-textarea {
+    width: 100%; min-height: 130px; resize: vertical; font-family: inherit; font-size: 13.5px;
+    line-height: 1.6; white-space: pre; overflow-x: auto;
+  }
+  .schedule-bulk-actions { display: flex; gap: 8px; }
+  .schedule-bulk-result { font-size: 12.5px; color: var(--text-dim); line-height: 1.6; white-space: pre-wrap; }
+
+  .schedule-colgroup-panel {
+    border: 1px solid var(--hairline); border-radius: 16px; padding: 14px 16px; margin-bottom: 16px;
+    background: var(--elevated); display: flex; flex-direction: column; gap: 10px;
+  }
+  .schedule-colgroup-desc { font-size: 12.5px; color: var(--text-faint); line-height: 1.6; }
+  .schedule-colgroup-form { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .schedule-colgroup-form .add-input { width: 84px; flex: none; }
+  .schedule-colgroup-empty { font-size: 12.5px; color: var(--text-faint); font-style: italic; }
+  .schedule-colgroup-list { display: flex; flex-wrap: wrap; gap: 8px; }
+  .schedule-colgroup-chip {
+    display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text-dim);
+    background: var(--panel); border: 1px solid var(--hairline); border-radius: 999px; padding: 4px 6px 4px 12px;
+  }
+  .sch-colgroup-toggle-btn, .sch-colgroup-remove-btn {
+    background: var(--hairline); border: none; color: var(--text-dim); border-radius: 999px;
+    padding: 2px 9px; font-size: 11.5px; cursor: pointer;
+  }
+  .sch-colgroup-toggle-btn:hover { background: var(--accent-dim); color: var(--accent); }
+  .sch-colgroup-remove-btn:hover { background: var(--red-dim); color: var(--red); }
+  .schedule-table .sch-col-hidden { display: none; }
+  .sch-row-toggle {
+    display: inline-flex; align-items: center; justify-content: center; width: 14px; margin-right: 4px;
+    cursor: pointer; user-select: none; color: inherit; opacity: 0.75;
+  }
+  .sch-row-toggle:hover { opacity: 1; }
+  .schedule-table tr.sch-group-row td, .schedule-table tr.sch-subgroup-row td { cursor: default; }
+
+  .schedule-table-wrap { overflow: hidden; border: 1px solid var(--hairline); border-radius: 16px; width: 100%; background: var(--panel); }
+  @media (max-width: 720px) {
+    .schedule-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  }
+  .schedule-scale-inner { transform-origin: top left; }
+  .schedule-table { border-collapse: collapse; font-size: 12.5px; white-space: nowrap; background: var(--panel); }
+  .schedule-table th, .schedule-table td {
+    border: 1px solid var(--hairline); padding: 5px 8px; text-align: center; background: var(--panel);
+  }
+  .sch-cell { background: var(--sch-cell-bg); position: relative; }
+  /* 메모가 남겨진 스케줄 셀 오른쪽 상단에 작게 표시되는 삼각형 표시.
+     이미지로 저장(html2canvas 캡처)할 때는 buildScheduleTableHtml(...,true)로 아예 마크업을
+     만들지 않으므로, 캡처 이미지에는 표시되지 않는다. */
+  .sch-memo-dot {
+    position: absolute; top: 0; right: 0; width: 0; height: 0;
+    border-style: solid; border-width: 0 7px 7px 0; border-color: transparent var(--orange) transparent transparent;
+    pointer-events: none;
+  }
+  .schedule-table thead th {
+    background: var(--panel); color: var(--text-dim); font-weight: 500; position: sticky; top: 0; z-index: 1;
+  }
+  .schedule-table thead .wd-sat { color: var(--blue); }
+  .schedule-table thead .wd-sun { color: var(--red); }
+  .schedule-table td.sch-info { text-align: left; color: var(--text-dim); background: var(--panel); }
+  .schedule-table td.sch-empty { text-align: center; color: var(--text-faint); padding: 24px; }
+  .schedule-table td.sch-nickname { color: var(--text); font-weight: 600; text-align: center; }
+  .schedule-table td.sch-col-name, .schedule-table td.sch-col-empno { text-align: center; }
+  .schedule-table td.sch-count { text-align: center; color: var(--text-dim); background: var(--panel); }
+  .schedule-table tr.sch-group-row td {
+    background: var(--elevated); color: var(--accent); font-weight: 600; text-align: left; position: relative;
+  }
+  .schedule-table tr.sch-subgroup-row td {
+    background: var(--hairline); color: var(--text-dim); font-weight: 500; text-align: left; font-size: 11.5px; letter-spacing: 0.02em;
+  }
+  .schedule-table tr.sch-summary-row td {
+    background: var(--accent-dim-soft); color: var(--text-dim); font-weight: 500;
+  }
+  .schedule-table tr.sch-total-row td {
+    background: var(--accent-dim); color: var(--text); font-weight: 600;
+  }
+  /* ----- 필요인력 / 대비 / 인력 대비 편성 3행 묶음 (라벨은 가운데 정렬) ----- */
+  .schedule-table tr.sch-summary-row td.sch-info,
+  .schedule-table tr.sch-total-row td.sch-info,
+  .schedule-table tr.sch-required-row td.sch-info,
+  .schedule-table tr.sch-diff-row td.sch-info,
+  .schedule-table tr.sch-status-row td.sch-info {
+    text-align: center;
+  }
+  .schedule-table tr.sch-required-row td.sch-info {
+    background: var(--blue-dim); color: var(--text); font-weight: 600;
+  }
+  .schedule-table tr.sch-required-row td.sch-required-cell {
+    background: var(--panel); padding: 3px 4px;
+  }
+  .sch-required-input {
+    width: 100%; min-width: 34px; max-width: 52px; box-sizing: border-box;
+    text-align: center; border: 1px solid var(--hairline); border-radius: 10px;
+    background: var(--elevated); color: var(--text); font-size: 12px; padding: 3px 2px;
+    -moz-appearance: textfield;
+  }
+  .sch-required-input:focus { border-color: var(--accent); }
+  .sch-required-input:disabled,
+  .sch-required-input--locked {
+    opacity: 0.5; cursor: not-allowed; background: var(--hairline);
+  }
+  .sch-required-input::-webkit-outer-spin-button,
+  .sch-required-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .schedule-table tr.sch-diff-row td {
+    background: var(--panel); color: var(--text-dim); font-weight: 500;
+  }
+  .schedule-table tr.sch-diff-row td.sch-info { font-weight: 500; }
+  .schedule-table tr.sch-status-row td {
+    background: var(--panel); color: var(--text-dim); font-weight: 700;
+  }
+  .schedule-table tr.sch-status-row td.sch-info { font-weight: 600; }
+  .schedule-table tr.sch-status-row td.sch-status-ok { color: var(--green); background: var(--green-dim); }
+  .schedule-table tr.sch-status-row td.sch-status-ng { color: var(--red); background: var(--red-dim); }
+  /* 인원 식별 정보(닉네임~결근 건수) 열을 화면에 고정해서, 날짜가 많아 가로로 스크롤/드래그해도
+     어떤 상담사의 행인지 항상 보이도록 함 */
+  .schedule-table thead th[colspan],
+  .schedule-table tbody td[colspan] {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+  }
+  .schedule-table thead th[colspan] { z-index: 4; }
+  .schedule-table .sch-col-nickname,
+  .schedule-table .sch-col-name,
+  .schedule-table .sch-col-empno,
+  .schedule-table .sch-col-hiredate,
+  .schedule-table .sch-col-workhours,
+  .schedule-table .sch-col-work,
+  .schedule-table .sch-col-off,
+  .schedule-table .sch-col-annual,
+  .schedule-table .sch-col-daehyu,
+  .schedule-table .sch-col-absent {
+    position: sticky;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .schedule-table td.sch-col-nickname, .schedule-table td.sch-col-name, .schedule-table td.sch-col-empno,
+  .schedule-table td.sch-col-hiredate, .schedule-table td.sch-col-workhours,
+  .schedule-table td.sch-col-work,
+  .schedule-table td.sch-col-off, .schedule-table td.sch-col-annual, .schedule-table td.sch-col-daehyu,
+  .schedule-table td.sch-col-absent {
+    z-index: 2;
+  }
+  .schedule-table th.sch-col-nickname, .schedule-table th.sch-col-name, .schedule-table th.sch-col-empno,
+  .schedule-table th.sch-col-hiredate, .schedule-table th.sch-col-workhours,
+  .schedule-table th.sch-col-work,
+  .schedule-table th.sch-col-off, .schedule-table th.sch-col-annual, .schedule-table th.sch-col-daehyu,
+  .schedule-table th.sch-col-absent {
+    z-index: 4;
+  }
+  .schedule-table .sch-col-nickname { left: 0; width: 88px; min-width: 88px; max-width: 88px; }
+  .schedule-table .sch-col-name { left: 88px; width: 56px; min-width: 56px; max-width: 56px; }
+  .schedule-table .sch-col-empno { left: 144px; width: 80px; min-width: 80px; max-width: 80px; }
+  .schedule-table .sch-col-hiredate { left: 224px; width: 88px; min-width: 88px; max-width: 88px; }
+  .schedule-table .sch-col-workhours { left: 312px; width: 88px; min-width: 88px; max-width: 88px; }
+  .schedule-table .sch-col-work { left: 400px; width: 46px; min-width: 46px; max-width: 46px; }
+  .schedule-table .sch-col-off { left: 446px; width: 46px; min-width: 46px; max-width: 46px; }
+  .schedule-table .sch-col-annual { left: 492px; width: 46px; min-width: 46px; max-width: 46px; }
+  .schedule-table .sch-col-daehyu { left: 538px; width: 46px; min-width: 46px; max-width: 46px; }
+  .schedule-table .sch-col-absent {
+    left: 584px; width: 46px; min-width: 46px; max-width: 46px;
+    box-shadow: 4px 0 6px -4px #00000080;
+  }
+  .schedule-table tbody td[colspan] { box-shadow: none; }
+  .schedule-table .sch-col-nickname, .schedule-table .sch-col-name, .schedule-table .sch-col-empno,
+  .schedule-table .sch-col-hiredate, .schedule-table .sch-col-workhours,
+  .schedule-table .sch-col-work,
+  .schedule-table .sch-col-off, .schedule-table .sch-col-annual, .schedule-table .sch-col-daehyu,
+  .schedule-table .sch-col-absent { text-overflow: clip; }
+
+  /* 캡처(이미지 저장) 시에는 화면 스크롤용 고정(sticky) 열이 필요 없고,
+     오히려 html2canvas가 sticky 위치 계산 때문에 표 너비를 실제보다 좁게 잡아
+     오른쪽 날짜 칸들이 잘려나가는 원인이 된다. 캡처용 래퍼 안에서는 sticky를
+     모두 해제해서 표 전체가 있는 그대로 렌더링되게 한다. */
+  .sch-capture-flatten .schedule-table th,
+  .sch-capture-flatten .schedule-table td {
+    position: static !important;
+    box-shadow: none !important;
+  }
+
+  /* 관리자 그룹 제목 행도 다른 그룹과 같은 모양을 쓰도록 클릭 가능한 느낌은 주지 않는다 */
+  .schedule-table tr.sch-group-row--static td { padding-right: 16px; }
+  .sch-cell:hover { outline: 1px solid var(--accent); outline-offset: -1px; }
+  .sch-cell.st-work { color: var(--text-faint); }
+  .sch-cell.st-off { background: var(--blue-dim); color: var(--blue); }
+  .sch-cell.st-annual { background: var(--orange-dim); color: var(--orange); }
+  .sch-cell.st-daehyu { background: var(--green-dim); color: var(--green); }
+  .sch-cell.st-half { background: var(--salmon-dim); color: var(--salmon); }
+  .sch-cell.st-gonghyu { background: var(--teal-dim); color: var(--teal); }
+  .sch-cell.st-gongga { background: var(--purple-dim); color: var(--purple); }
+  .sch-cell.st-maternity { background: var(--pink-dim); color: var(--pink); }
+  .sch-cell.st-special { background: var(--indigo-dim); color: var(--indigo); }
+  .sch-cell.st-education { background: var(--edu-dim); color: var(--edu); }
+  .sch-cell.st-late { background: var(--yellow-dim); color: var(--yellow); font-weight: 600; }
+  .sch-cell.st-absent { background: var(--red-dim); color: var(--red); font-weight: 600; }
+  .sch-cell.st-resigned { background: var(--hairline); color: var(--text-faint); }
+  .sch-cell--selected { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .sch-cell--selected::after {
+    content: ""; position: absolute; inset: 0; background: var(--accent-dim-soft); pointer-events: none;
+  }
+  .sch-staff-btn {
+    background: none; border: none; color: var(--text-faint); cursor: pointer; font-size: 12px;
+    padding: 1px 4px; border-radius: 6px;
+  }
+  .sch-staff-btn:hover { color: var(--accent); background: #ffffff0d; }
+  .sch-staff-btn.danger:hover { color: var(--red); }
+
+  .sch-menu {
+    position: fixed; z-index: 50; background: var(--mac-vibrancy); border: 1px solid var(--mac-vibrancy-hairline);
+    backdrop-filter: blur(28px) saturate(2); -webkit-backdrop-filter: blur(28px) saturate(2);
+    border-radius: 16px; padding: 6px; display: flex; flex-direction: column; gap: 2px;
+    box-shadow: var(--mac-shadow-float); min-width: 108px;
+  }
+  .sch-menu button {
+    background: none; border: none; color: var(--text); text-align: left; font-size: 13px;
+    padding: 7px 10px; border-radius: 10px; cursor: pointer;
+  }
+  .sch-menu button:hover { background: var(--accent-dim); color: var(--accent); }
+  .sch-menu .sch-menu-reset { color: var(--text-faint); border-top: 1px solid var(--hairline); margin-top: 2px; padding-top: 8px; }
+  .sch-menu button.sch-menu-danger { color: var(--red); }
+  .sch-menu button.sch-menu-danger:hover { background: var(--red-dim); color: var(--red); }
+  .sch-menu .sch-menu-divider { height: 1px; background: var(--hairline); margin: 4px 2px; }
+  .sch-menu .sch-menu-title {
+    font-size: 11.5px; color: var(--text-faint); padding: 4px 10px 6px; font-weight: 600;
+  }
+
+  /* 이미지로 저장: 실제 다운로드 전에 먼저 보여주는 미리보기 모달 */
+  .sch-preview-overlay {
+    position: fixed; inset: 0; z-index: 80; background: #000000b3;
+    display: flex; align-items: center; justify-content: center; padding: 24px;
+  }
+  .sch-preview-box {
+    background: var(--mac-vibrancy); border: 1px solid var(--mac-vibrancy-hairline); border-radius: 20px;
+    backdrop-filter: blur(28px) saturate(2); -webkit-backdrop-filter: blur(28px) saturate(2);
+    /* 예전에는 항상 고정 너비(최대 1100px)로 떠서, 캡처된 이미지가 그보다 좁으면
+       양옆에 불필요한 빈 공간이 생겼다. width를 fit-content로 바꿔서 실제 이미지
+       크기에 맞게 미리보기 박스도 함께 줄어들게 한다. */
+    width: fit-content; min-width: min(340px, 92vw); max-width: min(92vw, 1100px); max-height: 92vh;
+    display: flex; flex-direction: column;
+    box-shadow: 0 20px 60px #00000080; overflow: hidden;
+  }
+  .sch-preview-head {
+    display: flex; align-items: center; justify-content: space-between; padding: 14px 18px;
+    border-bottom: 1px solid var(--hairline); color: var(--text); font-size: 15px; font-weight: 600;
+    flex-shrink: 0;
+  }
+  .sch-preview-close {
+    background: none; border: none; color: var(--text-faint); font-size: 16px; cursor: pointer;
+    padding: 4px 9px; border-radius: 10px; line-height: 1;
+  }
+  .sch-preview-close:hover { color: var(--text); background: var(--elevated); }
+  .sch-preview-body {
+    padding: 16px; overflow: auto; display: flex; justify-content: center;
+    background: var(--bg); flex: 1;
+  }
+  .sch-preview-body img { max-width: 100%; height: auto; display: block; border-radius: 10px; }
+  .sch-preview-actions {
+    display: flex; justify-content: flex-end; gap: 8px; padding: 14px 18px;
+    border-top: 1px solid var(--hairline); flex-shrink: 0;
+  }
+  .sch-preview-actions .ghost-btn.danger { margin-right: auto; }
+  .sch-memo-box { width: min(420px, 92vw); }
+  .sch-memo-body { display: block; }
+  .sch-memo-textarea { width: 100%; min-height: 110px; resize: vertical; box-sizing: border-box; }
+
+  .schedule-log-title { font-size: 15px; margin: 20px 0 10px; color: var(--text); }
+  .sch-log-list { display: flex; flex-direction: column; gap: 6px; }
+  .sch-log-item {
+    display: flex; align-items: center; gap: 10px; background: var(--elevated);
+    border-radius: 12px; padding: 8px 12px; font-size: 13.5px;
+  }
+  .sch-log-item .sch-log-date { color: var(--text-dim); flex-shrink: 0; width: 76px; }
+  .sch-log-item .sch-log-name { color: var(--text); flex-shrink: 0; }
+  .sch-log-item .sch-log-tag { font-size: 11.5px; padding: 1px 8px; border-radius: 999px; }
+  .sch-log-item .sch-log-tag.late { color: var(--yellow); background: var(--yellow-dim); }
+  .sch-log-item .sch-log-tag.absent { color: var(--red); background: var(--red-dim); }
+  .sch-log-item .sch-log-clear { margin-left: auto; }
+  /* 캡처(이미지 저장) 시에는 "되돌리기" 버튼처럼 화면에서만 의미 있는 조작용 요소는 숨긴다. */
+  .sch-capture-flatten .sch-log-clear { display: none !important; }
+
+
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+

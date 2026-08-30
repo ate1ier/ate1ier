@@ -1,0 +1,56 @@
+  /* ---------- 면담일지 ---------- */
+  .badge.type-regular { color: var(--blue); background: var(--blue-dim); }
+  .badge.type-adhoc { color: var(--green); background: var(--green-dim); }
+  .badge.type-warning { color: var(--red); background: var(--red-dim); }
+  .interview-list { display: flex; flex-direction: column; gap: 10px; }
+  .interview-row {
+    background: var(--elevated); border: 1px solid var(--hairline);
+    border-radius: 14px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px;
+  }
+  .interview-row-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; cursor: pointer; }
+  .interview-row-chevron {
+    display: flex; align-items: center; justify-content: center; flex: none;
+    width: 16px; height: 16px; color: var(--text-faint); transition: transform 0.18s ease;
+  }
+  .interview-row.expanded .interview-row-chevron { transform: rotate(90deg); color: var(--text-dim); }
+  .interview-date { font-size: 14px; color: var(--text-dim); }
+  .interview-agent-name { font-size: 15px; color: var(--text); font-weight: 600; }
+  .interview-agent-ldap { font-size: 13px; color: var(--text-faint); }
+  .interview-agent-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .interview-agent-timezone { display: inline-flex; align-items: center; gap: 3px; font-size: 13px; color: var(--text-faint); }
+  .interview-row-actions { margin-left: auto; display: flex; gap: 6px; }
+  .interview-row-body { display: flex; flex-direction: column; gap: 6px; padding-top: 2px; padding-left: 24px; }
+  .interview-content { font-size: 14px; color: var(--text); white-space: pre-wrap; }
+  .interview-followup { font-size: 13px; color: var(--text-dim); }
+  .interview-textarea { width: 100%; min-height: 70px; resize: vertical; padding: 9px 12px; }
+  .interview-textarea-content { min-height: 160px; }
+  .agent-form-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 13px; }
+  @media (max-width: 620px) { .agent-form-row-2 { grid-template-columns: 1fr; } }
+  .agent-picker { position: relative; }
+  .agent-picker-list {
+    position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 30;
+    max-height: 230px; overflow-y: auto; background: var(--elevated); border: 1px solid var(--hairline-strong);
+    border-radius: 12px; box-shadow: var(--mac-shadow-sm); display: none; padding: 5px;
+  }
+  .agent-picker-list.open { display: block; }
+  .agent-picker-item {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+    padding: 8px 9px; border-radius: 8px; cursor: pointer; font-size: 13.5px; color: var(--text);
+  }
+  .agent-picker-item:hover { background: var(--accent-dim); color: var(--accent); }
+  .agent-picker-item-ldap { font-size: 12px; color: var(--text-faint); flex-shrink: 0; }
+  .agent-picker-empty { padding: 10px 9px; font-size: 13px; color: var(--text-faint); }
+  .agent-picker-info {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(88px, 1fr)); gap: 10px 14px;
+    margin-top: 8px; padding: 12px 14px; border: 1px solid var(--hairline-strong);
+    border-radius: 12px; background: var(--elevated);
+  }
+  .agent-picker-info:empty { display: none; }
+  .agent-picker-info-item { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .agent-picker-info-item-label { font-size: 11px; letter-spacing: 0.05em; color: var(--text-faint); text-transform: uppercase; }
+  .agent-picker-info-item-value { font-size: 13.5px; color: var(--text); }
+  .agent-interview-section { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--hairline); }
+  .agent-interview-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+  .agent-interview-title { font-size: 15.5px; font-weight: 600; }
+  .agent-interview-header-actions { display: flex; align-items: center; gap: 8px; }
+

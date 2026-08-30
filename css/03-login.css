@@ -1,0 +1,159 @@
+  /* ---------- 로그인 화면 ---------- */
+  .login-shell {
+    min-height: 80vh; display: flex; align-items: center; justify-content: center; padding: 20px;
+  }
+  .login-card {
+    width: 100%; max-width: 380px; background: var(--panel); border: 1px solid var(--hairline);
+    border-radius: var(--radius-xl); padding: 36px 32px;
+    box-shadow: var(--mac-shadow-float);
+  }
+  .login-title { font-size: 24px; letter-spacing: -0.01em; margin-bottom: 6px; }
+  .login-sub { font-size: 13px; color: var(--text-faint); margin-bottom: 22px; line-height: 1.5; }
+  .login-tabs { display: flex; gap: 4px; margin-bottom: 20px; background: var(--elevated); border-radius: 14px; padding: 4px; }
+  .login-tab {
+    flex: 1; background: none; border: none; color: var(--text-dim); font-size: 14px;
+    padding: 9px 0; border-radius: 12px; cursor: pointer; transition: all 0.15s ease;
+  }
+  .login-tab.active { background: var(--panel); color: var(--text); box-shadow: 0 0 0 1px var(--hairline); }
+  .login-error {
+    font-size: 13px; color: var(--red); background: var(--red-dim); border-radius: 12px;
+    padding: 8px 12px; margin-bottom: 14px;
+  }
+  .login-form { display: flex; flex-direction: column; gap: 12px; }
+  .login-field { display: flex; flex-direction: column; gap: 5px; font-size: 13px; color: var(--text-dim); }
+  .login-submit { margin-top: 4px; width: 100%; padding: 11px 0; font-size: 15px; }
+  .login-accounts-hint { margin-top: 16px; font-size: 12.5px; color: var(--text-faint); line-height: 1.5; }
+  .login-master-check {
+    display: flex; align-items: flex-start; gap: 8px; font-size: 12.5px; color: var(--text-dim);
+    background: var(--elevated); border: 1px solid var(--hairline); border-radius: 12px; padding: 10px 12px;
+    line-height: 1.5; cursor: pointer;
+  }
+  .login-master-check input { margin-top: 2px; flex-shrink: 0; }
+  .login-master-hint { color: var(--text-faint); }
+  .nav-account {
+    padding: 0 22px 10px; font-size: 13px; color: var(--text-faint);
+    display: flex; flex-direction: column; align-items: center; text-align: center; gap: 6px;
+  }
+  .nav-account-name {
+    max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .nav-logout-btn {
+    background: none; border: none; color: var(--text-faint); font-size: 12px; cursor: pointer;
+    padding: 2px 6px; border-radius: 10px; white-space: nowrap;
+  }
+  .nav-logout-btn:hover { color: var(--red); background: var(--red-dim); }
+  /* 사이드바에서는 로그아웃 버튼 + 남은 시간 줄이 기존처럼 nav-account의 직계 자식인 것처럼 보이도록
+     레이아웃에 관여하지 않는다. 독(dock)/좁은 화면 모드에서만 이 래퍼를 실제 세로 그룹으로 사용한다. */
+  .nav-logout-wrap { display: contents; }
+  .nav-session-row { display: flex; align-items: center; gap: 6px; }
+  .nav-session-extend-btn {
+    background: none; border: 1px solid var(--hairline); color: var(--accent); font-size: 11px; cursor: pointer;
+    padding: 2px 8px; border-radius: 999px; white-space: nowrap; flex-shrink: 0;
+    transition: border-color 0.15s ease, background 0.15s ease;
+  }
+  .nav-session-extend-btn:hover { border-color: var(--accent); background: var(--accent-dim); }
+
+  /* ---------- 자동 로그아웃 임박 알림 토스트 (오른쪽 상단) ---------- */
+  .session-warning-toast {
+    position: fixed;
+    top: 18px;
+    right: 18px;
+    z-index: 80;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    max-width: 300px;
+    padding: 14px 14px 14px 16px;
+    border-radius: var(--mac-radius-lg);
+    background: var(--mac-vibrancy);
+    backdrop-filter: blur(30px) saturate(2);
+    -webkit-backdrop-filter: blur(30px) saturate(2);
+    border: 1px solid var(--mac-vibrancy-hairline);
+    box-shadow: var(--mac-shadow-float);
+    color: var(--text);
+    animation: session-toast-in 0.22s ease;
+  }
+  @keyframes session-toast-in {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .session-toast-icon {
+    flex-shrink: 0;
+    color: var(--orange);
+    margin-top: 1px;
+  }
+  .session-toast-body { flex: 1; min-width: 0; }
+  .session-toast-title {
+    font-size: 13.5px;
+    font-weight: 600;
+    line-height: 1.35;
+    margin-bottom: 3px;
+  }
+  .session-toast-desc {
+    font-size: 12px;
+    color: var(--text-dim);
+    line-height: 1.4;
+  }
+  .session-toast-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+  }
+  .session-toast-extend-btn {
+    background: var(--accent);
+    border: none;
+    color: var(--accent-text);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 6px 12px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+  .session-toast-extend-btn:hover { filter: brightness(1.1); }
+  .session-toast-dismiss-btn {
+    background: none;
+    border: 1px solid var(--hairline);
+    color: var(--text-faint);
+    font-size: 12px;
+    cursor: pointer;
+    padding: 6px 12px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+  .session-toast-dismiss-btn:hover { color: var(--text); border-color: var(--hairline-strong); }
+  .session-toast-close-btn {
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    color: var(--text-faint);
+    cursor: pointer;
+    padding: 2px;
+    line-height: 1;
+    border-radius: 6px;
+  }
+  .session-toast-close-btn:hover { color: var(--text); }
+  @media (max-width: 600px) {
+    .session-warning-toast {
+      top: 12px;
+      right: 12px;
+      left: 12px;
+      max-width: none;
+    }
+  }
+  .nav-master-banner {
+    margin: 0 22px 14px; padding: 8px 8px; border-radius: 12px;
+    background: var(--accent-dim); border: 1px solid var(--accent);
+    font-size: 11px; color: var(--text); display: flex; flex-direction: column; gap: 6px;
+  }
+  .nav-master-banner span {
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block;
+  }
+  .nav-master-return-btn {
+    background: var(--accent); border: none; color: var(--accent-text); font-size: 11px; font-weight: 600;
+    cursor: pointer; padding: 5px 4px; border-radius: 10px; white-space: nowrap; width: 100%;
+  }
+  .nav-master-return-btn:hover { filter: brightness(1.1); }
+  .master-account-row { justify-content: space-between; flex-wrap: wrap; }
+

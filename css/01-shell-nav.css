@@ -1,0 +1,572 @@
+  /* ---------- 레이아웃 / 내비게이션 ---------- */
+  #layout {
+    display: flex;
+    min-height: 100vh;
+  }
+  #page-area {
+    flex: 1;
+    min-width: 0;
+    padding: 24px 20px;
+    display: flex;
+    justify-content: center;
+    position: relative;
+  }
+  #page-inner { width: 100%; max-width: 1400px; }
+  #page-inner.wide { max-width: 1800px; }
+
+  #nav {
+    width: 158px;
+    flex-shrink: 0;
+    border-left: 1px solid var(--mac-vibrancy-hairline);
+    background: var(--mac-vibrancy);
+    backdrop-filter: blur(30px) saturate(2);
+    -webkit-backdrop-filter: blur(30px) saturate(2);
+    box-shadow: var(--mac-glass-highlight);
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    padding: 28px 0;
+    overflow: hidden;
+  }
+  .global-session-badge {
+    display: none;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 10px;
+    border-radius: 24px;
+    background: var(--elevated);
+    border: 1px solid var(--hairline);
+    font-size: 11px;
+    color: var(--text-faint);
+    white-space: nowrap;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .global-session-badge.visible { display: inline-flex; }
+
+  .nav-label-top {
+    font-size: 18px;
+    letter-spacing: 0.12em;
+    color: var(--text-faint);
+    padding: 0 22px 12px;
+    text-transform: uppercase;
+  }
+  .nav-divider {
+    height: 1px;
+    background: var(--hairline);
+    margin: 0 22px 14px;
+  }
+  .nav-btn {
+    position: relative;
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    text-align: left;
+    font-size: 14.5px;
+    letter-spacing: -0.005em;
+    padding: 9px 14px;
+    margin: 1.5px 10px;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: color 0.12s ease, background 0.12s ease;
+    width: calc(100% - 20px);
+  }
+  .icon-emo { display: inline-block; vertical-align: -3px; flex-shrink: 0; }
+  .nav-btn:hover { color: var(--text); background: var(--mac-vibrancy-hairline); }
+  .nav-btn.active {
+    color: #ffffff;
+    background: var(--accent);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+  }
+  .nav-btn.active::before { content: none; }
+  .nav-spacer { flex: 1; }
+  .nav-master-mode {
+    margin: 0 8px 14px;
+    padding: 9px 10px;
+    border: 1px solid var(--accent);
+    border-radius: 14px;
+    background: var(--accent-dim);
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .nav-master-mode-title {
+    font-size: 13px; font-weight: 600; color: var(--accent); letter-spacing: -0.01em;
+    line-height: 1.3; white-space: nowrap;
+  }
+  .nav-master-mode-sub {
+    font-size: 11px; color: var(--text-dim); line-height: 1.3; white-space: nowrap;
+  }
+  .theme-toggle-wrap {
+    position: fixed;
+    right: 18px;
+    bottom: 18px;
+    z-index: 45;
+    padding: 4px;
+    margin: 0;
+    border: 1px solid var(--mac-vibrancy-hairline);
+    border-radius: 18px;
+    background: var(--mac-vibrancy);
+    backdrop-filter: blur(26px) saturate(2);
+    -webkit-backdrop-filter: blur(26px) saturate(2);
+    box-shadow: var(--mac-shadow-float);
+  }
+  .theme-toggle-wrap .theme-picker-btn { width: auto; }
+  .theme-picker-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    background: var(--elevated);
+    border: 1px solid var(--hairline);
+    border-radius: 12px;
+    padding: 4px 6px;
+    cursor: pointer;
+    color: var(--text-dim);
+    font-size: 11px;
+    transition: border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+  }
+  .theme-picker-btn:hover { color: var(--text); border-color: var(--accent); }
+  .theme-picker-btn.open { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); color: var(--text); }
+  .theme-picker-dot {
+    width: 11px; height: 11px; border-radius: 50%; flex-shrink: 0;
+    box-shadow: inset 0 0 0 2px #ffffff40, 0 0 0 1px #00000022;
+  }
+  .theme-picker-label {
+    flex: 1; text-align: left; font-weight: 500; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis;
+  }
+  .theme-picker-chevron { color: var(--text-faint); flex-shrink: 0; transition: transform 0.15s ease; }
+  .theme-picker-btn.open .theme-picker-chevron { transform: rotate(180deg); }
+
+  .theme-menu {
+    position: fixed; z-index: 60; background: var(--mac-vibrancy); border: 1px solid var(--mac-vibrancy-hairline);
+    backdrop-filter: blur(26px) saturate(2); -webkit-backdrop-filter: blur(26px) saturate(2);
+    border-radius: 18px; padding: 6px; display: flex; flex-direction: column; gap: 1px;
+    box-shadow: var(--mac-shadow-float); min-width: 180px;
+  }
+  .theme-menu-item {
+    display: flex; align-items: center; gap: 9px; background: none; border: none; width: 100%;
+    padding: 8px 9px; border-radius: 12px; cursor: pointer; color: var(--text); font-size: 13px; text-align: left;
+  }
+  .theme-menu-item:hover { background: var(--accent-dim); }
+  .theme-menu-item.active { background: var(--accent-dim); font-weight: 600; }
+  .theme-menu-dot {
+    width: 15px; height: 15px; border-radius: 50%; flex-shrink: 0;
+    box-shadow: inset 0 0 0 2px #ffffff40, 0 0 0 1px #00000022;
+  }
+  .theme-menu-name { flex: 1; white-space: nowrap; }
+  .theme-menu-check { color: var(--accent); font-weight: 700; flex-shrink: 0; }
+
+  /* 사용설명서 버튼: 테마(다크/라이트) 버튼과 같은 자리, 그 바로 위에 항상 떠 있다 */
+  /* 되돌리기(실행 취소) 버튼도 같은 스타일로, 사용설명서 버튼 바로 위에 쌓는다 */
+  .manual-toggle-wrap, .undo-toggle-wrap {
+    position: fixed;
+    right: 18px;
+    bottom: 66px;
+    z-index: 45;
+    padding: 4px;
+    margin: 0;
+    border: 1px solid var(--mac-vibrancy-hairline);
+    border-radius: 18px;
+    background: var(--mac-vibrancy);
+    backdrop-filter: blur(26px) saturate(2);
+    -webkit-backdrop-filter: blur(26px) saturate(2);
+    box-shadow: var(--mac-shadow-float);
+  }
+  .manual-toggle-wrap .theme-picker-btn, .undo-toggle-wrap .theme-picker-btn { width: auto; }
+  .theme-picker-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* ---------- ↩️ 되돌리기(실행 취소) 결과 토스트: 되돌리기 버튼 위에 잠깐 떴다가 사라짐 ---------- */
+  .undo-toast {
+    position: fixed;
+    right: 14px;
+    bottom: 214px;
+    z-index: 201;
+    padding: 8px 14px;
+    border-radius: var(--mac-radius);
+    background: var(--mac-vibrancy);
+    backdrop-filter: blur(20px) saturate(1.6);
+    -webkit-backdrop-filter: blur(20px) saturate(1.6);
+    border: 1px solid var(--mac-vibrancy-hairline);
+    box-shadow: var(--mac-shadow-float);
+    color: var(--text-dim);
+    font-size: 12.5px;
+    font-weight: 600;
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+    pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    white-space: nowrap;
+    max-width: 260px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .undo-toast.visible { opacity: 1; transform: translateY(0) scale(1); }
+  .undo-toast--empty { color: var(--text-faint); }
+  @media (max-width: 720px) { .undo-toast { right: 12px; bottom: 214px; font-size: 12px; } }
+
+  /* ---------- ☁️ 클라우드 동기화 상태 토스트 (오른쪽 상단, 잠깐 떴다가 사라짐) ---------- */
+  .cloud-sync-toast {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 14px 9px 12px;
+    border-radius: var(--mac-radius);
+    background: var(--mac-vibrancy);
+    backdrop-filter: blur(20px) saturate(1.6);
+    -webkit-backdrop-filter: blur(20px) saturate(1.6);
+    border: 1px solid var(--mac-vibrancy-hairline);
+    box-shadow: var(--mac-shadow-float);
+    color: var(--text-dim);
+    font-size: 12.5px;
+    font-weight: 600;
+    letter-spacing: -0.1px;
+    opacity: 0;
+    transform: translateY(-10px) scale(0.98);
+    pointer-events: none;
+    transition: opacity 0.22s ease, transform 0.22s ease;
+    white-space: nowrap;
+  }
+  .cloud-sync-toast.visible { opacity: 1; transform: translateY(0) scale(1); }
+  .cloud-sync-toast .icon-emo { flex-shrink: 0; }
+  .cloud-sync-toast.saved { color: var(--green); }
+  .cloud-sync-toast.error { color: var(--red); }
+  .cloud-sync-toast.syncing { color: var(--text-dim); }
+  .cloud-sync-spinner {
+    width: 13px;
+    height: 13px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    border: 2px solid var(--hairline-strong);
+    border-top-color: var(--accent);
+    animation: cloud-sync-spin 0.7s linear infinite;
+  }
+  @keyframes cloud-sync-spin { to { transform: rotate(360deg); } }
+  @media (max-width: 720px) {
+    .cloud-sync-toast { top: 12px; right: 12px; padding: 8px 12px 8px 10px; font-size: 12px; }
+  }
+
+  /* ---------- ☁️ 동시 편집 알림 배너 (남이 방금 고쳤을 때 / 저장 충돌났을 때) ---------- */
+  .cloud-live-banner-wrap {
+    position: fixed; top: 16px; left: 50%; transform: translateX(-50%); z-index: 199;
+    display: flex; flex-direction: column; gap: 8px; width: min(94vw, 480px); pointer-events: none;
+  }
+  .cloud-live-banner {
+    pointer-events: auto; display: flex; align-items: flex-start; gap: 10px;
+    padding: 12px 14px; border-radius: var(--mac-radius); background: var(--mac-vibrancy);
+    backdrop-filter: blur(20px) saturate(1.6); -webkit-backdrop-filter: blur(20px) saturate(1.6);
+    border: 1px solid var(--mac-vibrancy-hairline); box-shadow: var(--mac-shadow-float);
+    font-size: 13px; color: var(--text); animation: cloud-live-banner-in 0.18s ease;
+  }
+  .cloud-live-banner.conflict { border-color: var(--red); }
+  .cloud-live-banner .icon-emo { flex-shrink: 0; margin-top: 1px; }
+  .cloud-live-banner-body { flex: 1; min-width: 0; }
+  .cloud-live-banner-title { font-weight: 600; margin-bottom: 2px; }
+  .cloud-live-banner-desc { color: var(--text-dim); font-size: 12.5px; line-height: 1.5; }
+  .cloud-live-banner-desc b { color: var(--text); }
+  .cloud-live-banner-actions { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .cloud-live-banner-actions button { padding: 6px 11px; font-size: 12px; }
+  .cloud-live-banner-close {
+    background: none; border: none; color: var(--text-faint); cursor: pointer;
+    font-size: 13px; padding: 2px 4px; flex-shrink: 0;
+  }
+  .cloud-live-banner-close:hover { color: var(--text); }
+  @keyframes cloud-live-banner-in { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+  @media (max-width: 720px) {
+    .cloud-live-banner-wrap { top: 12px; width: 94vw; }
+  }
+
+  /* ---------- 데스크톱: 평소엔 숨겨진 macOS 독(Dock) + 가운데 하단 펼치기 버튼 ---------- */
+  .dock-toggle-btn { display: none; }
+  #theme-toggle-root .theme-toggle-wrap { position: fixed; right: 14px; bottom: 78px; z-index: 46; }
+  #manual-toggle-root .manual-toggle-wrap { position: fixed; right: 14px; bottom: 124px; z-index: 46; }
+  #undo-toggle-root .undo-toggle-wrap { position: fixed; right: 14px; bottom: 170px; z-index: 46; }
+  #refresh-toggle-root .manual-toggle-wrap { position: fixed; right: 14px; bottom: 216px; z-index: 46; }
+  /* 데이터 백업 버튼은 오른쪽 하단 스택에서 빼서 화면 왼쪽 위 고정 위치로 옮긴다 */
+  #backup-toggle-root .manual-toggle-wrap { position: fixed; left: 14px; top: 14px; right: auto; bottom: auto; z-index: 46; }
+  @media (min-width: 721px) {
+    #theme-toggle-root .theme-toggle-wrap { bottom: 18px; }
+    #manual-toggle-root .manual-toggle-wrap { bottom: 64px; }
+    #undo-toggle-root .undo-toggle-wrap { bottom: 110px; }
+    #refresh-toggle-root .manual-toggle-wrap { bottom: 156px; }
+    #backup-toggle-root .manual-toggle-wrap { left: 16px; top: 16px; }
+    .undo-toast { bottom: 154px; }
+    #page-area { padding-bottom: 56px; }
+    .dock-toggle-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: fixed;
+      left: 50%;
+      bottom: 14px;
+      transform: translateX(-50%);
+      z-index: 41;
+      width: 64px;
+      height: 28px;
+      padding: 0;
+      border: 1px solid var(--mac-vibrancy-hairline);
+      border-radius: 20px;
+      background: var(--mac-vibrancy);
+      backdrop-filter: blur(28px) saturate(2);
+      -webkit-backdrop-filter: blur(28px) saturate(2);
+      box-shadow: var(--mac-shadow-float);
+      color: var(--text-faint);
+      cursor: pointer;
+      transition: color 0.12s ease;
+    }
+    .dock-toggle-btn:hover { color: var(--text); }
+    .dock-toggle-btn svg { transition: transform 0.2s ease; }
+    .dock-toggle-btn.open svg { transform: rotate(180deg); }
+
+    #nav {
+      position: fixed;
+      left: 50%;
+      bottom: 40px;
+      z-index: 40;
+      width: auto;
+      max-width: 96vw;
+      flex-direction: row;
+      flex-wrap: nowrap;
+      align-items: center;
+      justify-content: center;
+      row-gap: 8px;
+      column-gap: 16px;
+      padding: 26px 22px;
+      border-radius: 32px;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      border: 1px solid var(--mac-vibrancy-hairline);
+      box-shadow: var(--mac-shadow-float);
+      opacity: 0;
+      transform: translateX(-50%) translateY(10px) scale(0.96);
+      pointer-events: none;
+      transition: opacity 0.16s ease, transform 0.18s cubic-bezier(.2, 1.2, .4, 1);
+    }
+    #nav.dock-open {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0) scale(1);
+      pointer-events: auto;
+    }
+    #nav .nav-label-top,
+    #nav .nav-spacer,
+    #nav .theme-toggle-wrap {
+      display: none;
+    }
+    /* 아이콘 아래에 작은 캡션을 붙여서, 사이드바가 펼쳐졌을 때 보이던
+       계정 이름 / 로그아웃까지 남은 시간 / 메뉴 이름을 이 독(dock)에서도 알 수 있게 한다.
+       모든 항목(메뉴 아이콘 / 계정 / 로그아웃)의 세로 높이를 동일하게 맞춰서,
+       독 안에서 아이콘들이 전부 같은 가운데 선에 나란히 놓이도록 한다. */
+    #nav .nav-btn {
+      width: auto;
+      margin: 0;
+      padding: 12px 20px;
+      border-radius: 22px;
+      white-space: nowrap;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 5px;
+      transition: color 0.12s ease, background 0.12s ease, transform 0.15s cubic-bezier(.2,1.4,.4,1);
+    }
+    #nav .nav-btn .nav-text,
+    #nav .nav-account-name .nav-text {
+      display: block !important;
+      font-size: 11.5px;
+      color: var(--text-faint);
+    }
+    #nav .nav-btn.active .nav-text { color: #ffffff; }
+    #nav .nav-btn:hover { transform: translateY(-4px) scale(1.06); background: var(--mac-vibrancy-hairline); }
+    #nav .nav-btn.active:hover { transform: translateY(-4px) scale(1.06); }
+
+    /* 아이콘 자체 크기를 더 키운다 (기본 15px → 28px) */
+    #nav .nav-btn .icon-emo,
+    #nav .nav-account-name .icon-emo,
+    #nav .nav-logout-btn .icon-emo {
+      width: 28px;
+      height: 28px;
+    }
+
+    #nav .nav-account {
+      flex-direction: row;
+      align-items: center;
+      gap: 20px;
+      padding: 0 4px;
+    }
+    #nav .nav-account-name {
+      max-width: 96px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      padding: 12px 6px;
+    }
+    #nav .nav-account-name .nav-text {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 96px;
+    }
+    /* 로그아웃 버튼(아이콘+라벨)은 다른 아이콘들과 정확히 같은 높이를 갖도록 하고,
+       자동 로그아웃 남은 시간 + 연장 버튼은 그 흐름 밖(절대 위치)으로 빼서 캡션처럼 붙인다.
+       이렇게 하면 로그아웃 항목도 다른 아이콘들과 똑같은 높이가 되어, 독 세로 가운데 선에
+       모든 아이콘이 완벽히 정렬된다. */
+    #nav .nav-logout-wrap {
+      position: relative;
+      display: flex;
+    }
+    #nav .nav-session-row {
+      position: absolute;
+      top: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      margin-top: 5px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      white-space: nowrap;
+    }
+    #nav .global-session-badge { font-size: 10px; padding: 2px 8px; }
+    #nav .nav-session-extend-btn { font-size: 10px; padding: 1px 7px; }
+    #nav .nav-logout-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      padding: 12px 8px;
+      border-radius: 20px;
+    }
+    /* 계정/로그아웃 묶음과 메뉴 아이콘들 사이를 나누는 세로 구분선.
+       로그아웃 버튼 바로 오른쪽, 메뉴 아이콘들 바로 왼쪽에 위치하며,
+       독의 세로 길이에 맞춰 위아래 끝까지 늘어난다 */
+    #nav .nav-divider {
+      display: block;
+      width: 1px;
+      height: auto;
+      align-self: stretch;
+      margin: 0 2px;
+      background: var(--mac-vibrancy-hairline);
+    }
+    #nav .nav-master-banner,
+    #nav .nav-master-mode {
+      flex-direction: row;
+      align-items: center;
+      margin: 0 4px;
+      padding: 6px 10px;
+      white-space: nowrap;
+    }
+    #nav .nav-master-mode-sub,
+    #nav .nav-master-banner span { display: none; }
+    #nav .nav-master-return-btn { width: auto; }
+  }
+
+  @media (max-width: 720px) {
+    #layout { flex-direction: column-reverse; }
+    #nav {
+      width: 100%;
+      flex-direction: row;
+      align-items: flex-start;
+      border-left: none;
+      border-top: 1px solid var(--hairline);
+      padding: 10px 14px;
+      gap: 4px;
+    }
+    .nav-label-top, .nav-divider { display: none; }
+    .nav-btn { width: auto; padding: 10px 16px; }
+    .nav-btn.active::before { left: 8px; right: 8px; top: auto; bottom: 0; width: auto; height: 2px; }
+    .nav-spacer { display: none; }
+    .nav-master-banner { margin: 0; padding: 4px 8px; flex-direction: row; align-items: center; gap: 6px; }
+    .nav-master-banner span { display: inline; max-width: 110px; }
+    .nav-master-return-btn { width: auto; }
+    .nav-master-mode { margin: 0; padding: 6px 10px; flex-direction: row; align-items: center; }
+    .nav-master-mode-sub { display: none; }
+  }
+
+  /* ---------- 모바일 전역 최적화 ---------- */
+  @media (max-width: 720px) {
+    /* iOS Safari는 입력창 글자 크기가 16px보다 작으면 탭할 때 화면을 자동으로 확대시켜버려서
+       사용성이 크게 떨어진다. 모바일에서는 모든 입력 요소 글자 크기를 16px 이상으로 고정한다. */
+    input, select, textarea { font-size: 16px !important; }
+    .badge, .badge-btn, .agent-filter-btn, .agent-sort-select { font-size: 12.5px !important; }
+
+    #page-area { padding: 14px 10px 84px; }
+    .card { padding: 18px 16px; border-radius: 20px; }
+    .login-card { padding: 24px 18px; }
+
+    /* 손가락 터치 기준으로 버튼 최소 크기를 넉넉하게 확보 */
+    .icon-btn { width: 40px; height: 40px; }
+    .schedule-month-btn { width: 34px; height: 34px; }
+    .ghost-btn, .primary-btn, .cancel-btn { padding: 10px 14px; }
+  }
+  @media (max-width: 600px) {
+    #nav {
+      justify-content: space-between;
+      padding: 8px 10px;
+      gap: 14px;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    /* 테마 선택 버튼의 글자 라벨만 계속 숨겨서 공간을 아낀다 */
+    #nav .theme-picker-label, #nav .theme-picker-chevron { display: none; }
+
+    /* 아이콘 아래에 작은 글씨로 캡션을 붙여서, 사이드바가 펼쳐졌을 때 보이던
+       계정 이름 / 로그아웃까지 남은 시간 / 메뉴 이름을 여기서도 바로 알 수 있게 한다 */
+    .nav-btn, .nav-account-name, .nav-logout-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      margin: 0;
+      flex-shrink: 0;
+    }
+    .nav-btn { padding: 9px 13px; font-size: 18px; }
+    .nav-btn .nav-text,
+    .nav-account-name .nav-text,
+    .nav-logout-btn .nav-text {
+      display: block !important;
+      font-size: 10px;
+      line-height: 1.15;
+      color: var(--text-faint);
+      white-space: nowrap;
+    }
+    .nav-btn.active .nav-text { color: #ffffff; }
+    .nav-btn.active::before { left: 4px; right: 4px; }
+
+    /* 아이콘 자체 크기를 키운다 (기본 15px → 22px) */
+    .nav-btn .icon-emo,
+    .nav-account-name .icon-emo,
+    .nav-logout-btn .icon-emo {
+      width: 22px;
+      height: 22px;
+    }
+
+    .nav-account {
+      flex-direction: row;
+      align-items: flex-start;
+      gap: 16px;
+      padding: 9px 0 0;
+    }
+    /* 로그아웃 버튼(아이콘+라벨)을 위, 남은 시간+연장 버튼을 캡션처럼 아래에 배치 */
+    .nav-logout-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+    }
+    .nav-logout-wrap .nav-logout-btn { order: 1; }
+    .nav-logout-wrap .nav-session-row { order: 2; }
+    .nav-session-row { display: flex; align-items: center; gap: 4px; }
+    .global-session-badge { font-size: 9.5px; padding: 1px 6px; }
+    .nav-session-extend-btn { font-size: 9.5px; padding: 1px 6px; }
+
+    .theme-toggle-wrap { flex-shrink: 0; }
+    .theme-picker-btn { padding: 5px; gap: 0; }
+  }
+
