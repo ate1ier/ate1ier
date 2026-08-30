@@ -875,6 +875,96 @@
     transition: border-color 0.15s ease, background 0.15s ease;
   }
   .nav-session-extend-btn:hover { border-color: var(--accent); background: var(--accent-dim); }
+
+  /* ---------- 자동 로그아웃 임박 알림 토스트 (오른쪽 상단) ---------- */
+  .session-warning-toast {
+    position: fixed;
+    top: 18px;
+    right: 18px;
+    z-index: 80;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    max-width: 300px;
+    padding: 14px 14px 14px 16px;
+    border-radius: var(--mac-radius-lg);
+    background: var(--mac-vibrancy);
+    backdrop-filter: blur(30px) saturate(2);
+    -webkit-backdrop-filter: blur(30px) saturate(2);
+    border: 1px solid var(--mac-vibrancy-hairline);
+    box-shadow: var(--mac-shadow-float);
+    color: var(--text);
+    animation: session-toast-in 0.22s ease;
+  }
+  @keyframes session-toast-in {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .session-toast-icon {
+    flex-shrink: 0;
+    color: var(--orange);
+    margin-top: 1px;
+  }
+  .session-toast-body { flex: 1; min-width: 0; }
+  .session-toast-title {
+    font-size: 13.5px;
+    font-weight: 600;
+    line-height: 1.35;
+    margin-bottom: 3px;
+  }
+  .session-toast-desc {
+    font-size: 12px;
+    color: var(--text-dim);
+    line-height: 1.4;
+  }
+  .session-toast-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+  }
+  .session-toast-extend-btn {
+    background: var(--accent);
+    border: none;
+    color: var(--accent-text);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 6px 12px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+  .session-toast-extend-btn:hover { filter: brightness(1.1); }
+  .session-toast-dismiss-btn {
+    background: none;
+    border: 1px solid var(--hairline);
+    color: var(--text-faint);
+    font-size: 12px;
+    cursor: pointer;
+    padding: 6px 12px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+  .session-toast-dismiss-btn:hover { color: var(--text); border-color: var(--hairline-strong); }
+  .session-toast-close-btn {
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    color: var(--text-faint);
+    cursor: pointer;
+    padding: 2px;
+    line-height: 1;
+    border-radius: 6px;
+  }
+  .session-toast-close-btn:hover { color: var(--text); }
+  @media (max-width: 600px) {
+    .session-warning-toast {
+      top: 12px;
+      right: 12px;
+      left: 12px;
+      max-width: none;
+    }
+  }
   .nav-master-banner {
     margin: 0 22px 14px; padding: 8px 8px; border-radius: 12px;
     background: var(--accent-dim); border: 1px solid var(--accent);
@@ -2126,6 +2216,7 @@
   <div id="page-area"><div id="page-inner"></div></div>
   <div id="nav"></div>
 </div>
+<div id="session-warning-toast-root"></div>
 <div id="theme-toggle-root"></div>
 <div id="manual-toggle-root"></div>
 <div id="undo-toggle-root"></div>
@@ -2160,6 +2251,7 @@
   const ICON_DOWNLOAD = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2.5v7.2"/><path d="M5.2 7.1 8 9.9l2.8-2.8"/><path d="M3.2 13h9.6"/></svg>`;
   const ICON_BELL = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11.2V7.4a4 4 0 0 1 8 0v3.8l1.1 1.5H2.9z"/><path d="M6.6 13.4a1.5 1.5 0 0 0 2.8 0"/></svg>`;
   const ICON_CLOCK = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="5.6"/><path d="M8 4.8V8l2.4 1.4"/></svg>`;
+  const ICON_CLOSE_SM = `<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg>`;
   const ICON_CHEVRON_RIGHT = `<svg class="icon-emo" viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.4 10.6 8 6 12.6"/></svg>`;
   const ICON_UNDO = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4.6v3.4h3.4"/><path d="M4.6 8A5 5 0 1 1 6 11.7"/></svg>`;
   const ICON_UPLOAD = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 9.7V2.5"/><path d="M5.2 5.3 8 2.5l2.8 2.8"/><path d="M3.2 13h9.6"/></svg>`;
@@ -3059,6 +3151,59 @@
     if (el) {
       el.innerHTML = `${ICON_CLOCK} ${formatRemainingTime(getSessionRemainingMs())}`;
       el.classList.add("visible");
+    }
+    updateSessionWarningToast();
+  }
+
+  // ---- 자동 로그아웃 임박(남은 시간 30분 이하) 알림 토스트 ----
+  const SESSION_WARNING_THRESHOLD_MS = 30 * 60 * 1000; // 30분
+  // 사용자가 토스트를 닫으면, 같은 로그인 회차(연장 전까지)에는 다시 띄우지 않는다.
+  let sessionWarningDismissed = false;
+
+  function hideSessionWarningToast() {
+    const root = document.getElementById("session-warning-toast-root");
+    if (root) root.innerHTML = "";
+  }
+
+  function extendSessionFromToast() {
+    setLoginAt(Date.now());
+    sessionWarningDismissed = false;
+    hideSessionWarningToast();
+    updateSessionRemainingDisplay();
+  }
+
+  function renderSessionWarningToast(remainingMs) {
+    const root = document.getElementById("session-warning-toast-root");
+    if (!root) return;
+    root.innerHTML = `
+      <div class="session-warning-toast" role="alert">
+        <span class="session-toast-icon">${ICON_CLOCK}</span>
+        <div class="session-toast-body">
+          <div class="session-toast-title">곧 자동 로그아웃돼요</div>
+          <div class="session-toast-desc">${formatRemainingTime(remainingMs)} 후 자동으로 로그아웃됩니다. 계속 사용하시려면 연장해주세요.</div>
+          <div class="session-toast-actions">
+            <button class="session-toast-extend-btn" id="session-toast-extend-btn" type="button">연장하기</button>
+            <button class="session-toast-dismiss-btn" id="session-toast-dismiss-btn" type="button">나중에</button>
+          </div>
+        </div>
+        <button class="session-toast-close-btn" id="session-toast-close-btn" type="button" title="닫기" aria-label="닫기">${ICON_CLOSE_SM}</button>
+      </div>
+    `;
+    const extendBtn = document.getElementById("session-toast-extend-btn");
+    if (extendBtn) extendBtn.onclick = extendSessionFromToast;
+    const dismissBtn = document.getElementById("session-toast-dismiss-btn");
+    if (dismissBtn) dismissBtn.onclick = () => { sessionWarningDismissed = true; hideSessionWarningToast(); };
+    const closeBtn = document.getElementById("session-toast-close-btn");
+    if (closeBtn) closeBtn.onclick = () => { sessionWarningDismissed = true; hideSessionWarningToast(); };
+  }
+
+  function updateSessionWarningToast() {
+    if (CURRENT_ACCOUNT_IS_MASTER) { hideSessionWarningToast(); return; }
+    const remaining = getSessionRemainingMs();
+    if (remaining > 0 && remaining <= SESSION_WARNING_THRESHOLD_MS && !sessionWarningDismissed) {
+      renderSessionWarningToast(remaining);
+    } else {
+      hideSessionWarningToast();
     }
   }
   // 마스터 계정이 다른 계정으로 들어가서 볼 때 쓰는 함수.
@@ -8333,6 +8478,8 @@
     if (extendBtn) {
       extendBtn.onclick = () => {
         setLoginAt(Date.now());
+        sessionWarningDismissed = false;
+        hideSessionWarningToast();
         updateSessionRemainingDisplay();
       };
     }
