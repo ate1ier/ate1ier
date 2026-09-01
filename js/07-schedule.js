@@ -169,7 +169,6 @@
     renderApp();
   }
 
-  let scheduleColGroupPanelOpen = false;
   function scheduleAddColGroup(start, end) {
     const s = Math.min(start, end), e = Math.max(start, end);
     scheduleUi.colGroups.push({ id: `cg${Date.now()}${Math.random().toString(36).slice(2, 6)}`, start: s, end: e, collapsed: true });
@@ -183,6 +182,12 @@
     const g = scheduleUi.colGroups.find((g) => g.id === id);
     if (g) g.collapsed = !g.collapsed;
     renderApp();
+  }
+  // "숨긴 열/행" 버튼 옆에 표시할 개수: 열 그룹(접힌 것) + 개별로 숨긴 열·행을 모두 합친다.
+  function scheduleHiddenCount() {
+    const collapsedColGroups = (scheduleUi.colGroups || []).filter((g) => g.collapsed).length;
+    return collapsedColGroups + scheduleUi.manualHiddenDays.size + scheduleUi.manualHiddenInfoCols.size
+      + scheduleUi.manualHiddenStaffIds.size + scheduleUi.manualHiddenSummaryRows.size;
   }
   // 이번 달 기준으로, 접혀 있는 열 그룹 + 개별로 접은 날짜들을 합쳐 돌려준다.
   function scheduleCollapsedDaySet() {
@@ -201,7 +206,7 @@
   // 선택이 전부 풀린다. 선택된 상태에서 오른쪽 마우스를 누르면 "접기" 메뉴가 뜬다.
   let scheduleHeaderSelCols = new Set(); // 선택된 열의 key. 날짜 열은 "d:3", 인원정보 열은 "i:empno" 형태
   let scheduleHeaderSelRows = new Set(); // 선택된 staffId(행)
-  let scheduleHiddenPanelOpen = false; // "숨긴 항목" 패널(접은 열·행을 다시 펼치는 곳) 열림 여부
+  let scheduleHiddenPanelOpen = false; // "숨긴 열/행" 패널(열 그룹 관리 + 접은 열·행을 다시 펼치는 곳) 열림 여부
 
   function scheduleApplyHeaderSelectionHighlight() {
     const root = document.getElementById("schedule-table-area");
@@ -2046,6 +2051,7 @@
           <button class="ghost-btn ${scheduleBulkPasteOpen ? "active" : ""}" id="sch-bulk-btn" style="margin-left:8px;">${ICON_CLIPBOARD} 일괄 붙여넣기</button>
           <button class="ghost-btn" id="sch-capture-btn">${ICON_CAMERA} 이미지로 저장 ▾</button>
           <button class="ghost-btn" id="sch-excel-btn">${ICON_CHART} 엑셀로 다운로드</button>
+          <button class="ghost-btn" id="sch-holidaydoc-btn">${ICON_CLIPBOARD} 휴일대체 확인서</button>
         </div>
       </div>
       <div class="status" id="schedule-status"></div>
@@ -2078,12 +2084,36 @@
         <span class="item"><span class="swatch" style="background:var(--text-faint);"></span>퇴사</span>
       </div>
       <div class="schedule-table-toolbar">
-        <button class="ghost-btn ${scheduleColGroupPanelOpen ? "active" : ""}" id="sch-colgroup-btn">${ICON_CALENDAR} 열 그룹 ▾</button>
-        <button class="ghost-btn ${scheduleHiddenPanelOpen ? "active" : ""}" id="sch-hidden-btn">숨긴 항목${(scheduleUi.manualHiddenDays.size + scheduleUi.manualHiddenInfoCols.size + scheduleUi.manualHiddenStaffIds.size + scheduleUi.manualHiddenSummaryRows.size) > 0 ? ` (${scheduleUi.manualHiddenDays.size + scheduleUi.manualHiddenInfoCols.size + scheduleUi.manualHiddenStaffIds.size + scheduleUi.manualHiddenSummaryRows.size})` : ""} ▾</button>
+        <button class="ghost-btn ${scheduleHiddenPanelOpen ? "active" : ""}" id="sch-hidden-btn">${ICON_CALENDAR} 숨긴 열/행${scheduleHiddenCount() > 0 ? ` (${scheduleHiddenCount()})` : ""} ▾</button>
         <button class="ghost-btn sch-delete-btn-small" id="sch-delete-btn">${ICON_TRASH} 일정 삭제</button>
       </div>
       ${scheduleHiddenPanelOpen ? `
         <div class="schedule-colgroup-panel">
+          <div class="schedule-colgroup-subtitle">날짜 범위로 열 그룹 만들기</div>
+          <div class="schedule-colgroup-desc">
+            엑셀처럼 원하는 날짜 범위를 골라 그 열들을 한 번에 접거나 펼 수 있어요. 시작일과 종료일을 입력하고 "그룹 추가"를 누르면 아래 목록에 추가돼요.
+          </div>
+          <div class="schedule-colgroup-form">
+            <input type="number" min="1" max="${scheduleDaysInMonth(scheduleUi.year, scheduleUi.monthIndex)}" class="add-input" id="sch-colgroup-start" placeholder="시작일">
+            <span>~</span>
+            <input type="number" min="1" max="${scheduleDaysInMonth(scheduleUi.year, scheduleUi.monthIndex)}" class="add-input" id="sch-colgroup-end" placeholder="종료일">
+            <button class="primary-btn" id="sch-colgroup-add-btn">그룹 추가</button>
+          </div>
+          ${scheduleUi.colGroups.length === 0 ? `
+            <div class="schedule-colgroup-empty">추가된 열 그룹이 없어요.</div>
+          ` : `
+            <div class="schedule-colgroup-list">
+              ${scheduleUi.colGroups.map((g) => `
+                <span class="schedule-colgroup-chip">
+                  ${pad2(scheduleUi.monthIndex + 1)}/${pad2(g.start)}~${pad2(scheduleUi.monthIndex + 1)}/${pad2(g.end)}
+                  <button class="sch-colgroup-toggle-btn" data-toggle-colgroup="${g.id}">${g.collapsed ? "펼치기" : "접기"}</button>
+                  <button class="sch-colgroup-remove-btn" data-remove-colgroup="${g.id}">✕</button>
+                </span>
+              `).join("")}
+            </div>
+          `}
+          <div class="schedule-colgroup-divider"></div>
+          <div class="schedule-colgroup-subtitle">개별로 숨긴 열·행</div>
           <div class="schedule-colgroup-desc">
             표에서 날짜 칸·인원 정보 칸(닉네임~결근)·인원 닉네임 칸·집계행(관리자 인원/필요인력/대비)·그룹 제목 행(관리자/아침조/채팅/유선 등)을 클릭해 선택한 뒤(여러 개 선택 가능), 오른쪽 마우스 버튼을 눌러 "접기"를 고르면 여기에 쌓여요. 데이터는 그대로 있고 화면에서만 숨겨져요.
           </div>
@@ -2126,32 +2156,6 @@
           `}
         </div>
       ` : ""}
-      ${scheduleColGroupPanelOpen ? `
-        <div class="schedule-colgroup-panel">
-          <div class="schedule-colgroup-desc">
-            엑셀처럼 원하는 날짜 범위를 골라 그 열들을 한 번에 접거나 펼 수 있어요. 시작일과 종료일을 입력하고 "그룹 추가"를 누르면 아래 목록에 추가돼요.
-          </div>
-          <div class="schedule-colgroup-form">
-            <input type="number" min="1" max="${scheduleDaysInMonth(scheduleUi.year, scheduleUi.monthIndex)}" class="add-input" id="sch-colgroup-start" placeholder="시작일">
-            <span>~</span>
-            <input type="number" min="1" max="${scheduleDaysInMonth(scheduleUi.year, scheduleUi.monthIndex)}" class="add-input" id="sch-colgroup-end" placeholder="종료일">
-            <button class="primary-btn" id="sch-colgroup-add-btn">그룹 추가</button>
-          </div>
-          ${scheduleUi.colGroups.length === 0 ? `
-            <div class="schedule-colgroup-empty">추가된 열 그룹이 없어요.</div>
-          ` : `
-            <div class="schedule-colgroup-list">
-              ${scheduleUi.colGroups.map((g) => `
-                <span class="schedule-colgroup-chip">
-                  ${pad2(scheduleUi.monthIndex + 1)}/${pad2(g.start)}~${pad2(scheduleUi.monthIndex + 1)}/${pad2(g.end)}
-                  <button class="sch-colgroup-toggle-btn" data-toggle-colgroup="${g.id}">${g.collapsed ? "펼치기" : "접기"}</button>
-                  <button class="sch-colgroup-remove-btn" data-remove-colgroup="${g.id}">✕</button>
-                </span>
-              `).join("")}
-            </div>
-          `}
-        </div>
-      ` : ""}
       <div id="schedule-table-area"><div class="schedule-table-wrap"><div class="schedule-scale-inner">${buildScheduleTableHtml()}</div></div></div>
       <div class="schedule-log-title">이번 달 지각·결근 기록</div>
       <div id="schedule-log-area">${buildScheduleLogHtml()}</div>
@@ -2164,11 +2168,8 @@
     document.getElementById("sch-lock-btn").onclick = () => scheduleToggleMonthLock(scheduleUi.year, scheduleUi.monthIndex);
     document.getElementById("sch-capture-btn").onclick = (e) => openScheduleCaptureMenu(e.currentTarget);
     document.getElementById("sch-excel-btn").onclick = () => exportScheduleToExcel();
+    document.getElementById("sch-holidaydoc-btn").onclick = () => generateHolidayDocx();
     document.getElementById("sch-delete-btn").onclick = (e) => openScheduleDeleteMenu(e.currentTarget);
-    document.getElementById("sch-colgroup-btn").onclick = () => {
-      scheduleColGroupPanelOpen = !scheduleColGroupPanelOpen;
-      renderApp();
-    };
     document.getElementById("sch-hidden-btn").onclick = () => {
       scheduleHiddenPanelOpen = !scheduleHiddenPanelOpen;
       renderApp();

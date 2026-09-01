@@ -5,7 +5,7 @@
   }
   .schedule-title { font-size: var(--page-title-size); font-weight: var(--page-title-weight); letter-spacing: -0.01em; }
   .schedule-month-nav { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-  .schedule-table-toolbar { display: flex; justify-content: flex-end; margin-bottom: 6px; }
+  .schedule-table-toolbar { display: flex; justify-content: flex-end; gap: 10px; margin-bottom: 6px; }
   .sch-delete-btn-small { font-size: 12px; padding: 4px 10px; }
   .schedule-month-btn {
     background: var(--elevated); border: 1px solid var(--hairline); color: var(--text-dim);
@@ -39,6 +39,8 @@
     background: var(--elevated); display: flex; flex-direction: column; gap: 10px;
   }
   .schedule-colgroup-desc { font-size: 12.5px; color: var(--text-faint); line-height: 1.6; }
+  .schedule-colgroup-subtitle { font-size: 13px; font-weight: 700; color: var(--text-dim); }
+  .schedule-colgroup-divider { height: 1px; background: var(--hairline); margin: 2px 0; }
   .schedule-colgroup-form { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .schedule-colgroup-form .add-input { width: 84px; flex: none; }
   .schedule-colgroup-empty { font-size: 12.5px; color: var(--text-faint); font-style: italic; }

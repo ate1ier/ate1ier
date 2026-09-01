@@ -49,9 +49,10 @@
   .qa-table td.qa-empty { text-align: center; color: var(--text-faint); padding: 24px; background: var(--panel); }
   .qa-score-input {
     width: 64px; box-sizing: border-box; text-align: center; border: 1px solid var(--hairline);
-    border-radius: 10px; background: var(--bg); color: var(--text); font-size: 13px; padding: 5px 4px;
+    border-radius: 10px; background: var(--bg); color: var(--text); font-size: 13px; font-weight: 700; padding: 5px 4px;
     -moz-appearance: textfield;
   }
+  html:not([data-theme="light"]) .qa-score-input:not(:disabled) { color: #ffffff; }
   .qa-score-input:disabled { background: var(--bg); color: var(--text-faint); cursor: not-allowed; }
   .qa-score-input:focus { border-color: var(--accent); }
   .qa-score-input::-webkit-outer-spin-button,
