@@ -9,6 +9,7 @@
     formType: "memo",
     formPriority: false,
     rangeMode: false,
+    upcomingExpanded: false, // "다가오는 일정"을 5개 넘게 펼쳐서 보고 있는지
   };
 
   function monthKey(y, m) { return acctKey(`personal-calendar:${y}-${pad2(m + 1)}`); }
@@ -114,15 +115,18 @@
       if (!b.time) return -1;
       return a.time.localeCompare(b.time);
     });
-    return items.slice(0, 6);
+    return items;
   }
+
+  const UPCOMING_COLLAPSED_COUNT = 5; // 접었을 때 기본으로 보여줄 개수
 
   function renderCalendarPage(root) {
     const grid = buildGrid(cal.year, cal.monthIndex);
     const selectedKey = pad2(cal.selectedDay);
     const selectedEntries = cal.monthData[selectedKey] || [];
     const selectedWeekday = WEEKDAYS[new Date(cal.year, cal.monthIndex, cal.selectedDay).getDay()];
-    const upcoming = computeUpcoming();
+    const upcomingAll = computeUpcoming();
+    const upcoming = cal.upcomingExpanded ? upcomingAll : upcomingAll.slice(0, UPCOMING_COLLAPSED_COUNT);
     const selectedISO = toISODate(cal.year, cal.monthIndex, cal.selectedDay);
 
     let gridHtml = "";
@@ -193,7 +197,8 @@
     }
 
     let upcomingHtml = "";
-    if (upcoming.length > 0) {
+    if (upcomingAll.length > 0) {
+      const remaining = upcomingAll.length - upcoming.length;
       upcomingHtml = `<div class="upcoming">
         <div class="upcoming-title">${ICON_CLIPBOARD} 다가오는 일정</div>
         <div class="upcoming-list">
@@ -208,6 +213,11 @@
             </button>`;
           }).join("")}
         </div>
+        ${upcomingAll.length > UPCOMING_COLLAPSED_COUNT ? `
+          <button type="button" class="upcoming-toggle" id="btn-upcoming-toggle">
+            ${cal.upcomingExpanded ? "접기 ▲" : `더보기 (${remaining}개) ▾`}
+          </button>
+        ` : ""}
       </div>`;
     }
 
@@ -292,6 +302,14 @@
       cal.hideDone = e.target.checked;
       renderApp();
     };
+
+    const upcomingToggleBtn = document.getElementById("btn-upcoming-toggle");
+    if (upcomingToggleBtn) {
+      upcomingToggleBtn.onclick = () => {
+        cal.upcomingExpanded = !cal.upcomingExpanded;
+        renderApp();
+      };
+    }
 
     document.querySelectorAll("[data-action='toggle']").forEach((btn) => {
       btn.onclick = () => toggleDoneEntry(btn.getAttribute("data-id"));
@@ -434,7 +452,7 @@
 
   /* ===================== 할 일(To-do) 모듈 ===================== */
   const TODO_KEY = acctKey("personal-calendar:todos");
-  const todoUi = { dueInput: "" };
+  const todoUi = { dueInput: "", doneExpanded: false }; // doneExpanded: 완료된 할 일을 펼쳐서 보고 있는지
 
   function loadTodos() {
     try {
@@ -492,28 +510,44 @@
 
   function renderTodoCard() {
     const tISO = todayISO();
-    const sorted = sortTodos(todos);
-    const remaining = todos.filter((t) => !t.done).length;
+    const activeTodos = sortTodos(todos.filter((t) => !t.done));
+    const doneTodos = sortTodos(todos.filter((t) => t.done));
+    const remaining = activeTodos.length;
 
-    let listHtml = "";
-    if (sorted.length === 0) {
-      listHtml = `<div class="todo-empty">할 일이 없어요.<br>아래에서 새 할 일을 추가해보세요.</div>`;
-    } else {
-      listHtml = sorted.map((t) => {
-        const isDueToday = !!t.due && t.due === tISO && !t.done;
-        const isOverdue = !!t.due && t.due < tISO && !t.done;
-        const dueCls = isDueToday ? "today" : (isOverdue ? "over" : "");
-        const dueLabel = t.due ? `${formatTodoDue(t.due)}${isDueToday ? " · 오늘" : (isOverdue ? " · 지남" : "")}` : "";
-        return `
+    function todoItemHtml(t) {
+      const isDueToday = !!t.due && t.due === tISO && !t.done;
+      const isOverdue = !!t.due && t.due < tISO && !t.done;
+      const dueCls = isDueToday ? "today" : (isOverdue ? "over" : "");
+      const dueLabel = t.due ? `${formatTodoDue(t.due)}${isDueToday ? " · 오늘" : (isOverdue ? " · 지남" : "")}` : "";
+      return `
         <div class="todo-item ${t.done ? "done" : ""} ${isDueToday ? "due-today" : ""}" data-id="${t.id}">
-          <button class="check-btn" data-action="todo-toggle" data-id="${t.id}">${t.done ? "✓" : ""}</button>
           <div class="todo-body">
             <span class="todo-text">${esc(t.text)}</span>
             ${t.due ? `<span class="todo-due ${dueCls}">${dueLabel}</span>` : ""}
           </div>
+          <button class="check-btn" data-action="todo-toggle" data-id="${t.id}">${t.done ? "✓" : ""}</button>
           <button class="del" data-action="todo-delete" data-id="${t.id}">✕</button>
         </div>`;
-      }).join("");
+    }
+
+    let listHtml = "";
+    if (activeTodos.length === 0 && doneTodos.length === 0) {
+      listHtml = `<div class="todo-empty">할 일이 없어요.<br>아래에서 새 할 일을 추가해보세요.</div>`;
+    } else if (activeTodos.length === 0) {
+      listHtml = `<div class="todo-empty">남은 할 일이 없어요. 다 처리했어요!</div>`;
+    } else {
+      listHtml = activeTodos.map(todoItemHtml).join("");
+    }
+
+    // 완료된 항목은 기본적으로 접어두고, 버튼을 눌러야 펼쳐서 볼 수 있게 한다.
+    let doneSectionHtml = "";
+    if (doneTodos.length > 0) {
+      doneSectionHtml = `
+        <button type="button" class="todo-done-toggle" id="btn-todo-done-toggle">
+          ${todoUi.doneExpanded ? "완료 항목 접기 ▲" : `완료 ${doneTodos.length}개 보기 ▾`}
+        </button>
+        ${todoUi.doneExpanded ? `<div class="todo-done-list">${doneTodos.map(todoItemHtml).join("")}</div>` : ""}
+      `;
     }
 
     return `
@@ -524,6 +558,7 @@
         </div>
         <div class="status" id="todo-status"></div>
         <div class="todo-list">${listHtml}</div>
+        ${doneSectionHtml}
         <form class="todo-add-form" id="todo-add-form">
           <div class="todo-add-row">
             <input class="add-input text-input" id="todo-input-text" placeholder="할 일을 입력하세요" autocomplete="off">
@@ -544,6 +579,13 @@
     document.querySelectorAll("[data-action='todo-delete']").forEach((btn) => {
       btn.onclick = () => { deleteTodo(btn.getAttribute("data-id")); renderApp(); };
     });
+    const doneToggleBtn = document.getElementById("btn-todo-done-toggle");
+    if (doneToggleBtn) {
+      doneToggleBtn.onclick = () => {
+        todoUi.doneExpanded = !todoUi.doneExpanded;
+        renderApp();
+      };
+    }
     const form = document.getElementById("todo-add-form");
     if (form) {
       form.onsubmit = (e) => {

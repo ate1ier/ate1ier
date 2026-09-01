@@ -176,3 +176,184 @@
     }
   }
 
+  /* ===================== 오늘의 브리핑 히어로 팝업 =====================
+     로그인 직후 한 번, 홈 화면 위에 "오늘 확인해야 할 것들"을 요약한 카드가
+     애니메이션과 함께 떠오른다. 항목을 누르면 해당 페이지로 이동하면서 닫힌다. */
+  function computeTodayBrief() {
+    const y = today.getFullYear(), m = today.getMonth(), d = today.getDate();
+    const iso = todayISO();
+    const holiday = getHoliday(iso);
+    const wd = WEEKDAYS[today.getDay()];
+
+    const staffList = getStaffListForMonth(y, m).filter((s) => !s.isAdmin);
+    const dateKey = scheduleDateKey(y, m, d);
+    const staffToday = staffList.map((s) => Object.assign({}, s, { record: getScheduleRecord(s.id, dateKey) }));
+    const working = staffToday.filter((s) => scheduleCountsAsWorked(s.record));
+    const lateList = working.filter((s) => s.record.attendance === "LATE");
+    const absentList = staffToday.filter((s) => s.record.status === "WORK" && s.record.attendance === "ABSENT");
+
+    const todayEntries = sortEntries(readMonthRaw(y, m)[pad2(d)] || []);
+
+    const todoRelevant = todos
+      .filter((t) => !t.done && (!t.due || t.due <= iso))
+      .sort((a, b) => (a.due || "").localeCompare(b.due || ""));
+
+    const NO_INTERVIEW_DAYS = 21;
+    const activeAgents = agentsData.filter((a) => a.status !== "RESIGNED" && !a.isAdmin);
+    const staleInterviewAgents = activeAgents
+      .map((a) => {
+        const records = interviewsData.filter((r) => r.agentId === a.id && r.date);
+        const lastDate = records.length ? records.map((r) => r.date).sort().slice(-1)[0] : null;
+        return { agent: a, lastDate };
+      })
+      .filter((x) => !x.lastDate || x.lastDate < addDaysISO(iso, -NO_INTERVIEW_DAYS));
+
+    const pinnedNotes = notesData.pinnedOrder.map((id) => notesData.notes[id]).filter(Boolean);
+
+    return { y, m, d, wd, holiday, staffList, working, lateList, absentList, todayEntries, todoRelevant, staleInterviewAgents, pinnedNotes };
+  }
+
+  function todayBriefRowsHtml(brief) {
+    const rows = [];
+    if (brief.staffList.length > 0) {
+      const troubleCount = brief.lateList.length + brief.absentList.length;
+      rows.push({
+        nav: "schedule",
+        warn: troubleCount > 0,
+        icon: ICON_USERS,
+        title: `오늘 근무 ${brief.working.length}명`,
+        sub: troubleCount > 0 ? `지각 ${brief.lateList.length}명 · 결근 ${brief.absentList.length}명 확인해주세요` : "지각·결근 없이 순조로워요",
+      });
+    }
+    if (brief.todayEntries.length > 0) {
+      const first = brief.todayEntries[0];
+      rows.push({
+        nav: "calendar",
+        warn: false,
+        icon: ICON_CALENDAR,
+        title: `오늘 일정 ${brief.todayEntries.length}건`,
+        sub: first.text ? esc(first.text) : "캘린더에서 자세히 확인해보세요",
+      });
+    }
+    if (brief.staleInterviewAgents.length > 0) {
+      rows.push({
+        nav: "interviews",
+        warn: true,
+        icon: ICON_BELL,
+        title: `면담 필요 상담사 ${brief.staleInterviewAgents.length}명`,
+        sub: "최근 21일간 면담 기록이 없어요",
+      });
+    }
+    if (brief.pinnedNotes.length > 0) {
+      rows.push({
+        nav: "notes",
+        warn: false,
+        icon: ICON_PIN,
+        title: `고정 메모 ${brief.pinnedNotes.length}개`,
+        sub: esc(brief.pinnedNotes[0].title || ""),
+      });
+    }
+    return rows;
+  }
+
+  const TODAY_BRIEF_TODO_VISIBLE = 5;
+  function todayBriefTodoHtml(brief) {
+    const iso = todayISO();
+    const list = brief.todoRelevant;
+    if (list.length === 0) return "";
+    const shown = list.slice(0, TODAY_BRIEF_TODO_VISIBLE);
+    const moreCount = list.length - shown.length;
+    return `
+      <div class="today-brief-section">
+        <div class="today-brief-section-title">${ICON_CHECK} 오늘 할 일 <span>${list.length}개</span></div>
+        <div class="today-brief-todo-list">
+          ${shown.map((t) => {
+            const isOver = !!t.due && t.due < iso;
+            return `
+              <div class="today-brief-todo-item" data-brief-todo-id="${t.id}">
+                <button type="button" class="check-btn" data-brief-todo-toggle="${t.id}" aria-label="완료 표시"></button>
+                <span class="todo-text">${esc(t.text)}</span>
+                ${t.due ? `<span class="todo-due ${isOver ? "over" : "today"}">${formatTodoDue(t.due)}${isOver ? " · 지남" : ""}</span>` : ""}
+              </div>`;
+          }).join("")}
+        </div>
+        ${moreCount > 0 ? `<button type="button" class="today-brief-more" data-brief-nav="calendar">외 ${moreCount}개 더보기 ›</button>` : ""}
+      </div>
+    `;
+  }
+
+  let todayBriefKeyHandler = null;
+  function closeTodayBriefPopup() {
+    const overlay = document.getElementById("today-brief-overlay");
+    if (!overlay) return;
+    if (todayBriefKeyHandler) { document.removeEventListener("keydown", todayBriefKeyHandler); todayBriefKeyHandler = null; }
+    overlay.classList.add("closing");
+    setTimeout(() => overlay.remove(), 200);
+  }
+  function todayBriefCardHtml(brief, rows) {
+    const hasTodo = brief.todoRelevant.length > 0;
+    return `
+      <div class="today-brief-card" role="dialog" aria-modal="true" aria-label="오늘의 브리핑">
+        <button type="button" class="today-brief-close" id="today-brief-close" aria-label="닫기">${ICON_CLOSE_SM}</button>
+        <div class="today-brief-head">
+          <div class="today-brief-badge">${ICON_SUN} 오늘의 브리핑</div>
+          <div class="today-brief-date">${brief.y}년 ${brief.m + 1}월 ${brief.d}일 <span class="wd">${brief.wd}요일</span></div>
+          ${brief.holiday ? `<span class="today-brief-holiday">${esc(brief.holiday)}</span>` : ""}
+        </div>
+        ${(rows.length === 0 && !hasTodo) ? `
+          <div class="today-brief-empty">${ICON_CHECK} 오늘은 특별히 챙길 일이 없어요.<br>편하게 하루를 시작해보세요.</div>
+        ` : `
+          ${hasTodo ? todayBriefTodoHtml(brief) : ""}
+          ${rows.length > 0 ? `
+            <div class="today-brief-rows">
+              ${rows.map((r, i) => `
+                <button type="button" class="today-brief-row ${r.warn ? "warn" : ""}" data-brief-nav="${r.nav}" style="animation-delay:${80 + i * 55}ms">
+                  <span class="today-brief-row-icon">${r.icon}</span>
+                  <span class="today-brief-row-text">
+                    <b>${esc(r.title)}</b>
+                    <span>${r.sub}</span>
+                  </span>
+                  ${ICON_CHEVRON_RIGHT}
+                </button>
+              `).join("")}
+            </div>
+          ` : ""}
+        `}
+        <button type="button" class="today-brief-cta" id="today-brief-cta">확인했어요, 시작할게요</button>
+      </div>
+    `;
+  }
+  function bindTodayBriefEvents(overlay) {
+    document.getElementById("today-brief-close").onclick = () => closeTodayBriefPopup();
+    document.getElementById("today-brief-cta").onclick = () => closeTodayBriefPopup();
+    overlay.querySelectorAll("[data-brief-nav]").forEach((btn) => {
+      btn.onclick = () => { closeTodayBriefPopup(); setPage(btn.getAttribute("data-brief-nav")); };
+    });
+    overlay.querySelectorAll("[data-brief-todo-toggle]").forEach((btn) => {
+      btn.onclick = () => {
+        toggleTodoDone(btn.getAttribute("data-brief-todo-toggle"));
+        refreshTodayBriefPopup();
+        if (state.page === "home" || state.page === "calendar") renderApp();
+      };
+    });
+  }
+  function refreshTodayBriefPopup() {
+    const overlay = document.getElementById("today-brief-overlay");
+    if (!overlay) return;
+    const brief = computeTodayBrief();
+    const rows = todayBriefRowsHtml(brief);
+    overlay.innerHTML = todayBriefCardHtml(brief, rows);
+    bindTodayBriefEvents(overlay);
+  }
+  function showTodayBriefPopup() {
+    if (document.getElementById("today-brief-overlay")) return;
+    const overlay = document.createElement("div");
+    overlay.id = "today-brief-overlay";
+    overlay.className = "today-brief-overlay";
+    document.body.appendChild(overlay);
+    refreshTodayBriefPopup();
+    overlay.onclick = (e) => { if (e.target === overlay) closeTodayBriefPopup(); };
+    todayBriefKeyHandler = (e) => { if (e.key === "Escape") closeTodayBriefPopup(); };
+    document.addEventListener("keydown", todayBriefKeyHandler);
+  }
+

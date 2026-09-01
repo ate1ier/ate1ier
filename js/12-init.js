@@ -18,6 +18,12 @@
 
   renderApp();
 
+  // 로그인/계정 생성 직후 딱 한 번, 홈 화면 위에 "오늘의 브리핑" 히어로 팝업을
+  // 살짝 늦게(화면이 먼저 자리 잡은 뒤) 애니메이션과 함께 띄워준다.
+  if (_justLoggedIn && !CURRENT_ACCOUNT_IS_MASTER) {
+    setTimeout(() => showTodayBriefPopup(), 450);
+  }
+
   // 로그인 후 5시간이 지나면 자동으로 로그아웃시키고, 그 전까지는 남은 시간을
   // 주기적으로 갱신해서 보여준다.
   if (!CURRENT_ACCOUNT_IS_MASTER) {

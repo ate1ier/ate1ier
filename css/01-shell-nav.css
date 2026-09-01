@@ -182,7 +182,7 @@
   .undo-toast {
     position: fixed;
     right: 14px;
-    bottom: 214px;
+    bottom: 260px;
     z-index: 201;
     padding: 8px 14px;
     border-radius: var(--mac-radius);
@@ -205,7 +205,7 @@
   }
   .undo-toast.visible { opacity: 1; transform: translateY(0) scale(1); }
   .undo-toast--empty { color: var(--text-faint); }
-  @media (max-width: 720px) { .undo-toast { right: 12px; bottom: 214px; font-size: 12px; } }
+  @media (max-width: 720px) { .undo-toast { right: 12px; font-size: 12px; } }
 
   /* ---------- ☁️ 클라우드 동기화 상태 토스트 (오른쪽 상단, 잠깐 떴다가 사라짐) ---------- */
   .cloud-sync-toast {
@@ -282,21 +282,67 @@
     .cloud-live-banner-wrap { top: 12px; width: 94vw; }
   }
 
-  /* ---------- 데스크톱: 평소엔 숨겨진 macOS 독(Dock) + 가운데 하단 펼치기 버튼 ---------- */
-  .dock-toggle-btn { display: none; }
+  /* ---------- 오른쪽 하단 유틸리티 독: 평소엔 접혀 있다가 버튼을 누르면 펼쳐진다 ----------
+     아래에서부터: (펼치기 버튼) → 다크/라이트 → 사용설명서 → 데이터 백업 → 되돌리기 → 새로고침 순으로 쌓는다. */
+  #utility-dock-root { position: relative; z-index: 46; }
+  .utility-dock-toggle-btn {
+    position: fixed;
+    right: 14px;
+    bottom: 32px;
+    z-index: 47;
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--mac-vibrancy-hairline);
+    border-radius: 50%;
+    background: var(--mac-vibrancy);
+    backdrop-filter: blur(26px) saturate(2);
+    -webkit-backdrop-filter: blur(26px) saturate(2);
+    box-shadow: var(--mac-shadow-float);
+    color: var(--text-faint);
+    cursor: pointer;
+    transition: color 0.12s ease, border-color 0.12s ease;
+  }
+  .utility-dock-toggle-btn:hover { color: var(--text); border-color: var(--accent); }
+  .utility-dock-toggle-btn svg { transition: transform 0.2s ease; }
+  .utility-dock-toggle-btn.open svg { transform: rotate(180deg); }
   #theme-toggle-root .theme-toggle-wrap { position: fixed; right: 14px; bottom: 78px; z-index: 46; }
   #manual-toggle-root .manual-toggle-wrap { position: fixed; right: 14px; bottom: 124px; z-index: 46; }
-  #undo-toggle-root .undo-toggle-wrap { position: fixed; right: 14px; bottom: 170px; z-index: 46; }
-  #refresh-toggle-root .manual-toggle-wrap { position: fixed; right: 14px; bottom: 216px; z-index: 46; }
-  /* 데이터 백업 버튼은 오른쪽 하단 스택에서 빼서 화면 왼쪽 위 고정 위치로 옮긴다 */
-  #backup-toggle-root .manual-toggle-wrap { position: fixed; left: 14px; top: 14px; right: auto; bottom: auto; z-index: 46; }
+  #backup-toggle-root .manual-toggle-wrap { position: fixed; right: 14px; bottom: 170px; z-index: 46; left: auto; top: auto; }
+  #undo-toggle-root .undo-toggle-wrap { position: fixed; right: 14px; bottom: 216px; z-index: 46; }
+  #refresh-toggle-root .manual-toggle-wrap { position: fixed; right: 14px; bottom: 262px; z-index: 46; }
+  /* 평소엔(펼치지 않았을 때) 다크/사용설명서/백업/되돌리기/새로고침 항목을 모두 접어서 숨긴다 */
+  #utility-dock-root:not(.open) .theme-toggle-wrap,
+  #utility-dock-root:not(.open) .manual-toggle-wrap,
+  #utility-dock-root:not(.open) .undo-toggle-wrap {
+    opacity: 0;
+    transform: translateY(8px) scale(0.96);
+    pointer-events: none;
+  }
+  #utility-dock-root.open .theme-toggle-wrap,
+  #utility-dock-root.open .manual-toggle-wrap,
+  #utility-dock-root.open .undo-toggle-wrap {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+  }
+  .theme-toggle-wrap, .manual-toggle-wrap, .undo-toggle-wrap {
+    transition: opacity 0.16s ease, transform 0.18s cubic-bezier(.2, 1.2, .4, 1);
+  }
+
+  /* ---------- 데스크톱: 평소엔 숨겨진 macOS 독(Dock) + 가운데 하단 펼치기 버튼 ---------- */
+  .dock-toggle-btn { display: none; }
   @media (min-width: 721px) {
-    #theme-toggle-root .theme-toggle-wrap { bottom: 18px; }
-    #manual-toggle-root .manual-toggle-wrap { bottom: 64px; }
-    #undo-toggle-root .undo-toggle-wrap { bottom: 110px; }
-    #refresh-toggle-root .manual-toggle-wrap { bottom: 156px; }
-    #backup-toggle-root .manual-toggle-wrap { left: 16px; top: 16px; }
-    .undo-toast { bottom: 154px; }
+    .utility-dock-toggle-btn { bottom: 18px; }
+    #theme-toggle-root .theme-toggle-wrap { bottom: 64px; }
+    #manual-toggle-root .manual-toggle-wrap { bottom: 110px; }
+    #backup-toggle-root .manual-toggle-wrap { bottom: 156px; }
+    #undo-toggle-root .undo-toggle-wrap { bottom: 202px; }
+    #refresh-toggle-root .manual-toggle-wrap { bottom: 248px; }
+    .undo-toast { bottom: 246px; }
     #page-area { padding-bottom: 56px; }
     .dock-toggle-btn {
       display: flex;

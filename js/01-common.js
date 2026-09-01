@@ -486,6 +486,41 @@
     dockToggleBtn.onclick = (e) => { e.stopPropagation(); toggleDock(); };
   }
 
+  /* ===================== 오른쪽 하단 유틸리티 독(다크·사용설명서·백업·되돌리기·새로고침) 접기/펼치기 =====================
+     평소엔 펼치기 버튼만 보이고, 눌러야 5개 항목이 위로 펼쳐진다.
+     다른 곳을 클릭하면 자동으로 다시 접힌다. */
+  function isUtilityDockOpen() {
+    const root = document.getElementById("utility-dock-root");
+    return !!(root && root.classList.contains("open"));
+  }
+  function utilityDockOutsideHandler(e) {
+    const root = document.getElementById("utility-dock-root");
+    const themeMenu = document.getElementById("theme-menu");
+    if (themeMenu && themeMenu.contains(e.target)) return; // 테마 목록 팝업 클릭은 독을 접지 않는다
+    if (root && !root.contains(e.target)) closeUtilityDock();
+  }
+  function openUtilityDock() {
+    const root = document.getElementById("utility-dock-root");
+    const btn = document.getElementById("utility-dock-toggle-btn");
+    if (root) root.classList.add("open");
+    if (btn) { btn.classList.add("open"); btn.setAttribute("aria-expanded", "true"); btn.title = "바로가기 메뉴 닫기"; btn.setAttribute("aria-label", "바로가기 메뉴 닫기"); }
+    setTimeout(() => document.addEventListener("mousedown", utilityDockOutsideHandler, true), 0);
+  }
+  function closeUtilityDock() {
+    const root = document.getElementById("utility-dock-root");
+    const btn = document.getElementById("utility-dock-toggle-btn");
+    if (root) root.classList.remove("open");
+    if (btn) { btn.classList.remove("open"); btn.setAttribute("aria-expanded", "false"); btn.title = "바로가기 메뉴 열기"; btn.setAttribute("aria-label", "바로가기 메뉴 열기"); }
+    document.removeEventListener("mousedown", utilityDockOutsideHandler, true);
+  }
+  function toggleUtilityDock() {
+    if (isUtilityDockOpen()) closeUtilityDock(); else openUtilityDock();
+  }
+  const utilityDockToggleBtn = document.getElementById("utility-dock-toggle-btn");
+  if (utilityDockToggleBtn) {
+    utilityDockToggleBtn.onclick = (e) => { e.stopPropagation(); toggleUtilityDock(); };
+  }
+
   // 다크/라이트 등 화면 테마 선택 버튼: 내비게이션(독)과 별개로 항상 화면 오른쪽 아래에 떠 있다.
   function renderThemeToggle() {
     const root = document.getElementById("theme-toggle-root");
@@ -1147,6 +1182,7 @@
           }
           setSession(account.id);
           setLoginAt(Date.now());
+          try { sessionStorage.setItem("app:just-logged-in", "1"); } catch (e) {}
           await flushCloudWrites();
           location.reload();
         };
@@ -1171,6 +1207,7 @@
           saveAccounts(accountsList);
           setSession(newAccount.id);
           setLoginAt(Date.now());
+          try { sessionStorage.setItem("app:just-logged-in", "1"); } catch (e) {}
           await flushCloudWrites();
           location.reload();
         };
@@ -1212,6 +1249,17 @@
   // 다만 이 경우에는 평소처럼 "홈"으로 돌아가지 않고, 누르기 직전에 보고 있던
   // 페이지를 그대로 유지해야 하므로, 새로고침 직전에 sessionStorage에 현재 페이지를
   // 잠깐 남겨두고 새로 불러온 뒤 한 번만 복원하고 지운다.
+  // 방금 로그인/계정 생성으로 들어온 경우에만(=이 새로고침이 로그인 직후인 경우에만)
+  // "오늘의 브리핑" 히어로 팝업을 한 번 띄운다. 세션 유지 중 브라우저를 새로 열거나
+  // "새로고침" 버튼을 눌렀을 때는 뜨지 않는다.
+  let _justLoggedIn = false;
+  try {
+    if (sessionStorage.getItem("app:just-logged-in") === "1") {
+      _justLoggedIn = true;
+      sessionStorage.removeItem("app:just-logged-in");
+    }
+  } catch (e) {}
+
   const REFRESH_RESTORE_PAGE_KEY = "app:refresh-restore-page";
   const VALID_PAGES = ["home", "calendar", "agents", "notes", "interviews", "qa", "schedule"];
   let _refreshRestorePage = null;

@@ -117,3 +117,120 @@
   .home-note-row:hover { border-color: var(--accent); }
   .home-note-row .snippet { font-size: 12.5px; color: var(--text-faint); margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+  /* ---------- 로그인 직후 뜨는 "오늘의 브리핑" 히어로 팝업 ---------- */
+  .today-brief-overlay {
+    position: fixed; inset: 0; z-index: 120; background: #000000b3;
+    display: flex; align-items: center; justify-content: center; padding: 20px;
+    animation: today-brief-overlay-in 0.22s ease;
+  }
+  .today-brief-overlay.closing { animation: today-brief-overlay-out 0.2s ease forwards; }
+  .today-brief-overlay.closing .today-brief-card { animation: today-brief-pop-out 0.2s cubic-bezier(.32,0,.6,1) forwards; }
+  @keyframes today-brief-overlay-in { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes today-brief-overlay-out { from { opacity: 1; } to { opacity: 0; } }
+  @keyframes today-brief-pop-out { from { opacity: 1; transform: translateY(0) scale(1); } to { opacity: 0; transform: translateY(10px) scale(0.95); } }
+
+  .today-brief-card {
+    position: relative;
+    width: min(94vw, 460px);
+    max-height: 88vh;
+    overflow: auto;
+    background: var(--mac-vibrancy);
+    border: 1px solid var(--mac-vibrancy-hairline);
+    border-radius: 26px;
+    backdrop-filter: blur(30px) saturate(2);
+    -webkit-backdrop-filter: blur(30px) saturate(2);
+    box-shadow: 0 24px 70px #00000066, 0 1px 0 rgba(255,255,255,0.08) inset;
+    padding: 26px 24px 22px;
+    animation: today-brief-pop-in 0.42s cubic-bezier(.2, 1.15, .3, 1);
+  }
+  @keyframes today-brief-pop-in {
+    0% { opacity: 0; transform: translateY(26px) scale(0.92); }
+    60% { opacity: 1; }
+    100% { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  .today-brief-close {
+    position: absolute; top: 16px; right: 16px; background: var(--elevated); border: 1px solid var(--hairline);
+    color: var(--text-faint); width: 28px; height: 28px; border-radius: 50%; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .today-brief-close:hover { color: var(--text); border-color: var(--accent); }
+  .today-brief-head {
+    padding: 4px 30px 18px 2px;
+    border-bottom: 1px solid var(--hairline);
+    margin-bottom: 16px;
+    background: linear-gradient(120deg, var(--accent-dim-soft), transparent 70%);
+  }
+  .today-brief-badge {
+    display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600;
+    color: var(--accent); background: var(--accent-dim); padding: 4px 12px; border-radius: 999px;
+    margin-bottom: 10px;
+  }
+  .today-brief-date { font-size: 24px; font-weight: 700; letter-spacing: -0.01em; }
+  .today-brief-date .wd {
+    display: inline-flex; align-items: center; margin-left: 8px; vertical-align: middle;
+    font-size: 12.5px; font-weight: 600; color: var(--text-dim); background: var(--elevated);
+    padding: 2px 10px; border-radius: 999px;
+  }
+  .today-brief-holiday {
+    display: inline-block; margin-top: 8px; font-size: 12.5px; color: var(--red); background: var(--red-dim);
+    padding: 3px 11px; border-radius: 999px;
+  }
+  .today-brief-section { margin-bottom: 16px; }
+  .today-brief-section-title {
+    display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600;
+    color: var(--text-dim); margin-bottom: 10px;
+  }
+  .today-brief-section-title span { color: var(--text-faint); font-weight: 400; }
+  .today-brief-todo-list { display: flex; flex-direction: column; gap: 6px; }
+  .today-brief-todo-item {
+    display: flex; align-items: center; gap: 10px; background: var(--elevated);
+    border: 1px solid var(--hairline); border-radius: 12px; padding: 9px 12px;
+    opacity: 0; animation: today-brief-row-in 0.28s ease forwards;
+  }
+  .today-brief-todo-item .todo-text { flex: 1; min-width: 0; }
+  .today-brief-more {
+    display: block; width: 100%; margin-top: 8px; padding: 7px 0;
+    background: none; border: 1px dashed var(--hairline); border-radius: 12px;
+    color: var(--text-faint); font-size: 12.5px; cursor: pointer;
+  }
+  .today-brief-more:hover { color: var(--accent); border-color: var(--accent); }
+  .today-brief-rows { display: flex; flex-direction: column; gap: 8px; }
+  .today-brief-row {
+    display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
+    background: var(--elevated); border: 1px solid var(--hairline); border-radius: 16px;
+    padding: 12px 14px; cursor: pointer; color: var(--text);
+    transition: border-color 0.12s ease, transform 0.1s ease, background 0.12s ease;
+    opacity: 0; animation: today-brief-row-in 0.32s ease forwards;
+  }
+  @keyframes today-brief-row-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  .today-brief-row:hover { border-color: var(--accent); background: var(--accent-dim-soft); transform: translateY(-1px); }
+  .today-brief-row:active { transform: scale(0.98); }
+  .today-brief-row.warn { border-color: var(--red-dim); }
+  .today-brief-row.warn:hover { border-color: var(--red); }
+  .today-brief-row-icon {
+    flex-shrink: 0; width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    background: var(--accent-dim); color: var(--accent);
+  }
+  .today-brief-row.warn .today-brief-row-icon { background: var(--red-dim); color: var(--red); }
+  .today-brief-row-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .today-brief-row-text b { font-size: 14.5px; font-weight: 600; }
+  .today-brief-row-text span { font-size: 12.5px; color: var(--text-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .today-brief-row .icon-chevron-right, .today-brief-row svg:last-child { color: var(--text-faint); flex-shrink: 0; }
+  .today-brief-empty {
+    text-align: center; color: var(--text-dim); font-size: 14px; line-height: 1.7; padding: 26px 10px;
+    background: var(--elevated); border: 1px dashed var(--hairline-strong); border-radius: 16px;
+  }
+  .today-brief-cta {
+    display: block; width: 100%; margin-top: 18px; padding: 12px 18px;
+    background: var(--accent); border: none; color: var(--accent-text);
+    border-radius: 14px; font-size: 14.5px; font-weight: 600; cursor: pointer;
+    transition: filter 0.12s ease, transform 0.08s ease;
+    box-shadow: 0 4px 16px var(--accent-dim);
+  }
+  .today-brief-cta:hover { filter: brightness(1.08); }
+  .today-brief-cta:active { transform: scale(0.98); }
+  @media (max-width: 480px) {
+    .today-brief-card { padding: 22px 18px 18px; border-radius: 22px; }
+    .today-brief-date { font-size: 21px; }
+  }
+
