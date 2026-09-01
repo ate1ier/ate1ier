@@ -9,6 +9,8 @@
     formType: "memo",
     formPriority: false,
     rangeMode: false,
+    formDetailMode: false, // 추가 폼에서 "상세 내용" 입력칸을 펼쳐서 보고 있는지
+    expandedEntries: {}, // 일정/메모 목록에서 상세 내용을 펼쳐서 보고 있는 항목의 id 모음
     upcomingExpanded: false, // "다가오는 일정"을 5개 넘게 펼쳐서 보고 있는지
   };
 
@@ -180,8 +182,10 @@
     } else {
       entriesHtml = `<div class="entries">` + visibleEntries.map((entry) => {
         const isRange = entry.rangeStart && entry.rangeEnd && entry.rangeStart !== entry.rangeEnd;
+        const hasDetail = !!(entry.detail && entry.detail.trim());
+        const expanded = hasDetail && !!cal.expandedEntries[entry.id];
         return `
-        <div class="entry ${entry.type} ${entry.done ? "done" : ""}" data-id="${entry.id}">
+        <div class="entry ${entry.type} ${entry.done ? "done" : ""} ${expanded ? "expanded" : ""}" data-id="${entry.id}">
           <button class="check-btn" data-action="toggle" data-id="${entry.id}">${entry.done ? "✓" : ""}</button>
           <div class="body">
             <span class="meta-row">
@@ -189,7 +193,15 @@
               ${(!isRange && entry.time) ? `<span class="time">${esc(entry.time)}</span>` : ""}
               ${entry.priority && !entry.done ? `<span class="priority-tag">★ 중요</span>` : ""}
             </span>
-            <span class="text">${esc(entry.text)}</span>
+            ${hasDetail ? `
+              <button type="button" class="entry-title-btn" data-action="expand" data-id="${entry.id}">
+                <span class="text">${esc(entry.text)}</span>
+                <span class="expand-chevron">${ICON_CHEVRON_RIGHT}</span>
+              </button>
+              ${expanded ? `<div class="entry-detail-card">${esc(entry.detail)}</div>` : ""}
+            ` : `
+              <span class="text">${esc(entry.text)}</span>
+            `}
           </div>
           <button class="del" data-action="delete" data-id="${entry.id}">✕</button>
         </div>`;
@@ -265,9 +277,13 @@
               </div>` : ""}
               <div class="add-row">
                 ${cal.rangeMode ? "" : `<input class="add-input time-input" id="input-time" placeholder="시간">`}
-                <input class="add-input text-input" id="input-text" placeholder="내용을 입력하세요" autocomplete="off">
+                <input class="add-input text-input" id="input-text" placeholder="제목을 입력하세요" autocomplete="off">
                 <button type="submit" class="submit-btn" aria-label="추가">＋</button>
               </div>
+              <button type="button" class="detail-toggle-link ${cal.formDetailMode ? "active" : ""}" id="btn-detail-toggle">
+                ${ICON_NOTE} ${cal.formDetailMode ? "상세 내용 접기" : "상세 내용 추가"}
+              </button>
+              ${cal.formDetailMode ? `<textarea class="add-textarea" id="input-detail" placeholder="상세 내용을 입력하세요 (선택)" rows="3"></textarea>` : ""}
             </form>
           </div>
           ${renderTodoCard()}
@@ -317,6 +333,13 @@
     document.querySelectorAll("[data-action='delete']").forEach((btn) => {
       btn.onclick = () => deleteEntry(btn.getAttribute("data-id"));
     });
+    document.querySelectorAll("[data-action='expand']").forEach((btn) => {
+      btn.onclick = () => {
+        const id = btn.getAttribute("data-id");
+        cal.expandedEntries[id] = !cal.expandedEntries[id];
+        renderApp();
+      };
+    });
     document.querySelectorAll("[data-goto-day]").forEach((btn) => {
       btn.onclick = () => { cal.selectedDay = parseInt(btn.getAttribute("data-goto-day"), 10); renderApp(); };
     });
@@ -333,15 +356,37 @@
       e.currentTarget.classList.toggle("active", cal.formPriority);
     };
     document.getElementById("btn-range").onclick = () => { cal.rangeMode = !cal.rangeMode; renderApp(); };
+    document.getElementById("btn-detail-toggle").onclick = () => {
+      cal.formDetailMode = !cal.formDetailMode;
+      const btn = document.getElementById("btn-detail-toggle");
+      btn.classList.toggle("active", cal.formDetailMode);
+      btn.innerHTML = `${ICON_NOTE} ${cal.formDetailMode ? "상세 내용 접기" : "상세 내용 추가"}`;
+      let ta = document.getElementById("input-detail");
+      if (cal.formDetailMode) {
+        if (!ta) {
+          ta = document.createElement("textarea");
+          ta.className = "add-textarea";
+          ta.id = "input-detail";
+          ta.placeholder = "상세 내용을 입력하세요 (선택)";
+          ta.rows = 3;
+          btn.insertAdjacentElement("afterend", ta);
+        }
+        ta.focus();
+      } else if (ta) {
+        ta.remove();
+      }
+    };
 
     document.getElementById("add-form").onsubmit = (e) => {
       e.preventDefault();
       const textInput = document.getElementById("input-text");
       const trimmed = textInput.value.trim();
       if (!trimmed) return;
+      const detailInput = document.getElementById("input-detail");
+      const detailVal = detailInput ? detailInput.value.trim() : "";
 
       const id = `${Date.now()}`;
-      const baseEntry = { id, text: trimmed, type: cal.formType, priority: cal.formPriority, done: false };
+      const baseEntry = { id, text: trimmed, type: cal.formType, priority: cal.formPriority, done: false, detail: detailVal };
 
       if (cal.rangeMode) {
         const startVal = document.getElementById("input-start").value;
@@ -378,6 +423,7 @@
       }
 
       cal.formPriority = false;
+      cal.formDetailMode = false;
       renderApp();
       const nt = document.getElementById("input-text");
       if (nt) nt.focus();
@@ -452,7 +498,7 @@
 
   /* ===================== 할 일(To-do) 모듈 ===================== */
   const TODO_KEY = acctKey("personal-calendar:todos");
-  const todoUi = { dueInput: "", doneExpanded: false }; // doneExpanded: 완료된 할 일을 펼쳐서 보고 있는지
+  const todoUi = { dueInput: "", doneExpanded: false, formDetailMode: false, expanded: {} }; // doneExpanded: 완료된 할 일을 펼쳐서 보고 있는지, expanded: 상세 내용을 펼쳐서 보고 있는 할 일 id 모음
 
   function loadTodos() {
     try {
@@ -478,10 +524,10 @@
 
   function todayISO() { return toISODate(today.getFullYear(), today.getMonth(), today.getDate()); }
 
-  function addTodo(text, due) {
+  function addTodo(text, due, detail) {
     const trimmed = text.trim();
     if (!trimmed) return;
-    todos.push({ id: genId(), text: trimmed, due: due || "", done: false });
+    todos.push({ id: genId(), text: trimmed, due: due || "", done: false, detail: (detail || "").trim() });
     saveTodos();
   }
   function toggleTodoDone(id) {
@@ -519,10 +565,20 @@
       const isOverdue = !!t.due && t.due < tISO && !t.done;
       const dueCls = isDueToday ? "today" : (isOverdue ? "over" : "");
       const dueLabel = t.due ? `${formatTodoDue(t.due)}${isDueToday ? " · 오늘" : (isOverdue ? " · 지남" : "")}` : "";
+      const hasDetail = !!(t.detail && t.detail.trim());
+      const expanded = hasDetail && !!todoUi.expanded[t.id];
       return `
-        <div class="todo-item ${t.done ? "done" : ""} ${isDueToday ? "due-today" : ""}" data-id="${t.id}">
+        <div class="todo-item ${t.done ? "done" : ""} ${isDueToday ? "due-today" : ""} ${expanded ? "expanded" : ""}" data-id="${t.id}">
           <div class="todo-body">
-            <span class="todo-text">${esc(t.text)}</span>
+            ${hasDetail ? `
+              <button type="button" class="todo-title-btn" data-action="todo-expand" data-id="${t.id}">
+                <span class="todo-text">${esc(t.text)}</span>
+                <span class="expand-chevron">${ICON_CHEVRON_RIGHT}</span>
+              </button>
+              ${expanded ? `<div class="todo-detail-card">${esc(t.detail)}</div>` : ""}
+            ` : `
+              <span class="todo-text">${esc(t.text)}</span>
+            `}
             ${t.due ? `<span class="todo-due ${dueCls}">${dueLabel}</span>` : ""}
           </div>
           <button class="check-btn" data-action="todo-toggle" data-id="${t.id}">${t.done ? "✓" : ""}</button>
@@ -561,12 +617,16 @@
         ${doneSectionHtml}
         <form class="todo-add-form" id="todo-add-form">
           <div class="todo-add-row">
-            <input class="add-input text-input" id="todo-input-text" placeholder="할 일을 입력하세요" autocomplete="off">
+            <input class="add-input text-input" id="todo-input-text" placeholder="할 일 제목을 입력하세요" autocomplete="off">
             <button type="submit" class="submit-btn" aria-label="추가">＋</button>
           </div>
           <div class="todo-add-row">
             <input class="add-input todo-due-input" type="date" id="todo-input-due" value="${todoUi.dueInput}">
           </div>
+          <button type="button" class="detail-toggle-link ${todoUi.formDetailMode ? "active" : ""}" id="btn-todo-detail-toggle">
+            ${ICON_NOTE} ${todoUi.formDetailMode ? "상세 내용 접기" : "상세 내용 추가"}
+          </button>
+          ${todoUi.formDetailMode ? `<textarea class="add-textarea" id="todo-input-detail" placeholder="상세 내용을 입력하세요 (선택)" rows="3"></textarea>` : ""}
         </form>
       </div>
     `;
@@ -579,11 +639,40 @@
     document.querySelectorAll("[data-action='todo-delete']").forEach((btn) => {
       btn.onclick = () => { deleteTodo(btn.getAttribute("data-id")); renderApp(); };
     });
+    document.querySelectorAll("[data-action='todo-expand']").forEach((btn) => {
+      btn.onclick = () => {
+        const id = btn.getAttribute("data-id");
+        todoUi.expanded[id] = !todoUi.expanded[id];
+        renderApp();
+      };
+    });
     const doneToggleBtn = document.getElementById("btn-todo-done-toggle");
     if (doneToggleBtn) {
       doneToggleBtn.onclick = () => {
         todoUi.doneExpanded = !todoUi.doneExpanded;
         renderApp();
+      };
+    }
+    const detailToggleBtn = document.getElementById("btn-todo-detail-toggle");
+    if (detailToggleBtn) {
+      detailToggleBtn.onclick = () => {
+        todoUi.formDetailMode = !todoUi.formDetailMode;
+        detailToggleBtn.classList.toggle("active", todoUi.formDetailMode);
+        detailToggleBtn.innerHTML = `${ICON_NOTE} ${todoUi.formDetailMode ? "상세 내용 접기" : "상세 내용 추가"}`;
+        let ta = document.getElementById("todo-input-detail");
+        if (todoUi.formDetailMode) {
+          if (!ta) {
+            ta = document.createElement("textarea");
+            ta.className = "add-textarea";
+            ta.id = "todo-input-detail";
+            ta.placeholder = "상세 내용을 입력하세요 (선택)";
+            ta.rows = 3;
+            detailToggleBtn.insertAdjacentElement("afterend", ta);
+          }
+          ta.focus();
+        } else if (ta) {
+          ta.remove();
+        }
       };
     }
     const form = document.getElementById("todo-add-form");
@@ -592,8 +681,10 @@
         e.preventDefault();
         const textInput = document.getElementById("todo-input-text");
         const dueInput = document.getElementById("todo-input-due");
-        addTodo(textInput.value, dueInput.value);
+        const detailInput = document.getElementById("todo-input-detail");
+        addTodo(textInput.value, dueInput.value, detailInput ? detailInput.value : "");
         todoUi.dueInput = dueInput.value;
+        todoUi.formDetailMode = false;
         renderApp();
         const nt = document.getElementById("todo-input-text");
         if (nt) nt.focus();
