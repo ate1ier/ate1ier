@@ -143,12 +143,25 @@
     monthIndex: today.getMonth(), // 0-based. 실시간 기준 당월로 시작한다.
     collapsedRowGroups: new Set(), // 접힌 행 그룹(관리자/주간/야간/채팅/유선 등)의 키 모음
     colGroups: [], // 사용자가 지정한 열(날짜) 그룹: { id, start, end, collapsed }
+    manualHiddenDays: new Set(), // 열 머리글을 직접 선택해서 접은 날짜(일자 숫자) 모음
+    manualHiddenStaffIds: new Set(), // 인원 이름칸을 직접 선택해서 접은 staffId 모음
+    manualHiddenInfoCols: new Set(), // 직접 선택해서 접은 인원 정보 열(닉네임~결근) 키 모음
+    manualHiddenSummaryRows: new Set(), // 직접 선택해서 접은 집계행(관리자 인원/필요인력/대비 등) 키 모음
   };
 
   // ----- 월별 스케줄 표: 행(인원 그룹)·열(날짜) 접기/펼치기 -----
   // 행 그룹 키는 "필터모드::그룹이름" 형태로 만들어서, 전체보기/주간보기/야간보기 등
   // 화면마다 접힌 상태가 서로 섞이지 않게 한다.
   function scheduleRowGroupKey(filterMode, name) { return `${filterMode || "ALL"}::${name}`; }
+  // "숨긴 항목" 패널에서 행 key를 사람이 읽기 좋은 한글로 대충 바꿔서 보여준다.
+  // (완벽히 다듬어진 문구는 아니지만, 어떤 행인지 알아볼 수 있는 정도면 충분하다.)
+  function schedulePrettyRowKey(key) {
+    const map = {
+      ADMIN: "관리자", DAY: "주간", NIGHT: "야간", CHAT: "채팅", VOICE: "유선",
+      ETC: "업무 구분 미지정", DAY_TYPED: "주간", NIGHT_TYPED: "야간", total: "합계", ALL: null,
+    };
+    return key.split(/::|·/).filter(Boolean).map((seg) => (seg in map ? map[seg] : seg)).filter(Boolean).join(" · ") || key;
+  }
   function scheduleIsRowGroupCollapsed(key) { return scheduleUi.collapsedRowGroups.has(key); }
   function scheduleToggleRowGroup(key) {
     if (scheduleUi.collapsedRowGroups.has(key)) scheduleUi.collapsedRowGroups.delete(key);
@@ -171,14 +184,138 @@
     if (g) g.collapsed = !g.collapsed;
     renderApp();
   }
-  // 이번 달 기준으로, 접혀 있는 열 그룹들에 포함된 날짜 번호 집합을 돌려준다.
+  // 이번 달 기준으로, 접혀 있는 열 그룹 + 개별로 접은 날짜들을 합쳐 돌려준다.
   function scheduleCollapsedDaySet() {
-    const set = new Set();
+    const set = new Set(scheduleUi.manualHiddenDays);
     (scheduleUi.colGroups || []).forEach((g) => {
       if (!g.collapsed) return;
       for (let d = g.start; d <= g.end; d++) set.add(d);
     });
     return set;
+  }
+
+  // ----- 표에서 열 머리글(날짜)·행 머리글(닉네임 칸)을 직접 클릭해서 선택 → 오른쪽 클릭으로 접기 -----
+  // 열 그룹(범위 지정)이나 행 그룹(관리자/주간/야간 등 미리 정해진 묶음) 접기와는 별개로,
+  // 표를 보다가 필요없는 날짜 몇 개·인원 몇 명만 바로 골라서 접을 수 있게 해준다.
+  // 클릭할 때마다 선택 상태가 토글되고(다시 누르면 선택 해제), 헤더가 아닌 곳을 클릭하면
+  // 선택이 전부 풀린다. 선택된 상태에서 오른쪽 마우스를 누르면 "접기" 메뉴가 뜬다.
+  let scheduleHeaderSelCols = new Set(); // 선택된 열의 key. 날짜 열은 "d:3", 인원정보 열은 "i:empno" 형태
+  let scheduleHeaderSelRows = new Set(); // 선택된 staffId(행)
+  let scheduleHiddenPanelOpen = false; // "숨긴 항목" 패널(접은 열·행을 다시 펼치는 곳) 열림 여부
+
+  function scheduleApplyHeaderSelectionHighlight() {
+    const root = document.getElementById("schedule-table-area");
+    if (!root) return;
+    root.querySelectorAll(".sch-col-th").forEach((th) => {
+      th.classList.toggle("sch-th--selected", scheduleHeaderSelCols.has(th.getAttribute("data-col-key")));
+    });
+    root.querySelectorAll(".sch-row-th").forEach((td) => {
+      td.classList.toggle("sch-th--selected", scheduleHeaderSelRows.has(td.getAttribute("data-row-key")));
+    });
+  }
+  function scheduleClearHeaderSelection() {
+    if (scheduleHeaderSelCols.size === 0 && scheduleHeaderSelRows.size === 0) return;
+    scheduleHeaderSelCols = new Set();
+    scheduleHeaderSelRows = new Set();
+    scheduleApplyHeaderSelectionHighlight();
+  }
+  function scheduleToggleColSelection(colKey) {
+    if (scheduleHeaderSelCols.has(colKey)) scheduleHeaderSelCols.delete(colKey);
+    else scheduleHeaderSelCols.add(colKey);
+    scheduleApplyHeaderSelectionHighlight();
+  }
+  function scheduleToggleRowSelection(rowKey) {
+    if (scheduleHeaderSelRows.has(rowKey)) scheduleHeaderSelRows.delete(rowKey);
+    else scheduleHeaderSelRows.add(rowKey);
+    scheduleApplyHeaderSelectionHighlight();
+  }
+  // 오른쪽 클릭으로 바로 접기 메뉴를 연다. 우클릭한 헤더가 지금 선택 목록에 없으면
+  // (다른 걸 선택해둔 채 엉뚱한 헤더를 우클릭한 경우 등) 그 헤더 하나만 선택한 것으로
+  // 다시 잡아준다. 이미 선택된 헤더를 우클릭하면 지금까지 골라둔 선택을 그대로 유지한다.
+  function scheduleHeaderRightClick(el, e) {
+    e.preventDefault();
+    e.stopPropagation();
+    const isCol = el.classList.contains("sch-col-th");
+    if (isCol) {
+      const colKey = el.getAttribute("data-col-key");
+      if (!scheduleHeaderSelCols.has(colKey)) {
+        scheduleHeaderSelCols = new Set([colKey]);
+        scheduleHeaderSelRows = new Set();
+      }
+    } else {
+      const rowKey = el.getAttribute("data-row-key");
+      if (!scheduleHeaderSelRows.has(rowKey)) {
+        scheduleHeaderSelRows = new Set([rowKey]);
+        scheduleHeaderSelCols = new Set();
+      }
+    }
+    scheduleApplyHeaderSelectionHighlight();
+    openScheduleHideMenu(e);
+  }
+  // 선택된 열·행을 실제로 접는다(=목록에 추가). 데이터 자체는 그대로 두고 화면에서만 숨긴다.
+  // 행 key는 인원이면 "s:staffId", 집계행(관리자 인원/필요인력/대비 등)이면 "r:행고유키" 형태.
+  function scheduleCollapseHeaderSelection() {
+    const n = scheduleHeaderSelCols.size + scheduleHeaderSelRows.size;
+    scheduleHeaderSelCols.forEach((k) => {
+      if (k.startsWith("d:")) scheduleUi.manualHiddenDays.add(Number(k.slice(2)));
+      else if (k.startsWith("i:")) scheduleUi.manualHiddenInfoCols.add(k.slice(2));
+    });
+    scheduleHeaderSelRows.forEach((k) => {
+      if (k.startsWith("s:")) scheduleUi.manualHiddenStaffIds.add(k.slice(2));
+      else if (k.startsWith("r:")) scheduleUi.manualHiddenSummaryRows.add(k.slice(2));
+    });
+    scheduleHeaderSelCols = new Set();
+    scheduleHeaderSelRows = new Set();
+    closeScheduleMenu();
+    renderApp();
+    flashScheduleStatus(`${n}개 접었어요.`);
+  }
+  function openScheduleHideMenu(e) {
+    closeScheduleMenu();
+    const menu = document.createElement("div");
+    menu.id = "sch-menu";
+    menu.className = "sch-menu";
+    const labelParts = [];
+    if (scheduleHeaderSelCols.size > 0) labelParts.push(`열 ${scheduleHeaderSelCols.size}개`);
+    if (scheduleHeaderSelRows.size > 0) labelParts.push(`행 ${scheduleHeaderSelRows.size}개`);
+    menu.innerHTML = `<div class="sch-menu-title">${labelParts.join(" · ")} 선택됨</div>` +
+      `<button type="button" data-collapse-header-sel="1">접기</button>` +
+      `<button type="button" class="sch-menu-reset" data-clear-header-sel="1">선택 해제</button>`;
+    document.body.appendChild(menu);
+    const clientX = e ? e.clientX : window.innerWidth / 2;
+    const clientY = e ? e.clientY : window.innerHeight / 2;
+    const top = Math.min(clientY + 4, window.innerHeight - menu.offsetHeight - 8);
+    const left = Math.min(clientX, window.innerWidth - menu.offsetWidth - 8);
+    menu.style.top = `${Math.max(8, top)}px`;
+    menu.style.left = `${Math.max(8, left)}px`;
+    menu.querySelector("[data-collapse-header-sel]").onclick = () => scheduleCollapseHeaderSelection();
+    const clearBtn = menu.querySelector("[data-clear-header-sel]");
+    clearBtn.onclick = () => { closeScheduleMenu(); scheduleClearHeaderSelection(); };
+    setTimeout(() => document.addEventListener("mousedown", scheduleMenuOutsideHandler, true), 0);
+  }
+  // 개별로 접어둔 날짜/인원정보열/인원/집계행을 다시 펼친다.
+  function scheduleUnhideDay(day) {
+    scheduleUi.manualHiddenDays.delete(day);
+    renderApp();
+  }
+  function scheduleUnhideInfoCol(key) {
+    scheduleUi.manualHiddenInfoCols.delete(key);
+    renderApp();
+  }
+  function scheduleUnhideSummaryRow(key) {
+    scheduleUi.manualHiddenSummaryRows.delete(key);
+    renderApp();
+  }
+  function scheduleUnhideStaff(staffId) {
+    scheduleUi.manualHiddenStaffIds.delete(staffId);
+    renderApp();
+  }
+  function scheduleUnhideAll() {
+    scheduleUi.manualHiddenDays = new Set();
+    scheduleUi.manualHiddenInfoCols = new Set();
+    scheduleUi.manualHiddenStaffIds = new Set();
+    scheduleUi.manualHiddenSummaryRows = new Set();
+    renderApp();
   }
 
   // ----- 월별 스케줄 일괄 붙여넣기 -----
@@ -275,6 +412,37 @@
     EDUCATION: { label: "교육", cls: "st-education" },
     RESIGNED: { label: "퇴사", cls: "st-resigned" },
   };
+
+  // 표 왼쪽에 고정된(스크롤해도 안 움직이는) 인원 정보 열들. 순서·너비는 CSS(.sch-col-*)와
+  // 반드시 맞춰야 한다 — 개별 열을 접었을 때 나머지 고정 열들의 위치(left)를 여기 너비값으로
+  // 다시 계산해서 밀어주기 때문. summaryOnly는 이미지 캡처(hideSummaryCols=true)에서는
+  // 아예 마크업에서 빠지는 근무~결근 집계 열 5개를 표시한다.
+  const SCHEDULE_INFO_COLS = [
+    { key: "nickname", label: "닉네임", width: 88 },
+    { key: "name", label: "이름", width: 56 },
+    { key: "empno", label: "사번", width: 80 },
+    { key: "hiredate", label: "입사일자", width: 88 },
+    { key: "workhours", label: "근무시간", width: 88 },
+    { key: "work", label: "근무", width: 46, summaryOnly: true },
+    { key: "off", label: "오프", width: 46, summaryOnly: true },
+    { key: "annual", label: "연차", width: 46, summaryOnly: true },
+    { key: "daehyu", label: "대휴", width: 46, summaryOnly: true },
+    { key: "absent", label: "결근", width: 46, summaryOnly: true },
+  ];
+  // 지금 화면(hideSummaryCols=false 기준)에서, 접히지 않은 고정 열들이 각각 왼쪽에서
+  // 몇 px 위치에 붙어야 하는지 계산한다. 접힌 열은 폭이 0이 되므로 뒤 열들이 그만큼 당겨진다.
+  function scheduleInfoColLeftOffsets() {
+    let offset = 0;
+    const lefts = {};
+    let lastVisibleKey = null;
+    SCHEDULE_INFO_COLS.forEach((c) => {
+      if (scheduleUi.manualHiddenInfoCols.has(c.key)) { lefts[c.key] = null; return; }
+      lefts[c.key] = offset;
+      offset += c.width;
+      lastVisibleKey = c.key;
+    });
+    return { lefts, lastVisibleKey };
+  }
 
   function scheduleDaysInMonth(year, monthIndex) { return new Date(year, monthIndex + 1, 0).getDate(); }
   function scheduleDateKey(year, monthIndex, day) { return `${year}-${pad2(monthIndex + 1)}-${pad2(day)}`; }
@@ -379,6 +547,11 @@
     while (m > 11) { m -= 12; y += 1; }
     scheduleUi.monthIndex = m;
     scheduleUi.year = y;
+    // 달이 바뀌면 날짜 번호·인원 목록의 의미가 달라지므로 선택·개별 접기 상태를 모두 초기화한다.
+    scheduleHeaderSelCols = new Set();
+    scheduleHeaderSelRows = new Set();
+    scheduleUi.manualHiddenDays = new Set();
+    scheduleUi.manualHiddenStaffIds = new Set();
     renderApp();
   }
 
@@ -434,35 +607,59 @@
     const collapsedDays = scheduleCollapsedDaySet();
     const colHiddenCls = (d) => (collapsedDays.has(d) ? " sch-col-hidden" : "");
     // 이미지로 저장할 때는 근무~결근 집계 열 5개를 표에서 아예 빼고 그린다.
-    // (CSS로 숨기면 html2canvas가 colspan 계산을 제대로 못 해서 표가 밀리므로
-    //  마크업 자체를 다르게 생성한다.)
-    const infoColCount = hideSummaryCols ? 5 : 10;
+    // 화면(hideSummaryCols가 false)에서 개별로 접은 인원정보 열(사번 등)도 같은 이유로
+    // "안 보이게" CSS로 숨기는 대신 마크업 자체에서 통째로 빼버린다 — "관리자 인원" 같은
+    // 요약행들이 인원정보 영역 전체를 colspan 하나로 합친 칸을 쓰는데, 이 표에서는
+    // CSS로 열을 숨기는 방식으로는 그 colspan 너비 계산이 정확히 안 맞아서(브라우저가
+    // 숨긴 셀만큼 너비를 못 줄여줌) 표가 밀려 보인다. 아예 셀 자체를 안 만들면 이 문제가 없다.
+    const infoColCount = hideSummaryCols
+      ? 5
+      : SCHEDULE_INFO_COLS.filter((c) => !scheduleUi.manualHiddenInfoCols.has(c.key)).length;
+    const { lefts: infoColLefts, lastVisibleKey: infoColLastVisible } = scheduleInfoColLeftOffsets();
 
     const monthStaff = getStaffListForMonth(year, monthIndex);
     const adminStaff = monthStaff.filter((s) => s.isAdmin);
     const dayStaff = sortStaffByType(monthStaff.filter((s) => s.group !== "night" && !s.isAdmin));
     const nightStaff = sortStaffByType(monthStaff.filter((s) => s.group === "night" && !s.isAdmin));
+    // 인원 정보 열(닉네임~결근) 하나를 그려주는 헬퍼. asTh=true면 헤더 셀(선택 가능),
+    // false면 각 인원 행의 값 칸(행 선택 가능)을 만든다. 개별로 접어둔 열은 아예 마크업에서
+    // 빼버린다(위 infoColCount 주석 참고) — 그래야 요약행들의 colspan 너비도 같이 맞는다.
+    function infoColHtml(colDef, asTh, valueHtml, extraCls, staffId) {
+      if (hideSummaryCols) {
+        // 캡처용 마크업: 개별 열 숨김을 적용하지 않고 항상 그대로 그린다.
+        if (colDef.summaryOnly) return "";
+        const tag = asTh ? "th" : "td";
+        return `<${tag} class="sch-info sch-col-${colDef.key}${extraCls ? ` ${extraCls}` : ""}">${asTh ? colDef.label : valueHtml}</${tag}>`;
+      }
+      if (scheduleUi.manualHiddenInfoCols.has(colDef.key)) return "";
+      const tag = asTh ? "th" : "td";
+      const stickyEndCls = colDef.key === infoColLastVisible ? " sch-sticky-end" : "";
+      const leftStyle = ` style="left:${infoColLefts[colDef.key]}px"`;
+      const selCls = asTh ? " sch-col-th" : " sch-row-th";
+      const dataAttrs = asTh
+        ? ` data-col-key="i:${colDef.key}" title="클릭해서 선택, 선택 후 오른쪽 클릭으로 접기"`
+        : ` data-staff-id="${staffId || ""}" data-row-key="s:${staffId || ""}"`;
+      return `<${tag} class="sch-info sch-col-${colDef.key}${stickyEndCls}${selCls}${extraCls ? ` ${extraCls}` : ""}"${leftStyle}${dataAttrs}>${asTh ? colDef.label : valueHtml}</${tag}>`;
+    }
 
     const headRow1 = `<th class="sch-info" colspan="${infoColCount}"></th>` + days.map((d) => {
       const wd = new Date(year, monthIndex, d).getDay();
       const isHoliday = !!getHoliday(scheduleDateKey(year, monthIndex, d));
       const cls = wd === 6 ? "wd-sat" : (isHoliday || wd === 0) ? "wd-sun" : "";
-      return `<th class="${cls}${colHiddenCls(d)}" title="${isHoliday ? esc(getHoliday(scheduleDateKey(year, monthIndex, d))) : ""}">${pad2(monthIndex + 1)}/${pad2(d)}</th>`;
+      return `<th class="${cls}${colHiddenCls(d)} sch-col-th" data-col-key="d:${d}" title="${isHoliday ? esc(getHoliday(scheduleDateKey(year, monthIndex, d))) : "클릭해서 선택, 선택 후 오른쪽 클릭으로 접기"}">${pad2(monthIndex + 1)}/${pad2(d)}</th>`;
     }).join("");
-    const summaryHeadCells = hideSummaryCols ? "" :
-      `<th class="sch-info sch-col-work">근무</th><th class="sch-info sch-col-off">오프</th><th class="sch-info sch-col-annual">연차</th><th class="sch-info sch-col-daehyu">대휴</th><th class="sch-info sch-col-absent">결근</th>`;
-    const headRow2 = `<th class="sch-info sch-col-nickname">닉네임</th><th class="sch-info sch-col-name">이름</th><th class="sch-info sch-col-empno">사번</th><th class="sch-info sch-col-hiredate">입사일자</th><th class="sch-info sch-col-workhours">근무시간</th>` +
-      summaryHeadCells +
+    const headRow2 = SCHEDULE_INFO_COLS.map((c) => infoColHtml(c, true)).join("") +
       days.map((d) => {
         const wd = new Date(year, monthIndex, d).getDay();
         const isHoliday = !!getHoliday(scheduleDateKey(year, monthIndex, d));
         const cls = wd === 6 ? "wd-sat" : (isHoliday || wd === 0) ? "wd-sun" : "";
-        return `<th class="${cls}${colHiddenCls(d)}">${WEEKDAYS[wd]}</th>`;
+        return `<th class="${cls}${colHiddenCls(d)} sch-col-th" data-col-key="d:${d}" title="클릭해서 선택, 선택 후 오른쪽 클릭으로 접기">${WEEKDAYS[wd]}</th>`;
       }).join("");
 
     let scheduleRowCounter = 0; // 드래그 선택의 사각형 범위 계산에 쓰는, 렌더링될 때마다 매겨지는 행 순번
     function staffRowHtml(s) {
       const rowIdx = scheduleRowCounter++;
+      const rowHiddenCls = scheduleUi.manualHiddenStaffIds.has(s.id) ? " sch-row-hidden" : "";
       const cells = days.map((d) => {
         const dateKey = scheduleDateKey(year, monthIndex, d);
         const record = getScheduleRecord(s.id, dateKey);
@@ -472,33 +669,41 @@
         return `<td class="sch-cell ${disp.cls}${colHiddenCls(d)}" data-staff-id="${s.id}" data-date="${dateKey}" data-row-idx="${rowIdx}" data-day="${d}" title="${esc(memo)}">${disp.label}${memoDot}</td>`;
       }).join("");
       const counts = scheduleStaffMonthCounts(s.id, year, monthIndex);
-      const summaryCells = hideSummaryCols ? "" : `
-          <td class="sch-count sch-col-work">${counts.WORK}</td>
-          <td class="sch-count sch-col-off">${counts.OFF}</td>
-          <td class="sch-count sch-col-annual">${counts.ANNUAL}</td>
-          <td class="sch-count sch-col-daehyu">${counts.DAEHYU}</td>
-          <td class="sch-count sch-col-absent">${counts.ABSENT}</td>`;
+      const infoColValues = {
+        nickname: esc(s.nickname), name: esc(s.name), empno: esc(s.empNo),
+        hiredate: esc(s.hireDate), workhours: esc(s.workHours),
+        work: counts.WORK, off: counts.OFF, annual: counts.ANNUAL, daehyu: counts.DAEHYU, absent: counts.ABSENT,
+      };
+      const infoCells = SCHEDULE_INFO_COLS.map((c) => {
+        const extraCls = c.key === "nickname" ? "sch-nickname" : (c.summaryOnly ? "sch-count" : "");
+        return infoColHtml(c, false, infoColValues[c.key], extraCls, s.id);
+      }).join("");
       return `
-        <tr>
-          <td class="sch-info sch-nickname sch-col-nickname">${esc(s.nickname)}</td>
-          <td class="sch-info sch-col-name">${esc(s.name)}</td>
-          <td class="sch-info sch-col-empno">${esc(s.empNo)}</td>
-          <td class="sch-info sch-col-hiredate">${esc(s.hireDate)}</td>
-          <td class="sch-info sch-col-workhours">${esc(s.workHours)}</td>${summaryCells}
+        <tr class="${rowHiddenCls.trim()}">
+          ${infoCells}
           ${cells}
         </tr>
       `;
     }
 
+    // 집계행(관리자 인원/필요인력/대비 등) 왼쪽 라벨 칸. rowKey가 있으면(=캡처가 아니면) 클릭해서
+    // 선택 → 오른쪽 클릭으로 그 행 전체를 접을 수 있게 만든다.
+    function summaryLabelCellHtml(rowKey, label) {
+      if (hideSummaryCols || !rowKey) return `<td class="sch-info" colspan="${infoColCount}">${label}</td>`;
+      return `<td class="sch-info sch-row-th" colspan="${infoColCount}" data-row-key="r:${esc(rowKey)}" title="클릭해서 선택, 선택 후 오른쪽 클릭으로 접기">${label}</td>`;
+    }
+    function summaryRowHiddenCls(rowKey) {
+      return (!hideSummaryCols && rowKey && scheduleUi.manualHiddenSummaryRows.has(rowKey)) ? " sch-row-hidden" : "";
+    }
     // type이 null/undefined면 업무 구분(채팅/유선)과 무관하게 목록 전체를 집계한다.
     // (관리자 인원 집계처럼 채팅/유선 구분 없이 셀 때 사용)
-    function summaryRowHtml(label, staffList, type) {
+    function summaryRowHtml(label, staffList, type, rowKey) {
       const cells = days.map((d) => {
         const dateKey = scheduleDateKey(year, monthIndex, d);
         const count = staffList.filter((s) => (!type || (s.types || []).indexOf(type) !== -1) && scheduleCountsAsWorked(getScheduleRecord(s.id, dateKey))).length;
         return `<td class="${colHiddenCls(d).trim()}">${count}</td>`;
       }).join("");
-      return `<tr class="sch-summary-row"><td class="sch-info" colspan="${infoColCount}">${label}</td>${cells}</tr>`;
+      return `<tr class="sch-summary-row${summaryRowHiddenCls(rowKey)}">${summaryLabelCellHtml(rowKey, label)}${cells}</tr>`;
     }
 
     // "필요인력" 행: 사용자가 직접 숫자를 입력하는 칸(인풋). groupKey는 "DAY"/"NIGHT", type은 "채팅"/"유선".
@@ -506,25 +711,25 @@
     // 클릭·타이핑 자체가 안 먹게 한다. (예전에는 blur 시점에만 저장을 막아서, 입력은 계속
     // 가능해 보이는데 실제로는 저장이 안 되는 것처럼 보이는 문제가 있었다.)
     const monthLocked = scheduleIsMonthLocked(year, monthIndex);
-    function requiredHeadcountRowHtml(groupKey, type, label) {
+    function requiredHeadcountRowHtml(groupKey, type, label, rowKey) {
       const cells = days.map((d) => {
         const val = getRequiredHeadcount(year, monthIndex, groupKey, type, d);
         return `<td class="sch-required-cell${colHiddenCls(d)}"><input type="number" class="sch-required-input${monthLocked ? " sch-required-input--locked" : ""}" min="0" step="1" inputmode="numeric" data-required-group="${groupKey}" data-required-type="${esc(type)}" data-required-day="${d}" value="${val === null ? "" : val}" placeholder="-"${monthLocked ? " disabled title=\"잠긴 달이에요. 잠금을 해제한 뒤 수정해주세요.\"" : ""}></td>`;
       }).join("");
-      return `<tr class="sch-required-row"><td class="sch-info" colspan="${infoColCount}">${label}</td>${cells}</tr>`;
+      return `<tr class="sch-required-row${summaryRowHiddenCls(rowKey)}">${summaryLabelCellHtml(rowKey, label)}${cells}</tr>`;
     }
     // "대비" 행: 실제 투입 인력 - 필요인력 (필요인력을 입력하지 않은 날짜는 빈칸)
-    function requiredDiffRowHtml(groupKey, type, staffList, label) {
+    function requiredDiffRowHtml(groupKey, type, staffList, label, rowKey) {
       const cells = days.map((d) => {
         const dateKey = scheduleDateKey(year, monthIndex, d);
         const required = getRequiredHeadcount(year, monthIndex, groupKey, type, d);
         const diff = required === null ? "" : (scheduleActualCount(staffList, type, dateKey) - required);
         return `<td class="${colHiddenCls(d).trim()}">${diff}</td>`;
       }).join("");
-      return `<tr class="sch-diff-row"><td class="sch-info" colspan="${infoColCount}">${label}</td>${cells}</tr>`;
+      return `<tr class="sch-diff-row${summaryRowHiddenCls(rowKey)}">${summaryLabelCellHtml(rowKey, label)}${cells}</tr>`;
     }
     // "인력 대비 편성" 행: 대비가 0 이상이면 O, 음수면 X (필요인력 미입력 날짜는 빈칸)
-    function requiredStatusRowHtml(groupKey, type, staffList, label) {
+    function requiredStatusRowHtml(groupKey, type, staffList, label, rowKey) {
       const cells = days.map((d) => {
         const dateKey = scheduleDateKey(year, monthIndex, d);
         const required = getRequiredHeadcount(year, monthIndex, groupKey, type, d);
@@ -537,21 +742,21 @@
         }
         return `<td class="${(colHiddenCls(d).trim() + statusCls).trim()}">${mark}</td>`;
       }).join("");
-      return `<tr class="sch-status-row"><td class="sch-info" colspan="${infoColCount}">${label}</td>${cells}</tr>`;
+      return `<tr class="sch-status-row${summaryRowHiddenCls(rowKey)}">${summaryLabelCellHtml(rowKey, label)}${cells}</tr>`;
     }
     // 그룹(주간/야간)의 채팅·유선 필요인력 3행 묶음(필요인력/대비/인력 대비 편성)을 한 번에 만든다.
     function requiredHeadcountBlockHtml(groupKey, groupLabel, staffList) {
       return (
-        requiredHeadcountRowHtml(groupKey, "채팅", `${groupLabel} 채팅 필요인력`) +
-        requiredDiffRowHtml(groupKey, "채팅", staffList, "대비") +
-        requiredStatusRowHtml(groupKey, "채팅", staffList, "인력 대비 편성") +
-        requiredHeadcountRowHtml(groupKey, "유선", `${groupLabel} 유선 필요인력`) +
-        requiredDiffRowHtml(groupKey, "유선", staffList, "대비") +
-        requiredStatusRowHtml(groupKey, "유선", staffList, "인력 대비 편성")
+        requiredHeadcountRowHtml(groupKey, "채팅", `${groupLabel} 채팅 필요인력`, `${groupKey}·채팅·필요인력`) +
+        requiredDiffRowHtml(groupKey, "채팅", staffList, "대비", `${groupKey}·채팅·대비`) +
+        requiredStatusRowHtml(groupKey, "채팅", staffList, "인력 대비 편성", `${groupKey}·채팅·인력대비편성`) +
+        requiredHeadcountRowHtml(groupKey, "유선", `${groupLabel} 유선 필요인력`, `${groupKey}·유선·필요인력`) +
+        requiredDiffRowHtml(groupKey, "유선", staffList, "대비", `${groupKey}·유선·대비`) +
+        requiredStatusRowHtml(groupKey, "유선", staffList, "인력 대비 편성", `${groupKey}·유선·인력대비편성`)
       );
     }
 
-    function totalRowHtml(label, groups) {
+    function totalRowHtml(label, groups, rowKey) {
       const cells = days.map((d) => {
         const dateKey = scheduleDateKey(year, monthIndex, d);
         let total = 0;
@@ -560,20 +765,26 @@
         });
         return `<td class="${colHiddenCls(d).trim()}">${total}</td>`;
       }).join("");
-      return `<tr class="sch-total-row"><td class="sch-info" colspan="${infoColCount}">${label}</td>${cells}</tr>`;
+      return `<tr class="sch-total-row${summaryRowHiddenCls(rowKey)}">${summaryLabelCellHtml(rowKey, label)}${cells}</tr>`;
     }
 
     // 행 그룹(관리자/주간/야간 등) 제목 행. 클릭하면 접히고 펼쳐지는 삼각형 토글을 함께 넣는다.
     function groupHeaderRow(key, label, isStatic) {
       const collapsed = scheduleIsRowGroupCollapsed(key);
       const toggle = `<span class="sch-row-toggle" data-toggle-row-group="${key}">${collapsed ? "▸" : "▾"}</span>`;
-      return `<tr class="sch-group-row${isStatic ? " sch-group-row--static" : ""}" data-group-key="${key}"><td colspan="${infoColCount + numDays}">${toggle}${label}</td></tr>`;
+      const hiddenCls = summaryRowHiddenCls(key);
+      const tdCls = hideSummaryCols ? "" : " sch-row-th";
+      const tdAttrs = hideSummaryCols ? "" : ` data-row-key="r:${esc(key)}" title="클릭해서 선택, 선택 후 오른쪽 클릭으로 접기"`;
+      return `<tr class="sch-group-row${isStatic ? " sch-group-row--static" : ""}${hiddenCls}" data-group-key="${key}"><td class="${tdCls.trim()}" colspan="${infoColCount + numDays}"${tdAttrs}>${toggle}${label}</td></tr>`;
     }
     // 소제목 행(채팅/유선/업무 구분 미지정). 부모 그룹 키에 이어 붙여서 고유 키를 만든다.
     function subGroupHeaderRow(key, label) {
       const collapsed = scheduleIsRowGroupCollapsed(key);
       const toggle = `<span class="sch-row-toggle" data-toggle-row-group="${key}">${collapsed ? "▸" : "▾"}</span>`;
-      return `<tr class="sch-subgroup-row" data-group-key="${key}"><td colspan="${infoColCount + numDays}">${toggle}${label}</td></tr>`;
+      const hiddenCls = summaryRowHiddenCls(key);
+      const tdCls = hideSummaryCols ? "" : " sch-row-th";
+      const tdAttrs = hideSummaryCols ? "" : ` data-row-key="r:${esc(key)}" title="클릭해서 선택, 선택 후 오른쪽 클릭으로 접기"`;
+      return `<tr class="sch-subgroup-row${hiddenCls}" data-group-key="${key}"><td class="${tdCls.trim()}" colspan="${infoColCount + numDays}"${tdAttrs}>${toggle}${label}</td></tr>`;
     }
     // 접힌 그룹은 제목 행만 남기고 본문(인원 행·집계 행)은 렌더링하지 않는다.
     function groupBody(key, renderFn) {
@@ -610,7 +821,7 @@
       } else {
         const key = scheduleRowGroupKey(filterMode, "ADMIN");
         bodyHtml += groupHeaderRow(key, `${ICON_SHIELD} 관리자 (${adminStaff.length}명)`, true);
-        bodyHtml += groupBody(key, () => adminStaff.map(staffRowHtml).join("") + summaryRowHtml("관리자 인원", adminStaff, null));
+        bodyHtml += groupBody(key, () => adminStaff.map(staffRowHtml).join("") + summaryRowHtml("관리자 인원", adminStaff, null, "관리자"));
       }
     } else if (filterMode === "DAY" || filterMode === "NIGHT") {
       // "주간 저장" / "야간 저장": 관리자는 빼고 해당 조만 보여준다.
@@ -622,7 +833,7 @@
         const key = scheduleRowGroupKey(filterMode, filterMode);
         bodyHtml += groupHeaderRow(key, groupTitle);
         bodyHtml += groupBody(key, () =>
-          subGroupsHtml(staffList, key) + summaryRowHtml("채팅 인원", staffList, "채팅") + summaryRowHtml("유선 인원", staffList, "유선") +
+          subGroupsHtml(staffList, key) + summaryRowHtml("채팅 인원", staffList, "채팅", `${filterMode}·채팅인원`) + summaryRowHtml("유선 인원", staffList, "유선", `${filterMode}·유선인원`) +
           (hideRequiredRows ? "" : requiredHeadcountBlockHtml(filterMode, filterMode === "DAY" ? "주간" : "야간", staffList))
         );
       }
@@ -638,15 +849,15 @@
         if (dayTyped.length > 0) {
           const key = scheduleRowGroupKey(filterMode, "DAY_TYPED");
           bodyHtml += groupHeaderRow(key, `${ICON_SUN} 주간 · ${typeName} (${dayTyped.length}명)`);
-          bodyHtml += groupBody(key, () => dayTyped.map(staffRowHtml).join("") + summaryRowHtml(`${typeName} 인원`, dayTyped, typeName));
+          bodyHtml += groupBody(key, () => dayTyped.map(staffRowHtml).join("") + summaryRowHtml(`${typeName} 인원`, dayTyped, typeName, `DAY_TYPED·${typeKey}`));
         }
         if (nightTyped.length > 0) {
           const key = scheduleRowGroupKey(filterMode, "NIGHT_TYPED");
           bodyHtml += groupHeaderRow(key, `${ICON_MOON} 야간 · ${typeName} (${nightTyped.length}명)`);
-          bodyHtml += groupBody(key, () => nightTyped.map(staffRowHtml).join("") + summaryRowHtml(`${typeName} 인원`, nightTyped, typeName));
+          bodyHtml += groupBody(key, () => nightTyped.map(staffRowHtml).join("") + summaryRowHtml(`${typeName} 인원`, nightTyped, typeName, `NIGHT_TYPED·${typeKey}`));
         }
         if (dayTyped.length > 0 && nightTyped.length > 0) {
-          bodyHtml += totalRowHtml(`주/야간 총 ${typeName} 출근 인원`, [{ staffList: dayTyped, type: typeName }, { staffList: nightTyped, type: typeName }]);
+          bodyHtml += totalRowHtml(`주/야간 총 ${typeName} 출근 인원`, [{ staffList: dayTyped, type: typeName }, { staffList: nightTyped, type: typeName }], `total·${typeKey}`);
         }
       }
     } else if (dayStaff.length === 0 && nightStaff.length === 0 && adminStaff.length === 0) {
@@ -655,13 +866,13 @@
       if (adminStaff.length > 0) {
         const key = scheduleRowGroupKey(filterMode, "ADMIN");
         bodyHtml += groupHeaderRow(key, `${ICON_SHIELD} 관리자 (${adminStaff.length}명)`, true);
-        bodyHtml += groupBody(key, () => adminStaff.map(staffRowHtml).join("") + summaryRowHtml("관리자 인원", adminStaff, null));
+        bodyHtml += groupBody(key, () => adminStaff.map(staffRowHtml).join("") + summaryRowHtml("관리자 인원", adminStaff, null, "관리자"));
       }
       if (dayStaff.length > 0) {
         const key = scheduleRowGroupKey(filterMode, "DAY");
         bodyHtml += groupHeaderRow(key, `${ICON_SUN} 아침조 / 주간 (${dayStaff.length}명)`);
         bodyHtml += groupBody(key, () =>
-          subGroupsHtml(dayStaff, key) + summaryRowHtml("채팅 인원", dayStaff, "채팅") + summaryRowHtml("유선 인원", dayStaff, "유선") +
+          subGroupsHtml(dayStaff, key) + summaryRowHtml("채팅 인원", dayStaff, "채팅", "DAY·채팅인원") + summaryRowHtml("유선 인원", dayStaff, "유선", "DAY·유선인원") +
           (hideRequiredRows ? "" : requiredHeadcountBlockHtml("DAY", "주간", dayStaff))
         );
       }
@@ -669,13 +880,13 @@
         const key = scheduleRowGroupKey(filterMode, "NIGHT");
         bodyHtml += groupHeaderRow(key, `${ICON_MOON} 야간조 (${nightStaff.length}명)`);
         bodyHtml += groupBody(key, () =>
-          subGroupsHtml(nightStaff, key) + summaryRowHtml("채팅 인원", nightStaff, "채팅") + summaryRowHtml("유선 인원", nightStaff, "유선") +
+          subGroupsHtml(nightStaff, key) + summaryRowHtml("채팅 인원", nightStaff, "채팅", "NIGHT·채팅인원") + summaryRowHtml("유선 인원", nightStaff, "유선", "NIGHT·유선인원") +
           (hideRequiredRows ? "" : requiredHeadcountBlockHtml("NIGHT", "야간", nightStaff))
         );
       }
       if (dayStaff.length > 0 && nightStaff.length > 0) {
-        bodyHtml += totalRowHtml("주/야간 총 채팅 출근 인원", [{ staffList: dayStaff, type: "채팅" }, { staffList: nightStaff, type: "채팅" }]);
-        bodyHtml += totalRowHtml("주/야간 총 유선 출근 인원", [{ staffList: dayStaff, type: "유선" }, { staffList: nightStaff, type: "유선" }]);
+        bodyHtml += totalRowHtml("주/야간 총 채팅 출근 인원", [{ staffList: dayStaff, type: "채팅" }, { staffList: nightStaff, type: "채팅" }], "total·채팅");
+        bodyHtml += totalRowHtml("주/야간 총 유선 출근 인원", [{ staffList: dayStaff, type: "유선" }, { staffList: nightStaff, type: "유선" }], "total·유선");
       }
     }
 
@@ -1621,6 +1832,20 @@
         scheduleToggleRowGroup(el.getAttribute("data-toggle-row-group"));
       };
     });
+    // 열 머리글(날짜)·행 머리글(닉네임 칸) 클릭 = 선택 토글, 오른쪽 클릭 = 접기 메뉴 열기
+    root.querySelectorAll(".sch-col-th").forEach((th) => {
+      th.onclick = (e) => { e.stopPropagation(); scheduleToggleColSelection(th.getAttribute("data-col-key")); };
+      th.oncontextmenu = (e) => scheduleHeaderRightClick(th, e);
+    });
+    root.querySelectorAll(".sch-row-th").forEach((td) => {
+      td.onclick = (e) => { e.stopPropagation(); scheduleToggleRowSelection(td.getAttribute("data-row-key")); };
+      td.oncontextmenu = (e) => scheduleHeaderRightClick(td, e);
+    });
+    // 헤더가 아닌 다른 곳을 클릭하면 열/행 선택을 해제한다.
+    root.onclick = (e) => {
+      if (!e.target.closest(".sch-col-th") && !e.target.closest(".sch-row-th")) scheduleClearHeaderSelection();
+    };
+    scheduleApplyHeaderSelectionHighlight();
   }
 
   // ----- 월별 스케줄 일괄 삭제 -----
@@ -1854,8 +2079,53 @@
       </div>
       <div class="schedule-table-toolbar">
         <button class="ghost-btn ${scheduleColGroupPanelOpen ? "active" : ""}" id="sch-colgroup-btn">${ICON_CALENDAR} 열 그룹 ▾</button>
+        <button class="ghost-btn ${scheduleHiddenPanelOpen ? "active" : ""}" id="sch-hidden-btn">숨긴 항목${(scheduleUi.manualHiddenDays.size + scheduleUi.manualHiddenInfoCols.size + scheduleUi.manualHiddenStaffIds.size + scheduleUi.manualHiddenSummaryRows.size) > 0 ? ` (${scheduleUi.manualHiddenDays.size + scheduleUi.manualHiddenInfoCols.size + scheduleUi.manualHiddenStaffIds.size + scheduleUi.manualHiddenSummaryRows.size})` : ""} ▾</button>
         <button class="ghost-btn sch-delete-btn-small" id="sch-delete-btn">${ICON_TRASH} 일정 삭제</button>
       </div>
+      ${scheduleHiddenPanelOpen ? `
+        <div class="schedule-colgroup-panel">
+          <div class="schedule-colgroup-desc">
+            표에서 날짜 칸·인원 정보 칸(닉네임~결근)·인원 닉네임 칸·집계행(관리자 인원/필요인력/대비)·그룹 제목 행(관리자/아침조/채팅/유선 등)을 클릭해 선택한 뒤(여러 개 선택 가능), 오른쪽 마우스 버튼을 눌러 "접기"를 고르면 여기에 쌓여요. 데이터는 그대로 있고 화면에서만 숨겨져요.
+          </div>
+          ${(scheduleUi.manualHiddenDays.size === 0 && scheduleUi.manualHiddenInfoCols.size === 0 && scheduleUi.manualHiddenStaffIds.size === 0 && scheduleUi.manualHiddenSummaryRows.size === 0) ? `
+            <div class="schedule-colgroup-empty">접어둔 열·행이 없어요.</div>
+          ` : `
+            <div class="schedule-colgroup-list">
+              ${Array.from(scheduleUi.manualHiddenDays).sort((a, b) => a - b).map((d) => `
+                <span class="schedule-colgroup-chip">
+                  ${pad2(scheduleUi.monthIndex + 1)}/${pad2(d)}
+                  <button class="sch-colgroup-toggle-btn" data-unhide-day="${d}">펼치기</button>
+                </span>
+              `).join("")}
+              ${Array.from(scheduleUi.manualHiddenInfoCols).map((key) => {
+                const col = SCHEDULE_INFO_COLS.find((c) => c.key === key);
+                return `
+                <span class="schedule-colgroup-chip">
+                  ${esc(col ? col.label : key)}
+                  <button class="sch-colgroup-toggle-btn" data-unhide-infocol="${esc(key)}">펼치기</button>
+                </span>
+              `;
+              }).join("")}
+              ${Array.from(scheduleUi.manualHiddenStaffIds).map((id) => {
+                const staff = getStaffListForMonth(scheduleUi.year, scheduleUi.monthIndex).find((s) => s.id === id);
+                return `
+                <span class="schedule-colgroup-chip">
+                  ${esc(staff ? staff.nickname : "(알 수 없음)")}
+                  <button class="sch-colgroup-toggle-btn" data-unhide-staff="${id}">펼치기</button>
+                </span>
+              `;
+              }).join("")}
+              ${Array.from(scheduleUi.manualHiddenSummaryRows).map((key) => `
+                <span class="schedule-colgroup-chip">
+                  ${esc(schedulePrettyRowKey(key))}
+                  <button class="sch-colgroup-toggle-btn" data-unhide-summaryrow="${esc(key)}">펼치기</button>
+                </span>
+              `).join("")}
+            </div>
+            <div><button class="ghost-btn" id="sch-unhide-all-btn">모두 펼치기</button></div>
+          `}
+        </div>
+      ` : ""}
       ${scheduleColGroupPanelOpen ? `
         <div class="schedule-colgroup-panel">
           <div class="schedule-colgroup-desc">
@@ -1899,6 +2169,24 @@
       scheduleColGroupPanelOpen = !scheduleColGroupPanelOpen;
       renderApp();
     };
+    document.getElementById("sch-hidden-btn").onclick = () => {
+      scheduleHiddenPanelOpen = !scheduleHiddenPanelOpen;
+      renderApp();
+    };
+    root.querySelectorAll("[data-unhide-day]").forEach((btn) => {
+      btn.onclick = () => scheduleUnhideDay(Number(btn.getAttribute("data-unhide-day")));
+    });
+    root.querySelectorAll("[data-unhide-infocol]").forEach((btn) => {
+      btn.onclick = () => scheduleUnhideInfoCol(btn.getAttribute("data-unhide-infocol"));
+    });
+    root.querySelectorAll("[data-unhide-staff]").forEach((btn) => {
+      btn.onclick = () => scheduleUnhideStaff(btn.getAttribute("data-unhide-staff"));
+    });
+    root.querySelectorAll("[data-unhide-summaryrow]").forEach((btn) => {
+      btn.onclick = () => scheduleUnhideSummaryRow(btn.getAttribute("data-unhide-summaryrow"));
+    });
+    const unhideAllBtn = document.getElementById("sch-unhide-all-btn");
+    if (unhideAllBtn) unhideAllBtn.onclick = () => scheduleUnhideAll();
     const colGroupAddBtn = document.getElementById("sch-colgroup-add-btn");
     if (colGroupAddBtn) {
       colGroupAddBtn.onclick = () => {

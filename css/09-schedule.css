@@ -54,12 +54,20 @@
   .sch-colgroup-toggle-btn:hover { background: var(--accent-dim); color: var(--accent); }
   .sch-colgroup-remove-btn:hover { background: var(--red-dim); color: var(--red); }
   .schedule-table .sch-col-hidden { display: none; }
+  .schedule-table tr.sch-row-hidden { display: none; }
+  /* 열 머리글(날짜)·행 머리글(닉네임 칸) 클릭으로 선택 → 오른쪽 클릭으로 접기 */
+  .schedule-table th.sch-col-th, .schedule-table td.sch-row-th { cursor: pointer; }
+  .schedule-table th.sch-col-th:hover, .schedule-table td.sch-row-th:hover { color: var(--accent); }
+  .schedule-table th.sch-th--selected, .schedule-table td.sch-th--selected {
+    background: var(--accent-dim) !important; color: var(--accent) !important;
+  }
   .sch-row-toggle {
     display: inline-flex; align-items: center; justify-content: center; width: 14px; margin-right: 4px;
     cursor: pointer; user-select: none; color: inherit; opacity: 0.75;
   }
   .sch-row-toggle:hover { opacity: 1; }
   .schedule-table tr.sch-group-row td, .schedule-table tr.sch-subgroup-row td { cursor: default; }
+  .schedule-table tr.sch-group-row td.sch-row-th, .schedule-table tr.sch-subgroup-row td.sch-row-th { cursor: pointer; }
 
   .schedule-table-wrap { overflow: hidden; border: 1px solid var(--hairline); border-radius: 16px; width: 100%; background: var(--panel); }
   @media (max-width: 720px) {
@@ -186,8 +194,10 @@
   .schedule-table .sch-col-daehyu { left: 538px; width: 46px; min-width: 46px; max-width: 46px; }
   .schedule-table .sch-col-absent {
     left: 584px; width: 46px; min-width: 46px; max-width: 46px;
-    box-shadow: 4px 0 6px -4px #00000080;
   }
+  /* 고정 열 중 지금 화면에 보이는 마지막 열에 그림자를 줘서 스크롤 경계를 표시한다.
+     (열을 개별로 접으면 이 자리가 바뀌므로, 특정 열 이름이 아니라 JS가 매번 계산해서 붙여주는 클래스) */
+  .schedule-table .sch-sticky-end { box-shadow: 4px 0 6px -4px #00000080; }
   .schedule-table tbody td[colspan] { box-shadow: none; }
   .schedule-table .sch-col-nickname, .schedule-table .sch-col-name, .schedule-table .sch-col-empno,
   .schedule-table .sch-col-hiredate, .schedule-table .sch-col-workhours,
