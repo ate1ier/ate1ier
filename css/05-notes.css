@@ -43,9 +43,10 @@
   }
   .inline-form .primary-btn:hover { filter: brightness(1.1); }
   .inline-form .cancel-btn {
-    background: none; border: 1px solid var(--hairline); color: var(--text-faint);
+    background: var(--elevated); border: 1px solid var(--hairline-strong); color: var(--text-dim);
     border-radius: 12px; padding: 9px 14px; font-size: 14px; cursor: pointer;
   }
+  .inline-form .cancel-btn:hover { color: var(--text); background: var(--hairline); }
 
   .pinned-block {
     border: 1px solid var(--accent);
@@ -80,10 +81,10 @@
   .folder-name { font-size: 17.5px; flex: 1; }
   .folder-count { font-size: 13px; color: var(--text-faint); }
   .folder-del {
-    background: none; border: none; color: var(--text-faint); cursor: pointer;
+    background: none; border: none; color: var(--text-dim); cursor: pointer;
     padding: 4px; border-radius: 8px; font-size: 14px;
   }
-  .folder-del:hover { color: var(--red); background: #ffffff0d; }
+  .folder-del:hover { color: var(--red); background: var(--red-dim); }
   .folder-body { padding: 4px 12px 12px; display: flex; flex-direction: column; gap: 6px; border-radius: 12px; transition: background 0.12s ease; }
   .folder-body.drag-over-zone { background: var(--accent-dim); }
   .folder-empty { color: var(--text-faint); font-size: 13.5px; font-style: italic; padding: 6px 8px 10px; }
@@ -140,10 +141,10 @@
     padding: 1px 7px; border-radius: 999px; flex-shrink: 0;
   }
   .note-del {
-    background: none; border: none; color: var(--text-faint); cursor: pointer;
+    background: none; border: none; color: var(--text-dim); cursor: pointer;
     padding: 4px; border-radius: 8px; font-size: 14px; flex-shrink: 0;
   }
-  .note-del:hover { color: var(--red); background: #ffffff0d; }
+  .note-del:hover { color: var(--red); background: var(--red-dim); }
   .note-body { padding: 0 14px 14px 34px; }
   .note-content {
     width: 100%;

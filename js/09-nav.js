@@ -5,11 +5,6 @@
       <div class="nav-account">
         <span class="nav-account-name">${ICON_USER} <span class="nav-text">${esc(CURRENT_ACCOUNT_NAME)}${CURRENT_ACCOUNT_IS_MASTER ? ' <span class="badge sm master">마스터</span>' : ""}</span></span>
         <div class="nav-logout-wrap">
-          ${!CURRENT_ACCOUNT_IS_MASTER ? `
-          <div class="nav-session-row nav-text">
-            <span class="global-session-badge" id="global-session-badge" title="자동 로그아웃까지 남은 시간"></span>
-            <button class="nav-session-extend-btn" id="nav-session-extend-btn" type="button" title="로그인 시간을 5시간으로 연장">연장</button>
-          </div>` : ""}
           <button class="nav-logout-btn" id="nav-logout-btn" title="로그아웃">${ICON_LOGOUT}<span class="nav-text"> 로그아웃</span></button>
         </div>
       </div>
@@ -36,11 +31,9 @@
       `}
       <div class="nav-spacer"></div>
     `;
-    renderThemeToggle();
-    renderManualToggle();
+    renderSettingsToggle();
     renderUndoToggle();
     renderRefreshToggle();
-    renderBackupToggle();
     nav.querySelectorAll("[data-nav]").forEach((btn) => {
       btn.onclick = () => { setPage(btn.getAttribute("data-nav")); closeDock(); };
     });
@@ -50,20 +43,10 @@
         if (window.confirm("로그아웃할까요?")) logout();
       };
     }
-    const extendBtn = document.getElementById("nav-session-extend-btn");
-    if (extendBtn) {
-      extendBtn.onclick = () => {
-        setLoginAt(Date.now());
-        sessionWarningDismissed = false;
-        hideSessionWarningToast();
-        updateSessionRemainingDisplay();
-      };
-    }
     const masterReturnBtn = document.getElementById("nav-master-return-btn");
     if (masterReturnBtn) {
       masterReturnBtn.onclick = () => masterReturnToOrigin();
     }
-    if (!CURRENT_ACCOUNT_IS_MASTER) updateSessionRemainingDisplay();
   }
 
   /* ===================== 마스터 계정: 계정 관리 페이지 ===================== */

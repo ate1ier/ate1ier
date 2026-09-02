@@ -38,7 +38,7 @@
      이 방식은 그런 오차 없이 항상 표 크기에 정확히 맞는다. margin:auto로 가운데 정렬. */
   .sch-capture-flatten .qa-table-wrap { display: table; width: auto; margin: 0 auto; overflow: visible; }
   .sch-capture-flatten .qa-table { width: auto; }
-  .qa-table th, .qa-table td { border: none; border-bottom: 1px solid var(--hairline); padding: 10px 12px; text-align: center; }
+  .qa-table th, .qa-table td { border: none; border-bottom: 1px solid var(--hairline); padding: 10px 12px; text-align: center; vertical-align: middle; }
   .qa-table thead th { background: var(--elevated); color: var(--text-dim); font-weight: 600; border-bottom: 1px solid var(--hairline-strong); }
   .qa-table tbody tr { background: var(--panel); transition: background 0.12s ease; }
   .qa-table tbody tr:last-child td { border-bottom: none; }
@@ -50,7 +50,7 @@
   .qa-score-input {
     width: 64px; box-sizing: border-box; text-align: center; border: 1px solid var(--hairline);
     border-radius: 10px; background: var(--bg); color: var(--text); font-size: 13px; font-weight: 700; padding: 5px 4px;
-    -moz-appearance: textfield;
+    -moz-appearance: textfield; vertical-align: middle;
   }
   html:not([data-theme="light"]) .qa-score-input:not(:disabled) { color: #ffffff; }
   .qa-score-input:disabled { background: var(--bg); color: var(--text-faint); cursor: not-allowed; }

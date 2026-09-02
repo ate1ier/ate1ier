@@ -24,15 +24,11 @@
     setTimeout(() => showTodayBriefPopup(), 450);
   }
 
-  // 로그인 후 5시간이 지나면 자동으로 로그아웃시키고, 그 전까지는 남은 시간을
-  // 주기적으로 갱신해서 보여준다.
-  if (!CURRENT_ACCOUNT_IS_MASTER) {
-    updateSessionRemainingDisplay();
-    setInterval(() => {
-      if (getSessionRemainingMs() <= 0) {
-        logout();
-        return;
-      }
-      updateSessionRemainingDisplay();
-    }, 15000);
-  }
+  // 로그인 유지 하트비트: 이 탭이 열려 있는 동안 "마지막으로 살아있던 시각"을 계속
+  // 갱신해서, 탭만 잠깐 닫았다 다시 열었을 때는 로그인이 유지되고 컴퓨터를 껐다
+  // 켤 정도로 오래 닫혀 있었을 때만 자동 로그아웃되게 한다 (판단 자체는 01-common.js의
+  // 세션 확인 부분에서 다음에 열릴 때 이뤄진다).
+  touchLastActive();
+  setInterval(touchLastActive, 15000);
+  window.addEventListener("pagehide", touchLastActive);
+  window.addEventListener("beforeunload", touchLastActive);

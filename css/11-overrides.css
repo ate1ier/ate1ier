@@ -9,7 +9,7 @@
 
   .add-input, .todo-due-input, .agent-sort-select, .agent-filter-btn,
   .type-btn, .note-content, .interview-textarea, .inline-form input[type="text"],
-  .inline-form select, .add-input, .range-row .date-input {
+  .inline-form select, .add-input, .range-row .date-input, .repeat-row .date-input, .repeat-row .repeat-select {
     border-radius: 10px !important;
   }
   .add-input:focus-visible, .note-content:focus-visible, .interview-textarea:focus-visible,

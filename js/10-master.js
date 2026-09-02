@@ -1,8 +1,30 @@
   function renderMasterPage(root) {
     if (!CURRENT_ACCOUNT_IS_MASTER) { setPage("home"); return; }
-    const uiState = { resettingId: null, renamingId: null, error: "", renameError: "" };
+    const uiState = {
+      tab: "accounts", resettingId: null, renamingId: null, error: "", renameError: "",
+      logAccountFilter: "all", expandedLogIds: new Set(),
+    };
 
     function draw() {
+      root.innerHTML = `
+        <div class="agent-list-header">
+          <div class="agent-list-title">마스터 계정 관리</div>
+        </div>
+        <div class="login-tabs" style="max-width:280px; margin-bottom:16px;">
+          <button type="button" class="login-tab ${uiState.tab === "accounts" ? "active" : ""}" data-master-tab="accounts">계정 관리</button>
+          <button type="button" class="login-tab ${uiState.tab === "activity" ? "active" : ""}" data-master-tab="activity">활동 로그</button>
+        </div>
+        <div id="master-tab-body"></div>
+      `;
+      root.querySelectorAll("[data-master-tab]").forEach((btn) => {
+        btn.onclick = () => { uiState.tab = btn.getAttribute("data-master-tab"); draw(); };
+      });
+      const body = document.getElementById("master-tab-body");
+      if (uiState.tab === "activity") drawActivityLog(body);
+      else drawAccounts(body);
+    }
+
+    function drawAccounts(root) {
       const accounts = loadAccounts().slice().sort((a, b) => (a.createdAt || "").localeCompare(b.createdAt || ""));
       const rows = accounts.map((a) => {
         const isSelf = a.id === CURRENT_ACCOUNT_ID;
@@ -46,9 +68,6 @@
         `;
       }).join("");
       root.innerHTML = `
-        <div class="agent-list-header">
-          <div class="agent-list-title">계정 관리</div>
-        </div>
         <div class="agent-summary">마스터 계정으로 다른 계정을 선택해서 들어가보거나, 비밀번호를 초기화하거나, 필요 없는 계정을 삭제할 수 있어요. 총 ${accounts.length}개 계정.</div>
         <div class="status" id="master-status"></div>
         <div class="agent-list">${rows || `<div class="agent-list-empty">등록된 계정이 없어요.</div>`}</div>
@@ -117,6 +136,87 @@
           uiState.error = "";
           draw();
           flash(`"${target ? target.username : ""}" 계정의 비밀번호를 초기화했어요.`);
+        };
+      });
+    }
+
+    // ----- 활동 로그 탭: 계정별 데이터 변경 이력을 간단한 목록으로 보여준다 -----
+    function drawActivityLog(root) {
+      const entries = loadActivityLog();
+      const accounts = loadAccounts();
+      const accountNameOf = (id) => { const a = accounts.find((x) => x.id === id); return a ? a.username : null; };
+
+      const accountOptionsMap = {};
+      entries.forEach((e) => {
+        if (!accountOptionsMap[e.accountId]) accountOptionsMap[e.accountId] = accountNameOf(e.accountId) || e.accountName || e.accountId;
+      });
+      const accountOptions = Object.keys(accountOptionsMap)
+        .map((id) => ({ id, name: accountOptionsMap[id] }))
+        .sort((a, b) => a.name.localeCompare(b.name, "ko"));
+
+      const filtered = uiState.logAccountFilter === "all"
+        ? entries
+        : entries.filter((e) => e.accountId === uiState.logAccountFilter);
+
+      const shown = filtered.slice(0, 200);
+      const rows = shown.map((e) => {
+        const isExpanded = uiState.expandedLogIds.has(e.id);
+        const startLabel = e.at ? esc(e.at.replace("T", " ").slice(0, 16)) : "-";
+        const endLabel = e.endedAt ? esc(e.endedAt.replace("T", " ").slice(11, 16)) : "";
+        const dt = endLabel && endLabel !== startLabel.slice(-5) ? `${startLabel} ~ ${endLabel}` : startLabel;
+        const whereLabel = esc(e.subLabel ? `${e.categoryLabel} · ${e.subLabel}` : (e.categoryLabel || "기타"));
+        return `
+          <div class="interview-row ${isExpanded ? "expanded" : ""}">
+            <div class="interview-row-top" data-action="toggle-log-row" data-id="${e.id}">
+              <span class="interview-row-chevron">${ICON_CHEVRON_RIGHT}</span>
+              <span class="interview-date">${dt}</span>
+              <span class="agent-row-name">${esc(e.accountName || "(삭제된 계정)")}</span>
+              ${e.viaMasterName ? `<span class="badge sm master">마스터: ${esc(e.viaMasterName)}</span>` : ""}
+              <span class="badge sm working">${whereLabel}</span>
+            </div>
+            ${isExpanded ? `
+              <div class="interview-row-body">
+                ${(e.diff && e.diff.length) ? e.diff.map((d) => `<div class="interview-content">${esc(d)}</div>`).join("") : `<div class="interview-content">세부 내용이 없어요.</div>`}
+              </div>
+            ` : ""}
+          </div>
+        `;
+      }).join("");
+
+      root.innerHTML = `
+        <div class="agent-summary">
+          각 계정에서 데이터가 바뀔 때마다 자동으로 기록돼요. 목록을 누르면 자세한 변경 내용을 볼 수 있어요.
+          총 ${filtered.length}건${filtered.length > shown.length ? ` (최근 ${shown.length}건만 표시)` : ""}.
+        </div>
+        <div style="display:flex; gap:8px; align-items:center; margin-bottom:14px; flex-wrap:wrap;">
+          <select class="agent-sort-select" id="log-account-filter">
+            <option value="all" ${uiState.logAccountFilter === "all" ? "selected" : ""}>전체 계정</option>
+            ${accountOptions.map((a) => `<option value="${esc(a.id)}" ${uiState.logAccountFilter === a.id ? "selected" : ""}>${esc(a.name)}</option>`).join("")}
+          </select>
+          ${entries.length ? `<button type="button" class="ghost-btn danger" id="log-clear-btn">로그 전체 지우기</button>` : ""}
+        </div>
+        <div class="interview-list">${rows || `<div class="agent-list-empty">${entries.length ? "이 계정에는 아직 활동 기록이 없어요." : "아직 쌓인 활동 기록이 없어요."}</div>`}</div>
+      `;
+
+      const filterEl = document.getElementById("log-account-filter");
+      if (filterEl) filterEl.onchange = () => { uiState.logAccountFilter = filterEl.value; draw(); };
+
+      const clearBtn = document.getElementById("log-clear-btn");
+      if (clearBtn) {
+        clearBtn.onclick = () => {
+          if (!window.confirm("모든 계정의 활동 로그를 전부 지울까요? 되돌릴 수 없어요.")) return;
+          clearActivityLog();
+          uiState.expandedLogIds.clear();
+          draw();
+        };
+      }
+
+      root.querySelectorAll("[data-action='toggle-log-row']").forEach((row) => {
+        row.onclick = () => {
+          const id = row.getAttribute("data-id");
+          if (uiState.expandedLogIds.has(id)) uiState.expandedLogIds.delete(id);
+          else uiState.expandedLogIds.add(id);
+          draw();
         };
       });
     }

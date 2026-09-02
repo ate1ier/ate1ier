@@ -21,19 +21,20 @@
 <link rel="stylesheet" href="css/09-schedule.css">
 <link rel="stylesheet" href="css/10-qa.css">
 <link rel="stylesheet" href="css/11-overrides.css">
+<link rel="stylesheet" href="css/12-global-search.css">
 </head>
 <body>
 <div id="layout">
   <div id="page-area"><div id="page-inner"></div></div>
-  <div id="nav"></div>
+  <div id="nav-dock">
+    <div id="global-search-root"></div>
+    <div id="nav"></div>
+  </div>
 </div>
-<div id="session-warning-toast-root"></div>
 <div id="utility-dock-root">
   <div id="refresh-toggle-root"></div>
   <div id="undo-toggle-root"></div>
-  <div id="backup-toggle-root"></div>
-  <div id="manual-toggle-root"></div>
-  <div id="theme-toggle-root"></div>
+  <div id="settings-toggle-root"></div>
   <button class="utility-dock-toggle-btn" id="utility-dock-toggle-btn" type="button" aria-haspopup="true" aria-expanded="false" aria-label="바로가기 메뉴 열기" title="바로가기 메뉴 열기">
     <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 9l5-4 5 4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
   </button>
@@ -47,6 +48,7 @@
   const ICON_HOME = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.3 8.2 8 3.2l5.7 5"/><path d="M3.6 6.8V13h3.1v-4h2.6v4h3.1V6.8"/></svg>`;
   const ICON_CALENDAR = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="3.4" width="11" height="10.2" rx="1.6"/><path d="M2.5 6.6h11M5.6 2v2.4M10.4 2v2.4"/></svg>`;
   const ICON_NOTE = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4.3 2.6h5l2.4 2.4v8.4h-7.4z"/><path d="M9.3 2.6V5h2.4"/><path d="M6 8.4h4M6 10.8h4"/></svg>`;
+  const ICON_EDIT = `<svg class="icon-emo" viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M10.6 2.4 13.6 5.4 5.4 13.6 2.2 13.8 2.4 10.6z"/><path d="M9.2 3.8 12.2 6.8"/></svg>`;
   const ICON_USERS = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2.1"/><path d="M2.4 13c0-2.1 1.6-3.6 3.6-3.6s3.6 1.5 3.6 3.6"/><circle cx="11.3" cy="6.4" r="1.7"/><path d="M9.9 9.6c1.7.2 3 1.5 3 3.4"/></svg>`;
   const ICON_CLIPBOARD = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.6" y="3" width="8.8" height="11.2" rx="1.4"/><path d="M6.2 3V2.4a1 1 0 0 1 1-1h1.6a1 1 0 0 1 1 1V3"/><path d="M5.8 7.4h4.4M5.8 10h4.4"/></svg>`;
   const ICON_CHART = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.4 13.6h11.2"/><rect x="3.8" y="8.4" width="2.1" height="4.3"/><rect x="7" y="5.6" width="2.1" height="7.1"/><rect x="10.2" y="9.8" width="2.1" height="2.9"/></svg>`;
@@ -72,6 +74,7 @@
   const ICON_UPLOAD = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 9.7V2.5"/><path d="M5.2 5.3 8 2.5l2.8 2.8"/><path d="M3.2 13h9.6"/></svg>`;
   const ICON_BACKUP = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.6 4.4c0-1 2.4-1.8 5.4-1.8s5.4.8 5.4 1.8-2.4 1.8-5.4 1.8-5.4-.8-5.4-1.8Z"/><path d="M2.6 4.4V8c0 1 2.4 1.8 5.4 1.8s5.4-.8 5.4-1.8V4.4"/><path d="M2.6 8v3.6c0 1 2.4 1.8 5.4 1.8s5.4-.8 5.4-1.8V8"/></svg>`;
   const ICON_REFRESH = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 8A5 5 0 1 1 11.4 4.3"/><path d="M13 2.6V6h-3.4"/></svg>`;
+  const ICON_SETTINGS = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="2.1"/><path d="M8 2.4v1.5M8 12.1v1.5M13.6 8h-1.5M3.9 8H2.4M11.9 4.1l-1.05 1.05M5.15 10.85 4.1 11.9M11.9 11.9l-1.05-1.05M5.15 5.15 4.1 4.1"/></svg>`;
   /* ===================== ☁️ 클라우드 동기화 (Supabase) =====================
      계정 목록과 각 계정의 데이터(할일/메모/상담사/면담일지/스케줄/캘린더)를
      Supabase의 kv_store 테이블에도 함께 저장해서, 다른 기기·다른 사람도
@@ -499,29 +502,35 @@
   }
   applyTheme(isValidTheme(getStoredTheme()) ? getStoredTheme() : "dark");
 
-  /* ===================== 데스크톱 독(Dock) 펼치기/닫기 ===================== */
+  /* ===================== 데스크톱 독(Dock) 펼치기/닫기 =====================
+     독 안에는 메뉴 카테고리(#nav) 말고도 전역 검색 바(#global-search-root)가
+     카테고리 바로 위에 함께 들어있으므로, 펼치기/접기 대상은 그 둘을 함께
+     감싸는 #nav-dock 전체다. */
   function isDockOpen() {
-    const nav = document.getElementById("nav");
-    return !!(nav && nav.classList.contains("dock-open"));
+    const navDock = document.getElementById("nav-dock");
+    return !!(navDock && navDock.classList.contains("dock-open"));
   }
   function dockOutsideHandler(e) {
-    const nav = document.getElementById("nav");
+    const navDock = document.getElementById("nav-dock");
     const btn = document.getElementById("dock-toggle-btn");
-    if (nav && !nav.contains(e.target) && !(btn && btn.contains(e.target))) closeDock();
+    if (navDock && !navDock.contains(e.target) && !(btn && btn.contains(e.target))) closeDock();
   }
   function openDock() {
-    const nav = document.getElementById("nav");
+    const navDock = document.getElementById("nav-dock");
     const btn = document.getElementById("dock-toggle-btn");
-    if (nav) nav.classList.add("dock-open");
+    if (navDock) navDock.classList.add("dock-open");
     if (btn) { btn.classList.add("open"); btn.setAttribute("aria-expanded", "true"); btn.title = "메뉴 닫기"; btn.setAttribute("aria-label", "메뉴 닫기"); }
     setTimeout(() => document.addEventListener("mousedown", dockOutsideHandler, true), 0);
   }
   function closeDock() {
-    const nav = document.getElementById("nav");
+    const navDock = document.getElementById("nav-dock");
     const btn = document.getElementById("dock-toggle-btn");
-    if (nav) nav.classList.remove("dock-open");
+    if (navDock) navDock.classList.remove("dock-open");
     if (btn) { btn.classList.remove("open"); btn.setAttribute("aria-expanded", "false"); btn.title = "메뉴 열기"; btn.setAttribute("aria-label", "메뉴 열기"); }
     document.removeEventListener("mousedown", dockOutsideHandler, true);
+    // 독 안에는 전역 검색창도 함께 들어있으므로, 독을 닫을 때 검색했던 내용도
+    // 남아있지 않고 초기화되게 한다.
+    if (typeof resetGlobalSearchQuery === "function") resetGlobalSearchQuery();
   }
   function toggleDock() {
     if (isDockOpen()) closeDock(); else openDock();
@@ -540,8 +549,8 @@
   }
   function utilityDockOutsideHandler(e) {
     const root = document.getElementById("utility-dock-root");
-    const themeMenu = document.getElementById("theme-menu");
-    if (themeMenu && themeMenu.contains(e.target)) return; // 테마 목록 팝업 클릭은 독을 접지 않는다
+    const settingsMenu = document.getElementById("settings-menu");
+    if (settingsMenu && settingsMenu.contains(e.target)) return; // 설정 목록 팝업 클릭은 독을 접지 않는다
     if (root && !root.contains(e.target)) closeUtilityDock();
   }
   function openUtilityDock() {
@@ -566,44 +575,29 @@
     utilityDockToggleBtn.onclick = (e) => { e.stopPropagation(); toggleUtilityDock(); };
   }
 
-  // 다크/라이트 등 화면 테마 선택 버튼: 내비게이션(독)과 별개로 항상 화면 오른쪽 아래에 떠 있다.
-  function renderThemeToggle() {
-    const root = document.getElementById("theme-toggle-root");
-    if (!root) return;
-    root.innerHTML = `
-      <div class="theme-toggle-wrap">
-        <button class="theme-picker-btn" id="nav-theme-toggle" type="button" aria-haspopup="true" aria-expanded="false" aria-label="화면 테마 선택" title="화면 테마 선택">
-          <span class="theme-picker-dot" style="background:${themeMeta(getCurrentTheme()).bg};"></span>
-          <span class="theme-picker-label">${themeMeta(getCurrentTheme()).label}</span>
-          <svg class="theme-picker-chevron" width="8" height="8" viewBox="0 0 10 10" aria-hidden="true"><path d="M1 3.5l4 4 4-4" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        </button>
-      </div>
-    `;
-    const themeBtn = document.getElementById("nav-theme-toggle");
-    if (themeBtn) {
-      themeBtn.onclick = (e) => {
-        e.stopPropagation();
-        if (document.getElementById("theme-menu")) { closeThemeMenu(); return; }
-        openThemeMenu(themeBtn);
-      };
-    }
-  }
-
-  // 사용설명서 버튼: 카테고리로 넣지 않고, 테마(다크/라이트) 버튼 바로 위에 항상 떠 있는 고정 버튼으로 표시.
-  // 누르면 페이지 이동 없이 PPT처럼 옆으로 넘겨보는 사용설명서 팝업이 뜬다.
-  function renderManualToggle() {
-    const root = document.getElementById("manual-toggle-root");
+  // 설정 버튼: 예전에는 테마·사용설명서·데이터 백업이 각각 독립된 버튼으로 오른쪽 아래에
+  // 따로따로 쌓여 있었는데, 항목이 많아질수록 화면이 복잡해 보여서(특히 모바일) 이 세 가지를
+  // "설정" 버튼 하나로 묶고, 그 안에서 목록으로 고르게 했다. 새로고침·되돌리기는 사용 빈도가
+  // 높아 그대로 독립 버튼으로 남겨둔다.
+  function renderSettingsToggle() {
+    const root = document.getElementById("settings-toggle-root");
     if (!root) return;
     root.innerHTML = `
       <div class="manual-toggle-wrap">
-        <button class="theme-picker-btn" id="nav-manual-toggle" type="button" aria-haspopup="dialog" aria-label="사용설명서 열기" title="사용설명서">
-          ${ICON_BOOK}
-          <span class="theme-picker-label">사용설명서</span>
+        <button class="theme-picker-btn" id="nav-settings-toggle" type="button" aria-haspopup="true" aria-expanded="false" aria-label="설정 메뉴 열기" title="설정 (테마 · 사용설명서 · 데이터 백업)">
+          ${ICON_SETTINGS}
+          <span class="theme-picker-label">설정</span>
         </button>
       </div>
     `;
-    const manualBtn = document.getElementById("nav-manual-toggle");
-    if (manualBtn) manualBtn.onclick = () => openManualModal();
+    const settingsBtn = document.getElementById("nav-settings-toggle");
+    if (settingsBtn) {
+      settingsBtn.onclick = (e) => {
+        e.stopPropagation();
+        if (document.getElementById("settings-menu")) { closeSettingsMenu(); return; }
+        openSettingsMenu(settingsBtn);
+      };
+    }
   }
 
   /* ===================== 데이터 백업/복원 =====================
@@ -708,22 +702,6 @@
     if (count === 0) return { ok: false, reason: "이 백업 파일에서 가져올 수 있는 데이터를 찾지 못했어요." };
     await flushCloudWrites();
     return { ok: true, count };
-  }
-
-  // 백업 버튼: 사용설명서 버튼 바로 위에 항상 떠 있는 고정 버튼으로 표시.
-  function renderBackupToggle() {
-    const root = document.getElementById("backup-toggle-root");
-    if (!root) return;
-    root.innerHTML = `
-      <div class="manual-toggle-wrap">
-        <button class="theme-picker-btn" id="nav-backup-toggle" type="button" aria-haspopup="dialog" aria-label="데이터 백업/복원 열기" title="데이터 백업/복원">
-          ${ICON_BACKUP}
-          <span class="theme-picker-label">데이터 백업</span>
-        </button>
-      </div>
-    `;
-    const backupBtn = document.getElementById("nav-backup-toggle");
-    if (backupBtn) backupBtn.onclick = () => openBackupModal();
   }
 
   // 새로고침 버튼: 백업 버튼이 있던 오른쪽 아래 자리에 항상 떠 있는 고정 버튼으로 표시.
@@ -844,35 +822,47 @@
     });
   }
 
-  // 테마 선택 팝오버(사이드바 하단의 테마 버튼을 누르면 뜨는 목록)
-  function closeThemeMenu() {
-    const existing = document.getElementById("theme-menu");
+  // 설정 메뉴 팝오버("설정" 버튼을 누르면 뜨는 목록) — 테마 선택 · 사용설명서 · 데이터 백업을
+  // 한 목록 안에 모아둔다. 항목이 3개뿐이라 테마도 별도 팝업으로 한 번 더 들어가지 않고
+  // 이 목록에서 바로 다크/라이트를 고를 수 있게 했다.
+  function closeSettingsMenu() {
+    const existing = document.getElementById("settings-menu");
     if (existing) existing.remove();
-    document.removeEventListener("mousedown", themeMenuOutsideHandler, true);
-    const btn = document.getElementById("nav-theme-toggle");
+    document.removeEventListener("mousedown", settingsMenuOutsideHandler, true);
+    const btn = document.getElementById("nav-settings-toggle");
     if (btn) { btn.classList.remove("open"); btn.setAttribute("aria-expanded", "false"); }
   }
-  function themeMenuOutsideHandler(e) {
-    const menu = document.getElementById("theme-menu");
-    const btn = document.getElementById("nav-theme-toggle");
-    if (menu && !menu.contains(e.target) && !(btn && btn.contains(e.target))) closeThemeMenu();
+  function settingsMenuOutsideHandler(e) {
+    const menu = document.getElementById("settings-menu");
+    const btn = document.getElementById("nav-settings-toggle");
+    if (menu && !menu.contains(e.target) && !(btn && btn.contains(e.target))) closeSettingsMenu();
   }
-  function openThemeMenu(anchorEl) {
-    closeThemeMenu();
+  function openSettingsMenu(anchorEl) {
+    closeSettingsMenu();
     anchorEl.classList.add("open");
     anchorEl.setAttribute("aria-expanded", "true");
     const rect = anchorEl.getBoundingClientRect();
     const current = getCurrentTheme();
     const menu = document.createElement("div");
-    menu.id = "theme-menu";
-    menu.className = "theme-menu";
-    menu.innerHTML = THEME_LIST.map((t) => `
-      <button type="button" class="theme-menu-item ${t.id === current ? "active" : ""}" data-theme-id="${t.id}">
-        <span class="theme-menu-dot" style="background:${t.bg};"></span>
-        <span class="theme-menu-name">${t.label}</span>
-        ${t.id === current ? '<span class="theme-menu-check">✓</span>' : ""}
+    menu.id = "settings-menu";
+    menu.className = "theme-menu settings-menu";
+    menu.innerHTML = `
+      <div class="settings-menu-label">테마</div>
+      ${THEME_LIST.map((t) => `
+        <button type="button" class="theme-menu-item ${t.id === current ? "active" : ""}" data-theme-id="${t.id}">
+          <span class="theme-menu-dot" style="background:${t.bg};"></span>
+          <span class="theme-menu-name">${t.label}</span>
+          ${t.id === current ? '<span class="theme-menu-check">✓</span>' : ""}
+        </button>
+      `).join("")}
+      <div class="settings-menu-divider"></div>
+      <button type="button" class="theme-menu-item" id="settings-manual-btn">
+        ${ICON_BOOK}<span class="theme-menu-name">사용설명서</span>
       </button>
-    `).join("");
+      <button type="button" class="theme-menu-item" id="settings-backup-btn">
+        ${ICON_BACKUP}<span class="theme-menu-name">데이터 백업</span>
+      </button>
+    `;
     document.body.appendChild(menu);
     const menuRect = menu.getBoundingClientRect();
     let top = rect.top - menuRect.height - 8;
@@ -884,10 +874,14 @@
     menu.querySelectorAll("[data-theme-id]").forEach((btn) => {
       btn.onclick = () => {
         setTheme(btn.getAttribute("data-theme-id"));
-        closeThemeMenu();
+        closeSettingsMenu();
       };
     });
-    setTimeout(() => document.addEventListener("mousedown", themeMenuOutsideHandler, true), 0);
+    const manualBtn = document.getElementById("settings-manual-btn");
+    if (manualBtn) manualBtn.onclick = () => { closeSettingsMenu(); openManualModal(); };
+    const backupBtn = document.getElementById("settings-backup-btn");
+    if (backupBtn) backupBtn.onclick = () => { closeSettingsMenu(); openBackupModal(); };
+    setTimeout(() => document.addEventListener("mousedown", settingsMenuOutsideHandler, true), 0);
   }
 
   /* ===================== 공통 유틸 ===================== */
@@ -910,14 +904,22 @@
      저장 키 앞에 "acct:{계정ID}:" 접두어를 붙여 브라우저 안에서만 서로
      분리해둡니다. */
   const ACCOUNTS_KEY = "personal-app:accounts";
+  // 로그인 세션(누가 로그인해 있는지)은 localStorage에 저장해서, 탭을 닫았다 새로
+  // 열어도(같은 브라우저인 한) 로그인이 그대로 유지되게 한다. 대신 아래 LAST_ACTIVE_KEY
+  // 하트비트로 "너무 오래(=컴퓨터를 껐다 켤 정도로) 닫혀 있었는지"를 따로 판단해서,
+  // 그 경우에만 자동으로 로그아웃시킨다.
   const SESSION_KEY = "personal-app:session";
   // 마스터 계정이 다른 계정을 "들어가서 보기" 했을 때, 원래(마스터) 계정으로
   // 돌아올 수 있도록 원래 세션을 잠깐 보관해두는 키.
   const MASTER_ORIGIN_KEY = "personal-app:master-origin";
-  // 로그인한 시각을 기록해두는 키. 이 시각으로부터 SESSION_DURATION_MS가
-  // 지나면 자동으로 로그아웃시킨다.
-  const LOGIN_AT_KEY = "personal-app:login-at";
-  const SESSION_DURATION_MS = 5 * 60 * 60 * 1000; // 5시간
+  // 이 앱이 마지막으로 화면에 떠 있었던 시각(하트비트). 탭이 열려 있는 동안 주기적으로
+  // 갱신되고, 탭/브라우저가 닫히면 더 이상 갱신되지 않는다. 다음에 열었을 때 이 시각과
+  // 지금 시각의 차이가 SESSION_GAP_LIMIT_MS보다 크면 "그동안 컴퓨터를 껐다 켰거나
+  // 오래 자리를 비운 것"으로 보고 자동 로그아웃시킨다. 그보다 짧으면(탭만 잠깐 닫았다
+  // 연 경우 등) 로그인 상태를 그대로 유지한다. 기준 시간을 바꾸고 싶으면 이 숫자만
+  // 고치면 된다.
+  const LAST_ACTIVE_KEY = "personal-app:last-active";
+  const SESSION_GAP_LIMIT_MS = 5 * 60 * 1000; // 5분
 
   const HAS_SUBTLE_CRYPTO = !!(window.crypto && window.crypto.subtle);
   // 예전(salt 없는 단순 해시) 방식 — 신규 계정에는 쓰지 않고, 예전에 만든
@@ -973,88 +975,16 @@
   function clearMasterOrigin() {
     try { localStorage.removeItem(MASTER_ORIGIN_KEY); } catch (e) {}
   }
-  function getLoginAt() {
-    try { return localStorage.getItem(LOGIN_AT_KEY); } catch (e) { return null; }
+  function getLastActive() {
+    try { return Number(localStorage.getItem(LAST_ACTIVE_KEY)) || 0; } catch (e) { return 0; }
   }
-  function setLoginAt(timestamp) {
-    try { localStorage.setItem(LOGIN_AT_KEY, String(timestamp)); } catch (e) {}
+  // 하트비트를 지금 시각으로 갱신한다. 로그인 직후, 그리고 탭이 열려 있는 동안
+  // 주기적으로 호출된다.
+  function touchLastActive() {
+    try { localStorage.setItem(LAST_ACTIVE_KEY, String(Date.now())); } catch (e) {}
   }
-  function clearLoginAt() {
-    try { localStorage.removeItem(LOGIN_AT_KEY); } catch (e) {}
-  }
-  // 자동 로그아웃까지 남은 시간(ms)을 계산한다. 로그인 시각 기록이 없으면 0으로 본다.
-  function getSessionRemainingMs() {
-    const loginAt = Number(getLoginAt());
-    if (!loginAt) return 0;
-    return SESSION_DURATION_MS - (Date.now() - loginAt);
-  }
-  function formatRemainingTime(ms) {
-    if (ms <= 0) return "0분";
-    const totalMinutes = Math.floor(ms / 60000);
-    const h = Math.floor(totalMinutes / 60);
-    const m = totalMinutes % 60;
-    if (h > 0) return `${h}시간 ${m}분`;
-    return `${m}분`;
-  }
-  function updateSessionRemainingDisplay() {
-    const el = document.getElementById("global-session-badge");
-    if (el) {
-      el.innerHTML = `${ICON_CLOCK} ${formatRemainingTime(getSessionRemainingMs())}`;
-      el.classList.add("visible");
-    }
-    updateSessionWarningToast();
-  }
-
-  // ---- 자동 로그아웃 임박(남은 시간 30분 이하) 알림 토스트 ----
-  const SESSION_WARNING_THRESHOLD_MS = 30 * 60 * 1000; // 30분
-  // 사용자가 토스트를 닫으면, 같은 로그인 회차(연장 전까지)에는 다시 띄우지 않는다.
-  let sessionWarningDismissed = false;
-
-  function hideSessionWarningToast() {
-    const root = document.getElementById("session-warning-toast-root");
-    if (root) root.innerHTML = "";
-  }
-
-  function extendSessionFromToast() {
-    setLoginAt(Date.now());
-    sessionWarningDismissed = false;
-    hideSessionWarningToast();
-    updateSessionRemainingDisplay();
-  }
-
-  function renderSessionWarningToast(remainingMs) {
-    const root = document.getElementById("session-warning-toast-root");
-    if (!root) return;
-    root.innerHTML = `
-      <div class="session-warning-toast" role="alert">
-        <span class="session-toast-icon">${ICON_CLOCK}</span>
-        <div class="session-toast-body">
-          <div class="session-toast-title">곧 자동 로그아웃돼요</div>
-          <div class="session-toast-desc">${formatRemainingTime(remainingMs)} 후 자동으로 로그아웃됩니다. 계속 사용하시려면 연장해주세요.</div>
-          <div class="session-toast-actions">
-            <button class="session-toast-extend-btn" id="session-toast-extend-btn" type="button">연장하기</button>
-            <button class="session-toast-dismiss-btn" id="session-toast-dismiss-btn" type="button">나중에</button>
-          </div>
-        </div>
-        <button class="session-toast-close-btn" id="session-toast-close-btn" type="button" title="닫기" aria-label="닫기">${ICON_CLOSE_SM}</button>
-      </div>
-    `;
-    const extendBtn = document.getElementById("session-toast-extend-btn");
-    if (extendBtn) extendBtn.onclick = extendSessionFromToast;
-    const dismissBtn = document.getElementById("session-toast-dismiss-btn");
-    if (dismissBtn) dismissBtn.onclick = () => { sessionWarningDismissed = true; hideSessionWarningToast(); };
-    const closeBtn = document.getElementById("session-toast-close-btn");
-    if (closeBtn) closeBtn.onclick = () => { sessionWarningDismissed = true; hideSessionWarningToast(); };
-  }
-
-  function updateSessionWarningToast() {
-    if (CURRENT_ACCOUNT_IS_MASTER) { hideSessionWarningToast(); return; }
-    const remaining = getSessionRemainingMs();
-    if (remaining > 0 && remaining <= SESSION_WARNING_THRESHOLD_MS && !sessionWarningDismissed) {
-      renderSessionWarningToast(remaining);
-    } else {
-      hideSessionWarningToast();
-    }
+  function clearLastActive() {
+    try { localStorage.removeItem(LAST_ACTIVE_KEY); } catch (e) {}
   }
   // 마스터 계정이 다른 계정으로 들어가서 볼 때 쓰는 함수.
   // 지금 세션(마스터)을 origin으로 저장해두고, 세션을 대상 계정으로 바꾼다.
@@ -1080,6 +1010,7 @@
     const list = loadAccounts();
     if (list.length <= 1) return { ok: false, reason: "마지막 남은 계정은 삭제할 수 없어요." };
     if (accountId === CURRENT_ACCOUNT_ID) return { ok: false, reason: "현재 로그인 중인 계정은 삭제할 수 없어요." };
+    const target = list.find((a) => a.id === accountId);
     const next = list.filter((a) => a.id !== accountId);
     saveAccounts(next);
     try {
@@ -1091,6 +1022,15 @@
       }
       keysToRemove.forEach((k) => localStorage.removeItem(k));
     } catch (e) { /* 데이터 정리 실패해도 계정 삭제 자체는 유지 */ }
+    appendActivityLog({
+      accountId,
+      accountName: target ? target.username : accountId,
+      viaMasterName: CURRENT_ACCOUNT_NAME,
+      categoryKey: "account",
+      categoryLabel: "계정 관리",
+      subLabel: "",
+      diff: ["계정이 삭제됐어요."],
+    });
     return { ok: true };
   }
   // 마스터가 다른 계정의 비밀번호를 새 비밀번호로 초기화한다.
@@ -1103,6 +1043,15 @@
     const passwordHash = await hashPassword(newPassword, salt);
     list[idx] = { ...list[idx], salt, passwordHash };
     saveAccounts(list);
+    appendActivityLog({
+      accountId,
+      accountName: list[idx].username,
+      viaMasterName: CURRENT_ACCOUNT_NAME,
+      categoryKey: "account",
+      categoryLabel: "계정 관리",
+      subLabel: "",
+      diff: ["비밀번호가 초기화됐어요."],
+    });
     return { ok: true };
   }
   // 마스터가 다른 계정의 이름(아이디)을 바꾼다. 이미 쓰이고 있는 이름으로는 바꿀 수 없다.
@@ -1115,8 +1064,18 @@
     const norm = trimmed.toLowerCase();
     const dup = list.find((a) => a.id !== accountId && a.username.toLowerCase() === norm);
     if (dup) return { ok: false, reason: "이미 사용 중인 계정 이름이에요." };
+    const oldUsername = list[idx].username;
     list[idx] = { ...list[idx], username: trimmed };
     saveAccounts(list);
+    appendActivityLog({
+      accountId,
+      accountName: trimmed,
+      viaMasterName: CURRENT_ACCOUNT_NAME,
+      categoryKey: "account",
+      categoryLabel: "계정 관리",
+      subLabel: "",
+      diff: [`계정 이름: ${oldUsername} → ${trimmed}`],
+    });
     return { ok: true };
   }
   function findAccountByUsername(username) {
@@ -1129,7 +1088,7 @@
   async function logout() {
     clearSession();
     clearMasterOrigin();
-    clearLoginAt();
+    clearLastActive();
     await flushCloudWrites();
     location.reload();
   }
@@ -1226,7 +1185,7 @@
             return;
           }
           setSession(account.id);
-          setLoginAt(Date.now());
+          touchLastActive();
           try { sessionStorage.setItem("app:just-logged-in", "1"); } catch (e) {}
           await flushCloudWrites();
           location.reload();
@@ -1251,7 +1210,7 @@
           accountsList.push(newAccount);
           saveAccounts(accountsList);
           setSession(newAccount.id);
-          setLoginAt(Date.now());
+          touchLastActive();
           try { sessionStorage.setItem("app:just-logged-in", "1"); } catch (e) {}
           await flushCloudWrites();
           location.reload();
@@ -1265,13 +1224,15 @@
   // 세션 확인: 로그인 상태가 아니면 로그인 화면만 그리고 나머지 앱 코드는 실행하지 않는다.
   const _session = getSession();
   let _account = _session ? findAccountById(_session) : null;
-  // 로그인한 지 5시간이 지났으면 자동으로 로그아웃 처리한다.
+  // 하트비트 확인: 마지막으로 이 앱이 열려 있었던 시각으로부터 너무 오래(컴퓨터를
+  // 껐다 켤 정도로) 지났으면 자동으로 로그아웃 처리한다. 탭만 잠깐 닫았다 연 경우처럼
+  // 그 안에 다시 열렸다면 로그인 상태를 그대로 유지한다.
   if (_account) {
-    const _loginAt = Number(getLoginAt());
-    if (!_loginAt || Date.now() - _loginAt >= SESSION_DURATION_MS) {
+    const lastActive = getLastActive();
+    if (!lastActive || Date.now() - lastActive >= SESSION_GAP_LIMIT_MS) {
       clearSession();
       clearMasterOrigin();
-      clearLoginAt();
+      clearLastActive();
       _account = null;
     }
   }
@@ -1288,6 +1249,251 @@
   if (_masterOriginId && !MASTER_ORIGIN_ACCOUNT) clearMasterOrigin();
   // 계정별로 데이터를 분리하기 위해 저장 키 앞에 이 접두어를 붙인다.
   function acctKey(key) { return `acct:${CURRENT_ACCOUNT_ID}:${key}`; }
+
+  /* ===================== 📋 계정 활동 로그 (마스터 전용) =====================
+     각 계정에서 실제 데이터(할일/메모/상담사/면담일지/QA/스케줄 등)가 저장될 때마다
+     "언제 · 누가 · 어디서(어떤 메뉴) · 무엇이 어떻게 바뀌었는지"를 간단히 기록해서
+     쌓아둔다. 이 로그 자체도 클라우드(kv_store)에 함께 저장되므로, 다른 관리자의
+     브라우저에서 생긴 활동도 마스터 계정이라면 새로고침 후 같이 볼 수 있다.
+     계정 목록 자체를 다루는 동작(비밀번호 초기화·이름 변경·삭제)은 acct: 접두어를
+     쓰지 않으므로, 해당 함수(resetAccountPassword 등) 안에서 직접 기록한다. */
+  const ACTIVITY_LOG_KEY = "activity-log:entries";
+  const ACTIVITY_LOG_MAX = 500; // 너무 오래 쌓이지 않도록 최신 N건만 유지
+  function loadActivityLog() {
+    try {
+      const raw = localStorage.getItem(ACTIVITY_LOG_KEY);
+      const parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) { return []; }
+  }
+  function appendActivityLog(entry) {
+    try {
+      const list = loadActivityLog();
+      list.unshift(Object.assign({ id: genId(), at: new Date().toISOString() }, entry));
+      if (list.length > ACTIVITY_LOG_MAX) list.length = ACTIVITY_LOG_MAX;
+      localStorage.setItem(ACTIVITY_LOG_KEY, JSON.stringify(list));
+    } catch (e) { /* 로그 저장 실패가 실제 데이터 저장에 영향을 주면 안 된다 */ }
+  }
+  function clearActivityLog() {
+    try { localStorage.setItem(ACTIVITY_LOG_KEY, JSON.stringify([])); } catch (e) {}
+  }
+  // acct:{id}:personal-xxx:... 형태의 저장 키에서 "어디서 바뀌었는지" 카테고리를 찾아낸다.
+  // (BACKUP_CATEGORIES를 그대로 재사용해 백업 화면의 분류와 일관성을 맞춘다.)
+  function activityCategoryForRelKey(relKey) {
+    const cat = BACKUP_CATEGORIES.find((c) => c.keyPrefixes.some((p) => relKey.indexOf(p) === 0));
+    if (cat) return { key: cat.key, label: cat.label };
+    return { key: "etc", label: "기타" };
+  }
+  // 캘린더처럼 한 카테고리 안에 저장 키가 여러 개(월별 일정 / 할 일 목록)로 나뉜 경우,
+  // 리스트에서 조금 더 구체적으로 어디가 바뀌었는지 보여주기 위한 부가 설명.
+  function activitySubLabel(relKey) {
+    if (relKey === "personal-calendar:todos") return "할 일 목록";
+    const m = /^personal-calendar:(\d{4}-\d{2})$/.exec(relKey);
+    if (m) return `${m[1]} 캘린더 일정`;
+    return "";
+  }
+  function _activityItemLabel(item) {
+    if (item === null || item === undefined) return "(없음)";
+    if (typeof item !== "object") return String(item);
+    const v = item.name || item.title || item.content || item.username || item.label || item.date;
+    if (v) return String(v).slice(0, 40);
+    return item.id ? `#${item.id}` : "항목";
+  }
+  function _activityScalar(v) {
+    if (v === undefined) return "(없음)";
+    if (v === null) return "(비어있음)";
+    if (typeof v === "object") { try { return JSON.stringify(v).slice(0, 60); } catch (e) { return "(객체)"; } }
+    const s = String(v);
+    if (s === "") return "(빈 값)";
+    return s.length > 60 ? `${s.slice(0, 60)}…` : s;
+  }
+  // 저장 전/후 값을 비교해 사람이 읽을 수 있는 변경 내역 줄들을 만든다. 배열은 id 기준으로
+  // 추가/삭제/수정을 구분하고, 객체는 키 기준으로(최대 2단계까지) 비교한다. 완벽한 diff는
+  // 아니지만 "대략 뭐가 바뀌었는지" 파악하기엔 충분한 수준을 목표로 한다.
+  function diffActivityValues(oldVal, newVal, depth) {
+    const lines = [];
+    if (oldVal === undefined && newVal !== undefined) return ["새로 만들어졌어요."];
+    if (oldVal !== undefined && newVal === undefined) return ["삭제됐어요."];
+    if (Array.isArray(oldVal) && Array.isArray(newVal)) {
+      const idBased = (oldVal.length && oldVal.every((x) => x && typeof x === "object" && x.id != null))
+        || (newVal.length && newVal.every((x) => x && typeof x === "object" && x.id != null));
+      if (idBased) {
+        const oldMap = {}; oldVal.forEach((x) => { if (x && x.id != null) oldMap[x.id] = x; });
+        const newMap = {}; newVal.forEach((x) => { if (x && x.id != null) newMap[x.id] = x; });
+        Object.keys(newMap).forEach((id) => {
+          if (!(id in oldMap)) { lines.push(`+ 추가됨: ${_activityItemLabel(newMap[id])}`); return; }
+          const fieldLines = diffActivityValues(oldMap[id], newMap[id], (depth || 0) + 1);
+          if (fieldLines.length) lines.push(`✎ 수정됨: ${_activityItemLabel(newMap[id])} — ${fieldLines.join(" / ")}`);
+        });
+        Object.keys(oldMap).forEach((id) => {
+          if (!(id in newMap)) lines.push(`- 삭제됨: ${_activityItemLabel(oldMap[id])}`);
+        });
+      } else if (JSON.stringify(oldVal) !== JSON.stringify(newVal)) {
+        lines.push(oldVal.length === newVal.length ? "목록 내용이 바뀌었어요." : `목록 항목 수: ${oldVal.length}개 → ${newVal.length}개`);
+      }
+      return lines;
+    }
+    if (oldVal && newVal && typeof oldVal === "object" && typeof newVal === "object") {
+      if ((depth || 0) >= 3) {
+        if (JSON.stringify(oldVal) !== JSON.stringify(newVal)) lines.push("내용이 바뀌었어요.");
+        return lines;
+      }
+      const keys = Array.from(new Set(Object.keys(oldVal).concat(Object.keys(newVal))));
+      keys.forEach((k) => {
+        const ov = oldVal[k];
+        const nv = newVal[k];
+        if (JSON.stringify(ov) === JSON.stringify(nv)) return;
+        if (ov && nv && typeof ov === "object" && typeof nv === "object") {
+          const sub = diffActivityValues(ov, nv, (depth || 0) + 1);
+          if (sub.length) sub.forEach((s) => lines.push(`${k}.${s}`));
+          else lines.push(`${k}: 내용이 바뀌었어요.`);
+        } else {
+          lines.push(`${k}: ${_activityScalar(ov)} → ${_activityScalar(nv)}`);
+        }
+      });
+      return lines;
+    }
+    if (oldVal !== newVal) lines.push(`${_activityScalar(oldVal)} → ${_activityScalar(newVal)}`);
+    return lines;
+  }
+  function buildActivityDiffLines(oldRaw, newRaw) {
+    if (oldRaw === newRaw) return [];
+    let oldVal, newVal;
+    try { oldVal = oldRaw != null ? JSON.parse(oldRaw) : undefined; } catch (e) { oldVal = oldRaw; }
+    try { newVal = newRaw != null ? JSON.parse(newRaw) : undefined; } catch (e) { newVal = newRaw; }
+    const lines = diffActivityValues(oldVal, newVal, 0);
+    if (lines.length > 40) return lines.slice(0, 40).concat([`...외 ${lines.length - 40}건 더`]);
+    return lines.length ? lines : ["내용이 바뀌었어요."];
+  }
+
+  /* ---- 3분 단위로 묶어서 기록하기 ----
+     한 계정에서 짧은 시간 안에 여러 번 수정하면(스케줄 셀 여러 칸 수정 등) 로그가
+     한 줄씩 계속 쌓여서 목록이 너무 많아진다. 그래서 계정별로 "첫 변경이 생긴 시점"
+     부터 3분짜리 타이머를 하나 돌리고, 그 3분 동안 생긴 변경들은 전부 한 줄(리스트
+     항목 하나)로 모아서 기록한다. 3분이 지나면 그 줄은 마감되고, 그다음 변경부터는
+     새로운 3분 타이머(=새로운 줄)로 다시 쌓인다. 진행 중인 묶음은 클라우드에도 같이
+     저장해두므로, 브라우저를 껐다 켜거나 다른 탭/다른 사람이 열어도 이어서 처리된다. */
+  const ACTIVITY_BATCH_WINDOW_MS = 3 * 60 * 1000;
+  const ACTIVITY_PENDING_KEY = "activity-log:pending";
+  const _activityFlushTimers = {}; // accountId -> setTimeout id (이 탭이 열려 있는 동안만 유효)
+  function loadPendingActivityBatches() {
+    try {
+      const raw = localStorage.getItem(ACTIVITY_PENDING_KEY);
+      const parsed = raw ? JSON.parse(raw) : {};
+      return parsed && typeof parsed === "object" ? parsed : {};
+    } catch (e) { return {}; }
+  }
+  function savePendingActivityBatches(map) {
+    try { localStorage.setItem(ACTIVITY_PENDING_KEY, JSON.stringify(map)); } catch (e) {}
+  }
+  function scheduleActivityFlush(accountId, delayMs) {
+    if (_activityFlushTimers[accountId]) return; // 이미 이 탭에서 예약돼 있음
+    _activityFlushTimers[accountId] = setTimeout(() => {
+      delete _activityFlushTimers[accountId];
+      finalizeActivityBatch(accountId);
+    }, Math.max(0, delayMs));
+  }
+  // 진행 중이던 묶음을 하나의 로그 항목으로 마감해서 실제 목록(activity-log:entries)에 올린다.
+  function finalizeActivityBatch(accountId) {
+    if (_activityFlushTimers[accountId]) { clearTimeout(_activityFlushTimers[accountId]); delete _activityFlushTimers[accountId]; }
+    const pending = loadPendingActivityBatches();
+    const batch = pending[accountId];
+    if (!batch || !batch.changes || !batch.changes.length) { delete pending[accountId]; savePendingActivityBatches(pending); return; }
+    delete pending[accountId];
+    savePendingActivityBatches(pending);
+    const whereLabels = [];
+    batch.changes.forEach((c) => {
+      const w = c.subLabel ? `${c.categoryLabel} · ${c.subLabel}` : c.categoryLabel;
+      if (whereLabels.indexOf(w) === -1) whereLabels.push(w);
+    });
+    const categoryLabel = whereLabels.length <= 2 ? whereLabels.join(", ") : `${whereLabels.slice(0, 2).join(", ")} 외 ${whereLabels.length - 2}곳`;
+    const diffLines = [];
+    batch.changes.forEach((c) => {
+      const timeLabel = c.at ? c.at.slice(11, 16) : "";
+      const where = c.subLabel ? `${c.categoryLabel} · ${c.subLabel}` : c.categoryLabel;
+      (c.diff && c.diff.length ? c.diff : ["내용이 바뀌었어요."]).forEach((line) => diffLines.push(`[${timeLabel}] ${where} — ${line}`));
+    });
+    appendActivityLog({
+      at: batch.startedAt,
+      endedAt: new Date().toISOString(),
+      accountId,
+      accountName: batch.accountName,
+      viaMasterName: batch.viaMasterName,
+      categoryKey: "batch",
+      categoryLabel,
+      subLabel: `${batch.changes.length}건`,
+      diff: diffLines,
+    });
+  }
+  // 개별 변경 하나를 계정별 진행 중인 3분 묶음에 쌓는다(묶음이 없거나 이미 3분이
+  // 지났으면 새 묶음을 새로 시작한다).
+  function queueActivityChange(change) {
+    let pending = loadPendingActivityBatches();
+    const existing = pending[change.accountId];
+    if (existing && existing.startedAt && (Date.now() - Date.parse(existing.startedAt)) >= ACTIVITY_BATCH_WINDOW_MS) {
+      finalizeActivityBatch(change.accountId); // 창이 이미 끝난 묶음이면 먼저 마감하고 새로 시작
+      pending = loadPendingActivityBatches();
+    }
+    let batch = pending[change.accountId];
+    if (!batch) {
+      batch = { startedAt: new Date().toISOString(), accountId: change.accountId, accountName: change.accountName, viaMasterName: change.viaMasterName, changes: [] };
+      pending[change.accountId] = batch;
+      scheduleActivityFlush(change.accountId, ACTIVITY_BATCH_WINDOW_MS);
+    } else {
+      batch.accountName = change.accountName;
+      batch.viaMasterName = change.viaMasterName;
+    }
+    batch.changes.push({
+      at: new Date().toISOString(),
+      categoryKey: change.categoryKey,
+      categoryLabel: change.categoryLabel,
+      subLabel: change.subLabel,
+      diff: change.diff,
+    });
+    savePendingActivityBatches(pending);
+  }
+  // 앱을 새로 열 때, 다른 탭/다른 사람이 만들어두고 아직 안 끝난 묶음들을 이어받는다.
+  // 이미 3분이 지나버린 묶음은 바로 마감하고, 아직 남았으면 남은 시간만큼만 다시 예약한다.
+  function resumePendingActivityBatches() {
+    const pending = loadPendingActivityBatches();
+    const now = Date.now();
+    Object.keys(pending).forEach((accountId) => {
+      const batch = pending[accountId];
+      if (!batch || !batch.startedAt) return;
+      const elapsed = now - Date.parse(batch.startedAt);
+      if (elapsed >= ACTIVITY_BATCH_WINDOW_MS) finalizeActivityBatch(accountId);
+      else scheduleActivityFlush(accountId, ACTIVITY_BATCH_WINDOW_MS - elapsed);
+    });
+  }
+  resumePendingActivityBatches();
+
+  // acct:{계정id}:{나머지 키} 형태의 저장에만 반응해서 활동 로그를 남긴다. 계정 목록
+  // (비밀번호/이름/삭제)처럼 이 접두어를 쓰지 않는 값은 여기서 잡히지 않고, 해당
+  // 동작을 하는 함수(renameAccount 등) 안에서 직접 appendActivityLog를 호출한다.
+  const _preActivityLogSetItem = localStorage.setItem;
+  localStorage.setItem = function (key, value) {
+    const m = typeof key === "string" ? /^acct:([^:]+):(.+)$/.exec(key) : null;
+    let oldRaw = null;
+    if (m) { try { oldRaw = localStorage.getItem(key); } catch (e) {} }
+    _preActivityLogSetItem(key, value);
+    if (!m || oldRaw === value) return; // 실제로 값이 바뀐 경우에만 기록
+    try {
+      const accountId = m[1];
+      const relKey = m[2];
+      const acc = accountId === CURRENT_ACCOUNT_ID ? { username: CURRENT_ACCOUNT_NAME } : (findAccountById(accountId) || {});
+      const cat = activityCategoryForRelKey(relKey);
+      queueActivityChange({
+        accountId,
+        accountName: acc.username || "(삭제된 계정)",
+        viaMasterName: MASTER_ORIGIN_ACCOUNT ? MASTER_ORIGIN_ACCOUNT.username : null,
+        categoryKey: cat.key,
+        categoryLabel: cat.label,
+        subLabel: activitySubLabel(relKey),
+        diff: buildActivityDiffLines(oldRaw, value),
+      });
+    } catch (e) { /* 로그 기록 실패가 실제 저장에 영향을 주면 안 된다 */ }
+  };
+
 
   // 화면 오른쪽 아래 "새로고침" 버튼을 누르면, 다른 사람/다른 기기에서 바뀐 내용을
   // 서버에서 다시 받아오기 위해 페이지를 실제로 다시 불러온다(location.reload()).
@@ -1479,9 +1685,18 @@
     formType: "memo",
     formPriority: false,
     rangeMode: false,
+    repeatMode: false, // 추가 폼에서 "반복" 설정이 켜져 있는지
+    repeatFreq: "weekly", // "weekly"(매주) | "monthly"(매월)
+    repeatWeekday: null, // 반복 폼에서 사용자가 고른 요일(0~6, 일~토). null이면 선택된 날짜의 요일을 기본값으로 보여줌
+    repeatMonthDay: null, // 반복 폼에서 사용자가 고른 날짜(1~31). null이면 선택된 날짜를 기본값으로 보여줌
     formDetailMode: false, // 추가 폼에서 "상세 내용" 입력칸을 펼쳐서 보고 있는지
     expandedEntries: {}, // 일정/메모 목록에서 상세 내용을 펼쳐서 보고 있는 항목의 id 모음
     upcomingExpanded: false, // "다가오는 일정"을 5개 넘게 펼쳐서 보고 있는지
+    editingEntryId: null, // 현재 인라인으로 수정 중인 일정/메모의 id (없으면 null)
+    editRangeMode: false, // 수정 폼에서 "기간 설정"이 켜져 있는지
+    editPriority: false, // 수정 폼의 중요 표시 상태
+    editType: "memo", // 수정 폼의 메모/일정 선택 상태
+    editDetailMode: false, // 수정 폼에서 상세 내용 입력칸을 펼쳐서 보고 있는지
   };
 
   function monthKey(y, m) { return acctKey(`personal-calendar:${y}-${pad2(m + 1)}`); }
@@ -1544,6 +1759,57 @@
     }
     return days;
   }
+  const REPEAT_MAX_OCCURRENCES = 104; // 한 번에 만들 수 있는 반복 일정의 최대 개수(무한 생성 방지용 안전장치)
+  // 월 단위로 날짜를 더하되, 대상 월에 그 날짜가 없으면(예: 31일 -> 2월) 그 달의 마지막 날로 맞춘다.
+  function addMonthsClamped(date, n) {
+    const day = date.getDate();
+    const targetFirst = new Date(date.getFullYear(), date.getMonth() + n, 1);
+    const lastDayOfTarget = new Date(targetFirst.getFullYear(), targetFirst.getMonth() + 1, 0).getDate();
+    targetFirst.setDate(Math.min(day, lastDayOfTarget));
+    return targetFirst;
+  }
+  // 특정 연/월에 day가 그 달에 없으면(예: 2월 31일) 그 달의 마지막 날로 맞춘 Date를 반환.
+  function clampedMonthDate(y, m, day) {
+    const lastDay = new Date(y, m + 1, 0).getDate();
+    return new Date(y, m, Math.min(day, lastDay));
+  }
+  // startISO부터 untilISO까지 매주/매월 반복되는 날짜(ISO)들을 계산한다. 안전장치로 최대 개수를 넘지 않는다.
+  // 매월 반복은 항상 원래 사용자가 고른 날짜(monthDay)를 기준으로 매달 다시 계산해서, 예를 들어
+  // 2월엔 28일로 클램프되더라도 3월엔 다시 31일로 돌아오게 한다(28일로 계속 밀리지 않도록).
+  function computeRepeatDates(startISO, freq, untilISO, monthDay) {
+    const dates = [];
+    const start = parseISODate(startISO);
+    const until = parseISODate(untilISO);
+    let guard = 0;
+    while (guard < REPEAT_MAX_OCCURRENCES) {
+      const cur = freq === "monthly"
+        ? clampedMonthDate(start.getFullYear(), start.getMonth() + guard, monthDay)
+        : new Date(start.getFullYear(), start.getMonth(), start.getDate() + guard * 7);
+      if (cur > until) break;
+      dates.push(toISODate(cur.getFullYear(), cur.getMonth(), cur.getDate()));
+      guard++;
+    }
+    return dates;
+  }
+  // 반복 규칙을 사람이 읽을 수 있는 짧은 라벨로 바꾼다. (예: "매주 월요일", "매월 15일")
+  function repeatRuleLabel(freq, weekday, monthDay) {
+    if (freq === "monthly") return `매월 ${monthDay}일`;
+    return `매주 ${WEEKDAYS[weekday]}요일`;
+  }
+  // fromISO(선택한 시작일) 이후 첫 번째로 규칙(요일 또는 날짜)에 맞는 날짜를 찾는다.
+  // 예: 오늘이 화요일인데 "매주 수요일"을 골랐으면 다음 수요일부터 반복이 시작된다.
+  function firstRuleMatchOnOrAfter(fromISO, freq, weekday, monthDay) {
+    const from = parseISODate(fromISO);
+    if (freq === "weekly") {
+      const diff = (weekday - from.getDay() + 7) % 7;
+      const d = new Date(from.getFullYear(), from.getMonth(), from.getDate() + diff);
+      return toISODate(d.getFullYear(), d.getMonth(), d.getDate());
+    }
+    let cand = clampedMonthDate(from.getFullYear(), from.getMonth(), monthDay);
+    // 이번 달의 대상 날짜가 이미 지났거나(클램프로 인해 from보다 앞선 날짜가 됐거나) 지난 경우 다음 달로 넘어간다.
+    if (cand < from) cand = clampedMonthDate(from.getFullYear(), from.getMonth() + 1, monthDay);
+    return toISODate(cand.getFullYear(), cand.getMonth(), cand.getDate());
+  }
   function buildGrid(year, monthIndex) {
     const firstWeekday = new Date(year, monthIndex, 1).getDay();
     const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
@@ -1592,6 +1858,39 @@
 
   const UPCOMING_COLLAPSED_COUNT = 5; // 접었을 때 기본으로 보여줄 개수
 
+  // 일정/메모 한 건을 수정 중일 때 목록 안에 인라인으로 표시하는 편집 폼.
+  function entryEditFormHtml(entry) {
+    const isRange = entry.rangeStart && entry.rangeEnd && entry.rangeStart !== entry.rangeEnd;
+    return `
+      <div class="entry entry-editing" data-id="${entry.id}">
+        <div class="entry-edit-form">
+          <div class="type-row">
+            <button type="button" class="type-btn memo ${cal.editType === "memo" ? "active" : ""}" data-edit-type="memo">메모</button>
+            <button type="button" class="type-btn event ${cal.editType === "event" ? "active" : ""}" data-edit-type="event">일정</button>
+            <button type="button" class="type-btn priority ${cal.editPriority ? "active" : ""}" id="btn-edit-priority">★ 중요</button>
+          </div>
+          ${isRange ? `
+          <div class="range-row">
+            <input type="date" class="date-input" id="edit-input-start" value="${entry.rangeStart}">
+            <span class="arrow">→</span>
+            <input type="date" class="date-input" id="edit-input-end" value="${entry.rangeEnd}">
+          </div>` : ""}
+          <div class="add-row">
+            ${isRange ? "" : `<input class="add-input time-input" id="edit-input-time" placeholder="시간" value="${esc(entry.time || "")}">`}
+            <input class="add-input text-input" id="edit-input-text" placeholder="제목을 입력하세요" autocomplete="off" value="${esc(entry.text)}">
+          </div>
+          <button type="button" class="detail-toggle-link ${cal.editDetailMode ? "active" : ""}" id="btn-edit-detail-toggle">
+            ${ICON_NOTE} ${cal.editDetailMode ? "상세 내용 접기" : "상세 내용 추가"}
+          </button>
+          ${cal.editDetailMode ? `<textarea class="add-textarea" id="edit-input-detail" placeholder="상세 내용을 입력하세요 (선택)" rows="3">${esc(entry.detail || "")}</textarea>` : ""}
+          <div class="entry-edit-actions">
+            <button type="button" class="ghost-btn" data-action="cancel-edit">취소</button>
+            <button type="button" class="submit-btn confirm-btn" data-action="save-edit" data-id="${entry.id}">저장</button>
+          </div>
+        </div>
+      </div>`;
+  }
+
   function renderCalendarPage(root) {
     const grid = buildGrid(cal.year, cal.monthIndex);
     const selectedKey = pad2(cal.selectedDay);
@@ -1600,6 +1899,10 @@
     const upcomingAll = computeUpcoming();
     const upcoming = cal.upcomingExpanded ? upcomingAll : upcomingAll.slice(0, UPCOMING_COLLAPSED_COUNT);
     const selectedISO = toISODate(cal.year, cal.monthIndex, cal.selectedDay);
+    const repeatDefaultUntil = addMonthsClamped(new Date(cal.year, cal.monthIndex, cal.selectedDay), 3);
+    const repeatDefaultUntilISO = toISODate(repeatDefaultUntil.getFullYear(), repeatDefaultUntil.getMonth(), repeatDefaultUntil.getDate());
+    const repeatWeekdayValue = cal.repeatWeekday !== null ? cal.repeatWeekday : new Date(cal.year, cal.monthIndex, cal.selectedDay).getDay();
+    const repeatMonthDayValue = cal.repeatMonthDay !== null ? cal.repeatMonthDay : cal.selectedDay;
 
     let gridHtml = "";
     grid.forEach((c, i) => {
@@ -1652,14 +1955,18 @@
     } else {
       entriesHtml = `<div class="entries">` + visibleEntries.map((entry) => {
         const isRange = entry.rangeStart && entry.rangeEnd && entry.rangeStart !== entry.rangeEnd;
+        const isRepeat = !!entry.repeatId;
         const hasDetail = !!(entry.detail && entry.detail.trim());
         const expanded = hasDetail && !!cal.expandedEntries[entry.id];
+        if (cal.editingEntryId === entry.id) return entryEditFormHtml(entry);
         return `
         <div class="entry ${entry.type} ${entry.done ? "done" : ""} ${expanded ? "expanded" : ""}" data-id="${entry.id}">
           <button class="check-btn" data-action="toggle" data-id="${entry.id}">${entry.done ? "✓" : ""}</button>
           <div class="body">
             <span class="meta-row">
               ${isRange ? `<span class="range-badge">${formatRangeLabel(entry.rangeStart, entry.rangeEnd)}</span>` : ""}
+              ${isRepeat ? `<span class="repeat-badge">${ICON_REFRESH} ${esc(entry.repeatLabel || "반복")}</span>
+                <button type="button" class="repeat-clear-btn" data-action="delete-series" data-id="${entry.id}">전체 삭제</button>` : ""}
               ${(!isRange && entry.time) ? `<span class="time">${esc(entry.time)}</span>` : ""}
               ${entry.priority && !entry.done ? `<span class="priority-tag">★ 중요</span>` : ""}
             </span>
@@ -1673,6 +1980,7 @@
               <span class="text">${esc(entry.text)}</span>
             `}
           </div>
+          <button class="icon-edit-btn" data-action="edit" data-id="${entry.id}" aria-label="수정">${ICON_EDIT}</button>
           <button class="del" data-action="delete" data-id="${entry.id}">✕</button>
         </div>`;
       }).join("") + `</div>`;
@@ -1738,12 +2046,31 @@
                 <button type="button" class="type-btn event ${cal.formType === "event" ? "active" : ""}" data-form-type="event">일정</button>
                 <button type="button" class="type-btn priority ${cal.formPriority ? "active" : ""}" id="btn-priority">★ 중요</button>
                 <button type="button" class="type-btn rangetoggle ${cal.rangeMode ? "active" : ""}" id="btn-range">기간 설정</button>
+                <button type="button" class="type-btn repeattoggle ${cal.repeatMode ? "active" : ""}" id="btn-repeat">${ICON_REFRESH} 반복</button>
               </div>
               ${cal.rangeMode ? `
               <div class="range-row">
                 <input type="date" class="date-input" id="input-start" value="${selectedISO}">
                 <span class="arrow">→</span>
                 <input type="date" class="date-input" id="input-end" value="${selectedISO}">
+              </div>` : ""}
+              ${cal.repeatMode ? `
+              <div class="repeat-row">
+                <select class="repeat-select" id="input-repeat-freq">
+                  <option value="weekly" ${cal.repeatFreq === "weekly" ? "selected" : ""}>매주</option>
+                  <option value="monthly" ${cal.repeatFreq === "monthly" ? "selected" : ""}>매월</option>
+                </select>
+                ${cal.repeatFreq === "monthly" ? `
+                <select class="repeat-select" id="input-repeat-monthday">
+                  ${Array.from({ length: 31 }, (_, i) => i + 1).map((d) => `<option value="${d}" ${d === repeatMonthDayValue ? "selected" : ""}>${d}일</option>`).join("")}
+                </select>` : `
+                <select class="repeat-select" id="input-repeat-weekday">
+                  ${WEEKDAYS.map((w, i) => `<option value="${i}" ${i === repeatWeekdayValue ? "selected" : ""}>${w}요일</option>`).join("")}
+                </select>`}
+              </div>
+              <div class="repeat-row">
+                <span class="repeat-until-label">종료일</span>
+                <input type="date" class="date-input" id="input-repeat-until" value="${repeatDefaultUntilISO}" min="${selectedISO}">
               </div>` : ""}
               <div class="add-row">
                 ${cal.rangeMode ? "" : `<input class="add-input time-input" id="input-time" placeholder="시간">`}
@@ -1803,6 +2130,55 @@
     document.querySelectorAll("[data-action='delete']").forEach((btn) => {
       btn.onclick = () => deleteEntry(btn.getAttribute("data-id"));
     });
+    document.querySelectorAll("[data-action='delete-series']").forEach((btn) => {
+      btn.onclick = () => deleteRepeatSeries(btn.getAttribute("data-id"));
+    });
+    document.querySelectorAll("[data-action='edit']").forEach((btn) => {
+      btn.onclick = () => startEditEntry(btn.getAttribute("data-id"));
+    });
+    document.querySelectorAll("[data-action='cancel-edit']").forEach((btn) => {
+      btn.onclick = () => { cal.editingEntryId = null; renderApp(); };
+    });
+    document.querySelectorAll("[data-action='save-edit']").forEach((btn) => {
+      btn.onclick = () => saveEditEntry(btn.getAttribute("data-id"));
+    });
+    document.querySelectorAll("[data-edit-type]").forEach((btn) => {
+      btn.onclick = () => {
+        cal.editType = btn.getAttribute("data-edit-type");
+        document.querySelectorAll("[data-edit-type]").forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+      };
+    });
+    const editPriorityBtn = document.getElementById("btn-edit-priority");
+    if (editPriorityBtn) {
+      editPriorityBtn.onclick = (e) => {
+        cal.editPriority = !cal.editPriority;
+        e.currentTarget.classList.toggle("active", cal.editPriority);
+      };
+    }
+    const editDetailToggleBtn = document.getElementById("btn-edit-detail-toggle");
+    if (editDetailToggleBtn) {
+      editDetailToggleBtn.onclick = () => {
+        cal.editDetailMode = !cal.editDetailMode;
+        editDetailToggleBtn.classList.toggle("active", cal.editDetailMode);
+        editDetailToggleBtn.innerHTML = `${ICON_NOTE} ${cal.editDetailMode ? "상세 내용 접기" : "상세 내용 추가"}`;
+        let ta = document.getElementById("edit-input-detail");
+        if (cal.editDetailMode) {
+          if (!ta) {
+            ta = document.createElement("textarea");
+            ta.className = "add-textarea";
+            ta.id = "edit-input-detail";
+            ta.placeholder = "상세 내용을 입력하세요 (선택)";
+            ta.rows = 3;
+            ta.value = editingDetailDraft();
+            editDetailToggleBtn.insertAdjacentElement("afterend", ta);
+          }
+          ta.focus();
+        } else if (ta) {
+          ta.remove();
+        }
+      };
+    }
     document.querySelectorAll("[data-action='expand']").forEach((btn) => {
       btn.onclick = () => {
         const id = btn.getAttribute("data-id");
@@ -1825,7 +2201,28 @@
       cal.formPriority = !cal.formPriority;
       e.currentTarget.classList.toggle("active", cal.formPriority);
     };
-    document.getElementById("btn-range").onclick = () => { cal.rangeMode = !cal.rangeMode; renderApp(); };
+    document.getElementById("btn-range").onclick = () => {
+      cal.rangeMode = !cal.rangeMode;
+      if (cal.rangeMode) cal.repeatMode = false;
+      renderApp();
+    };
+    document.getElementById("btn-repeat").onclick = () => {
+      cal.repeatMode = !cal.repeatMode;
+      if (cal.repeatMode) cal.rangeMode = false;
+      renderApp();
+    };
+    const repeatFreqSelect = document.getElementById("input-repeat-freq");
+    if (repeatFreqSelect) {
+      repeatFreqSelect.onchange = (e) => { cal.repeatFreq = e.target.value; renderApp(); };
+    }
+    const repeatWeekdaySelect = document.getElementById("input-repeat-weekday");
+    if (repeatWeekdaySelect) {
+      repeatWeekdaySelect.onchange = (e) => { cal.repeatWeekday = parseInt(e.target.value, 10); };
+    }
+    const repeatMonthDaySelect = document.getElementById("input-repeat-monthday");
+    if (repeatMonthDaySelect) {
+      repeatMonthDaySelect.onchange = (e) => { cal.repeatMonthDay = parseInt(e.target.value, 10); };
+    }
     document.getElementById("btn-detail-toggle").onclick = () => {
       cal.formDetailMode = !cal.formDetailMode;
       const btn = document.getElementById("btn-detail-toggle");
@@ -1881,6 +2278,43 @@
           }
         });
         saveCurrentMonth();
+      } else if (cal.repeatMode) {
+        const untilVal = document.getElementById("input-repeat-until").value;
+        const selectedISO = toISODate(cal.year, cal.monthIndex, cal.selectedDay);
+        if (!untilVal) return;
+        const timeInput = document.getElementById("input-time");
+        const freq = cal.repeatFreq;
+        const weekdaySelect = document.getElementById("input-repeat-weekday");
+        const monthDaySelect = document.getElementById("input-repeat-monthday");
+        const weekday = weekdaySelect ? parseInt(weekdaySelect.value, 10) : new Date(cal.year, cal.monthIndex, cal.selectedDay).getDay();
+        const monthDay = monthDaySelect ? parseInt(monthDaySelect.value, 10) : cal.selectedDay;
+        const actualStartISO = firstRuleMatchOnOrAfter(selectedISO, freq, weekday, monthDay);
+        if (actualStartISO > untilVal) return; // 종료일 안에 조건에 맞는 날짜가 하나도 없음
+        const repeatDates = computeRepeatDates(actualStartISO, freq, untilVal, monthDay);
+        const repeatId = `rep-${id}`;
+        const repeatLabel = repeatRuleLabel(freq, weekday, monthDay);
+        repeatDates.forEach((iso, idx) => {
+          const dt = parseISODate(iso);
+          const y = dt.getFullYear(), m = dt.getMonth(), d = dt.getDate();
+          const dayKey = pad2(d);
+          const entry = Object.assign({}, baseEntry, {
+            id: `${id}-${idx}`, time: timeInput.value.trim(), rangeStart: iso, rangeEnd: iso,
+            repeatId, repeatLabel, repeatDates,
+          });
+          if (y === cal.year && m === cal.monthIndex) {
+            const list = cal.monthData[dayKey] ? [...cal.monthData[dayKey]] : [];
+            list.push(entry);
+            cal.monthData[dayKey] = sortEntries(list);
+          } else {
+            const otherData = readMonthRaw(y, m);
+            const list = otherData[dayKey] ? [...otherData[dayKey]] : [];
+            list.push(entry);
+            otherData[dayKey] = sortEntries(list);
+            writeMonthRaw(y, m, otherData);
+          }
+        });
+        saveCurrentMonth();
+        if (repeatDates.length >= REPEAT_MAX_OCCURRENCES) flashCalStatus(`최대 ${REPEAT_MAX_OCCURRENCES}개까지 등록됐어요`);
       } else {
         const timeInput = document.getElementById("input-time");
         const key = pad2(cal.selectedDay);
@@ -1894,6 +2328,8 @@
 
       cal.formPriority = false;
       cal.formDetailMode = false;
+      cal.repeatWeekday = null;
+      cal.repeatMonthDay = null;
       renderApp();
       const nt = document.getElementById("input-text");
       if (nt) nt.focus();
@@ -1913,6 +2349,10 @@
   function findEntry(id) {
     const key = pad2(cal.selectedDay);
     return (cal.monthData[key] || []).find((it) => it.id === id);
+  }
+  function editingDetailDraft() {
+    const entry = findEntry(cal.editingEntryId);
+    return entry ? (entry.detail || "") : "";
   }
   function forEachRangeDay(entry, fn) {
     if (entry.rangeStart && entry.rangeEnd && entry.rangeStart !== entry.rangeEnd) {
@@ -1964,11 +2404,130 @@
     renderApp();
   }
 
+  // 반복 일정의 한 항목(id)을 눌렀을 때, 같은 repeatId를 가진 모든 날짜의 항목을 한 번에 삭제한다.
+  function deleteRepeatSeries(id) {
+    const entry = findEntry(id);
+    if (!entry || !entry.repeatId || !Array.isArray(entry.repeatDates)) return;
+    const repeatId = entry.repeatId;
+    const dates = entry.repeatDates;
+    if (!window.confirm(`"${entry.text}" 반복 일정 전체(${dates.length}개)를 삭제할까요?`)) return;
+
+    const touchedMonthKeys = new Set([monthKey(cal.year, cal.monthIndex)]);
+    dates.forEach((iso) => {
+      const dt = parseISODate(iso);
+      touchedMonthKeys.add(monthKey(dt.getFullYear(), dt.getMonth()));
+    });
+    const undoYear = cal.year, undoMonthIndex = cal.monthIndex;
+    recordUndo("반복 일정 삭제", Array.from(touchedMonthKeys), () => {
+      if (cal.year === undoYear && cal.monthIndex === undoMonthIndex) loadMonth(cal.year, cal.monthIndex);
+    });
+
+    dates.forEach((iso) => {
+      const dt = parseISODate(iso);
+      const y = dt.getFullYear(), m = dt.getMonth();
+      const dayKey = pad2(dt.getDate());
+      if (y === cal.year && m === cal.monthIndex) {
+        const list = (cal.monthData[dayKey] || []).filter((it) => it.repeatId !== repeatId);
+        if (list.length) cal.monthData[dayKey] = list; else delete cal.monthData[dayKey];
+      } else {
+        const data = readMonthRaw(y, m);
+        const list = (data[dayKey] || []).filter((it) => it.repeatId !== repeatId);
+        if (list.length) data[dayKey] = list; else delete data[dayKey];
+        writeMonthRaw(y, m, data);
+      }
+    });
+    saveCurrentMonth();
+    renderApp();
+  }
+
+  function startEditEntry(id) {
+    const entry = findEntry(id);
+    if (!entry) return;
+    cal.editingEntryId = id;
+    cal.editType = entry.type;
+    cal.editPriority = !!entry.priority;
+    cal.editDetailMode = !!(entry.detail && entry.detail.trim());
+    renderApp();
+  }
+
+  function saveEditEntry(id) {
+    const entry = findEntry(id);
+    if (!entry) return;
+    const textInput = document.getElementById("edit-input-text");
+    const trimmed = textInput.value.trim();
+    if (!trimmed) return;
+    const detailInput = document.getElementById("edit-input-detail");
+    const detailVal = detailInput ? detailInput.value.trim() : "";
+    const isRange = entry.rangeStart && entry.rangeEnd && entry.rangeStart !== entry.rangeEnd;
+
+    const touchedMonthKeys = new Set([monthKey(cal.year, cal.monthIndex)]);
+    forEachRangeDay(entry, (y, m) => { touchedMonthKeys.add(monthKey(y, m)); });
+
+    if (isRange) {
+      const startVal = document.getElementById("edit-input-start").value;
+      const endVal = document.getElementById("edit-input-end").value;
+      if (!startVal || !endVal) return;
+      const newDays = dateRangeDays(startVal, endVal);
+      newDays.forEach(({ y, m }) => touchedMonthKeys.add(monthKey(y, m)));
+      const undoYear = cal.year, undoMonthIndex = cal.monthIndex;
+      recordUndo("일정 수정", Array.from(touchedMonthKeys), () => {
+        if (cal.year === undoYear && cal.monthIndex === undoMonthIndex) loadMonth(cal.year, cal.monthIndex);
+      });
+      // 기존에 걸쳐 있던 날짜들에서 이 항목을 먼저 지운다.
+      forEachRangeDay(entry, (y, m, dayKey) => {
+        if (y === cal.year && m === cal.monthIndex) {
+          const list = (cal.monthData[dayKey] || []).filter((it) => it.id !== id);
+          if (list.length) cal.monthData[dayKey] = list; else delete cal.monthData[dayKey];
+        } else {
+          const data = readMonthRaw(y, m);
+          const list = (data[dayKey] || []).filter((it) => it.id !== id);
+          if (list.length) data[dayKey] = list; else delete data[dayKey];
+          writeMonthRaw(y, m, data);
+        }
+      });
+      // 새 기간에 다시 채워 넣는다.
+      const rangeStart = newDays[0].iso;
+      const rangeEnd = newDays[newDays.length - 1].iso;
+      const newEntry = { id, text: trimmed, type: cal.editType, priority: cal.editPriority, done: entry.done, detail: detailVal, time: "", rangeStart, rangeEnd };
+      newDays.forEach(({ y, m, d }) => {
+        const dayKey = pad2(d);
+        if (y === cal.year && m === cal.monthIndex) {
+          const list = cal.monthData[dayKey] ? [...cal.monthData[dayKey]] : [];
+          list.push(newEntry);
+          cal.monthData[dayKey] = sortEntries(list);
+        } else {
+          const otherData = readMonthRaw(y, m);
+          const list = otherData[dayKey] ? [...otherData[dayKey]] : [];
+          list.push(newEntry);
+          otherData[dayKey] = sortEntries(list);
+          writeMonthRaw(y, m, otherData);
+        }
+      });
+    } else {
+      const timeInput = document.getElementById("edit-input-time");
+      const undoYear = cal.year, undoMonthIndex = cal.monthIndex;
+      recordUndo("일정 수정", Array.from(touchedMonthKeys), () => {
+        if (cal.year === undoYear && cal.monthIndex === undoMonthIndex) loadMonth(cal.year, cal.monthIndex);
+      });
+      const key = pad2(cal.selectedDay);
+      const list = (cal.monthData[key] || []).map((it) => (it.id === id ? Object.assign({}, it, {
+        text: trimmed, type: cal.editType, priority: cal.editPriority, detail: detailVal,
+        time: timeInput ? timeInput.value.trim() : "",
+      }) : it));
+      cal.monthData[key] = sortEntries(list);
+    }
+
+    cal.editingEntryId = null;
+    cal.editDetailMode = false;
+    saveCurrentMonth();
+    renderApp();
+  }
+
   loadMonth(cal.year, cal.monthIndex);
 
   /* ===================== 할 일(To-do) 모듈 ===================== */
   const TODO_KEY = acctKey("personal-calendar:todos");
-  const todoUi = { dueInput: "", doneExpanded: false, formDetailMode: false, expanded: {} }; // doneExpanded: 완료된 할 일을 펼쳐서 보고 있는지, expanded: 상세 내용을 펼쳐서 보고 있는 할 일 id 모음
+  const todoUi = { dueInput: "", doneExpanded: false, formDetailMode: false, expanded: {}, editingId: null, editDetailMode: false }; // doneExpanded: 완료된 할 일을 펼쳐서 보고 있는지, expanded: 상세 내용을 펼쳐서 보고 있는 할 일 id 모음, editingId: 인라인으로 수정 중인 할 일 id
 
   function loadTodos() {
     try {
@@ -2010,6 +2569,12 @@
     todos = todos.filter((t) => t.id !== id);
     saveTodos();
   }
+  function updateTodo(id, patch) {
+    if (!todos.some((t) => t.id === id)) return;
+    recordUndo("할 일 수정", TODO_KEY, () => { todos = loadTodos(); });
+    todos = todos.map((t) => (t.id === id ? Object.assign({}, t, patch) : t));
+    saveTodos();
+  }
   function sortTodos(list) {
     return [...list].sort((a, b) => {
       if (!!a.done !== !!b.done) return a.done ? 1 : -1;
@@ -2030,7 +2595,30 @@
     const doneTodos = sortTodos(todos.filter((t) => t.done));
     const remaining = activeTodos.length;
 
+    function todoEditFormHtml(t) {
+      return `
+        <div class="todo-item todo-editing" data-id="${t.id}">
+          <div class="todo-edit-form">
+            <div class="add-row">
+              <input class="add-input text-input" id="todo-edit-input-text" placeholder="할 일 제목을 입력하세요" autocomplete="off" value="${esc(t.text)}">
+            </div>
+            <div class="todo-add-row">
+              <input class="add-input todo-due-input" type="date" id="todo-edit-input-due" value="${esc(t.due || "")}">
+            </div>
+            <button type="button" class="detail-toggle-link ${todoUi.editDetailMode ? "active" : ""}" id="btn-todo-edit-detail-toggle">
+              ${ICON_NOTE} ${todoUi.editDetailMode ? "상세 내용 접기" : "상세 내용 추가"}
+            </button>
+            ${todoUi.editDetailMode ? `<textarea class="add-textarea" id="todo-edit-input-detail" placeholder="상세 내용을 입력하세요 (선택)" rows="3">${esc(t.detail || "")}</textarea>` : ""}
+            <div class="entry-edit-actions">
+              <button type="button" class="ghost-btn" data-action="todo-cancel-edit">취소</button>
+              <button type="button" class="submit-btn confirm-btn" data-action="todo-save-edit" data-id="${t.id}">저장</button>
+            </div>
+          </div>
+        </div>`;
+    }
+
     function todoItemHtml(t) {
+      if (todoUi.editingId === t.id) return todoEditFormHtml(t);
       const isDueToday = !!t.due && t.due === tISO && !t.done;
       const isOverdue = !!t.due && t.due < tISO && !t.done;
       const dueCls = isDueToday ? "today" : (isOverdue ? "over" : "");
@@ -2052,6 +2640,7 @@
             ${t.due ? `<span class="todo-due ${dueCls}">${dueLabel}</span>` : ""}
           </div>
           <button class="check-btn" data-action="todo-toggle" data-id="${t.id}">${t.done ? "✓" : ""}</button>
+          <button class="icon-edit-btn" data-action="todo-edit" data-id="${t.id}" aria-label="수정">${ICON_EDIT}</button>
           <button class="del" data-action="todo-delete" data-id="${t.id}">✕</button>
         </div>`;
     }
@@ -2116,6 +2705,56 @@
         renderApp();
       };
     });
+    document.querySelectorAll("[data-action='todo-edit']").forEach((btn) => {
+      btn.onclick = () => {
+        const id = btn.getAttribute("data-id");
+        const t = todos.find((it) => it.id === id);
+        todoUi.editingId = id;
+        todoUi.editDetailMode = !!(t && t.detail && t.detail.trim());
+        renderApp();
+      };
+    });
+    document.querySelectorAll("[data-action='todo-cancel-edit']").forEach((btn) => {
+      btn.onclick = () => { todoUi.editingId = null; renderApp(); };
+    });
+    document.querySelectorAll("[data-action='todo-save-edit']").forEach((btn) => {
+      btn.onclick = () => {
+        const id = btn.getAttribute("data-id");
+        const textInput = document.getElementById("todo-edit-input-text");
+        const trimmed = textInput.value.trim();
+        if (!trimmed) return;
+        const dueInput = document.getElementById("todo-edit-input-due");
+        const detailInput = document.getElementById("todo-edit-input-detail");
+        updateTodo(id, { text: trimmed, due: dueInput ? dueInput.value : "", detail: detailInput ? detailInput.value.trim() : "" });
+        todoUi.editingId = null;
+        todoUi.editDetailMode = false;
+        renderApp();
+      };
+    });
+    const editDetailToggleBtn = document.getElementById("btn-todo-edit-detail-toggle");
+    if (editDetailToggleBtn) {
+      editDetailToggleBtn.onclick = () => {
+        todoUi.editDetailMode = !todoUi.editDetailMode;
+        editDetailToggleBtn.classList.toggle("active", todoUi.editDetailMode);
+        editDetailToggleBtn.innerHTML = `${ICON_NOTE} ${todoUi.editDetailMode ? "상세 내용 접기" : "상세 내용 추가"}`;
+        let ta = document.getElementById("todo-edit-input-detail");
+        if (todoUi.editDetailMode) {
+          if (!ta) {
+            const editingTodo = todos.find((it) => it.id === todoUi.editingId);
+            ta = document.createElement("textarea");
+            ta.className = "add-textarea";
+            ta.id = "todo-edit-input-detail";
+            ta.placeholder = "상세 내용을 입력하세요 (선택)";
+            ta.rows = 3;
+            ta.value = editingTodo ? (editingTodo.detail || "") : "";
+            editDetailToggleBtn.insertAdjacentElement("afterend", ta);
+          }
+          ta.focus();
+        } else if (ta) {
+          ta.remove();
+        }
+      };
+    }
     const doneToggleBtn = document.getElementById("btn-todo-done-toggle");
     if (doneToggleBtn) {
       doneToggleBtn.onclick = () => {
@@ -5762,7 +6401,7 @@
     const lockedTag = scheduleIsMonthLocked(scheduleUi.year, scheduleUi.monthIndex) ? " · 확정됨" : "";
     const titleSuffix = captureMode === "ALL" ? "" : ` · ${modeName}`;
     wrapper.innerHTML = `
-      <div style="font-size:22px;margin-bottom:4px;color:${cText};">월별 상담사 스케줄${titleSuffix}</div>
+      <div style="font-size:22px;margin-bottom:4px;color:${cText};">월별 스케줄${titleSuffix}</div>
       <div style="font-size:15px;color:${cTextDim};margin-bottom:16px;">${esc(scheduleMonthLabel())}${lockedTag} · 캡처일 ${esc(todayISO())}</div>
       <div class="schedule-legend" style="margin-bottom:14px;">
         <span class="item"><span class="swatch" style="background:${cBlue};"></span>오프</span>
@@ -6317,7 +6956,7 @@
   function renderSchedulePage(root) {
     root.innerHTML = `
       <div class="schedule-top">
-        <div class="schedule-title">월별 상담사 스케줄</div>
+        <div class="schedule-title">월별 스케줄</div>
         <div class="schedule-month-nav">
           <button class="schedule-month-btn" id="sch-prev-month">‹</button>
           <div class="schedule-month-label">${scheduleMonthLabel()}${scheduleIsMonthLocked(scheduleUi.year, scheduleUi.monthIndex) ? ` <span class="sch-locked-badge">${ICON_LOCK} 확정됨</span>` : ""}</div>
@@ -6759,9 +7398,11 @@
         flags.push(`<span class="flag off">${esc(meta ? meta.label : "휴무")}</span>`);
       }
       const typeBadges = (s.types || []).map((t) => `<span class="badge sm ${t === "유선" ? "voice" : "chat"}">${esc(t)}</span>`).join("");
+      const ldapText = s.nickname && s.nickname !== s.name ? s.nickname : "";
       return `
         <div class="home-staff-row ${s.record.status !== "WORK" ? "is-off" : ""}">
           <span class="name">${esc(s.name)}</span>
+          ${ldapText ? `<span class="ldap">${esc(ldapText)}</span>` : ""}
           ${typeBadges}
           <span class="spacer"></span>
           ${flags.join("")}
@@ -6801,6 +7442,7 @@
       : `<div class="home-todo-list">${todoRelevant.slice(0, 6).map((t) => {
           const isOver = t.due && t.due < iso;
           return `<div class="home-todo-row">
+            <button type="button" class="check-btn" data-home-todo-toggle="${t.id}" aria-label="완료 표시"></button>
             <span>${esc(t.text)}</span>
             ${t.due ? `<span class="due ${isOver ? "over" : ""}">${formatTodoDue(t.due)}${isOver ? " · 지남" : " · 오늘"}</span>` : ""}
           </div>`;
@@ -6906,6 +7548,12 @@
         renderHomePage(root);
       };
     }
+    root.querySelectorAll("[data-home-todo-toggle]").forEach((btn) => {
+      btn.onclick = () => {
+        toggleTodoDone(btn.getAttribute("data-home-todo-toggle"));
+        renderHomePage(root);
+      };
+    });
   }
 
   /* ===================== 오늘의 브리핑 히어로 팝업 =====================
@@ -7096,11 +7744,6 @@
       <div class="nav-account">
         <span class="nav-account-name">${ICON_USER} <span class="nav-text">${esc(CURRENT_ACCOUNT_NAME)}${CURRENT_ACCOUNT_IS_MASTER ? ' <span class="badge sm master">마스터</span>' : ""}</span></span>
         <div class="nav-logout-wrap">
-          ${!CURRENT_ACCOUNT_IS_MASTER ? `
-          <div class="nav-session-row nav-text">
-            <span class="global-session-badge" id="global-session-badge" title="자동 로그아웃까지 남은 시간"></span>
-            <button class="nav-session-extend-btn" id="nav-session-extend-btn" type="button" title="로그인 시간을 5시간으로 연장">연장</button>
-          </div>` : ""}
           <button class="nav-logout-btn" id="nav-logout-btn" title="로그아웃">${ICON_LOGOUT}<span class="nav-text"> 로그아웃</span></button>
         </div>
       </div>
@@ -7127,11 +7770,9 @@
       `}
       <div class="nav-spacer"></div>
     `;
-    renderThemeToggle();
-    renderManualToggle();
+    renderSettingsToggle();
     renderUndoToggle();
     renderRefreshToggle();
-    renderBackupToggle();
     nav.querySelectorAll("[data-nav]").forEach((btn) => {
       btn.onclick = () => { setPage(btn.getAttribute("data-nav")); closeDock(); };
     });
@@ -7141,29 +7782,41 @@
         if (window.confirm("로그아웃할까요?")) logout();
       };
     }
-    const extendBtn = document.getElementById("nav-session-extend-btn");
-    if (extendBtn) {
-      extendBtn.onclick = () => {
-        setLoginAt(Date.now());
-        sessionWarningDismissed = false;
-        hideSessionWarningToast();
-        updateSessionRemainingDisplay();
-      };
-    }
     const masterReturnBtn = document.getElementById("nav-master-return-btn");
     if (masterReturnBtn) {
       masterReturnBtn.onclick = () => masterReturnToOrigin();
     }
-    if (!CURRENT_ACCOUNT_IS_MASTER) updateSessionRemainingDisplay();
   }
 
   /* ===================== 마스터 계정: 계정 관리 페이지 ===================== */
 
   function renderMasterPage(root) {
     if (!CURRENT_ACCOUNT_IS_MASTER) { setPage("home"); return; }
-    const uiState = { resettingId: null, renamingId: null, error: "", renameError: "" };
+    const uiState = {
+      tab: "accounts", resettingId: null, renamingId: null, error: "", renameError: "",
+      logAccountFilter: "all", expandedLogIds: new Set(),
+    };
 
     function draw() {
+      root.innerHTML = `
+        <div class="agent-list-header">
+          <div class="agent-list-title">마스터 계정 관리</div>
+        </div>
+        <div class="login-tabs" style="max-width:280px; margin-bottom:16px;">
+          <button type="button" class="login-tab ${uiState.tab === "accounts" ? "active" : ""}" data-master-tab="accounts">계정 관리</button>
+          <button type="button" class="login-tab ${uiState.tab === "activity" ? "active" : ""}" data-master-tab="activity">활동 로그</button>
+        </div>
+        <div id="master-tab-body"></div>
+      `;
+      root.querySelectorAll("[data-master-tab]").forEach((btn) => {
+        btn.onclick = () => { uiState.tab = btn.getAttribute("data-master-tab"); draw(); };
+      });
+      const body = document.getElementById("master-tab-body");
+      if (uiState.tab === "activity") drawActivityLog(body);
+      else drawAccounts(body);
+    }
+
+    function drawAccounts(root) {
       const accounts = loadAccounts().slice().sort((a, b) => (a.createdAt || "").localeCompare(b.createdAt || ""));
       const rows = accounts.map((a) => {
         const isSelf = a.id === CURRENT_ACCOUNT_ID;
@@ -7207,9 +7860,6 @@
         `;
       }).join("");
       root.innerHTML = `
-        <div class="agent-list-header">
-          <div class="agent-list-title">계정 관리</div>
-        </div>
         <div class="agent-summary">마스터 계정으로 다른 계정을 선택해서 들어가보거나, 비밀번호를 초기화하거나, 필요 없는 계정을 삭제할 수 있어요. 총 ${accounts.length}개 계정.</div>
         <div class="status" id="master-status"></div>
         <div class="agent-list">${rows || `<div class="agent-list-empty">등록된 계정이 없어요.</div>`}</div>
@@ -7278,6 +7928,87 @@
           uiState.error = "";
           draw();
           flash(`"${target ? target.username : ""}" 계정의 비밀번호를 초기화했어요.`);
+        };
+      });
+    }
+
+    // ----- 활동 로그 탭: 계정별 데이터 변경 이력을 간단한 목록으로 보여준다 -----
+    function drawActivityLog(root) {
+      const entries = loadActivityLog();
+      const accounts = loadAccounts();
+      const accountNameOf = (id) => { const a = accounts.find((x) => x.id === id); return a ? a.username : null; };
+
+      const accountOptionsMap = {};
+      entries.forEach((e) => {
+        if (!accountOptionsMap[e.accountId]) accountOptionsMap[e.accountId] = accountNameOf(e.accountId) || e.accountName || e.accountId;
+      });
+      const accountOptions = Object.keys(accountOptionsMap)
+        .map((id) => ({ id, name: accountOptionsMap[id] }))
+        .sort((a, b) => a.name.localeCompare(b.name, "ko"));
+
+      const filtered = uiState.logAccountFilter === "all"
+        ? entries
+        : entries.filter((e) => e.accountId === uiState.logAccountFilter);
+
+      const shown = filtered.slice(0, 200);
+      const rows = shown.map((e) => {
+        const isExpanded = uiState.expandedLogIds.has(e.id);
+        const startLabel = e.at ? esc(e.at.replace("T", " ").slice(0, 16)) : "-";
+        const endLabel = e.endedAt ? esc(e.endedAt.replace("T", " ").slice(11, 16)) : "";
+        const dt = endLabel && endLabel !== startLabel.slice(-5) ? `${startLabel} ~ ${endLabel}` : startLabel;
+        const whereLabel = esc(e.subLabel ? `${e.categoryLabel} · ${e.subLabel}` : (e.categoryLabel || "기타"));
+        return `
+          <div class="interview-row ${isExpanded ? "expanded" : ""}">
+            <div class="interview-row-top" data-action="toggle-log-row" data-id="${e.id}">
+              <span class="interview-row-chevron">${ICON_CHEVRON_RIGHT}</span>
+              <span class="interview-date">${dt}</span>
+              <span class="agent-row-name">${esc(e.accountName || "(삭제된 계정)")}</span>
+              ${e.viaMasterName ? `<span class="badge sm master">마스터: ${esc(e.viaMasterName)}</span>` : ""}
+              <span class="badge sm working">${whereLabel}</span>
+            </div>
+            ${isExpanded ? `
+              <div class="interview-row-body">
+                ${(e.diff && e.diff.length) ? e.diff.map((d) => `<div class="interview-content">${esc(d)}</div>`).join("") : `<div class="interview-content">세부 내용이 없어요.</div>`}
+              </div>
+            ` : ""}
+          </div>
+        `;
+      }).join("");
+
+      root.innerHTML = `
+        <div class="agent-summary">
+          각 계정에서 데이터가 바뀔 때마다 자동으로 기록돼요. 목록을 누르면 자세한 변경 내용을 볼 수 있어요.
+          총 ${filtered.length}건${filtered.length > shown.length ? ` (최근 ${shown.length}건만 표시)` : ""}.
+        </div>
+        <div style="display:flex; gap:8px; align-items:center; margin-bottom:14px; flex-wrap:wrap;">
+          <select class="agent-sort-select" id="log-account-filter">
+            <option value="all" ${uiState.logAccountFilter === "all" ? "selected" : ""}>전체 계정</option>
+            ${accountOptions.map((a) => `<option value="${esc(a.id)}" ${uiState.logAccountFilter === a.id ? "selected" : ""}>${esc(a.name)}</option>`).join("")}
+          </select>
+          ${entries.length ? `<button type="button" class="ghost-btn danger" id="log-clear-btn">로그 전체 지우기</button>` : ""}
+        </div>
+        <div class="interview-list">${rows || `<div class="agent-list-empty">${entries.length ? "이 계정에는 아직 활동 기록이 없어요." : "아직 쌓인 활동 기록이 없어요."}</div>`}</div>
+      `;
+
+      const filterEl = document.getElementById("log-account-filter");
+      if (filterEl) filterEl.onchange = () => { uiState.logAccountFilter = filterEl.value; draw(); };
+
+      const clearBtn = document.getElementById("log-clear-btn");
+      if (clearBtn) {
+        clearBtn.onclick = () => {
+          if (!window.confirm("모든 계정의 활동 로그를 전부 지울까요? 되돌릴 수 없어요.")) return;
+          clearActivityLog();
+          uiState.expandedLogIds.clear();
+          draw();
+        };
+      }
+
+      root.querySelectorAll("[data-action='toggle-log-row']").forEach((row) => {
+        row.onclick = () => {
+          const id = row.getAttribute("data-id");
+          if (uiState.expandedLogIds.has(id)) uiState.expandedLogIds.delete(id);
+          else uiState.expandedLogIds.add(id);
+          draw();
         };
       });
     }
@@ -7404,7 +8135,7 @@
         icon: ICON_BOOK,
         title: "사용설명서",
         subtitle: "업무 종합 관리, 이렇게 사용하세요",
-        desc: "왼쪽 메뉴에는 7가지 기능이 있어요. 이 사용설명서는 PPT처럼 옆으로 넘겨보면서 기능 하나하나를 확인할 수 있게 만들었어요. 위쪽 탭을 클릭하거나, 양옆 화살표 버튼, 키보드 ← → 방향키, 화면 스와이프로도 넘길 수 있어요.",
+        desc: "왼쪽 메뉴에는 7가지 기능이 있어요. 이 사용설명서는 PPT처럼 옆으로 넘겨보면서 기능 하나하나를 확인할 수 있게 만들었어요. 위쪽 탭을 클릭하거나, 양옆 화살표 버튼, 키보드 ← → 방향키, 화면 스와이프로도 넘길 수 있어요. 메뉴 아래쪽에는 화면 테마 변경, 되돌리기(Ctrl+Z), 데이터 백업/복원, 새로고침 버튼도 있으니 참고하세요.",
         intro: true,
         chips: [
           { icon: ICON_HOME, label: "홈" },
@@ -7423,9 +8154,10 @@
         subtitle: "로그인 후 가장 먼저 보이는 대시보드",
         desc: "오늘 하루를 시작할 때 필요한 정보를 한 화면에 모아서 보여줘요.",
         features: [
+          "로그인하면 '오늘의 브리핑' 팝업이 한 번 떠서, 오늘 근무 현황·일정·면담 필요 알림·할 일·고정 메모를 요약해서 보여줘요.",
           "오늘 근무 현황 — 월별 스케줄을 기준으로 오늘 근무 중인 인원과 지각·결근 여부를 바로 확인해요.",
           "오늘 일정 — 캘린더에 등록된 오늘 일정을 미리 보여줘요.",
-          "면담 필요 알림 — 면담이 필요한 상담사를 놓치지 않도록 알려줘요.",
+          "면담 필요 알림 — 최근 21일 내 면담 기록이 없는 상담사를 놓치지 않도록 알려줘요.",
           "할 일 / 고정 메모 — 자주 확인할 항목을 홈 화면에 바로 띄워둘 수 있어요.",
           "각 섹션 오른쪽의 '바로가기' 버튼을 누르면 해당 메뉴로 곧장 이동해요.",
         ],
@@ -7438,9 +8170,12 @@
         desc: "월 단위로 일정을 관리하고, 다가오는 일정을 놓치지 않게 도와줘요.",
         features: [
           "날짜를 클릭하면 그날의 일정을 확인하고 새로 추가할 수 있어요.",
-          "일정마다 시간과 우선순위를 지정할 수 있어요.",
+          "'메모'와 '일정' 두 유형으로 구분해서 등록하고, 시간과 우선순위(★ 중요)도 지정할 수 있어요.",
+          "시작일~종료일을 지정해서 여러 날에 걸친 일정도 만들 수 있고, 상세 내용도 함께 적어둘 수 있어요.",
+          "완료한 일정은 체크 표시하고, '완료 항목 숨기기'로 화면에서 가려볼 수 있어요.",
           "공휴일은 자동으로 표시돼요.",
           "다가오는 일정 목록을 한눈에 확인할 수 있어요.",
+          "캘린더 화면 안에 할 일(Todo) 카드도 있어서, 마감일을 정해 할 일을 등록하고 완료 체크할 수 있어요.",
         ],
       },
       {
@@ -7450,9 +8185,9 @@
         subtitle: "인원 정보를 등록하고 관리",
         desc: "여기에 등록한 인원 정보가 월별 스케줄과 면담일지에도 함께 반영돼요.",
         features: [
-          "상담사 정보를 등록하고 검색·필터링할 수 있어요 (재직 상태 · 업무 구분 · 조 등).",
+          "상담사 정보를 등록하고 검색·필터링할 수 있어요 (재직 상태 · 업무 구분 · 조 등). 이름은 초성만 입력해도 검색돼요.",
           "정렬 기준을 바꾸거나, '사용자 지정' 정렬에서는 직접 드래그해서 순서를 바꿀 수 있어요.",
-          "상담사를 클릭하면 상세 정보와 면담 이력을 함께 확인할 수 있어요.",
+          "상담사를 클릭하면 상세 정보, QA 점수 미리보기, 면담 이력을 함께 확인할 수 있어요.",
           "자주 확인하는 상담사는 즐겨찾기로 고정해둘 수 있어요.",
         ],
       },
@@ -7463,9 +8198,9 @@
         subtitle: "메모를 남기고 폴더로 정리",
         desc: "업무 중 떠오르는 내용을 바로 기록하고 체계적으로 정리할 수 있어요.",
         features: [
-          "새 메모를 작성하고 폴더별로 분류해서 관리해요.",
+          "새 메모를 작성하고 폴더별로 분류해서 관리해요. 폴더는 접었다 펼 수 있어요.",
           "중요한 메모는 최대 5개까지 화면 상단에 고정할 수 있어요.",
-          "제목 수정, 삭제, 폴더 이동이 자유로워요.",
+          "제목 수정, 삭제가 자유롭고, 드래그로 순서를 바꾸거나 다른 폴더로 옮길 수 있어요.",
         ],
       },
       {
@@ -7475,8 +8210,8 @@
         subtitle: "상담사별 면담 기록 관리",
         desc: "면담 내용과 후속조치를 기록해서 다음 면담 때 이어서 참고할 수 있어요.",
         features: [
-          "상담사별 면담 기록을 추가·수정·삭제할 수 있어요.",
-          "면담 유형이나 검색어로 필요한 기록만 걸러볼 수 있어요.",
+          "상담사별 면담 기록을 추가·수정·삭제할 수 있어요. 상담사는 이름·LDAP·초성으로 검색해서 바로 선택할 수 있어요.",
+          "면담 유형(정기·수시·경고)이나 검색어로 필요한 기록만 걸러볼 수 있어요.",
           "후속조치 내용을 함께 남겨서 다음 면담 때 참고할 수 있어요.",
         ],
       },
@@ -7491,6 +8226,7 @@
           "인원마다 유선 점수·채팅 점수를 따로 입력하면, 종합 점수와 전월 대비 점수 차이가 자동으로 계산돼요.",
           "당월 전체/유선/채팅/주간/야간/주간 채팅/주간 유선/야간 채팅/야간 유선 평균을 상단에서 한눈에 확인할 수 있어요.",
           "'상담사 관리'에서 재직 상태가 '근무중'인 인원만 자동으로 표시돼요 (관리자는 제외).",
+          "표를 전체·주간·야간·유선·채팅 기준으로 나눠서 이미지로 저장할 수 있어요.",
           "지난 달은 자동으로 '확정됨' 상태로 잠겨요. '잠금 해제' 버튼으로 다시 열어 수정한 뒤 '이 달 잠그기'로 다시 잠글 수 있어요.",
         ],
       },
@@ -7504,10 +8240,13 @@
           "이름·사번·조·업무 구분 등 인원 정보는 '상담사 관리'에서 수정하면 자동으로 반영돼요.",
           "재직 중인 인원만 자동으로 표시되고, 퇴사 처리된 인원은 스케줄에서 빠져요. 관리자는 표 맨 위에 따로 표시돼요.",
           "월 이동 버튼으로 지난 달·다음 달 스케줄도 확인할 수 있어요.",
-          "일괄 붙여넣기로 여러 인원의 스케줄을 한 번에 입력할 수 있어요.",
+          "일괄 붙여넣기로 여러 인원의 스케줄을 한 번에 입력할 수 있어요. 근무·오프·연차·대휴·반차·공휴·공가·육휴·특휴·교육·지각·결근·퇴사 등 다양한 값을 인식해요.",
           "셀을 드래그해서 여러 칸을 한 번에 선택한 뒤, 메뉴에서 상태를 골라 한 번에 적용할 수 있어요.",
-          "이미지로 저장하거나 엑셀 파일로 다운로드할 수 있어요.",
-          "셀을 클릭하면 근무/오프/연차 등 다양한 상태로 바로 바꿀 수 있어요. 지각은 출근 인원에 포함, 결근은 제외돼요.",
+          "셀을 클릭하면 근무/오프/연차 등 다양한 상태로 바로 바꿀 수 있고, 메모도 남길 수 있어요. 지각은 출근 인원에 포함, 결근은 제외돼요.",
+          "날짜·조·업무 구분별로 필요 인원(헤드카운트)을 설정하면, 실제 근무 인원과의 차이를 자동으로 계산해서 보여줘요.",
+          "필요 없는 열·행은 선택 후 오른쪽 클릭으로 접어서 숨길 수 있고, 날짜 범위를 묶어 그룹으로 한 번에 접었다 펼 수도 있어요.",
+          "이미지로 저장하거나 엑셀 파일로 다운로드할 수 있고, '휴일대체 확인서'도 회사 양식 그대로 자동으로 만들 수 있어요.",
+          "이번 달 지각·결근 기록을 표 아래에서 바로 확인할 수 있어요.",
           "지난 달은 자동으로 '확정됨' 상태로 잠기고 그 시점 인원 구성이 고정돼요. '잠금 해제' 버튼으로 다시 열어 수정할 수 있어요.",
         ],
       },
@@ -7635,18 +8374,353 @@
     setTimeout(() => showTodayBriefPopup(), 450);
   }
 
-  // 로그인 후 5시간이 지나면 자동으로 로그아웃시키고, 그 전까지는 남은 시간을
-  // 주기적으로 갱신해서 보여준다.
-  if (!CURRENT_ACCOUNT_IS_MASTER) {
-    updateSessionRemainingDisplay();
-    setInterval(() => {
-      if (getSessionRemainingMs() <= 0) {
-        logout();
-        return;
-      }
-      updateSessionRemainingDisplay();
-    }, 15000);
+  // 로그인 유지 하트비트: 이 탭이 열려 있는 동안 "마지막으로 살아있던 시각"을 계속
+  // 갱신해서, 탭만 잠깐 닫았다 다시 열었을 때는 로그인이 유지되고 컴퓨터를 껐다
+  // 켤 정도로 오래 닫혀 있었을 때만 자동 로그아웃되게 한다 (판단 자체는 01-common.js의
+  // 세션 확인 부분에서 다음에 열릴 때 이뤄진다).
+  touchLastActive();
+  setInterval(touchLastActive, 15000);
+  window.addEventListener("pagehide", touchLastActive);
+  window.addEventListener("beforeunload", touchLastActive);
+
+  /* ===================== 전역 검색 (상담사 · 메모 · 면담일지 통합) =====================
+     상담사 관리 / 업무 정리 / 면담일지 페이지에 각각 따로 있는 검색을 한 곳에서
+     "이 사람과 관련된 것 다 보여줘" 식으로 통합해서 찾아주는 기능.
+     - 위치: 하단 내비게이션 독의 카테고리 아이콘들 바로 위 (#nav-dock 안, #nav 앞)
+     - 결과: 새 페이지로 이동하지 않고, 검색 바로 위에 카드 목록(드롭다운)으로 떠서 보여줌
+     - 카드를 클릭하면 해당 페이지로 이동해서 그 항목을 바로 펼쳐서 보여줌
+
+     주의: 이 검색창은 renderNav()처럼 매번 innerHTML을 새로 그리지 않는다(앱 전체에서
+     renderApp()이 호출될 때마다 통째로 다시 그려지면, 타이핑 중 입력창이 사라져서
+     포커스/커서가 끊길 수 있기 때문). 그래서 앱이 처음 뜰 때 딱 한 번만 껍데기를
+     그리고, 이후에는 결과 패널(#gs-results-panel)만 갱신한다. */
+
+  const ICON_SEARCH = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="7" r="4.2"/><path d="M13 13l-2.9-2.9"/></svg>`;
+
+  const globalSearchState = { query: "" };
+
+  function gsTruncateText(str, max) {
+    const s = (str || "").replace(/\s+/g, " ").trim();
+    if (!s) return "";
+    if (s.length <= max) return s;
+    return s.slice(0, max) + "…";
   }
+
+  // 일반 텍스트 포함 검색 + 초성 검색(상담사 이름 검색과 동일한 방식)을 함께 지원.
+  function gsTextMatches(text, needle) {
+    if (!needle) return false;
+    const t = (text || "").toLowerCase();
+    if (t.indexOf(needle) !== -1) return true;
+    if (getChosungString(text || "").indexOf(needle) !== -1) return true;
+    return false;
+  }
+
+  function computeGlobalSearchResults(rawQuery) {
+    const needle = (rawQuery || "").trim().toLowerCase();
+    if (!needle) return null;
+
+    const agentResults = agentsData.filter((a) => agentMatchesSearch(a, rawQuery)).slice(0, 20);
+
+    const noteResults = [];
+    Object.keys(notesData.notes).forEach((id) => {
+      const note = notesData.notes[id];
+      if (!note) return;
+      if (gsTextMatches(note.title, needle) || gsTextMatches(note.content, needle)) {
+        noteResults.push(note);
+      }
+    });
+
+    const interviewResults = interviewsData.filter((rec) => {
+      const agent = agentsData.find((a) => a.id === rec.agentId);
+      if (agent && agentMatchesSearch(agent, rawQuery)) return true;
+      if (gsTextMatches(rec.content, needle)) return true;
+      if (gsTextMatches(rec.followUp, needle)) return true;
+      return false;
+    }).slice(0, 20);
+
+    // 품질 관리는 근무중이든 퇴사든 상관없이, 이름이 일치하는 "QA 관리 대상"
+    // (관리자가 아닌) 상담사를 그대로 보여준다. 상담사 결과와 대상은 같지만
+    // 화면에서는 면담일지처럼 별도 섹션으로 분리해서 QA 점수만 보여준다.
+    const qaResults = agentResults.filter((a) => !a.isAdmin);
+
+    return {
+      agentResults,
+      noteResults: noteResults.slice(0, 20),
+      interviewResults: sortInterviews(interviewResults),
+      qaResults,
+    };
+  }
+
+  // 최근 3개월(이번 달 포함) QA 점수를 가로로 나란히 보여주는 알약 목록.
+  // (상담사 상세의 "최근 QA 점수" 미리보기와 같은 3개월 구간을 그대로 재사용한다.)
+  function gsQaMonthPillsHtml(agent) {
+    if (typeof getQAScore !== "function") return "";
+    const months = [];
+    for (let i = 0; i <= 2; i++) {
+      let m = today.getMonth() - i;
+      let y = today.getFullYear();
+      while (m < 0) { m += 12; y -= 1; }
+      months.push({ year: y, monthIndex: m });
+    }
+    return months.map(({ year, monthIndex }) => {
+      const val = getQAScore(agent.id, year, monthIndex);
+      const isCur = year === today.getFullYear() && monthIndex === today.getMonth();
+      const label = isCur ? "이번 달" : `${monthIndex + 1}월`;
+      return `
+        <div class="gs-qa-cell${val === null ? " empty" : ""}">
+          <div class="gs-qa-cell-label">${esc(label)}</div>
+          <div class="gs-qa-cell-value">${val === null ? "데이터 없음" : val.toFixed(1)}</div>
+        </div>
+      `;
+    }).join("");
+  }
+
+  function renderGlobalSearchResultsHtml(results, query) {
+    if (!results) return "";
+    const { agentResults, noteResults, interviewResults, qaResults } = results;
+    const total = agentResults.length + noteResults.length + interviewResults.length + qaResults.length;
+    if (total === 0) {
+      return `<div class="gs-empty">"${esc(query)}"에 대한 검색 결과가 없어요.</div>`;
+    }
+
+    let html = "";
+
+    if (agentResults.length) {
+      html += `<div class="gs-section"><div class="gs-section-title">${ICON_USERS} 상담사 <span class="gs-count">${agentResults.length}</span></div>`;
+      html += agentResults.map((a) => {
+        return `
+        <button type="button" class="gs-card" data-gs-action="agent" data-id="${a.id}">
+          <div class="gs-card-main">
+            <span class="gs-card-title">${esc(a.name)}${a.isAdmin ? ' <span class="badge sm admin">관리자</span>' : ""}</span>
+            <span class="gs-card-sub">${esc(a.ldap || "-")}</span>
+          </div>
+          <div class="gs-card-badges">
+            ${a.status === "RESIGNED" ? '<span class="badge sm resigned">퇴사</span>' : '<span class="badge sm working">근무중</span>'}
+          </div>
+        </button>
+      `;
+      }).join("");
+      html += `</div>`;
+    }
+
+    if (qaResults.length) {
+      html += `<div class="gs-section"><div class="gs-section-title">${ICON_QA} 품질 관리 <span class="gs-count">${qaResults.length}</span></div>`;
+      html += qaResults.map((a) => `
+        <button type="button" class="gs-card gs-card-qa" data-gs-action="qa" data-id="${a.id}">
+          <div class="gs-card-main">
+            <span class="gs-card-title">${esc(a.name)}</span>
+            <div class="gs-qa-sub-row">
+              <span class="gs-card-sub">QA 점수</span>
+              <div class="gs-qa-pills">${gsQaMonthPillsHtml(a)}</div>
+            </div>
+          </div>
+        </button>
+      `).join("");
+      html += `</div>`;
+    }
+
+    if (noteResults.length) {
+      html += `<div class="gs-section"><div class="gs-section-title">${ICON_NOTE} 메모 <span class="gs-count">${noteResults.length}</span></div>`;
+      html += noteResults.map((n) => {
+        const folder = n.folderId ? notesData.folders.find((f) => f.id === n.folderId) : null;
+        const snippet = gsTruncateText(n.content, 60);
+        return `
+        <button type="button" class="gs-card" data-gs-action="note" data-id="${n.id}">
+          <div class="gs-card-main">
+            <span class="gs-card-title">${esc(n.title)}</span>
+            <span class="gs-card-sub">${snippet ? esc(snippet) : '<span class="agent-field-empty">내용 없음</span>'}</span>
+          </div>
+          ${folder ? `<div class="gs-card-badges"><span class="note-folder-tag">${esc(folder.name)}</span></div>` : ""}
+        </button>
+      `;
+      }).join("");
+      html += `</div>`;
+    }
+
+    if (interviewResults.length) {
+      html += `<div class="gs-section"><div class="gs-section-title">${ICON_CLIPBOARD} 면담일지 <span class="gs-count">${interviewResults.length}</span></div>`;
+      html += interviewResults.map((rec) => {
+        const agent = agentsData.find((a) => a.id === rec.agentId);
+        const snippet = gsTruncateText(rec.content, 60);
+        return `
+        <button type="button" class="gs-card" data-gs-action="interview" data-id="${rec.id}">
+          <div class="gs-card-main">
+            <span class="gs-card-title">${esc(agent ? agent.name : "(삭제된 상담사)")} <span class="badge sm ${interviewTypeBadgeClass(rec.type)}">${esc(rec.type || "수시")}</span></span>
+            <span class="gs-card-sub">${snippet ? esc(snippet) : '<span class="agent-field-empty">내용 없음</span>'}</span>
+          </div>
+          <div class="gs-card-badges"><span class="gs-card-date">${esc(rec.date || "-")}</span></div>
+        </button>
+      `;
+      }).join("");
+      html += `</div>`;
+    }
+
+    return html;
+  }
+
+  function openGlobalSearchResults() {
+    const wrap = document.getElementById("gs-wrap");
+    if (wrap) wrap.classList.add("open");
+  }
+  function closeGlobalSearchResults() {
+    const wrap = document.getElementById("gs-wrap");
+    if (wrap) wrap.classList.remove("open");
+  }
+
+  // 검색창 입력값 + 결과 패널을 비운다. 독을 닫을 때(closeDock)와 검색 결과 카드를
+  // 선택해 다른 페이지로 이동할 때 공통으로 쓴다.
+  function resetGlobalSearchQuery() {
+    globalSearchState.query = "";
+    const input = document.getElementById("gs-input");
+    if (input) input.value = "";
+    const clearBtn = document.getElementById("gs-clear-btn");
+    if (clearBtn) clearBtn.classList.remove("visible");
+    const panel = document.getElementById("gs-results-panel");
+    if (panel) panel.innerHTML = "";
+    closeGlobalSearchResults();
+  }
+
+  // 검색 결과 카드를 선택해 다른 페이지로 이동한 뒤: 검색창을 비우고 독을 닫는다.
+  function resetGlobalSearchAfterNavigate() {
+    resetGlobalSearchQuery();
+    if (typeof closeDock === "function") closeDock();
+  }
+
+  function openAgentFromGlobalSearch(id) {
+    agentsUi.selectedId = id;
+    agentsUi.mode = "view";
+    agentsUi.interviewMode = "list";
+    agentsUi.interviewEditingId = null;
+    setPage("agents");
+    resetGlobalSearchAfterNavigate();
+  }
+
+  // 품질 관리 화면으로 이동하면서, 오늘 기준 달로 맞추고 그 상담사의 행을 강조한다.
+  // (상담사 상세 → "품질 관리로 이동" 버튼과 동일한 방식)
+  function openQAFromGlobalSearch(id) {
+    qaUi.year = today.getFullYear();
+    qaUi.monthIndex = today.getMonth();
+    qaHighlightAgentId = id;
+    setPage("qa");
+    resetGlobalSearchAfterNavigate();
+  }
+
+  function openNoteFromGlobalSearch(id) {
+    const note = notesData.notes[id];
+    if (!note) return;
+    const folderKey = note.folderId || UNFILED;
+    notesUi.collapsedFolders[folderKey] = false;
+    notesUi.expanded[id] = true;
+    setPage("notes");
+    resetGlobalSearchAfterNavigate();
+    setTimeout(() => {
+      const row = document.querySelector(`.note-row[data-note-id="${id}"]`);
+      if (row) row.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 60);
+  }
+
+  function openInterviewFromGlobalSearch(id) {
+    const rec = interviewsData.find((r) => r.id === id);
+    if (!rec) return;
+    const agent = agentsData.find((a) => a.id === rec.agentId);
+    interviewsUi.mode = "list";
+    interviewsUi.searchQuery = agent ? agent.name : "";
+    interviewsUi.typeFilter = "all";
+    interviewsUi.expandedIds.add(id);
+    setPage("interviews");
+    resetGlobalSearchAfterNavigate();
+    setTimeout(() => {
+      const row = document.querySelector(`.interview-row-top[data-id="${id}"]`);
+      if (row) row.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 60);
+  }
+
+  function attachGlobalSearchResultHandlers(panel) {
+    panel.querySelectorAll("[data-gs-action='agent']").forEach((btn) => {
+      btn.onclick = () => openAgentFromGlobalSearch(btn.getAttribute("data-id"));
+    });
+    panel.querySelectorAll("[data-gs-action='qa']").forEach((btn) => {
+      btn.onclick = () => openQAFromGlobalSearch(btn.getAttribute("data-id"));
+    });
+    panel.querySelectorAll("[data-gs-action='note']").forEach((btn) => {
+      btn.onclick = () => openNoteFromGlobalSearch(btn.getAttribute("data-id"));
+    });
+    panel.querySelectorAll("[data-gs-action='interview']").forEach((btn) => {
+      btn.onclick = () => openInterviewFromGlobalSearch(btn.getAttribute("data-id"));
+    });
+  }
+
+  function updateGlobalSearchResultsPanel() {
+    const panel = document.getElementById("gs-results-panel");
+    if (!panel) return;
+    const query = globalSearchState.query;
+    if (!query.trim()) {
+      closeGlobalSearchResults();
+      panel.innerHTML = "";
+      return;
+    }
+    const results = computeGlobalSearchResults(query);
+    panel.innerHTML = renderGlobalSearchResultsHtml(results, query);
+    openGlobalSearchResults();
+    attachGlobalSearchResultHandlers(panel);
+  }
+
+  function globalSearchOutsideHandler(e) {
+    const wrap = document.getElementById("gs-wrap");
+    if (wrap && !wrap.contains(e.target)) closeGlobalSearchResults();
+  }
+
+  function renderGlobalSearchShell() {
+    const root = document.getElementById("global-search-root");
+    if (!root) return;
+    // 마스터(관리자) 계정은 상담사·메모·면담일지 페이지 자체가 없으므로 검색도 숨긴다.
+    if (CURRENT_ACCOUNT_IS_MASTER) { root.innerHTML = ""; return; }
+
+    root.innerHTML = `
+      <div class="gs-wrap" id="gs-wrap">
+        <div class="gs-bar">
+          <input type="text" id="gs-input" class="gs-input" placeholder="이름 통합 검색" autocomplete="off">
+          <button type="button" id="gs-clear-btn" class="gs-clear-btn" title="지우기" aria-label="지우기">${ICON_CLOSE_SM}</button>
+          ${ICON_SEARCH}
+        </div>
+        <div class="gs-results" id="gs-results-panel"></div>
+      </div>
+    `;
+
+    const input = document.getElementById("gs-input");
+    const clearBtn = document.getElementById("gs-clear-btn");
+
+    input.oninput = (e) => {
+      globalSearchState.query = e.target.value;
+      clearBtn.classList.toggle("visible", !!e.target.value);
+      updateGlobalSearchResultsPanel();
+    };
+    input.addEventListener("focus", () => {
+      if (globalSearchState.query.trim()) openGlobalSearchResults();
+    });
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        closeGlobalSearchResults();
+        input.blur();
+      } else if (e.key === "Enter") {
+        const panel = document.getElementById("gs-results-panel");
+        const first = panel && panel.querySelector(".gs-card");
+        if (first) first.click();
+      }
+    });
+    clearBtn.onclick = () => {
+      globalSearchState.query = "";
+      input.value = "";
+      clearBtn.classList.remove("visible");
+      updateGlobalSearchResultsPanel();
+      input.focus();
+    };
+
+    document.addEventListener("mousedown", globalSearchOutsideHandler, true);
+  }
+
+  // 앱 전체 렌더 주기(renderApp/renderNav)와 분리해서, 처음 한 번만 그린다.
+  renderGlobalSearchShell();
 })();
 </script>
 </body>

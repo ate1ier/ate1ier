@@ -241,7 +241,7 @@
     background: none; border: none; color: var(--text-faint); cursor: pointer; font-size: 12px;
     padding: 1px 4px; border-radius: 6px;
   }
-  .sch-staff-btn:hover { color: var(--accent); background: #ffffff0d; }
+  .sch-staff-btn:hover { color: var(--accent); background: var(--accent-dim-soft); }
   .sch-staff-btn.danger:hover { color: var(--red); }
 
   .sch-menu {

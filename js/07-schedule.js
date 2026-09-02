@@ -1487,7 +1487,7 @@
     const lockedTag = scheduleIsMonthLocked(scheduleUi.year, scheduleUi.monthIndex) ? " · 확정됨" : "";
     const titleSuffix = captureMode === "ALL" ? "" : ` · ${modeName}`;
     wrapper.innerHTML = `
-      <div style="font-size:22px;margin-bottom:4px;color:${cText};">월별 상담사 스케줄${titleSuffix}</div>
+      <div style="font-size:22px;margin-bottom:4px;color:${cText};">월별 스케줄${titleSuffix}</div>
       <div style="font-size:15px;color:${cTextDim};margin-bottom:16px;">${esc(scheduleMonthLabel())}${lockedTag} · 캡처일 ${esc(todayISO())}</div>
       <div class="schedule-legend" style="margin-bottom:14px;">
         <span class="item"><span class="swatch" style="background:${cBlue};"></span>오프</span>
@@ -2042,7 +2042,7 @@
   function renderSchedulePage(root) {
     root.innerHTML = `
       <div class="schedule-top">
-        <div class="schedule-title">월별 상담사 스케줄</div>
+        <div class="schedule-title">월별 스케줄</div>
         <div class="schedule-month-nav">
           <button class="schedule-month-btn" id="sch-prev-month">‹</button>
           <div class="schedule-month-label">${scheduleMonthLabel()}${scheduleIsMonthLocked(scheduleUi.year, scheduleUi.monthIndex) ? ` <span class="sch-locked-badge">${ICON_LOCK} 확정됨</span>` : ""}</div>

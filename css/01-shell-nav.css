@@ -28,23 +28,6 @@
     padding: 28px 0;
     overflow: hidden;
   }
-  .global-session-badge {
-    display: none;
-    align-items: center;
-    gap: 4px;
-    padding: 3px 10px;
-    border-radius: 24px;
-    background: var(--elevated);
-    border: 1px solid var(--hairline);
-    font-size: 11px;
-    color: var(--text-faint);
-    white-space: nowrap;
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .global-session-badge.visible { display: inline-flex; }
-
   .nav-label-top {
     font-size: 18px;
     letter-spacing: 0.12em;
@@ -159,6 +142,14 @@
   .theme-menu-name { flex: 1; white-space: nowrap; }
   .theme-menu-check { color: var(--accent); font-weight: 700; flex-shrink: 0; }
 
+  /* 설정 메뉴(테마 + 사용설명서 + 데이터 백업을 한 목록에 모아둔 팝오버)에서만 쓰는 라벨/구분선 */
+  .settings-menu { min-width: 190px; }
+  .settings-menu-label {
+    padding: 6px 9px 2px; font-size: 11px; font-weight: 600; color: var(--text-faint);
+    letter-spacing: 0.02em;
+  }
+  .settings-menu-divider { height: 1px; margin: 5px 4px; background: var(--hairline); }
+
   /* 사용설명서 버튼: 테마(다크/라이트) 버튼과 같은 자리, 그 바로 위에 항상 떠 있다 */
   /* 되돌리기(실행 취소) 버튼도 같은 스타일로, 사용설명서 버튼 바로 위에 쌓는다 */
   .manual-toggle-wrap, .undo-toggle-wrap {
@@ -182,7 +173,7 @@
   .undo-toast {
     position: fixed;
     right: 14px;
-    bottom: 260px;
+    bottom: 168px;
     z-index: 201;
     padding: 8px 14px;
     border-radius: var(--mac-radius);
@@ -283,7 +274,9 @@
   }
 
   /* ---------- 오른쪽 하단 유틸리티 독: 평소엔 접혀 있다가 버튼을 누르면 펼쳐진다 ----------
-     아래에서부터: (펼치기 버튼) → 다크/라이트 → 사용설명서 → 데이터 백업 → 되돌리기 → 새로고침 순으로 쌓는다. */
+     아래에서부터: (펼치기 버튼) → 설정(테마·사용설명서·데이터 백업) → 되돌리기 → 새로고침 순으로 쌓는다.
+     예전엔 테마·사용설명서·데이터 백업이 각각 따로 쌓여 있어서 5개나 됐는데, 자주 안 쓰는
+     이 세 가지를 "설정" 버튼 하나로 묶어서 지금은 3개만 쌓인다. */
   #utility-dock-root { position: relative; z-index: 46; }
   .utility-dock-toggle-btn {
     position: fixed;
@@ -309,20 +302,16 @@
   .utility-dock-toggle-btn:hover { color: var(--text); border-color: var(--accent); }
   .utility-dock-toggle-btn svg { transition: transform 0.2s ease; }
   .utility-dock-toggle-btn.open svg { transform: rotate(180deg); }
-  #theme-toggle-root .theme-toggle-wrap { position: fixed; right: 14px; bottom: 78px; z-index: 46; }
-  #manual-toggle-root .manual-toggle-wrap { position: fixed; right: 14px; bottom: 124px; z-index: 46; }
-  #backup-toggle-root .manual-toggle-wrap { position: fixed; right: 14px; bottom: 170px; z-index: 46; left: auto; top: auto; }
-  #undo-toggle-root .undo-toggle-wrap { position: fixed; right: 14px; bottom: 216px; z-index: 46; }
-  #refresh-toggle-root .manual-toggle-wrap { position: fixed; right: 14px; bottom: 262px; z-index: 46; }
-  /* 평소엔(펼치지 않았을 때) 다크/사용설명서/백업/되돌리기/새로고침 항목을 모두 접어서 숨긴다 */
-  #utility-dock-root:not(.open) .theme-toggle-wrap,
+  #settings-toggle-root .manual-toggle-wrap { position: fixed; right: 14px; bottom: 78px; z-index: 46; left: auto; top: auto; }
+  #undo-toggle-root .undo-toggle-wrap { position: fixed; right: 14px; bottom: 124px; z-index: 46; }
+  #refresh-toggle-root .manual-toggle-wrap { position: fixed; right: 14px; bottom: 170px; z-index: 46; }
+  /* 평소엔(펼치지 않았을 때) 설정/되돌리기/새로고침 항목을 모두 접어서 숨긴다 */
   #utility-dock-root:not(.open) .manual-toggle-wrap,
   #utility-dock-root:not(.open) .undo-toggle-wrap {
     opacity: 0;
     transform: translateY(8px) scale(0.96);
     pointer-events: none;
   }
-  #utility-dock-root.open .theme-toggle-wrap,
   #utility-dock-root.open .manual-toggle-wrap,
   #utility-dock-root.open .undo-toggle-wrap {
     opacity: 1;
@@ -337,12 +326,10 @@
   .dock-toggle-btn { display: none; }
   @media (min-width: 721px) {
     .utility-dock-toggle-btn { bottom: 18px; }
-    #theme-toggle-root .theme-toggle-wrap { bottom: 64px; }
-    #manual-toggle-root .manual-toggle-wrap { bottom: 110px; }
-    #backup-toggle-root .manual-toggle-wrap { bottom: 156px; }
-    #undo-toggle-root .undo-toggle-wrap { bottom: 202px; }
-    #refresh-toggle-root .manual-toggle-wrap { bottom: 248px; }
-    .undo-toast { bottom: 246px; }
+    #settings-toggle-root .manual-toggle-wrap { bottom: 64px; }
+    #undo-toggle-root .undo-toggle-wrap { bottom: 110px; }
+    #refresh-toggle-root .manual-toggle-wrap { bottom: 156px; }
+    .undo-toast { bottom: 154px; }
     #page-area { padding-bottom: 56px; }
     .dock-toggle-btn {
       display: flex;
@@ -370,34 +357,67 @@
     .dock-toggle-btn svg { transition: transform 0.2s ease; }
     .dock-toggle-btn.open svg { transform: rotate(180deg); }
 
-    #nav {
+    /* #nav-dock: 전역 검색 바 + 메뉴 카테고리(#nav)를 세로로 함께 묶어서
+       화면 중앙 하단에 띄우는 바깥 컨테이너. 펼치기 버튼을 누르면 이 컨테이너
+       전체가 함께 나타나며, 검색 바는 항상 카테고리 목록 바로 위, 독의 유리판
+       배경 "안쪽"에 얹혀서 카테고리와 같은 너비로 늘어난다. */
+    #nav-dock {
       position: fixed;
       left: 50%;
       bottom: 40px;
       z-index: 40;
       width: auto;
       max-width: 96vw;
-      flex-direction: row;
-      flex-wrap: nowrap;
-      align-items: center;
-      justify-content: center;
-      row-gap: 8px;
-      column-gap: 16px;
-      padding: 26px 22px;
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 10px;
+      padding: 16px 22px 26px;
       border-radius: 32px;
-      overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
       border: 1px solid var(--mac-vibrancy-hairline);
+      background: var(--mac-vibrancy);
+      backdrop-filter: blur(30px) saturate(2);
+      -webkit-backdrop-filter: blur(30px) saturate(2);
       box-shadow: var(--mac-shadow-float);
       opacity: 0;
       transform: translateX(-50%) translateY(10px) scale(0.96);
       pointer-events: none;
       transition: opacity 0.16s ease, transform 0.18s cubic-bezier(.2, 1.2, .4, 1);
     }
-    #nav.dock-open {
+    #nav-dock.dock-open {
       opacity: 1;
       transform: translateX(-50%) translateY(0) scale(1);
       pointer-events: auto;
+    }
+    /* 검색 바 영역: 독 안쪽에서 카테고리 아이콘 줄과 얇은 구분선으로만 나뉜다.
+       마스터 계정은 검색창 자체가 비어있는 채로 렌더되므로, 그 경우엔 이 영역을
+       통째로 접어서 빈 구분선만 남는 일이 없게 한다. */
+    #nav-dock #global-search-root {
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--mac-vibrancy-hairline);
+    }
+    #nav-dock #global-search-root:empty {
+      display: none;
+    }
+    #nav-dock #nav {
+      position: static;
+      flex-direction: row;
+      flex-wrap: nowrap;
+      align-items: center;
+      justify-content: center;
+      row-gap: 8px;
+      column-gap: 16px;
+      padding: 0;
+      border-radius: 0;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      border: none;
+      background: none;
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+      box-shadow: none;
+      width: auto;
+      max-width: 96vw;
     }
     #nav .nav-label-top,
     #nav .nav-spacer,
@@ -459,27 +479,12 @@
       text-overflow: ellipsis;
       max-width: 96px;
     }
-    /* 로그아웃 버튼(아이콘+라벨)은 다른 아이콘들과 정확히 같은 높이를 갖도록 하고,
-       자동 로그아웃 남은 시간 + 연장 버튼은 그 흐름 밖(절대 위치)으로 빼서 캡션처럼 붙인다.
+    /* 로그아웃 버튼(아이콘+라벨)이 다른 아이콘들과 정확히 같은 높이를 갖도록 한다.
        이렇게 하면 로그아웃 항목도 다른 아이콘들과 똑같은 높이가 되어, 독 세로 가운데 선에
        모든 아이콘이 완벽히 정렬된다. */
     #nav .nav-logout-wrap {
-      position: relative;
       display: flex;
     }
-    #nav .nav-session-row {
-      position: absolute;
-      top: 100%;
-      left: 50%;
-      transform: translateX(-50%);
-      margin-top: 5px;
-      display: flex;
-      align-items: center;
-      gap: 5px;
-      white-space: nowrap;
-    }
-    #nav .global-session-badge { font-size: 10px; padding: 2px 8px; }
-    #nav .nav-session-extend-btn { font-size: 10px; padding: 1px 7px; }
     #nav .nav-logout-btn {
       display: flex;
       flex-direction: column;
@@ -599,18 +604,12 @@
       gap: 16px;
       padding: 9px 0 0;
     }
-    /* 로그아웃 버튼(아이콘+라벨)을 위, 남은 시간+연장 버튼을 캡션처럼 아래에 배치 */
     .nav-logout-wrap {
       display: flex;
       flex-direction: column;
       align-items: center;
       gap: 3px;
     }
-    .nav-logout-wrap .nav-logout-btn { order: 1; }
-    .nav-logout-wrap .nav-session-row { order: 2; }
-    .nav-session-row { display: flex; align-items: center; gap: 4px; }
-    .global-session-badge { font-size: 9.5px; padding: 1px 6px; }
-    .nav-session-extend-btn { font-size: 9.5px; padding: 1px 6px; }
 
     .theme-toggle-wrap { flex-shrink: 0; }
     .theme-picker-btn { padding: 5px; gap: 0; }

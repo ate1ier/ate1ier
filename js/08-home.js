@@ -27,9 +27,11 @@
         flags.push(`<span class="flag off">${esc(meta ? meta.label : "휴무")}</span>`);
       }
       const typeBadges = (s.types || []).map((t) => `<span class="badge sm ${t === "유선" ? "voice" : "chat"}">${esc(t)}</span>`).join("");
+      const ldapText = s.nickname && s.nickname !== s.name ? s.nickname : "";
       return `
         <div class="home-staff-row ${s.record.status !== "WORK" ? "is-off" : ""}">
           <span class="name">${esc(s.name)}</span>
+          ${ldapText ? `<span class="ldap">${esc(ldapText)}</span>` : ""}
           ${typeBadges}
           <span class="spacer"></span>
           ${flags.join("")}
@@ -69,6 +71,7 @@
       : `<div class="home-todo-list">${todoRelevant.slice(0, 6).map((t) => {
           const isOver = t.due && t.due < iso;
           return `<div class="home-todo-row">
+            <button type="button" class="check-btn" data-home-todo-toggle="${t.id}" aria-label="완료 표시"></button>
             <span>${esc(t.text)}</span>
             ${t.due ? `<span class="due ${isOver ? "over" : ""}">${formatTodoDue(t.due)}${isOver ? " · 지남" : " · 오늘"}</span>` : ""}
           </div>`;
@@ -174,6 +177,12 @@
         renderHomePage(root);
       };
     }
+    root.querySelectorAll("[data-home-todo-toggle]").forEach((btn) => {
+      btn.onclick = () => {
+        toggleTodoDone(btn.getAttribute("data-home-todo-toggle"));
+        renderHomePage(root);
+      };
+    });
   }
 
   /* ===================== 오늘의 브리핑 히어로 팝업 =====================

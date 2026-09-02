@@ -1,0 +1,187 @@
+  /* ---------- 전역 검색 (상담사 · 메모 · 면담일지 통합 검색) ----------
+     하단 내비게이션 독의 카테고리 아이콘들 바로 위에 놓이는 검색 바.
+     검색 결과는 별도 페이지로 이동하지 않고, 이 바로 위에 카드 목록으로
+     떠서 보여준다. */
+  .gs-wrap {
+    position: relative;
+    width: 100%;
+  }
+  .gs-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 10px 16px;
+    border-radius: 999px;
+    background: var(--elevated);
+    border: 1px solid var(--hairline);
+    color: var(--text-faint);
+  }
+  .gs-bar:focus-within { border-color: var(--accent); }
+  .gs-bar .icon-emo { flex-shrink: 0; color: var(--text-faint); }
+  .gs-input {
+    flex: 1;
+    min-width: 0;
+    background: none;
+    border: none;
+    outline: none;
+    color: var(--text);
+    font-size: 14px;
+    text-align: center;
+  }
+  .gs-input::placeholder { color: var(--text-faint); }
+  .gs-clear-btn {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: none;
+    background: var(--hairline);
+    color: var(--text-dim);
+    cursor: pointer;
+    flex-shrink: 0;
+    padding: 0;
+  }
+  .gs-clear-btn.visible { display: flex; }
+  .gs-clear-btn:hover { background: var(--hairline-strong); color: var(--text); }
+  .gs-clear-btn svg { width: 10px; height: 10px; }
+
+  /* 검색 결과 카드 패널: 검색 바 바로 위(bottom: 100%)에 떠서 나타난다 */
+  .gs-results {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: calc(100% + 10px);
+    max-height: 56vh;
+    overflow-y: auto;
+    border-radius: 20px;
+    border: 1px solid var(--mac-vibrancy-hairline);
+    background: var(--mac-vibrancy);
+    backdrop-filter: blur(30px) saturate(2);
+    -webkit-backdrop-filter: blur(30px) saturate(2);
+    box-shadow: var(--mac-shadow-float);
+    padding: 10px;
+    opacity: 0;
+    transform: translateY(6px);
+    pointer-events: none;
+    transition: opacity 0.14s ease, transform 0.16s cubic-bezier(.2, 1.2, .4, 1);
+  }
+  .gs-wrap.open .gs-results {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+  }
+  .gs-empty {
+    padding: 26px 10px;
+    text-align: center;
+    color: var(--text-faint);
+    font-size: 13.5px;
+  }
+  .gs-section { margin-bottom: 6px; }
+  .gs-section:last-child { margin-bottom: 0; }
+  .gs-section-title {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 8px 4px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-faint);
+    letter-spacing: 0.02em;
+  }
+  .gs-section-title .icon-emo { width: 13px; height: 13px; }
+  .gs-count {
+    font-size: 11px;
+    color: var(--text-faint);
+    background: var(--hairline);
+    border-radius: 999px;
+    padding: 0 6px;
+  }
+  .gs-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    width: 100%;
+    text-align: left;
+    padding: 9px 10px;
+    border-radius: 14px;
+    border: none;
+    background: none;
+    color: var(--text);
+    cursor: pointer;
+    transition: background 0.12s ease;
+    font-family: inherit;
+  }
+  .gs-card:hover { background: var(--mac-vibrancy-hairline); }
+  .gs-card-main {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+  .gs-card-title {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .gs-card-sub {
+    font-size: 12px;
+    color: var(--text-faint);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 320px;
+  }
+  .gs-card-badges {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+  .gs-card-date { font-size: 11.5px; color: var(--text-faint); white-space: nowrap; }
+  .gs-card-qa .gs-card-main { flex: 1; min-width: 0; }
+  .gs-card-qa .gs-card-sub { color: var(--accent); flex-shrink: 0; }
+  .gs-qa-sub-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    min-width: 0;
+  }
+  /* 3개월 알약을 항상 3열 그리드로 배치해 폭을 동일하게 맞춘다.
+     기존 flex 방식은 각 알약이 내용물(예: "이번 달 데이터 없음" vs "8월 72.4") 길이에 맞춰
+     너비가 제각각이 되어, 텍스트가 짧은 알약(주로 값이 있는 달)만 유독 작아 보였다. */
+  .gs-qa-pills { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+  .gs-qa-cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    height: 22px;
+    padding: 0 8px;
+    border-radius: 999px;
+    background: var(--accent-dim);
+    color: var(--accent);
+    box-sizing: border-box;
+  }
+  .gs-qa-cell.empty {
+    background: var(--hairline); color: var(--text-faint);
+    /* 전역 .empty 규칙(패딩/배경/테두리/여백/기울임체)이 이 알약에도 새어 들어와
+       "데이터 없음" 알약만 위로 들뜨고 커 보이면서 8월 알약과 높이가 어긋나던
+       문제를 바로잡는다. */
+    padding: 0 8px; border: none; border-radius: 999px; margin-bottom: 0;
+    font-style: normal; text-align: left;
+  }
+  .gs-qa-cell-label { font-size: 10.5px; opacity: 0.8; line-height: 22px; }
+  .gs-qa-cell-value { font-size: 12.5px; font-weight: 600; line-height: 22px; }
+
+  /* 데스크톱: 독 안쪽에서 카테고리 아이콘 줄과 같은 너비로 꽉 채워지는 바 형태 */
+  @media (min-width: 721px) {
+    .gs-bar { width: 100%; max-width: none; }
+  }

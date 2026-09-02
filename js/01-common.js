@@ -2,6 +2,7 @@
   const ICON_HOME = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.3 8.2 8 3.2l5.7 5"/><path d="M3.6 6.8V13h3.1v-4h2.6v4h3.1V6.8"/></svg>`;
   const ICON_CALENDAR = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="3.4" width="11" height="10.2" rx="1.6"/><path d="M2.5 6.6h11M5.6 2v2.4M10.4 2v2.4"/></svg>`;
   const ICON_NOTE = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4.3 2.6h5l2.4 2.4v8.4h-7.4z"/><path d="M9.3 2.6V5h2.4"/><path d="M6 8.4h4M6 10.8h4"/></svg>`;
+  const ICON_EDIT = `<svg class="icon-emo" viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M10.6 2.4 13.6 5.4 5.4 13.6 2.2 13.8 2.4 10.6z"/><path d="M9.2 3.8 12.2 6.8"/></svg>`;
   const ICON_USERS = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2.1"/><path d="M2.4 13c0-2.1 1.6-3.6 3.6-3.6s3.6 1.5 3.6 3.6"/><circle cx="11.3" cy="6.4" r="1.7"/><path d="M9.9 9.6c1.7.2 3 1.5 3 3.4"/></svg>`;
   const ICON_CLIPBOARD = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.6" y="3" width="8.8" height="11.2" rx="1.4"/><path d="M6.2 3V2.4a1 1 0 0 1 1-1h1.6a1 1 0 0 1 1 1V3"/><path d="M5.8 7.4h4.4M5.8 10h4.4"/></svg>`;
   const ICON_CHART = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.4 13.6h11.2"/><rect x="3.8" y="8.4" width="2.1" height="4.3"/><rect x="7" y="5.6" width="2.1" height="7.1"/><rect x="10.2" y="9.8" width="2.1" height="2.9"/></svg>`;
@@ -27,6 +28,7 @@
   const ICON_UPLOAD = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 9.7V2.5"/><path d="M5.2 5.3 8 2.5l2.8 2.8"/><path d="M3.2 13h9.6"/></svg>`;
   const ICON_BACKUP = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.6 4.4c0-1 2.4-1.8 5.4-1.8s5.4.8 5.4 1.8-2.4 1.8-5.4 1.8-5.4-.8-5.4-1.8Z"/><path d="M2.6 4.4V8c0 1 2.4 1.8 5.4 1.8s5.4-.8 5.4-1.8V4.4"/><path d="M2.6 8v3.6c0 1 2.4 1.8 5.4 1.8s5.4-.8 5.4-1.8V8"/></svg>`;
   const ICON_REFRESH = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 8A5 5 0 1 1 11.4 4.3"/><path d="M13 2.6V6h-3.4"/></svg>`;
+  const ICON_SETTINGS = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="2.1"/><path d="M8 2.4v1.5M8 12.1v1.5M13.6 8h-1.5M3.9 8H2.4M11.9 4.1l-1.05 1.05M5.15 10.85 4.1 11.9M11.9 11.9l-1.05-1.05M5.15 5.15 4.1 4.1"/></svg>`;
   /* ===================== ☁️ 클라우드 동기화 (Supabase) =====================
      계정 목록과 각 계정의 데이터(할일/메모/상담사/면담일지/스케줄/캘린더)를
      Supabase의 kv_store 테이블에도 함께 저장해서, 다른 기기·다른 사람도
@@ -454,29 +456,35 @@
   }
   applyTheme(isValidTheme(getStoredTheme()) ? getStoredTheme() : "dark");
 
-  /* ===================== 데스크톱 독(Dock) 펼치기/닫기 ===================== */
+  /* ===================== 데스크톱 독(Dock) 펼치기/닫기 =====================
+     독 안에는 메뉴 카테고리(#nav) 말고도 전역 검색 바(#global-search-root)가
+     카테고리 바로 위에 함께 들어있으므로, 펼치기/접기 대상은 그 둘을 함께
+     감싸는 #nav-dock 전체다. */
   function isDockOpen() {
-    const nav = document.getElementById("nav");
-    return !!(nav && nav.classList.contains("dock-open"));
+    const navDock = document.getElementById("nav-dock");
+    return !!(navDock && navDock.classList.contains("dock-open"));
   }
   function dockOutsideHandler(e) {
-    const nav = document.getElementById("nav");
+    const navDock = document.getElementById("nav-dock");
     const btn = document.getElementById("dock-toggle-btn");
-    if (nav && !nav.contains(e.target) && !(btn && btn.contains(e.target))) closeDock();
+    if (navDock && !navDock.contains(e.target) && !(btn && btn.contains(e.target))) closeDock();
   }
   function openDock() {
-    const nav = document.getElementById("nav");
+    const navDock = document.getElementById("nav-dock");
     const btn = document.getElementById("dock-toggle-btn");
-    if (nav) nav.classList.add("dock-open");
+    if (navDock) navDock.classList.add("dock-open");
     if (btn) { btn.classList.add("open"); btn.setAttribute("aria-expanded", "true"); btn.title = "메뉴 닫기"; btn.setAttribute("aria-label", "메뉴 닫기"); }
     setTimeout(() => document.addEventListener("mousedown", dockOutsideHandler, true), 0);
   }
   function closeDock() {
-    const nav = document.getElementById("nav");
+    const navDock = document.getElementById("nav-dock");
     const btn = document.getElementById("dock-toggle-btn");
-    if (nav) nav.classList.remove("dock-open");
+    if (navDock) navDock.classList.remove("dock-open");
     if (btn) { btn.classList.remove("open"); btn.setAttribute("aria-expanded", "false"); btn.title = "메뉴 열기"; btn.setAttribute("aria-label", "메뉴 열기"); }
     document.removeEventListener("mousedown", dockOutsideHandler, true);
+    // 독 안에는 전역 검색창도 함께 들어있으므로, 독을 닫을 때 검색했던 내용도
+    // 남아있지 않고 초기화되게 한다.
+    if (typeof resetGlobalSearchQuery === "function") resetGlobalSearchQuery();
   }
   function toggleDock() {
     if (isDockOpen()) closeDock(); else openDock();
@@ -495,8 +503,8 @@
   }
   function utilityDockOutsideHandler(e) {
     const root = document.getElementById("utility-dock-root");
-    const themeMenu = document.getElementById("theme-menu");
-    if (themeMenu && themeMenu.contains(e.target)) return; // 테마 목록 팝업 클릭은 독을 접지 않는다
+    const settingsMenu = document.getElementById("settings-menu");
+    if (settingsMenu && settingsMenu.contains(e.target)) return; // 설정 목록 팝업 클릭은 독을 접지 않는다
     if (root && !root.contains(e.target)) closeUtilityDock();
   }
   function openUtilityDock() {
@@ -521,44 +529,29 @@
     utilityDockToggleBtn.onclick = (e) => { e.stopPropagation(); toggleUtilityDock(); };
   }
 
-  // 다크/라이트 등 화면 테마 선택 버튼: 내비게이션(독)과 별개로 항상 화면 오른쪽 아래에 떠 있다.
-  function renderThemeToggle() {
-    const root = document.getElementById("theme-toggle-root");
-    if (!root) return;
-    root.innerHTML = `
-      <div class="theme-toggle-wrap">
-        <button class="theme-picker-btn" id="nav-theme-toggle" type="button" aria-haspopup="true" aria-expanded="false" aria-label="화면 테마 선택" title="화면 테마 선택">
-          <span class="theme-picker-dot" style="background:${themeMeta(getCurrentTheme()).bg};"></span>
-          <span class="theme-picker-label">${themeMeta(getCurrentTheme()).label}</span>
-          <svg class="theme-picker-chevron" width="8" height="8" viewBox="0 0 10 10" aria-hidden="true"><path d="M1 3.5l4 4 4-4" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        </button>
-      </div>
-    `;
-    const themeBtn = document.getElementById("nav-theme-toggle");
-    if (themeBtn) {
-      themeBtn.onclick = (e) => {
-        e.stopPropagation();
-        if (document.getElementById("theme-menu")) { closeThemeMenu(); return; }
-        openThemeMenu(themeBtn);
-      };
-    }
-  }
-
-  // 사용설명서 버튼: 카테고리로 넣지 않고, 테마(다크/라이트) 버튼 바로 위에 항상 떠 있는 고정 버튼으로 표시.
-  // 누르면 페이지 이동 없이 PPT처럼 옆으로 넘겨보는 사용설명서 팝업이 뜬다.
-  function renderManualToggle() {
-    const root = document.getElementById("manual-toggle-root");
+  // 설정 버튼: 예전에는 테마·사용설명서·데이터 백업이 각각 독립된 버튼으로 오른쪽 아래에
+  // 따로따로 쌓여 있었는데, 항목이 많아질수록 화면이 복잡해 보여서(특히 모바일) 이 세 가지를
+  // "설정" 버튼 하나로 묶고, 그 안에서 목록으로 고르게 했다. 새로고침·되돌리기는 사용 빈도가
+  // 높아 그대로 독립 버튼으로 남겨둔다.
+  function renderSettingsToggle() {
+    const root = document.getElementById("settings-toggle-root");
     if (!root) return;
     root.innerHTML = `
       <div class="manual-toggle-wrap">
-        <button class="theme-picker-btn" id="nav-manual-toggle" type="button" aria-haspopup="dialog" aria-label="사용설명서 열기" title="사용설명서">
-          ${ICON_BOOK}
-          <span class="theme-picker-label">사용설명서</span>
+        <button class="theme-picker-btn" id="nav-settings-toggle" type="button" aria-haspopup="true" aria-expanded="false" aria-label="설정 메뉴 열기" title="설정 (테마 · 사용설명서 · 데이터 백업)">
+          ${ICON_SETTINGS}
+          <span class="theme-picker-label">설정</span>
         </button>
       </div>
     `;
-    const manualBtn = document.getElementById("nav-manual-toggle");
-    if (manualBtn) manualBtn.onclick = () => openManualModal();
+    const settingsBtn = document.getElementById("nav-settings-toggle");
+    if (settingsBtn) {
+      settingsBtn.onclick = (e) => {
+        e.stopPropagation();
+        if (document.getElementById("settings-menu")) { closeSettingsMenu(); return; }
+        openSettingsMenu(settingsBtn);
+      };
+    }
   }
 
   /* ===================== 데이터 백업/복원 =====================
@@ -663,22 +656,6 @@
     if (count === 0) return { ok: false, reason: "이 백업 파일에서 가져올 수 있는 데이터를 찾지 못했어요." };
     await flushCloudWrites();
     return { ok: true, count };
-  }
-
-  // 백업 버튼: 사용설명서 버튼 바로 위에 항상 떠 있는 고정 버튼으로 표시.
-  function renderBackupToggle() {
-    const root = document.getElementById("backup-toggle-root");
-    if (!root) return;
-    root.innerHTML = `
-      <div class="manual-toggle-wrap">
-        <button class="theme-picker-btn" id="nav-backup-toggle" type="button" aria-haspopup="dialog" aria-label="데이터 백업/복원 열기" title="데이터 백업/복원">
-          ${ICON_BACKUP}
-          <span class="theme-picker-label">데이터 백업</span>
-        </button>
-      </div>
-    `;
-    const backupBtn = document.getElementById("nav-backup-toggle");
-    if (backupBtn) backupBtn.onclick = () => openBackupModal();
   }
 
   // 새로고침 버튼: 백업 버튼이 있던 오른쪽 아래 자리에 항상 떠 있는 고정 버튼으로 표시.
@@ -799,35 +776,47 @@
     });
   }
 
-  // 테마 선택 팝오버(사이드바 하단의 테마 버튼을 누르면 뜨는 목록)
-  function closeThemeMenu() {
-    const existing = document.getElementById("theme-menu");
+  // 설정 메뉴 팝오버("설정" 버튼을 누르면 뜨는 목록) — 테마 선택 · 사용설명서 · 데이터 백업을
+  // 한 목록 안에 모아둔다. 항목이 3개뿐이라 테마도 별도 팝업으로 한 번 더 들어가지 않고
+  // 이 목록에서 바로 다크/라이트를 고를 수 있게 했다.
+  function closeSettingsMenu() {
+    const existing = document.getElementById("settings-menu");
     if (existing) existing.remove();
-    document.removeEventListener("mousedown", themeMenuOutsideHandler, true);
-    const btn = document.getElementById("nav-theme-toggle");
+    document.removeEventListener("mousedown", settingsMenuOutsideHandler, true);
+    const btn = document.getElementById("nav-settings-toggle");
     if (btn) { btn.classList.remove("open"); btn.setAttribute("aria-expanded", "false"); }
   }
-  function themeMenuOutsideHandler(e) {
-    const menu = document.getElementById("theme-menu");
-    const btn = document.getElementById("nav-theme-toggle");
-    if (menu && !menu.contains(e.target) && !(btn && btn.contains(e.target))) closeThemeMenu();
+  function settingsMenuOutsideHandler(e) {
+    const menu = document.getElementById("settings-menu");
+    const btn = document.getElementById("nav-settings-toggle");
+    if (menu && !menu.contains(e.target) && !(btn && btn.contains(e.target))) closeSettingsMenu();
   }
-  function openThemeMenu(anchorEl) {
-    closeThemeMenu();
+  function openSettingsMenu(anchorEl) {
+    closeSettingsMenu();
     anchorEl.classList.add("open");
     anchorEl.setAttribute("aria-expanded", "true");
     const rect = anchorEl.getBoundingClientRect();
     const current = getCurrentTheme();
     const menu = document.createElement("div");
-    menu.id = "theme-menu";
-    menu.className = "theme-menu";
-    menu.innerHTML = THEME_LIST.map((t) => `
-      <button type="button" class="theme-menu-item ${t.id === current ? "active" : ""}" data-theme-id="${t.id}">
-        <span class="theme-menu-dot" style="background:${t.bg};"></span>
-        <span class="theme-menu-name">${t.label}</span>
-        ${t.id === current ? '<span class="theme-menu-check">✓</span>' : ""}
+    menu.id = "settings-menu";
+    menu.className = "theme-menu settings-menu";
+    menu.innerHTML = `
+      <div class="settings-menu-label">테마</div>
+      ${THEME_LIST.map((t) => `
+        <button type="button" class="theme-menu-item ${t.id === current ? "active" : ""}" data-theme-id="${t.id}">
+          <span class="theme-menu-dot" style="background:${t.bg};"></span>
+          <span class="theme-menu-name">${t.label}</span>
+          ${t.id === current ? '<span class="theme-menu-check">✓</span>' : ""}
+        </button>
+      `).join("")}
+      <div class="settings-menu-divider"></div>
+      <button type="button" class="theme-menu-item" id="settings-manual-btn">
+        ${ICON_BOOK}<span class="theme-menu-name">사용설명서</span>
       </button>
-    `).join("");
+      <button type="button" class="theme-menu-item" id="settings-backup-btn">
+        ${ICON_BACKUP}<span class="theme-menu-name">데이터 백업</span>
+      </button>
+    `;
     document.body.appendChild(menu);
     const menuRect = menu.getBoundingClientRect();
     let top = rect.top - menuRect.height - 8;
@@ -839,10 +828,14 @@
     menu.querySelectorAll("[data-theme-id]").forEach((btn) => {
       btn.onclick = () => {
         setTheme(btn.getAttribute("data-theme-id"));
-        closeThemeMenu();
+        closeSettingsMenu();
       };
     });
-    setTimeout(() => document.addEventListener("mousedown", themeMenuOutsideHandler, true), 0);
+    const manualBtn = document.getElementById("settings-manual-btn");
+    if (manualBtn) manualBtn.onclick = () => { closeSettingsMenu(); openManualModal(); };
+    const backupBtn = document.getElementById("settings-backup-btn");
+    if (backupBtn) backupBtn.onclick = () => { closeSettingsMenu(); openBackupModal(); };
+    setTimeout(() => document.addEventListener("mousedown", settingsMenuOutsideHandler, true), 0);
   }
 
   /* ===================== 공통 유틸 ===================== */
@@ -865,14 +858,22 @@
      저장 키 앞에 "acct:{계정ID}:" 접두어를 붙여 브라우저 안에서만 서로
      분리해둡니다. */
   const ACCOUNTS_KEY = "personal-app:accounts";
+  // 로그인 세션(누가 로그인해 있는지)은 localStorage에 저장해서, 탭을 닫았다 새로
+  // 열어도(같은 브라우저인 한) 로그인이 그대로 유지되게 한다. 대신 아래 LAST_ACTIVE_KEY
+  // 하트비트로 "너무 오래(=컴퓨터를 껐다 켤 정도로) 닫혀 있었는지"를 따로 판단해서,
+  // 그 경우에만 자동으로 로그아웃시킨다.
   const SESSION_KEY = "personal-app:session";
   // 마스터 계정이 다른 계정을 "들어가서 보기" 했을 때, 원래(마스터) 계정으로
   // 돌아올 수 있도록 원래 세션을 잠깐 보관해두는 키.
   const MASTER_ORIGIN_KEY = "personal-app:master-origin";
-  // 로그인한 시각을 기록해두는 키. 이 시각으로부터 SESSION_DURATION_MS가
-  // 지나면 자동으로 로그아웃시킨다.
-  const LOGIN_AT_KEY = "personal-app:login-at";
-  const SESSION_DURATION_MS = 5 * 60 * 60 * 1000; // 5시간
+  // 이 앱이 마지막으로 화면에 떠 있었던 시각(하트비트). 탭이 열려 있는 동안 주기적으로
+  // 갱신되고, 탭/브라우저가 닫히면 더 이상 갱신되지 않는다. 다음에 열었을 때 이 시각과
+  // 지금 시각의 차이가 SESSION_GAP_LIMIT_MS보다 크면 "그동안 컴퓨터를 껐다 켰거나
+  // 오래 자리를 비운 것"으로 보고 자동 로그아웃시킨다. 그보다 짧으면(탭만 잠깐 닫았다
+  // 연 경우 등) 로그인 상태를 그대로 유지한다. 기준 시간을 바꾸고 싶으면 이 숫자만
+  // 고치면 된다.
+  const LAST_ACTIVE_KEY = "personal-app:last-active";
+  const SESSION_GAP_LIMIT_MS = 5 * 60 * 1000; // 5분
 
   const HAS_SUBTLE_CRYPTO = !!(window.crypto && window.crypto.subtle);
   // 예전(salt 없는 단순 해시) 방식 — 신규 계정에는 쓰지 않고, 예전에 만든
@@ -928,88 +929,16 @@
   function clearMasterOrigin() {
     try { localStorage.removeItem(MASTER_ORIGIN_KEY); } catch (e) {}
   }
-  function getLoginAt() {
-    try { return localStorage.getItem(LOGIN_AT_KEY); } catch (e) { return null; }
+  function getLastActive() {
+    try { return Number(localStorage.getItem(LAST_ACTIVE_KEY)) || 0; } catch (e) { return 0; }
   }
-  function setLoginAt(timestamp) {
-    try { localStorage.setItem(LOGIN_AT_KEY, String(timestamp)); } catch (e) {}
+  // 하트비트를 지금 시각으로 갱신한다. 로그인 직후, 그리고 탭이 열려 있는 동안
+  // 주기적으로 호출된다.
+  function touchLastActive() {
+    try { localStorage.setItem(LAST_ACTIVE_KEY, String(Date.now())); } catch (e) {}
   }
-  function clearLoginAt() {
-    try { localStorage.removeItem(LOGIN_AT_KEY); } catch (e) {}
-  }
-  // 자동 로그아웃까지 남은 시간(ms)을 계산한다. 로그인 시각 기록이 없으면 0으로 본다.
-  function getSessionRemainingMs() {
-    const loginAt = Number(getLoginAt());
-    if (!loginAt) return 0;
-    return SESSION_DURATION_MS - (Date.now() - loginAt);
-  }
-  function formatRemainingTime(ms) {
-    if (ms <= 0) return "0분";
-    const totalMinutes = Math.floor(ms / 60000);
-    const h = Math.floor(totalMinutes / 60);
-    const m = totalMinutes % 60;
-    if (h > 0) return `${h}시간 ${m}분`;
-    return `${m}분`;
-  }
-  function updateSessionRemainingDisplay() {
-    const el = document.getElementById("global-session-badge");
-    if (el) {
-      el.innerHTML = `${ICON_CLOCK} ${formatRemainingTime(getSessionRemainingMs())}`;
-      el.classList.add("visible");
-    }
-    updateSessionWarningToast();
-  }
-
-  // ---- 자동 로그아웃 임박(남은 시간 30분 이하) 알림 토스트 ----
-  const SESSION_WARNING_THRESHOLD_MS = 30 * 60 * 1000; // 30분
-  // 사용자가 토스트를 닫으면, 같은 로그인 회차(연장 전까지)에는 다시 띄우지 않는다.
-  let sessionWarningDismissed = false;
-
-  function hideSessionWarningToast() {
-    const root = document.getElementById("session-warning-toast-root");
-    if (root) root.innerHTML = "";
-  }
-
-  function extendSessionFromToast() {
-    setLoginAt(Date.now());
-    sessionWarningDismissed = false;
-    hideSessionWarningToast();
-    updateSessionRemainingDisplay();
-  }
-
-  function renderSessionWarningToast(remainingMs) {
-    const root = document.getElementById("session-warning-toast-root");
-    if (!root) return;
-    root.innerHTML = `
-      <div class="session-warning-toast" role="alert">
-        <span class="session-toast-icon">${ICON_CLOCK}</span>
-        <div class="session-toast-body">
-          <div class="session-toast-title">곧 자동 로그아웃돼요</div>
-          <div class="session-toast-desc">${formatRemainingTime(remainingMs)} 후 자동으로 로그아웃됩니다. 계속 사용하시려면 연장해주세요.</div>
-          <div class="session-toast-actions">
-            <button class="session-toast-extend-btn" id="session-toast-extend-btn" type="button">연장하기</button>
-            <button class="session-toast-dismiss-btn" id="session-toast-dismiss-btn" type="button">나중에</button>
-          </div>
-        </div>
-        <button class="session-toast-close-btn" id="session-toast-close-btn" type="button" title="닫기" aria-label="닫기">${ICON_CLOSE_SM}</button>
-      </div>
-    `;
-    const extendBtn = document.getElementById("session-toast-extend-btn");
-    if (extendBtn) extendBtn.onclick = extendSessionFromToast;
-    const dismissBtn = document.getElementById("session-toast-dismiss-btn");
-    if (dismissBtn) dismissBtn.onclick = () => { sessionWarningDismissed = true; hideSessionWarningToast(); };
-    const closeBtn = document.getElementById("session-toast-close-btn");
-    if (closeBtn) closeBtn.onclick = () => { sessionWarningDismissed = true; hideSessionWarningToast(); };
-  }
-
-  function updateSessionWarningToast() {
-    if (CURRENT_ACCOUNT_IS_MASTER) { hideSessionWarningToast(); return; }
-    const remaining = getSessionRemainingMs();
-    if (remaining > 0 && remaining <= SESSION_WARNING_THRESHOLD_MS && !sessionWarningDismissed) {
-      renderSessionWarningToast(remaining);
-    } else {
-      hideSessionWarningToast();
-    }
+  function clearLastActive() {
+    try { localStorage.removeItem(LAST_ACTIVE_KEY); } catch (e) {}
   }
   // 마스터 계정이 다른 계정으로 들어가서 볼 때 쓰는 함수.
   // 지금 세션(마스터)을 origin으로 저장해두고, 세션을 대상 계정으로 바꾼다.
@@ -1035,6 +964,7 @@
     const list = loadAccounts();
     if (list.length <= 1) return { ok: false, reason: "마지막 남은 계정은 삭제할 수 없어요." };
     if (accountId === CURRENT_ACCOUNT_ID) return { ok: false, reason: "현재 로그인 중인 계정은 삭제할 수 없어요." };
+    const target = list.find((a) => a.id === accountId);
     const next = list.filter((a) => a.id !== accountId);
     saveAccounts(next);
     try {
@@ -1046,6 +976,15 @@
       }
       keysToRemove.forEach((k) => localStorage.removeItem(k));
     } catch (e) { /* 데이터 정리 실패해도 계정 삭제 자체는 유지 */ }
+    appendActivityLog({
+      accountId,
+      accountName: target ? target.username : accountId,
+      viaMasterName: CURRENT_ACCOUNT_NAME,
+      categoryKey: "account",
+      categoryLabel: "계정 관리",
+      subLabel: "",
+      diff: ["계정이 삭제됐어요."],
+    });
     return { ok: true };
   }
   // 마스터가 다른 계정의 비밀번호를 새 비밀번호로 초기화한다.
@@ -1058,6 +997,15 @@
     const passwordHash = await hashPassword(newPassword, salt);
     list[idx] = { ...list[idx], salt, passwordHash };
     saveAccounts(list);
+    appendActivityLog({
+      accountId,
+      accountName: list[idx].username,
+      viaMasterName: CURRENT_ACCOUNT_NAME,
+      categoryKey: "account",
+      categoryLabel: "계정 관리",
+      subLabel: "",
+      diff: ["비밀번호가 초기화됐어요."],
+    });
     return { ok: true };
   }
   // 마스터가 다른 계정의 이름(아이디)을 바꾼다. 이미 쓰이고 있는 이름으로는 바꿀 수 없다.
@@ -1070,8 +1018,18 @@
     const norm = trimmed.toLowerCase();
     const dup = list.find((a) => a.id !== accountId && a.username.toLowerCase() === norm);
     if (dup) return { ok: false, reason: "이미 사용 중인 계정 이름이에요." };
+    const oldUsername = list[idx].username;
     list[idx] = { ...list[idx], username: trimmed };
     saveAccounts(list);
+    appendActivityLog({
+      accountId,
+      accountName: trimmed,
+      viaMasterName: CURRENT_ACCOUNT_NAME,
+      categoryKey: "account",
+      categoryLabel: "계정 관리",
+      subLabel: "",
+      diff: [`계정 이름: ${oldUsername} → ${trimmed}`],
+    });
     return { ok: true };
   }
   function findAccountByUsername(username) {
@@ -1084,7 +1042,7 @@
   async function logout() {
     clearSession();
     clearMasterOrigin();
-    clearLoginAt();
+    clearLastActive();
     await flushCloudWrites();
     location.reload();
   }
@@ -1181,7 +1139,7 @@
             return;
           }
           setSession(account.id);
-          setLoginAt(Date.now());
+          touchLastActive();
           try { sessionStorage.setItem("app:just-logged-in", "1"); } catch (e) {}
           await flushCloudWrites();
           location.reload();
@@ -1206,7 +1164,7 @@
           accountsList.push(newAccount);
           saveAccounts(accountsList);
           setSession(newAccount.id);
-          setLoginAt(Date.now());
+          touchLastActive();
           try { sessionStorage.setItem("app:just-logged-in", "1"); } catch (e) {}
           await flushCloudWrites();
           location.reload();
@@ -1220,13 +1178,15 @@
   // 세션 확인: 로그인 상태가 아니면 로그인 화면만 그리고 나머지 앱 코드는 실행하지 않는다.
   const _session = getSession();
   let _account = _session ? findAccountById(_session) : null;
-  // 로그인한 지 5시간이 지났으면 자동으로 로그아웃 처리한다.
+  // 하트비트 확인: 마지막으로 이 앱이 열려 있었던 시각으로부터 너무 오래(컴퓨터를
+  // 껐다 켤 정도로) 지났으면 자동으로 로그아웃 처리한다. 탭만 잠깐 닫았다 연 경우처럼
+  // 그 안에 다시 열렸다면 로그인 상태를 그대로 유지한다.
   if (_account) {
-    const _loginAt = Number(getLoginAt());
-    if (!_loginAt || Date.now() - _loginAt >= SESSION_DURATION_MS) {
+    const lastActive = getLastActive();
+    if (!lastActive || Date.now() - lastActive >= SESSION_GAP_LIMIT_MS) {
       clearSession();
       clearMasterOrigin();
-      clearLoginAt();
+      clearLastActive();
       _account = null;
     }
   }
@@ -1243,6 +1203,251 @@
   if (_masterOriginId && !MASTER_ORIGIN_ACCOUNT) clearMasterOrigin();
   // 계정별로 데이터를 분리하기 위해 저장 키 앞에 이 접두어를 붙인다.
   function acctKey(key) { return `acct:${CURRENT_ACCOUNT_ID}:${key}`; }
+
+  /* ===================== 📋 계정 활동 로그 (마스터 전용) =====================
+     각 계정에서 실제 데이터(할일/메모/상담사/면담일지/QA/스케줄 등)가 저장될 때마다
+     "언제 · 누가 · 어디서(어떤 메뉴) · 무엇이 어떻게 바뀌었는지"를 간단히 기록해서
+     쌓아둔다. 이 로그 자체도 클라우드(kv_store)에 함께 저장되므로, 다른 관리자의
+     브라우저에서 생긴 활동도 마스터 계정이라면 새로고침 후 같이 볼 수 있다.
+     계정 목록 자체를 다루는 동작(비밀번호 초기화·이름 변경·삭제)은 acct: 접두어를
+     쓰지 않으므로, 해당 함수(resetAccountPassword 등) 안에서 직접 기록한다. */
+  const ACTIVITY_LOG_KEY = "activity-log:entries";
+  const ACTIVITY_LOG_MAX = 500; // 너무 오래 쌓이지 않도록 최신 N건만 유지
+  function loadActivityLog() {
+    try {
+      const raw = localStorage.getItem(ACTIVITY_LOG_KEY);
+      const parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) { return []; }
+  }
+  function appendActivityLog(entry) {
+    try {
+      const list = loadActivityLog();
+      list.unshift(Object.assign({ id: genId(), at: new Date().toISOString() }, entry));
+      if (list.length > ACTIVITY_LOG_MAX) list.length = ACTIVITY_LOG_MAX;
+      localStorage.setItem(ACTIVITY_LOG_KEY, JSON.stringify(list));
+    } catch (e) { /* 로그 저장 실패가 실제 데이터 저장에 영향을 주면 안 된다 */ }
+  }
+  function clearActivityLog() {
+    try { localStorage.setItem(ACTIVITY_LOG_KEY, JSON.stringify([])); } catch (e) {}
+  }
+  // acct:{id}:personal-xxx:... 형태의 저장 키에서 "어디서 바뀌었는지" 카테고리를 찾아낸다.
+  // (BACKUP_CATEGORIES를 그대로 재사용해 백업 화면의 분류와 일관성을 맞춘다.)
+  function activityCategoryForRelKey(relKey) {
+    const cat = BACKUP_CATEGORIES.find((c) => c.keyPrefixes.some((p) => relKey.indexOf(p) === 0));
+    if (cat) return { key: cat.key, label: cat.label };
+    return { key: "etc", label: "기타" };
+  }
+  // 캘린더처럼 한 카테고리 안에 저장 키가 여러 개(월별 일정 / 할 일 목록)로 나뉜 경우,
+  // 리스트에서 조금 더 구체적으로 어디가 바뀌었는지 보여주기 위한 부가 설명.
+  function activitySubLabel(relKey) {
+    if (relKey === "personal-calendar:todos") return "할 일 목록";
+    const m = /^personal-calendar:(\d{4}-\d{2})$/.exec(relKey);
+    if (m) return `${m[1]} 캘린더 일정`;
+    return "";
+  }
+  function _activityItemLabel(item) {
+    if (item === null || item === undefined) return "(없음)";
+    if (typeof item !== "object") return String(item);
+    const v = item.name || item.title || item.content || item.username || item.label || item.date;
+    if (v) return String(v).slice(0, 40);
+    return item.id ? `#${item.id}` : "항목";
+  }
+  function _activityScalar(v) {
+    if (v === undefined) return "(없음)";
+    if (v === null) return "(비어있음)";
+    if (typeof v === "object") { try { return JSON.stringify(v).slice(0, 60); } catch (e) { return "(객체)"; } }
+    const s = String(v);
+    if (s === "") return "(빈 값)";
+    return s.length > 60 ? `${s.slice(0, 60)}…` : s;
+  }
+  // 저장 전/후 값을 비교해 사람이 읽을 수 있는 변경 내역 줄들을 만든다. 배열은 id 기준으로
+  // 추가/삭제/수정을 구분하고, 객체는 키 기준으로(최대 2단계까지) 비교한다. 완벽한 diff는
+  // 아니지만 "대략 뭐가 바뀌었는지" 파악하기엔 충분한 수준을 목표로 한다.
+  function diffActivityValues(oldVal, newVal, depth) {
+    const lines = [];
+    if (oldVal === undefined && newVal !== undefined) return ["새로 만들어졌어요."];
+    if (oldVal !== undefined && newVal === undefined) return ["삭제됐어요."];
+    if (Array.isArray(oldVal) && Array.isArray(newVal)) {
+      const idBased = (oldVal.length && oldVal.every((x) => x && typeof x === "object" && x.id != null))
+        || (newVal.length && newVal.every((x) => x && typeof x === "object" && x.id != null));
+      if (idBased) {
+        const oldMap = {}; oldVal.forEach((x) => { if (x && x.id != null) oldMap[x.id] = x; });
+        const newMap = {}; newVal.forEach((x) => { if (x && x.id != null) newMap[x.id] = x; });
+        Object.keys(newMap).forEach((id) => {
+          if (!(id in oldMap)) { lines.push(`+ 추가됨: ${_activityItemLabel(newMap[id])}`); return; }
+          const fieldLines = diffActivityValues(oldMap[id], newMap[id], (depth || 0) + 1);
+          if (fieldLines.length) lines.push(`✎ 수정됨: ${_activityItemLabel(newMap[id])} — ${fieldLines.join(" / ")}`);
+        });
+        Object.keys(oldMap).forEach((id) => {
+          if (!(id in newMap)) lines.push(`- 삭제됨: ${_activityItemLabel(oldMap[id])}`);
+        });
+      } else if (JSON.stringify(oldVal) !== JSON.stringify(newVal)) {
+        lines.push(oldVal.length === newVal.length ? "목록 내용이 바뀌었어요." : `목록 항목 수: ${oldVal.length}개 → ${newVal.length}개`);
+      }
+      return lines;
+    }
+    if (oldVal && newVal && typeof oldVal === "object" && typeof newVal === "object") {
+      if ((depth || 0) >= 3) {
+        if (JSON.stringify(oldVal) !== JSON.stringify(newVal)) lines.push("내용이 바뀌었어요.");
+        return lines;
+      }
+      const keys = Array.from(new Set(Object.keys(oldVal).concat(Object.keys(newVal))));
+      keys.forEach((k) => {
+        const ov = oldVal[k];
+        const nv = newVal[k];
+        if (JSON.stringify(ov) === JSON.stringify(nv)) return;
+        if (ov && nv && typeof ov === "object" && typeof nv === "object") {
+          const sub = diffActivityValues(ov, nv, (depth || 0) + 1);
+          if (sub.length) sub.forEach((s) => lines.push(`${k}.${s}`));
+          else lines.push(`${k}: 내용이 바뀌었어요.`);
+        } else {
+          lines.push(`${k}: ${_activityScalar(ov)} → ${_activityScalar(nv)}`);
+        }
+      });
+      return lines;
+    }
+    if (oldVal !== newVal) lines.push(`${_activityScalar(oldVal)} → ${_activityScalar(newVal)}`);
+    return lines;
+  }
+  function buildActivityDiffLines(oldRaw, newRaw) {
+    if (oldRaw === newRaw) return [];
+    let oldVal, newVal;
+    try { oldVal = oldRaw != null ? JSON.parse(oldRaw) : undefined; } catch (e) { oldVal = oldRaw; }
+    try { newVal = newRaw != null ? JSON.parse(newRaw) : undefined; } catch (e) { newVal = newRaw; }
+    const lines = diffActivityValues(oldVal, newVal, 0);
+    if (lines.length > 40) return lines.slice(0, 40).concat([`...외 ${lines.length - 40}건 더`]);
+    return lines.length ? lines : ["내용이 바뀌었어요."];
+  }
+
+  /* ---- 3분 단위로 묶어서 기록하기 ----
+     한 계정에서 짧은 시간 안에 여러 번 수정하면(스케줄 셀 여러 칸 수정 등) 로그가
+     한 줄씩 계속 쌓여서 목록이 너무 많아진다. 그래서 계정별로 "첫 변경이 생긴 시점"
+     부터 3분짜리 타이머를 하나 돌리고, 그 3분 동안 생긴 변경들은 전부 한 줄(리스트
+     항목 하나)로 모아서 기록한다. 3분이 지나면 그 줄은 마감되고, 그다음 변경부터는
+     새로운 3분 타이머(=새로운 줄)로 다시 쌓인다. 진행 중인 묶음은 클라우드에도 같이
+     저장해두므로, 브라우저를 껐다 켜거나 다른 탭/다른 사람이 열어도 이어서 처리된다. */
+  const ACTIVITY_BATCH_WINDOW_MS = 3 * 60 * 1000;
+  const ACTIVITY_PENDING_KEY = "activity-log:pending";
+  const _activityFlushTimers = {}; // accountId -> setTimeout id (이 탭이 열려 있는 동안만 유효)
+  function loadPendingActivityBatches() {
+    try {
+      const raw = localStorage.getItem(ACTIVITY_PENDING_KEY);
+      const parsed = raw ? JSON.parse(raw) : {};
+      return parsed && typeof parsed === "object" ? parsed : {};
+    } catch (e) { return {}; }
+  }
+  function savePendingActivityBatches(map) {
+    try { localStorage.setItem(ACTIVITY_PENDING_KEY, JSON.stringify(map)); } catch (e) {}
+  }
+  function scheduleActivityFlush(accountId, delayMs) {
+    if (_activityFlushTimers[accountId]) return; // 이미 이 탭에서 예약돼 있음
+    _activityFlushTimers[accountId] = setTimeout(() => {
+      delete _activityFlushTimers[accountId];
+      finalizeActivityBatch(accountId);
+    }, Math.max(0, delayMs));
+  }
+  // 진행 중이던 묶음을 하나의 로그 항목으로 마감해서 실제 목록(activity-log:entries)에 올린다.
+  function finalizeActivityBatch(accountId) {
+    if (_activityFlushTimers[accountId]) { clearTimeout(_activityFlushTimers[accountId]); delete _activityFlushTimers[accountId]; }
+    const pending = loadPendingActivityBatches();
+    const batch = pending[accountId];
+    if (!batch || !batch.changes || !batch.changes.length) { delete pending[accountId]; savePendingActivityBatches(pending); return; }
+    delete pending[accountId];
+    savePendingActivityBatches(pending);
+    const whereLabels = [];
+    batch.changes.forEach((c) => {
+      const w = c.subLabel ? `${c.categoryLabel} · ${c.subLabel}` : c.categoryLabel;
+      if (whereLabels.indexOf(w) === -1) whereLabels.push(w);
+    });
+    const categoryLabel = whereLabels.length <= 2 ? whereLabels.join(", ") : `${whereLabels.slice(0, 2).join(", ")} 외 ${whereLabels.length - 2}곳`;
+    const diffLines = [];
+    batch.changes.forEach((c) => {
+      const timeLabel = c.at ? c.at.slice(11, 16) : "";
+      const where = c.subLabel ? `${c.categoryLabel} · ${c.subLabel}` : c.categoryLabel;
+      (c.diff && c.diff.length ? c.diff : ["내용이 바뀌었어요."]).forEach((line) => diffLines.push(`[${timeLabel}] ${where} — ${line}`));
+    });
+    appendActivityLog({
+      at: batch.startedAt,
+      endedAt: new Date().toISOString(),
+      accountId,
+      accountName: batch.accountName,
+      viaMasterName: batch.viaMasterName,
+      categoryKey: "batch",
+      categoryLabel,
+      subLabel: `${batch.changes.length}건`,
+      diff: diffLines,
+    });
+  }
+  // 개별 변경 하나를 계정별 진행 중인 3분 묶음에 쌓는다(묶음이 없거나 이미 3분이
+  // 지났으면 새 묶음을 새로 시작한다).
+  function queueActivityChange(change) {
+    let pending = loadPendingActivityBatches();
+    const existing = pending[change.accountId];
+    if (existing && existing.startedAt && (Date.now() - Date.parse(existing.startedAt)) >= ACTIVITY_BATCH_WINDOW_MS) {
+      finalizeActivityBatch(change.accountId); // 창이 이미 끝난 묶음이면 먼저 마감하고 새로 시작
+      pending = loadPendingActivityBatches();
+    }
+    let batch = pending[change.accountId];
+    if (!batch) {
+      batch = { startedAt: new Date().toISOString(), accountId: change.accountId, accountName: change.accountName, viaMasterName: change.viaMasterName, changes: [] };
+      pending[change.accountId] = batch;
+      scheduleActivityFlush(change.accountId, ACTIVITY_BATCH_WINDOW_MS);
+    } else {
+      batch.accountName = change.accountName;
+      batch.viaMasterName = change.viaMasterName;
+    }
+    batch.changes.push({
+      at: new Date().toISOString(),
+      categoryKey: change.categoryKey,
+      categoryLabel: change.categoryLabel,
+      subLabel: change.subLabel,
+      diff: change.diff,
+    });
+    savePendingActivityBatches(pending);
+  }
+  // 앱을 새로 열 때, 다른 탭/다른 사람이 만들어두고 아직 안 끝난 묶음들을 이어받는다.
+  // 이미 3분이 지나버린 묶음은 바로 마감하고, 아직 남았으면 남은 시간만큼만 다시 예약한다.
+  function resumePendingActivityBatches() {
+    const pending = loadPendingActivityBatches();
+    const now = Date.now();
+    Object.keys(pending).forEach((accountId) => {
+      const batch = pending[accountId];
+      if (!batch || !batch.startedAt) return;
+      const elapsed = now - Date.parse(batch.startedAt);
+      if (elapsed >= ACTIVITY_BATCH_WINDOW_MS) finalizeActivityBatch(accountId);
+      else scheduleActivityFlush(accountId, ACTIVITY_BATCH_WINDOW_MS - elapsed);
+    });
+  }
+  resumePendingActivityBatches();
+
+  // acct:{계정id}:{나머지 키} 형태의 저장에만 반응해서 활동 로그를 남긴다. 계정 목록
+  // (비밀번호/이름/삭제)처럼 이 접두어를 쓰지 않는 값은 여기서 잡히지 않고, 해당
+  // 동작을 하는 함수(renameAccount 등) 안에서 직접 appendActivityLog를 호출한다.
+  const _preActivityLogSetItem = localStorage.setItem;
+  localStorage.setItem = function (key, value) {
+    const m = typeof key === "string" ? /^acct:([^:]+):(.+)$/.exec(key) : null;
+    let oldRaw = null;
+    if (m) { try { oldRaw = localStorage.getItem(key); } catch (e) {} }
+    _preActivityLogSetItem(key, value);
+    if (!m || oldRaw === value) return; // 실제로 값이 바뀐 경우에만 기록
+    try {
+      const accountId = m[1];
+      const relKey = m[2];
+      const acc = accountId === CURRENT_ACCOUNT_ID ? { username: CURRENT_ACCOUNT_NAME } : (findAccountById(accountId) || {});
+      const cat = activityCategoryForRelKey(relKey);
+      queueActivityChange({
+        accountId,
+        accountName: acc.username || "(삭제된 계정)",
+        viaMasterName: MASTER_ORIGIN_ACCOUNT ? MASTER_ORIGIN_ACCOUNT.username : null,
+        categoryKey: cat.key,
+        categoryLabel: cat.label,
+        subLabel: activitySubLabel(relKey),
+        diff: buildActivityDiffLines(oldRaw, value),
+      });
+    } catch (e) { /* 로그 기록 실패가 실제 저장에 영향을 주면 안 된다 */ }
+  };
+
 
   // 화면 오른쪽 아래 "새로고침" 버튼을 누르면, 다른 사람/다른 기기에서 바뀐 내용을
   // 서버에서 다시 받아오기 위해 페이지를 실제로 다시 불러온다(location.reload()).
