@@ -174,16 +174,135 @@
   /* ---- 동시 편집 충돌 감지 ----
      _knownServerUpdatedAt: 이 브라우저가 마지막으로 확인한 "서버에 있는" 버전의 updated_at.
        내가 저장에 성공하거나, 실시간으로 남의 변경을 확인할 때마다 갱신된다.
+     _knownServerValue: 위 시점의 실제 내용(JSON 문자열). 나중에 충돌이 나면 "그때는
+       이랬는데, 나는 이렇게 바꿨고, 지금 서버는 이렇게 바뀌어 있다"를 비교해서 자동으로
+       합칠 수 있는 기준(base)으로 쓴다.
      _ourWriteTimestamps: 내가 방금 보낸 저장 요청의 updated_at을 key별로 기억해둔다.
        실시간 이벤트가 돌아왔을 때 "방금 내가 쓴 걸 그대로 되돌려받은 것"인지
        "남이 새로 고친 것"인지 구분하는 용도.
      _pushChains: 같은 key에 대한 저장 요청을 한 번에 하나씩만 순서대로 보내서,
        내가 연달아 두 번 저장했을 뿐인데 스스로와 충돌났다고 오판하는 걸 막는다. */
   const _knownServerUpdatedAt = {};
+  const _knownServerValue = {};
   const _ourWriteTimestamps = {};
   const _pushChains = {};
-  const _conflictedKeys = new Set(); // 저장하려 했지만 충돌해서 보류 중인 키
+  const _conflictedKeys = new Set(); // 자동 병합도 실패해서 정말로 물어봐야 하는 키
   const _remoteChangedKeys = new Set(); // 남이 고쳤는데 아직 화면엔 반영 안 한 키
+
+  /* ---- 저장 충돌 자동 병합 ----
+     지금까지는 같은 key(예: 면담일지 전체, 스케줄 전체처럼 카테고리 하나를 통째로 담은
+     덩어리)를 다른 사람이 "거의 동시에" 저장하면 무조건 "저장 충돌" 팝업을 띄우고
+     사용자가 직접 "새로 불러오기 / 내 걸로 덮어쓰기" 중 하나를 고르게 했다. 문제는
+     같은 카테고리 안에서 서로 완전히 다른 항목(예: A 상담사 면담 기록 vs B 상담사 면담
+     기록)을 고친 경우에도 "같은 key"라는 이유만으로 매번 충돌로 잡혔다는 점이다.
+     아래 3-way 병합은 "마지막으로 서버와 같았던 상태(base)"를 기준으로 "내가 바꾼 부분"과
+     "남이 바꾼 부분"을 항목 단위(id가 있는 배열)나 키 단위(객체)로 비교해서, 서로 겹치지
+     않으면 조용히 합쳐서 다시 저장한다. 정말로 같은 항목의 같은 값을 서로 다르게 고친
+     경우에만(드물게) 예전처럼 팝업을 띄운다. */
+  const MERGE_CONFLICT = Symbol("merge-conflict");
+  function _deepEqual(a, b) {
+    if (a === b) return true;
+    if (a === null || b === null || typeof a !== "object" || typeof b !== "object") return false;
+    if (Array.isArray(a) !== Array.isArray(b)) return false;
+    if (Array.isArray(a)) {
+      if (a.length !== b.length) return false;
+      for (let i = 0; i < a.length; i++) if (!_deepEqual(a[i], b[i])) return false;
+      return true;
+    }
+    const ka = Object.keys(a), kb = Object.keys(b);
+    if (ka.length !== kb.length) return false;
+    return ka.every((k) => Object.prototype.hasOwnProperty.call(b, k) && _deepEqual(a[k], b[k]));
+  }
+  // "id를 가진 객체들의 배열"인지 판단한다 (면담 기록, 상담사, 할 일처럼 각 항목을
+  // 하나씩 구분해서 합칠 수 있는 목록). 순서만 있는 배열(즐겨찾기 순서 등)은 해당 없음.
+  function _isIdArray(arr) {
+    return Array.isArray(arr) && arr.length > 0 && arr.every((it) => it && typeof it === "object" && !Array.isArray(it) && (typeof it.id === "string" || typeof it.id === "number"));
+  }
+  function _merge3(base, local, remote) {
+    if (_deepEqual(local, remote)) return local;
+    if (_deepEqual(local, base)) return remote; // 나는 이 부분을 안 바꿨음 → 남의 변경을 그대로 받음
+    if (_deepEqual(remote, base)) return local; // 남은 이 부분을 안 바꿨음 → 내 변경을 그대로 유지
+    // 여기부터는 둘 다 바뀐 경우. 구조를 보고 항목 단위로 합칠 수 있는지 시도한다.
+    if (_isIdArray(local) && _isIdArray(remote)) {
+      const baseArr = Array.isArray(base) ? base : [];
+      const baseById = {}; baseArr.forEach((it) => { if (it && it.id != null) baseById[it.id] = it; });
+      const localById = {}; local.forEach((it) => { localById[it.id] = it; });
+      const remoteById = {}; remote.forEach((it) => { remoteById[it.id] = it; });
+      const ids = []; const seen = new Set();
+      local.forEach((it) => { if (!seen.has(it.id)) { seen.add(it.id); ids.push(it.id); } });
+      remote.forEach((it) => { if (!seen.has(it.id)) { seen.add(it.id); ids.push(it.id); } });
+      const result = [];
+      for (const id of ids) {
+        const inBase = Object.prototype.hasOwnProperty.call(baseById, id);
+        const inLocal = Object.prototype.hasOwnProperty.call(localById, id);
+        const inRemote = Object.prototype.hasOwnProperty.call(remoteById, id);
+        if (inLocal && inRemote) {
+          const merged = _merge3(inBase ? baseById[id] : undefined, localById[id], remoteById[id]);
+          if (merged === MERGE_CONFLICT) return MERGE_CONFLICT;
+          result.push(merged);
+        } else if (inLocal && !inRemote) {
+          // 남에게 없는 항목: 내가 새로 추가했거나, 남이 지운 뒤에도 나는 그대로 갖고 있음 → 유지
+          result.push(localById[id]);
+        } else if (!inLocal && inRemote) {
+          // 나에게 없는 항목: base와 비교해서 남이 그 사이에 손대지 않은 채 나만 지웠다면
+          // 삭제를 존중하고, 남이 그 사이 고치거나 새로 추가했다면 잃어버리지 않게 살려둔다.
+          if (inBase && _deepEqual(baseById[id], remoteById[id])) { /* 삭제 유지 */ }
+          else result.push(remoteById[id]);
+        }
+      }
+      return result;
+    }
+    if (local && remote && typeof local === "object" && typeof remote === "object" && !Array.isArray(local) && !Array.isArray(remote)) {
+      const baseObj = (base && typeof base === "object" && !Array.isArray(base)) ? base : {};
+      const keys = new Set([...Object.keys(baseObj), ...Object.keys(local), ...Object.keys(remote)]);
+      const result = {};
+      for (const k of keys) {
+        const inBase = Object.prototype.hasOwnProperty.call(baseObj, k);
+        const inLocal = Object.prototype.hasOwnProperty.call(local, k);
+        const inRemote = Object.prototype.hasOwnProperty.call(remote, k);
+        if (inLocal && inRemote) {
+          const merged = _merge3(inBase ? baseObj[k] : undefined, local[k], remote[k]);
+          if (merged === MERGE_CONFLICT) return MERGE_CONFLICT;
+          result[k] = merged;
+        } else if (inLocal && !inRemote) {
+          if (inBase && _deepEqual(baseObj[k], local[k])) { /* 내가 안 바꿨고 남이 지움 → 삭제 유지 */ }
+          else result[k] = local[k];
+        } else if (!inLocal && inRemote) {
+          if (inBase && _deepEqual(baseObj[k], remote[k])) { /* 남이 안 바꿨고 내가 지움 → 삭제 유지 */ }
+          else result[k] = remote[k];
+        }
+      }
+      return result;
+    }
+    // 순서만 있는 배열이나 값 하나(문자열/숫자 등)를 서로 다르게 고친 경우는 자동으로
+    // 합칠 방법이 없다 → 여기서만 "진짜 충돌"로 취급한다.
+    return MERGE_CONFLICT;
+  }
+  // 충돌이 났을 때 자동 병합을 시도한다. 성공하면 합쳐진 JSON 문자열을, 실패하면
+  // null을 돌려준다. 병합에 성공하면 이 브라우저의 화면(메모리)에도 즉시 반영해서,
+  // 다시 저장을 시도하는 동안 화면이 최신 내용을 보여주게 한다.
+  async function _tryAutoMergeConflict(key, localValue) {
+    try {
+      const { data, error } = await cloud.from("kv_store").select("value,updated_at").eq("key", key).maybeSingle();
+      if (error || !data) return null;
+      _knownServerUpdatedAt[key] = data.updated_at;
+      let baseParsed, localParsed, remoteParsed;
+      try {
+        baseParsed = _knownServerValue[key] !== undefined ? JSON.parse(_knownServerValue[key]) : undefined;
+        localParsed = JSON.parse(localValue);
+        remoteParsed = JSON.parse(data.value);
+      } catch (e) { return null; } // JSON이 아니면 자동 병합을 시도하지 않음
+      const merged = _merge3(baseParsed, localParsed, remoteParsed);
+      if (merged === MERGE_CONFLICT) return null;
+      const mergedStr = JSON.stringify(merged);
+      _origSetItem(key, mergedStr);
+      let affectedPages = [];
+      try { affectedPages = _applyRemoteChangeToMemory(key); } catch (e) {}
+      if (affectedPages.indexOf(state.page) !== -1 && !_hasActiveEditableFocus()) renderApp();
+      return mergedStr;
+    } catch (e) { return null; }
+  }
+
 
   const CLOUD_KEY_LABELS = [
     ["personal-schedule:data", "월별 스케줄"],
@@ -197,6 +316,61 @@
   function cloudKeyLabel(key) {
     const found = CLOUD_KEY_LABELS.find(([frag]) => key.indexOf(frag) !== -1);
     return found ? found[1] : "데이터";
+  }
+
+  /* ---- 실시간 변경 사항을 "지금 이 화면이 들고 있는 메모리"에 곧바로 반영하기.
+     각 화면(모듈)은 localStorage에서 한 번 읽어들인 값을 자바스크립트 변수(interviewsData,
+     notesData 등)에 담아두고 그걸로 화면을 그린다. 그래서 남이 저장한 내용이 localStorage에만
+     반영되고 이 변수들을 다시 안 읽어오면, 다른 화면 갔다가 돌아와도 여전히 예전 내용이 보인다.
+     아래 함수는 바뀐 key에 맞는 모듈 변수를 즉시 다시 읽어들이고, 그 데이터를 사용하는
+     화면 이름들을 돌려준다 — "지금 보고 있는 화면"이 그 목록에 있을 때만 그 자리에서
+     다시 그려줄지 말지를 판단하는 데 쓴다. */
+  function _monthDataKeyMatch(key) {
+    const m = key.match(/personal-calendar:(\d{4})-(\d{2})$/);
+    if (!m) return null;
+    return { year: Number(m[1]), monthIndex: Number(m[2]) - 1 };
+  }
+  function _applyRemoteChangeToMemory(key) {
+    if (key.indexOf("personal-calendar:todos") !== -1) {
+      todos = loadTodos();
+      return ["calendar", "home"];
+    }
+    const monthMatch = _monthDataKeyMatch(key);
+    if (monthMatch) {
+      // 지금 화면에 열려 있는 달과 같을 때만 그 자리에서 다시 읽어들인다(다른 달 데이터는
+      // 어차피 화면에 안 보이니 나중에 그 달로 이동할 때 자연스럽게 새로 읽힌다).
+      if (cal.year === monthMatch.year && cal.monthIndex === monthMatch.monthIndex) loadMonth(cal.year, cal.monthIndex);
+      return ["calendar", "home"];
+    }
+    if (key.indexOf("personal-notes:data") !== -1) {
+      undoRestoreObjectInPlace(notesData, loadNotesData());
+      return ["notes", "home"];
+    }
+    if (key.indexOf("personal-agents:data") !== -1) {
+      agentsData = loadAgentsData();
+      return ["agents", "home", "interviews", "schedule", "qa"];
+    }
+    if (key.indexOf("personal-qa:data") !== -1) {
+      qaData = loadQAData();
+      return ["qa"];
+    }
+    if (key.indexOf("personal-interviews:data") !== -1) {
+      interviewsData = loadInterviewsData();
+      return ["interviews", "home"];
+    }
+    if (key.indexOf("personal-schedule:data") !== -1) {
+      reloadScheduleData();
+      return ["schedule", "home"];
+    }
+    return [];
+  }
+  // 지금 어딘가에 글자를 입력 중인지(텍스트칸에 커서가 가 있는지) 확인한다. 입력 중일 때
+  // 화면을 억지로 다시 그리면 커서 위치나 아직 저장 안 된 입력 내용이 날아갈 수 있어서,
+  // 그럴 때는 그 자리에서 바로 반영하지 않고 예전처럼 "새로고침" 배너로만 알린다.
+  function _hasActiveEditableFocus() {
+    const el = document.activeElement;
+    if (!el) return false;
+    return el.tagName === "TEXTAREA" || el.tagName === "INPUT" || !!el.isContentEditable;
   }
 
   /* ---- 배너 UI: "남이 방금 고쳤어요" / "저장 충돌" 을 화면 위쪽에 띄운다.
@@ -226,7 +400,7 @@
       ${ICON_BELL}
       <div class="cloud-live-banner-body">
         <div class="cloud-live-banner-title">저장 충돌</div>
-        <div class="cloud-live-banner-desc"><b>${esc(labels)}</b>을(를) 다른 관리자(또는 다른 탭)가 거의 같은 시간에 수정해서, 내가 방금 한 변경이 아직 저장되지 못했어요.</div>
+        <div class="cloud-live-banner-desc"><b>${esc(labels)}</b>의 같은 항목을 다른 관리자(또는 다른 탭)가 거의 같은 순간에 고쳐서, 자동으로 합칠 수 없었어요. 내가 방금 한 변경이 아직 저장되지 못했어요.</div>
         <div class="cloud-live-banner-actions">
           <button type="button" class="ghost-btn" id="cloud-conflict-reload">최신 내용 불러오기</button>
           <button type="button" class="primary-btn" id="cloud-conflict-force">내 변경으로 덮어쓰기</button>
@@ -271,7 +445,9 @@
     };
   }
 
-  async function _doCloudPush(key, value, force) {
+  async function _doCloudPush(key, value, opts) {
+    const force = !!(opts && opts.force);
+    const attempt = (opts && opts.attempt) || 0;
     try {
       const newTs = new Date().toISOString();
       const expected = _knownServerUpdatedAt[key];
@@ -292,6 +468,12 @@
         await cloud.from("kv_store").upsert({ key, value, updated_at: newTs });
       }
       if (!wroteOk) {
+        // 곧바로 팝업을 띄우지 않고, 먼저 자동으로 합쳐볼 수 있는지 시도한다. 서로 다른
+        // 항목을 고친 경우가 대부분이라 여기서 대부분 조용히 해결된다(최대 3번 재시도).
+        if (attempt < 3) {
+          const merged = await _tryAutoMergeConflict(key, value);
+          if (merged !== null) return _doCloudPush(key, merged, { force: false, attempt: attempt + 1 });
+        }
         _conflictedKeys.add(key);
         _renderConflictBanner();
         notifyCloudSyncSettle(false);
@@ -300,6 +482,7 @@
       _conflictedKeys.delete(key);
       _renderConflictBanner();
       _knownServerUpdatedAt[key] = newTs;
+      _knownServerValue[key] = value;
       _ourWriteTimestamps[key] = newTs;
       notifyCloudSyncSettle(true);
     } catch (e) {
@@ -313,8 +496,8 @@
     const force = !!(opts && opts.force);
     const prev = _pushChains[key] || Promise.resolve();
     const run = prev.then(
-      () => _doCloudPush(key, value, force),
-      () => _doCloudPush(key, value, force)
+      () => _doCloudPush(key, value, { force }),
+      () => _doCloudPush(key, value, { force })
     );
     _pushChains[key] = run.catch(() => {});
     return _trackCloudWrite(run);
@@ -323,6 +506,7 @@
     try {
       await cloud.from("kv_store").delete().eq("key", key);
       delete _knownServerUpdatedAt[key];
+      delete _knownServerValue[key];
       _conflictedKeys.delete(key);
       _renderConflictBanner();
       notifyCloudSyncSettle(true);
@@ -350,6 +534,7 @@
       data.forEach((row) => {
         try { _origSetItem(row.key, row.value); } catch (e) {}
         _knownServerUpdatedAt[row.key] = row.updated_at;
+        _knownServerValue[row.key] = row.value;
       });
     } catch (e) { /* 오프라인 등으로 실패하면 이전에 이 브라우저에 남아있던 값으로 동작 */ }
   }
@@ -365,10 +550,16 @@
   };
   await cloudHydrate();
 
-  /* ---- 실시간 구독: 다른 사람(또는 다른 탭)이 저장하면 새로고침 없이도 바로 알려준다.
-     화면을 그 자리에서 억지로 다시 그리면 지금 입력 중이던 내용이 튈 수 있어서,
-     "바뀌었어요 + 새로고침" 배너로 알리는 정도로만 개입한다. 내가 방금 보낸 저장이
-     그대로 돌아온 경우(에코)는 알림에서 제외한다. */
+  /* ---- 실시간 구독: 다른 사람(또는 다른 탭)이 저장하면 곧바로 반영한다.
+     - 우선 로컬 저장소(localStorage)에도 최신 값을 바로 써둔다. 이렇게 해야 지금 다른
+       화면을 보고 있다가 나중에 그 화면으로 돌아왔을 때(또는 그 모듈이 새로 데이터를
+       읽어들일 때) 새로고침 없이도 최신 내용이 보인다.
+     - 그 다음 해당 데이터를 들고 있는 모듈의 메모리 변수도 즉시 다시 읽어들인다.
+     - "지금 보고 있는 화면"이 바로 그 데이터를 쓰는 화면이라면: 입력 중인 칸이 없을 때는
+       그 자리에서 곧장 다시 그려서 보여주고, 입력 중인 칸이 있을 때는(화면을 억지로 다시
+       그리면 커서/미저장 입력이 튈 수 있으므로) 예전처럼 "바뀌었어요 + 새로고침" 배너로만
+       알린다. 지금 보고 있는 화면과 무관한 데이터라면 이미 메모리에 반영해뒀으니 배너 없이
+       조용히 넘어간다. 내가 방금 보낸 저장이 그대로 돌아온 경우(에코)는 제외한다. */
   if (cloud) {
     cloud
       .channel("kv_store_live")
@@ -380,13 +571,25 @@
           if (!row || !row.key || !isCloudSynced(row.key)) return;
           if (payload.eventType === "DELETE") {
             delete _knownServerUpdatedAt[row.key];
+            delete _knownServerValue[row.key];
             return;
           }
           if (_ourWriteTimestamps[row.key] === row.updated_at) return; // 내가 방금 쓴 것의 에코
           _knownServerUpdatedAt[row.key] = row.updated_at;
-          if (localStorage.getItem(row.key) === row.value) return; // 이미 같은 내용이면 알릴 필요 없음
-          _remoteChangedKeys.add(row.key);
-          _renderRemoteUpdateBanner();
+          _knownServerValue[row.key] = row.value;
+          if (localStorage.getItem(row.key) === row.value) return; // 이미 같은 내용이면 반영할 필요 없음
+          _origSetItem(row.key, row.value); // 로컬 저장소에도 최신 내용 반영 (다른 화면 갔다 왔을 때를 대비)
+          let affectedPages = [];
+          try { affectedPages = _applyRemoteChangeToMemory(row.key); } catch (e) {}
+          const isCurrentPageAffected = affectedPages.indexOf(state.page) !== -1;
+          if (isCurrentPageAffected && !_hasActiveEditableFocus()) {
+            renderApp(); // 지금 보고 있는 화면 데이터인데 입력 중이 아니라면 새로고침 없이 그 자리에서 갱신
+            return;
+          }
+          if (isCurrentPageAffected) {
+            _remoteChangedKeys.add(row.key); // 입력 중이라 화면을 억지로 바꾸지 않고 배너로만 알림
+            _renderRemoteUpdateBanner();
+          }
         }
       )
       .subscribe();
