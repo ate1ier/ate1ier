@@ -5,6 +5,11 @@
   .gs-wrap {
     position: relative;
     width: 100%;
+    /* 검색 결과 패널 배경: 기본 --mac-vibrancy(0.66)보다 불투명하게 */
+    --gs-results-bg: rgba(41, 41, 46, 0.94);
+  }
+  html[data-theme="light"] .gs-wrap {
+    --gs-results-bg: rgba(255, 255, 255, 0.94);
   }
   .gs-bar {
     display: flex;
@@ -58,7 +63,7 @@
     overflow-y: auto;
     border-radius: 20px;
     border: 1px solid var(--mac-vibrancy-hairline);
-    background: var(--mac-vibrancy);
+    background: var(--gs-results-bg, var(--mac-vibrancy));
     backdrop-filter: blur(30px) saturate(2);
     -webkit-backdrop-filter: blur(30px) saturate(2);
     box-shadow: var(--mac-shadow-float);

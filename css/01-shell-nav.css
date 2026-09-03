@@ -343,17 +343,18 @@
       width: 64px;
       height: 28px;
       padding: 0;
-      border: 1px solid var(--mac-vibrancy-hairline);
+      border: 1px solid var(--hairline-strong);
       border-radius: 20px;
-      background: var(--mac-vibrancy);
+      background: rgba(59, 59, 67, 0.88);
       backdrop-filter: blur(28px) saturate(2);
       -webkit-backdrop-filter: blur(28px) saturate(2);
       box-shadow: var(--mac-shadow-float);
-      color: var(--text-faint);
+      color: var(--text-dim);
       cursor: pointer;
-      transition: color 0.12s ease;
+      transition: color 0.12s ease, border-color 0.12s ease, background 0.12s ease;
     }
-    .dock-toggle-btn:hover { color: var(--text); }
+    html[data-theme="light"] .dock-toggle-btn { background: rgba(255, 255, 255, 0.88); }
+    .dock-toggle-btn:hover { color: var(--text); border-color: var(--accent); }
     .dock-toggle-btn svg { transition: transform 0.2s ease; }
     .dock-toggle-btn.open svg { transform: rotate(180deg); }
 
