@@ -1694,9 +1694,28 @@
     location.reload();
   }
 
+  // 목록에서 눌러서 펼쳐본 상태(면담일지 펼침, 캘린더/할일 상세 펼침, 메모 펼침, "더보기" 등)는
+  // 그 화면을 잠깐 보다가 떠나면 초기화해서, 나중에 다시 들어올 때는 항상 접힌 채로 깔끔하게
+  // 보이게 한다. 전역 검색 결과를 눌러 다른 화면의 특정 항목을 펼쳐서 보여주는 기능은 "이동할
+  // 목적지" 화면의 상태를 미리 켜둔 뒤 setPage를 호출하는 방식이라, 여기서는 "떠나는 화면"의
+  // 상태만 초기화해야 서로 부딪히지 않는다.
+  function _resetExpandedStateForPage(p) {
+    if (p === "home") {
+      if (typeof homeUi !== "undefined") homeUi.interviewAlertExpanded = false;
+    } else if (p === "calendar") {
+      if (typeof cal !== "undefined") { cal.expandedEntries = {}; cal.upcomingExpanded = false; }
+      if (typeof todoUi !== "undefined") { todoUi.expanded = {}; todoUi.doneExpanded = false; }
+    } else if (p === "notes") {
+      if (typeof notesUi !== "undefined") notesUi.expanded = {};
+    } else if (p === "interviews") {
+      if (typeof interviewsUi !== "undefined") interviewsUi.expandedIds = new Set();
+    }
+  }
+
   function setPage(p) {
     // 마스터 계정은 계정 관리 페이지 외에는 이동하지 않는다.
     if (CURRENT_ACCOUNT_IS_MASTER) { state.page = "master"; renderApp(); return; }
+    if (p !== state.page) _resetExpandedStateForPage(state.page); // 떠나는 화면의 펼침 상태 초기화
     // "월별 스케줄" 카테고리를 누르면 항상 실시간 기준 당월 스케줄을 보여준다.
     if (p === "schedule" && typeof scheduleUi !== "undefined") {
       scheduleUi.year = today.getFullYear();
