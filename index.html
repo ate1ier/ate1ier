@@ -4647,6 +4647,132 @@
     interviewsData = interviewsData.filter((r) => r.id !== id);
     saveInterviewsData();
   }
+  /* ---- 면담일지 엑셀 다운로드 ---- */
+  function interviewExportFilename(labelPart) {
+    return `면담일지_${sanitizeFilenamePart(labelPart)}_${backupFilenameStamp()}.xlsx`;
+  }
+  function interviewExportRowData(rec) {
+    const agent = agentsData.find((a) => a.id === rec.agentId);
+    const manager = rec.managerId ? agentsData.find((a) => a.id === rec.managerId) : null;
+    return {
+      date: rec.date || "",
+      type: rec.type || "수시",
+      agentName: agent ? agent.name : "(삭제된 상담사)",
+      agentLdap: agent ? (agent.ldap || "") : "",
+      group: agent ? (agent.group === "night" ? "야간" : "주간") : "",
+      workTypes: agent && agent.workTypes ? agent.workTypes.join(", ") : "",
+      manager: manager ? `${manager.name} (${manager.ldap || "-"})` : "",
+      content: rec.content || "",
+      followUp: rec.followUp || "",
+      createdAt: rec.createdAt ? rec.createdAt.replace("T", " ").slice(0, 16) : "",
+    };
+  }
+  // 면담 기록 목록을 엑셀(.xlsx) 파일로 내려받는다. 개별/전체/주·야간별/상담사별 다운로드가 모두 이 함수를 함께 쓴다.
+  async function exportInterviewsToExcel(list, filename, statusElId) {
+    if (typeof ExcelJS === "undefined") {
+      flashInterviewStatus("엑셀 변환 기능을 불러오지 못했어요. 인터넷 연결을 확인해주세요.", statusElId);
+      return;
+    }
+    if (!list.length) {
+      flashInterviewStatus("다운로드할 면담 기록이 없어요.", statusElId);
+      return;
+    }
+    try {
+      const wb = new ExcelJS.Workbook();
+      const ws = wb.addWorksheet("면담일지");
+      const columns = [
+        { header: "면담일자", key: "date", width: 12 },
+        { header: "유형", key: "type", width: 8 },
+        { header: "상담사", key: "agentName", width: 12 },
+        { header: "LDAP", key: "agentLdap", width: 12 },
+        { header: "근무조", key: "group", width: 8 },
+        { header: "업무구분", key: "workTypes", width: 12 },
+        { header: "면담 관리자", key: "manager", width: 16 },
+        { header: "면담 내용", key: "content", width: 46 },
+        { header: "후속조치 / 다음 계획", key: "followUp", width: 32 },
+        { header: "작성일시", key: "createdAt", width: 17 },
+      ];
+      ws.columns = columns;
+      // 면담 내용 · 후속조치 열은 글이 길어 왼쪽 정렬, 나머지 열은 가운데 정렬로 통일한다.
+      const leftAlignKeys = new Set(["content", "followUp"]);
+      sortInterviews(list).forEach((rec) => ws.addRow(interviewExportRowData(rec)));
+
+      const headerRow = ws.getRow(1);
+      headerRow.height = 22;
+      headerRow.eachCell((cell) => {
+        cell.font = { bold: true, size: 10, color: { argb: "FF4D5057" } };
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFEEF0F3" } };
+        cell.alignment = { vertical: "middle", horizontal: "center" };
+        cell.border = {
+          top: { style: "thin", color: { argb: "FFB7BCC5" } },
+          left: { style: "thin", color: { argb: "FFB7BCC5" } },
+          right: { style: "thin", color: { argb: "FFB7BCC5" } },
+          bottom: { style: "medium", color: { argb: "FF9AA0AB" } },
+        };
+      });
+      ws.eachRow((row, rowNumber) => {
+        if (rowNumber === 1) return;
+        row.eachCell({ includeEmpty: true }, (cell) => {
+          const key = columns[cell.col - 1] ? columns[cell.col - 1].key : null;
+          const isLeft = leftAlignKeys.has(key);
+          cell.font = Object.assign({}, cell.font, { size: 10 });
+          cell.alignment = isLeft
+            ? { vertical: "middle", horizontal: "left", wrapText: true }
+            : { vertical: "middle", horizontal: "center", wrapText: true };
+          cell.border = {
+            top: { style: "thin", color: { argb: "FFC7CBD3" } },
+            left: { style: "thin", color: { argb: "FFC7CBD3" } },
+            right: { style: "thin", color: { argb: "FFC7CBD3" } },
+            bottom: { style: "thin", color: { argb: "FFC7CBD3" } },
+          };
+        });
+      });
+      // 표(사용된 범위) 밖 셀에는 엑셀 기본 눈금선이 보이지 않도록 시트 눈금선 자체를 끈다.
+      ws.views = [{ state: "frozen", ySplit: 1, showGridLines: false }];
+
+      const buffer = await wb.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      link.click();
+      URL.revokeObjectURL(url);
+      flashInterviewStatus("엑셀 파일을 다운로드했어요.", statusElId);
+    } catch (err) {
+      console.error(err);
+      flashInterviewStatus("엑셀 파일을 만들지 못했어요.", statusElId);
+    }
+  }
+  // 면담 기록 한 건만 엑셀로 내려받는다. (목록의 각 행 · 상담사 상세 화면 공용)
+  function downloadSingleInterview(id) {
+    const rec = interviewsData.find((r) => r.id === id);
+    if (!rec) return;
+    const agent = agentsData.find((a) => a.id === rec.agentId);
+    const label = `${agent ? agent.name : "상담사"}_${rec.date || ""}`;
+    exportInterviewsToExcel([rec], interviewExportFilename(label));
+  }
+  // 등록된 면담 기록 전체를 (현재 검색·필터와 무관하게) 엑셀로 내려받는다.
+  function downloadAllInterviews() {
+    exportInterviewsToExcel(interviewsData, interviewExportFilename("전체"), "interview-status");
+  }
+  // 대상 상담사의 근무 조(주간/야간) 기준으로 면담 기록을 나눠 엑셀로 내려받는다.
+  function downloadInterviewsByGroup(group) {
+    const list = interviewsData.filter((r) => {
+      const agent = agentsData.find((a) => a.id === r.agentId);
+      if (!agent) return false;
+      const isNight = agent.group === "night";
+      return group === "night" ? isNight : !isNight;
+    });
+    exportInterviewsToExcel(list, interviewExportFilename(group === "night" ? "야간" : "주간"), "interview-status");
+  }
+  // 상담사 한 명을 골라 그 사람의 면담 기록만 엑셀로 내려받는다.
+  function downloadInterviewsByAgent(agentId) {
+    const agent = agentsData.find((a) => a.id === agentId);
+    if (!agent) return;
+    const list = interviewsData.filter((r) => r.agentId === agentId);
+    exportInterviewsToExcel(list, interviewExportFilename(agent.name), "interview-status");
+  }
   function interviewTypeBadgeClass(type) {
     if (type === "정기") return "type-regular";
     if (type === "경고") return "type-warning";
@@ -4840,6 +4966,7 @@
           ${agentMetaHtml}
           ${managerHtml}
           <div class="interview-row-actions">
+            <button class="ghost-btn" data-action="${actionPrefix}-download-interview" data-id="${rec.id}" title="엑셀 다운로드">${ICON_DOWNLOAD}</button>
             <button class="ghost-btn" data-action="${actionPrefix}-edit-interview" data-id="${rec.id}">수정</button>
             <button class="ghost-btn danger" data-action="${actionPrefix}-delete-interview" data-id="${rec.id}">삭제</button>
           </div>
@@ -4904,7 +5031,22 @@
       const typeFilterBtns = ["all", ...INTERVIEW_TYPES].map((t) => `
         <button type="button" class="agent-filter-btn ${interviewsUi.typeFilter === t ? "active" : ""}" data-interview-filter="${t}">${t === "all" ? "전체" : t}</button>
       `).join("");
+      const exportAgentOptionsHtml = agentsData
+        .slice()
+        .sort((a, b) => a.name.localeCompare(b.name, "ko"))
+        .map((a) => `<option value="${a.id}">${esc(a.name)} (${esc(a.ldap || "-")})</option>`)
+        .join("");
       bodyHtml = `
+        <div class="interview-export-row">
+          <span class="interview-export-label">${ICON_DOWNLOAD} 엑셀 다운로드</span>
+          <button type="button" class="ghost-btn" id="interview-export-all">전체</button>
+          <button type="button" class="ghost-btn" id="interview-export-day">주간</button>
+          <button type="button" class="ghost-btn" id="interview-export-night">야간</button>
+          <select class="interview-export-select" id="interview-export-agent-select">
+            <option value="">상담사별 다운로드...</option>
+            ${exportAgentOptionsHtml}
+          </select>
+        </div>
         <div class="agent-controls">
           <input type="text" class="add-input agent-search-input" id="interview-search-input" placeholder="상담사 이름 또는 LDAP 검색" value="${esc(interviewsUi.searchQuery)}" autocomplete="off">
           <div class="agent-filter-row">${typeFilterBtns}</div>
@@ -4950,6 +5092,9 @@
 
   function attachInterviewListAreaHandlers(root) {
     attachInterviewRowToggles(root, updateInterviewListArea);
+    root.querySelectorAll("[data-action='page-download-interview']").forEach((btn) => {
+      btn.onclick = () => downloadSingleInterview(btn.getAttribute("data-id"));
+    });
     root.querySelectorAll("[data-action='page-edit-interview']").forEach((btn) => {
       btn.onclick = () => {
         interviewsUi.mode = "edit";
@@ -4990,6 +5135,20 @@
         renderApp();
       };
     });
+    const exportAllBtn = document.getElementById("interview-export-all");
+    if (exportAllBtn) exportAllBtn.onclick = () => downloadAllInterviews();
+    const exportDayBtn = document.getElementById("interview-export-day");
+    if (exportDayBtn) exportDayBtn.onclick = () => downloadInterviewsByGroup("day");
+    const exportNightBtn = document.getElementById("interview-export-night");
+    if (exportNightBtn) exportNightBtn.onclick = () => downloadInterviewsByGroup("night");
+    const exportAgentSelect = document.getElementById("interview-export-agent-select");
+    if (exportAgentSelect) {
+      exportAgentSelect.onchange = () => {
+        const agentId = exportAgentSelect.value;
+        if (agentId) downloadInterviewsByAgent(agentId);
+        exportAgentSelect.value = "";
+      };
+    }
     attachInterviewListAreaHandlers(root);
 
     const form = document.getElementById("interview-page-form");
@@ -5065,6 +5224,9 @@
 
   function attachAgentInterviewEvents(root, agent) {
     attachInterviewRowToggles(root, renderApp);
+    root.querySelectorAll("[data-action='agent-download-interview']").forEach((btn) => {
+      btn.onclick = () => downloadSingleInterview(btn.getAttribute("data-id"));
+    });
     const addBtn = document.getElementById("btn-agent-interview-add");
     if (addBtn) {
       addBtn.onclick = () => {
