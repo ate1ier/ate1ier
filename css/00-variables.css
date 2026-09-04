@@ -53,29 +53,30 @@
     --page-title-weight: 600;
   }
   html[data-theme="light"] {
-    --bg: #f2f3f5;
+    /* ---- macOS 라이트 모드처럼: 더 밝고 화사하게, 테두리는 얇고 옅게, 포인트는 파스텔 블루 ---- */
+    --bg: #f8fafc;
     --panel: #ffffff;
-    --elevated: #e3e5ea;
-    --hairline: rgba(0, 0, 0, 0.15);
-    --hairline-strong: rgba(0, 0, 0, 0.24);
+    --elevated: #eef4fc;
+    --hairline: rgba(60, 60, 67, 0.11);
+    --hairline-strong: rgba(60, 60, 67, 0.18);
     --text: #1d1d1f;
-    --text-dim: #4c4c52;
-    --text-faint: #7c7c82;
-    --accent: #007aff;
-    --accent-dim: #007aff1f;
-    --accent-dim-soft: #007aff08;
+    --text-dim: #55555b;
+    --text-faint: #86868b;
+    --accent: #4a90e2;
+    --accent-dim: #4a90e224;
+    --accent-dim-soft: #4a90e20c;
     --accent-text: #ffffff;
-    --weekend-tint: #eeeef1;
+    --weekend-tint: #eef4fc;
     --native-color-scheme: light;
   }
   /* ---- light 테마는 상태색(오프·연차·대휴 등)이 다크와 다르게 밝은 배경용으로 조정된다 ---- */
   html[data-theme="light"] {
-    --mac-vibrancy: rgba(255, 255, 255, 0.58);
-    --mac-vibrancy-hairline: rgba(0, 0, 0, 0.07);
-    --mac-glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.6);
-    --mac-shadow: 0 20px 48px rgba(0, 0, 0, 0.10), 0 1px 0 rgba(255, 255, 255, 0.5) inset;
-    --mac-shadow-sm: 0 6px 16px rgba(0, 0, 0, 0.08);
-    --mac-shadow-float: 0 16px 36px rgba(0, 0, 0, 0.16), 0 1px 0 rgba(255, 255, 255, 0.5) inset;
+    --mac-vibrancy: rgba(255, 255, 255, 0.66);
+    --mac-vibrancy-hairline: rgba(60, 60, 67, 0.06);
+    --mac-glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+    --mac-shadow: 0 20px 48px rgba(60, 60, 67, 0.08), 0 1px 0 rgba(255, 255, 255, 0.6) inset;
+    --mac-shadow-sm: 0 6px 16px rgba(60, 60, 67, 0.06);
+    --mac-shadow-float: 0 16px 36px rgba(60, 60, 67, 0.12), 0 1px 0 rgba(255, 255, 255, 0.6) inset;
     --green: #2c7f96;
     --green-dim: #2c7f9626;
     --red: #c94f4f;

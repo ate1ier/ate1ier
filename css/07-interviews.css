@@ -26,6 +26,9 @@
   .interview-textarea-content { min-height: 160px; }
   .agent-form-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 13px; }
   @media (max-width: 620px) { .agent-form-row-2 { grid-template-columns: 1fr; } }
+  .agent-form-row-2-date-type { align-items: center; }
+  .agent-form-row-2-date-type .agent-radio-row { margin-top: 0; height: 40px; align-items: center; }
+  @media (max-width: 620px) { .agent-form-row-2-date-type { align-items: stretch; } }
   .agent-picker { position: relative; }
   .agent-picker-list {
     position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 30;

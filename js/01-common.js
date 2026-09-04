@@ -142,6 +142,7 @@
   const _pushChains = {};
   const _conflictedKeys = new Set(); // 자동 병합도 실패해서 정말로 물어봐야 하는 키
   const _remoteChangedKeys = new Set(); // 남이 고쳤는데 아직 화면엔 반영 안 한 키
+  const _fieldConflictNotices = new Map(); // key -> 자동 병합은 됐지만 "이 부분은 겹쳤어요"라고 알려줄 경로들
 
   /* ---- 저장 충돌 자동 병합 ----
      지금까지는 같은 key(예: 면담일지 전체, 스케줄 전체처럼 카테고리 하나를 통째로 담은
@@ -151,8 +152,17 @@
      기록)을 고친 경우에도 "같은 key"라는 이유만으로 매번 충돌로 잡혔다는 점이다.
      아래 3-way 병합은 "마지막으로 서버와 같았던 상태(base)"를 기준으로 "내가 바꾼 부분"과
      "남이 바꾼 부분"을 항목 단위(id가 있는 배열)나 키 단위(객체)로 비교해서, 서로 겹치지
-     않으면 조용히 합쳐서 다시 저장한다. 정말로 같은 항목의 같은 값을 서로 다르게 고친
-     경우에만(드물게) 예전처럼 팝업을 띄운다. */
+     않으면 조용히 합쳐서 다시 저장한다.
+     예전에는 이 병합 도중 어느 한 군데(예: 스케줄의 특정 날짜·특정 칸 하나)만 정말로
+     서로 다른 값으로 동시에 고쳐져도, 그 즉시 객체 전체 병합을 MERGE_CONFLICT로 실패
+     처리해서 무관한 나머지 변경사항까지 통째로 막고 팝업을 띄웠다. 지금은 그렇게 하지
+     않는다 — 진짜로 겹친 "그 한 군데"만 지금 저장하려던 값으로 우선 적용(그 경로를
+     conflicts 목록에 기록)하고, 나머지는 정상적으로 병합해서 저장을 계속 진행한다.
+     겹친 부분이 있었다는 사실은 저장을 막는 팝업이 아니라, 확인만 하면 사라지는
+     가벼운 알림 배너로 알려준다(_renderFieldConflictBanner). 병합 자체가 시작조차
+     안 되는 경우(최상위 값이 애초에 id 없는 배열이나 문자열/숫자 같은 단일 값이라
+     항목 단위로 쪼갤 방법이 없는 경우, 또는 서버 재조회/JSON 파싱 자체가 실패한 경우)
+     에만 예전처럼 진짜 "저장 충돌" 팝업을 띄운다. */
   const MERGE_CONFLICT = Symbol("merge-conflict");
   function _deepEqual(a, b) {
     if (a === b) return true;
@@ -172,7 +182,16 @@
   function _isIdArray(arr) {
     return Array.isArray(arr) && arr.length > 0 && arr.every((it) => it && typeof it === "object" && !Array.isArray(it) && (typeof it.id === "string" || typeof it.id === "number"));
   }
-  function _merge3(base, local, remote) {
+  // path: 지금 비교 중인 위치를 사람이 읽을 수 있는 경로 문자열로 나타낸 것
+  //   (예: "records[2026-05-01].agentId", "monthLocks[2026-05]"). 최상위 호출에서는
+  //   빈 문자열("")이고, 객체 키로 들어갈 때는 ".key"를, id 배열의 항목으로 들어갈
+  //   때는 "[id]"를 이어붙인다. 진짜로 자동 병합이 안 되는 지점을 만나면 이 경로를
+  //   conflicts 배열에 기록해두고, 그 지점만 "지금 저장하려는 값(local)"으로 정해서
+  //   계속 진행한다 — 그래야 무관한 나머지 변경들이 그 한 지점 때문에 통째로 막히지 않는다.
+  // conflicts: 위에서 기록해두는 경로들을 담을 배열(호출부에서 []로 넘겨서 결과를 받아본다).
+  function _merge3(base, local, remote, path, conflicts) {
+    path = path || "";
+    conflicts = conflicts || [];
     if (_deepEqual(local, remote)) return local;
     if (_deepEqual(local, base)) return remote; // 나는 이 부분을 안 바꿨음 → 남의 변경을 그대로 받음
     if (_deepEqual(remote, base)) return local; // 남은 이 부분을 안 바꿨음 → 내 변경을 그대로 유지
@@ -191,8 +210,7 @@
         const inLocal = Object.prototype.hasOwnProperty.call(localById, id);
         const inRemote = Object.prototype.hasOwnProperty.call(remoteById, id);
         if (inLocal && inRemote) {
-          const merged = _merge3(inBase ? baseById[id] : undefined, localById[id], remoteById[id]);
-          if (merged === MERGE_CONFLICT) return MERGE_CONFLICT;
+          const merged = _merge3(inBase ? baseById[id] : undefined, localById[id], remoteById[id], path + "[" + id + "]", conflicts);
           result.push(merged);
         } else if (inLocal && !inRemote) {
           // 남에게 없는 항목: 내가 새로 추가했거나, 남이 지운 뒤에도 나는 그대로 갖고 있음 → 유지
@@ -215,8 +233,7 @@
         const inLocal = Object.prototype.hasOwnProperty.call(local, k);
         const inRemote = Object.prototype.hasOwnProperty.call(remote, k);
         if (inLocal && inRemote) {
-          const merged = _merge3(inBase ? baseObj[k] : undefined, local[k], remote[k]);
-          if (merged === MERGE_CONFLICT) return MERGE_CONFLICT;
+          const merged = _merge3(inBase ? baseObj[k] : undefined, local[k], remote[k], path ? path + "." + k : k, conflicts);
           result[k] = merged;
         } else if (inLocal && !inRemote) {
           if (inBase && _deepEqual(baseObj[k], local[k])) { /* 내가 안 바꿨고 남이 지움 → 삭제 유지 */ }
@@ -229,8 +246,14 @@
       return result;
     }
     // 순서만 있는 배열이나 값 하나(문자열/숫자 등)를 서로 다르게 고친 경우는 자동으로
-    // 합칠 방법이 없다 → 여기서만 "진짜 충돌"로 취급한다.
-    return MERGE_CONFLICT;
+    // 합칠 방법이 없다. 이 지점이 애초에 최상위(path === "")라면 — 즉 카테고리 전체가
+    // 통째로 이런 값이라 항목 단위로 쪼갤 여지가 아예 없다면 — 예전처럼 진짜 충돌로
+    // 취급해서 팝업을 띄운다. 하지만 객체나 목록 "안"의 한 지점에서 이런 일이 생긴
+    // 거라면, 그 지점만 지금 저장하려던 값을 우선 적용하고 기록만 남긴 뒤 나머지
+    // 병합은 그대로 계속한다 — 한 군데의 진짜 충돌이 전체 저장을 막지 않도록.
+    if (!path) return MERGE_CONFLICT;
+    conflicts.push(path);
+    return local;
   }
   // 충돌이 났을 때 자동 병합을 시도한다. 성공하면 합쳐진 JSON 문자열을, 실패하면
   // null을 돌려준다. 병합에 성공하면 이 브라우저의 화면(메모리)에도 즉시 반영해서,
@@ -246,15 +269,25 @@
         localParsed = JSON.parse(localValue);
         remoteParsed = JSON.parse(data.value);
       } catch (e) { return null; } // JSON이 아니면 자동 병합을 시도하지 않음
-      const merged = _merge3(baseParsed, localParsed, remoteParsed);
+      const conflicts = [];
+      const merged = _merge3(baseParsed, localParsed, remoteParsed, "", conflicts);
       if (merged === MERGE_CONFLICT) return null;
       const mergedStr = JSON.stringify(merged);
       _origSetItem(key, mergedStr);
       let affectedPages = [];
       try { affectedPages = _applyRemoteChangeToMemory(key); } catch (e) {}
       if (affectedPages.indexOf(state.page) !== -1 && !_hasActiveEditableFocus()) renderApp();
+      // 진짜로 겹친 지점이 일부 있었다면(그래도 저장 자체는 계속 진행됐다) 팝업으로
+      // 막지 않고, 확인하면 사라지는 가벼운 알림 배너로만 알려준다.
+      if (conflicts.length) _noteFieldConflicts(key, conflicts);
       return mergedStr;
     } catch (e) { return null; }
+  }
+  function _noteFieldConflicts(key, paths) {
+    let set = _fieldConflictNotices.get(key);
+    if (!set) { set = new Set(); _fieldConflictNotices.set(key, set); }
+    paths.forEach((p) => set.add(p));
+    _renderFieldConflictBanner();
   }
 
 
@@ -397,6 +430,35 @@
       _remoteChangedKeys.clear();
       _renderRemoteUpdateBanner();
     };
+  }
+  // "저장은 정상적으로 진행됐지만, 그중 일부 지점만 다른 관리자와 겹쳐서 내가 방금
+  // 저장한 값으로 정했어요"를 알려주는 가벼운 배너. _renderConflictBanner(저장 충돌)와
+  // 달리 저장을 막지 않으며, 확인 버튼을 누르면 그냥 사라진다.
+  function _renderFieldConflictBanner() {
+    let el = document.getElementById("cloud-field-conflict-banner");
+    if (!_fieldConflictNotices.size) { if (el) el.remove(); return; }
+    if (!el) {
+      el = document.createElement("div");
+      el.id = "cloud-field-conflict-banner";
+      el.className = "cloud-live-banner";
+      _liveBannerWrap().appendChild(el);
+    }
+    const labels = Array.from(new Set(Array.from(_fieldConflictNotices.keys()).map(cloudKeyLabel))).join(", ");
+    const spotCount = Array.from(_fieldConflictNotices.values()).reduce((sum, s) => sum + s.size, 0);
+    el.innerHTML = `
+      ${ICON_BELL}
+      <div class="cloud-live-banner-body">
+        <div class="cloud-live-banner-title">일부 항목이 거의 동시에 수정됐어요</div>
+        <div class="cloud-live-banner-desc"><b>${esc(labels)}</b>에서 ${spotCount}곳을 다른 관리자(또는 다른 탭)와 겹쳐서 고쳤어요. 겹치지 않은 나머지 변경은 자동으로 함께 합쳐 저장했고, 겹친 부분만 방금 내가 저장한 값으로 반영됐어요. 혹시 다른 관리자가 그 부분을 다르게 고치려던 거였다면 다시 확인해 주세요.</div>
+        <div class="cloud-live-banner-actions">
+          <button type="button" class="primary-btn" id="cloud-field-conflict-dismiss">확인</button>
+        </div>
+      </div>
+      <button type="button" class="cloud-live-banner-close" id="cloud-field-conflict-close" aria-label="닫기">✕</button>
+    `;
+    const dismiss = () => { _fieldConflictNotices.clear(); _renderFieldConflictBanner(); };
+    document.getElementById("cloud-field-conflict-dismiss").onclick = dismiss;
+    document.getElementById("cloud-field-conflict-close").onclick = dismiss;
   }
 
   async function _doCloudPush(key, value, opts) {

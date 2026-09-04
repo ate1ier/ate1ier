@@ -200,7 +200,7 @@
             <input type="date" class="date-input" id="edit-input-end" value="${entry.rangeEnd}">
           </div>` : ""}
           <div class="add-row">
-            ${isRange ? "" : `<input class="add-input time-input" id="edit-input-time" placeholder="시간" value="${esc(entry.time || "")}">`}
+            ${isRange ? "" : `<input type="time" class="add-input time-input" id="edit-input-time" value="${esc(entry.time || "")}">`}
             <input class="add-input text-input" id="edit-input-text" placeholder="제목을 입력하세요" autocomplete="off" value="${esc(entry.text)}">
           </div>
           <button type="button" class="detail-toggle-link ${cal.editDetailMode ? "active" : ""}" id="btn-edit-detail-toggle">
@@ -397,7 +397,7 @@
                 <input type="date" class="date-input" id="input-repeat-until" value="${repeatDefaultUntilISO}" min="${selectedISO}">
               </div>` : ""}
               <div class="add-row">
-                ${cal.rangeMode ? "" : `<input class="add-input time-input" id="input-time" placeholder="시간">`}
+                ${cal.rangeMode ? "" : `<input type="time" class="add-input time-input" id="input-time">`}
                 <input class="add-input text-input" id="input-text" placeholder="제목을 입력하세요" autocomplete="off">
                 <button type="submit" class="submit-btn" aria-label="추가">＋</button>
               </div>

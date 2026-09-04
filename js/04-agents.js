@@ -310,7 +310,7 @@
           <input type="text" class="add-input" id="agent-input-empno" value="${esc(v.empNo)}" placeholder="예: T25070840" autocomplete="off">
         </label>
         <label class="agent-form-label">입사일자
-          <input type="text" class="add-input" id="agent-input-hiredate" value="${esc(v.hireDate)}" placeholder="예: 2025-07-17" autocomplete="off">
+          <input type="date" class="add-input" id="agent-input-hiredate" value="${esc(v.hireDate)}" autocomplete="off">
         </label>
         <label class="agent-form-label">연락처
           <input type="text" class="add-input" id="agent-input-contact" value="${esc(v.contact)}" placeholder="예: 010-1234-5678" autocomplete="off">

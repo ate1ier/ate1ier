@@ -41,15 +41,28 @@
   function interviewExportFilename(labelPart) {
     return `면담일지_${sanitizeFilenamePart(labelPart)}_${backupFilenameStamp()}.xlsx`;
   }
+  // 입사일자 문자열(예: 2025-07-17) 기준으로 오늘까지의 근속 개월수를 계산한다. 형식이 없거나 잘못되면 null.
+  function calcTenureMonths(hireDateStr) {
+    if (!hireDateStr) return null;
+    const hire = new Date(hireDateStr);
+    if (isNaN(hire.getTime())) return null;
+    const now = new Date();
+    let months = (now.getFullYear() - hire.getFullYear()) * 12 + (now.getMonth() - hire.getMonth());
+    if (now.getDate() < hire.getDate()) months -= 1;
+    return months < 0 ? 0 : months;
+  }
   function interviewExportRowData(rec) {
     const agent = agentsData.find((a) => a.id === rec.agentId);
     const manager = rec.managerId ? agentsData.find((a) => a.id === rec.managerId) : null;
+    const tenureMonths = agent ? calcTenureMonths(agent.hireDate) : null;
     return {
       date: rec.date || "",
       type: rec.type || "수시",
       agentName: agent ? agent.name : "(삭제된 상담사)",
       agentLdap: agent ? (agent.ldap || "") : "",
       group: agent ? (agent.group === "night" ? "야간" : "주간") : "",
+      hireDate: agent ? (agent.hireDate || "") : "",
+      tenureMonths: tenureMonths === null ? "" : `${tenureMonths}개월`,
       workTypes: agent && agent.workTypes ? agent.workTypes.join(", ") : "",
       manager: manager ? `${manager.name} (${manager.ldap || "-"})` : "",
       content: rec.content || "",
@@ -76,6 +89,8 @@
         { header: "상담사", key: "agentName", width: 12 },
         { header: "LDAP", key: "agentLdap", width: 12 },
         { header: "근무조", key: "group", width: 8 },
+        { header: "입사일자", key: "hireDate", width: 12 },
+        { header: "근속개월수", key: "tenureMonths", width: 10 },
         { header: "업무구분", key: "workTypes", width: 12 },
         { header: "면담 관리자", key: "manager", width: 16 },
         { header: "면담 내용", key: "content", width: 46 },
@@ -288,14 +303,16 @@
 
     return `
       ${pickerRowHtml}
-      <label class="agent-form-label">면담 날짜
-        <input type="text" class="add-input" id="${idPrefix}-date" value="${esc(v.date || "")}" placeholder="예: ${todayISO()}" autocomplete="off">
-      </label>
-      <div class="agent-form-label">면담 유형
-        <div class="agent-radio-row">
-          ${INTERVIEW_TYPES.map((t) => `
-            <label class="agent-radio"><input type="radio" name="${idPrefix}-type" value="${t}" ${v.type === t ? "checked" : ""}> ${t}</label>
-          `).join("")}
+      <div class="agent-form-row-2 agent-form-row-2-date-type">
+        <label class="agent-form-label">면담 날짜
+          <input type="date" class="add-input" id="${idPrefix}-date" value="${esc(v.date || "")}" autocomplete="off">
+        </label>
+        <div class="agent-form-label">면담 유형
+          <div class="agent-radio-row">
+            ${INTERVIEW_TYPES.map((t) => `
+              <label class="agent-radio"><input type="radio" name="${idPrefix}-type" value="${t}" ${v.type === t ? "checked" : ""}> ${t}</label>
+            `).join("")}
+          </div>
         </div>
       </div>
       <label class="agent-form-label">면담 내용
