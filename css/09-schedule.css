@@ -71,10 +71,9 @@
   .schedule-table tr.sch-group-row td, .schedule-table tr.sch-subgroup-row td { cursor: default; }
   .schedule-table tr.sch-group-row td.sch-row-th, .schedule-table tr.sch-subgroup-row td.sch-row-th { cursor: pointer; }
 
+  /* 표는 JS(fitScheduleTable)가 화면 폭에 맞춰 항상 축소해 주므로, 모바일에서도
+     가로 스크롤 없이 한 화면에 들어온다 - overflow는 항상 hidden으로 둔다. */
   .schedule-table-wrap { overflow: hidden; border: 1px solid var(--hairline); border-radius: 16px; width: 100%; background: var(--panel); }
-  @media (max-width: 720px) {
-    .schedule-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-  }
   .schedule-scale-inner { transform-origin: top left; }
   .schedule-table { border-collapse: collapse; font-size: 12.5px; white-space: nowrap; background: var(--panel); }
   .schedule-table th, .schedule-table td {

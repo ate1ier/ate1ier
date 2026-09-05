@@ -62,3 +62,11 @@
   .qa-diff.down { color: var(--red); }
   .qa-diff.flat { color: var(--text-faint); }
 
+  /* 좁은 화면에서도 좌우 스크롤 없이 표 전체가 들어오도록 여백과 글자 크기를 줄인다 */
+  @media (max-width: 480px) {
+    .qa-table-wrap { overflow-x: hidden; }
+    .qa-table { font-size: 11px; }
+    .qa-table th, .qa-table td { padding: 7px 4px; }
+    .qa-score-input { width: 42px; padding: 4px 2px; font-size: 12px; }
+  }
+

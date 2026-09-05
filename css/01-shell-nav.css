@@ -323,8 +323,13 @@
   }
 
   /* ---------- 데스크톱: 평소엔 숨겨진 macOS 독(Dock) + 가운데 하단 펼치기 버튼 ---------- */
+  /* dock-toggle-btn 안에는 두 가지 아이콘이 함께 들어있다: 데스크톱용 위/아래 화살표(svg)와
+     모바일용 삼선(햄버거) 아이콘(span 3개). 화면 폭에 따라 미디어쿼리로 둘 중 하나만 보여준다. */
   .dock-toggle-btn { display: none; }
+  .dock-toggle-btn .dock-toggle-chevron { display: none; }
+  .dock-toggle-btn .dock-toggle-hamburger { display: none; }
   @media (min-width: 721px) {
+    .dock-toggle-btn .dock-toggle-chevron { display: block; }
     .utility-dock-toggle-btn { bottom: 18px; }
     #settings-toggle-root .manual-toggle-wrap { bottom: 64px; }
     #undo-toggle-root .undo-toggle-wrap { bottom: 110px; }
@@ -526,26 +531,117 @@
     #nav .nav-master-return-btn { width: auto; }
   }
 
+  /* ---------- 모바일: 왼쪽 상단 삼선(햄버거) 버튼 → 세로 목록 드롭다운 메뉴 ----------
+     데스크톱의 "평소엔 숨겨진 독" 방식과 똑같은 열기/닫기 메커니즘(openDock/closeDock,
+     #dock-toggle-btn, #nav-dock.dock-open)을 그대로 재사용하되, 화면 중앙 하단에
+     가로로 뜨는 대신 왼쪽 위 버튼 바로 아래에서 세로 목록으로 펼쳐지도록 위치/방향만
+     바꾼다. #nav-dock을 position:fixed로 완전히 화면 흐름에서 빼기 때문에, 페이지
+     영역이 어떤 페이지에서도 nav 때문에 폭이 줄거나 가로 스크롤이 생기지 않는다. */
   @media (max-width: 720px) {
-    #layout { flex-direction: column-reverse; }
+    #layout { flex-direction: column; }
+
+    .dock-toggle-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: fixed;
+      left: 14px;
+      top: 14px;
+      bottom: auto;
+      transform: none;
+      z-index: 70;
+      width: 42px;
+      height: 42px;
+      padding: 0;
+      border: 1px solid var(--mac-vibrancy-hairline);
+      border-radius: 14px;
+      background: var(--mac-vibrancy);
+      backdrop-filter: blur(28px) saturate(2);
+      -webkit-backdrop-filter: blur(28px) saturate(2);
+      box-shadow: var(--mac-shadow-float);
+      color: var(--text-dim);
+      cursor: pointer;
+      transition: color 0.12s ease, border-color 0.12s ease;
+    }
+    .dock-toggle-btn:hover, .dock-toggle-btn.open { color: var(--text); border-color: var(--accent); }
+    .dock-toggle-btn .dock-toggle-hamburger {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      width: 18px;
+      height: 13px;
+    }
+    .dock-toggle-btn .dock-toggle-hamburger span {
+      display: block;
+      width: 100%;
+      height: 2px;
+      border-radius: 2px;
+      background: currentColor;
+      transition: transform 0.2s ease, opacity 0.2s ease;
+    }
+    .dock-toggle-btn .dock-toggle-hamburger span + span { margin-top: 4px; }
+    .dock-toggle-btn.open .dock-toggle-hamburger span:nth-child(1) { transform: translateY(6px) rotate(45deg); }
+    .dock-toggle-btn.open .dock-toggle-hamburger span:nth-child(2) { opacity: 0; }
+    .dock-toggle-btn.open .dock-toggle-hamburger span:nth-child(3) { transform: translateY(-6px) rotate(-45deg); }
+
+    /* 버튼 아래에서 세로로 펼쳐지는 메뉴 카드. 검색 바 + 메뉴 목록을 함께 담는다. */
+    #nav-dock {
+      position: fixed;
+      left: 14px;
+      top: 64px;
+      bottom: auto;
+      z-index: 69;
+      width: min(80vw, 260px);
+      max-width: none;
+      max-height: calc(100vh - 84px);
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 10px;
+      padding: 14px 10px 16px;
+      border-radius: 24px;
+      border: 1px solid var(--mac-vibrancy-hairline);
+      background: var(--mac-vibrancy);
+      backdrop-filter: blur(30px) saturate(2);
+      -webkit-backdrop-filter: blur(30px) saturate(2);
+      box-shadow: var(--mac-shadow-float);
+      opacity: 0;
+      transform: translateY(-8px) scale(0.97);
+      pointer-events: none;
+      transition: opacity 0.16s ease, transform 0.18s cubic-bezier(.2, 1.2, .4, 1);
+    }
+    #nav-dock.dock-open {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+      pointer-events: auto;
+    }
+    #nav-dock #global-search-root {
+      padding: 0 8px 12px;
+      border-bottom: 1px solid var(--mac-vibrancy-hairline);
+    }
+    #nav-dock #global-search-root:empty { display: none; }
+
+    /* #nav 자체는 세로 목록(원래 사이드바) 스타일을 그대로 쓰고, 폭/테두리/배경만
+       드롭다운 카드 안쪽에 맞게 초기화한다. */
     #nav {
       width: 100%;
-      flex-direction: row;
-      align-items: flex-start;
+      flex-direction: column;
+      align-items: stretch;
       border-left: none;
-      border-top: 1px solid var(--hairline);
-      padding: 10px 14px;
-      gap: 4px;
+      background: none;
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+      box-shadow: none;
+      padding: 4px 0 0;
+      gap: 1px;
+      overflow: visible;
     }
-    .nav-label-top, .nav-divider { display: none; }
-    .nav-btn { width: auto; padding: 10px 16px; }
-    .nav-btn.active::before { left: 8px; right: 8px; top: auto; bottom: 0; width: auto; height: 2px; }
-    .nav-spacer { display: none; }
-    .nav-master-banner { margin: 0; padding: 4px 8px; flex-direction: row; align-items: center; gap: 6px; }
-    .nav-master-banner span { display: inline; max-width: 110px; }
-    .nav-master-return-btn { width: auto; }
-    .nav-master-mode { margin: 0; padding: 6px 10px; flex-direction: row; align-items: center; }
-    .nav-master-mode-sub { display: none; }
+    .nav-btn { width: 100%; margin: 0; padding: 11px 14px; font-size: 14.5px; box-sizing: border-box; }
+    .nav-master-banner { margin: 0 4px 10px; padding: 8px 10px; }
+    .nav-master-mode { margin: 0 4px 10px; padding: 8px 10px; }
   }
 
   /* ---------- 모바일 전역 최적화 ---------- */
@@ -555,7 +651,9 @@
     input, select, textarea { font-size: 16px !important; }
     .badge, .badge-btn, .agent-filter-btn, .agent-sort-select { font-size: 12.5px !important; }
 
-    #page-area { padding: 14px 10px 84px; }
+    /* 위쪽은 고정된 삼선 버튼과 겹치지 않도록, 아래쪽은 오른쪽 하단에 떠 있는
+       유틸리티 독(설정·되돌리기·새로고침 버튼)에 콘텐츠 끝부분이 가리지 않도록 여유를 둔다 */
+    #page-area { padding: 66px 10px 70px; }
     .card { padding: 18px 16px; border-radius: 20px; }
     .login-card { padding: 24px 18px; }
 
@@ -563,63 +661,5 @@
     .icon-btn { width: 40px; height: 40px; }
     .schedule-month-btn { width: 34px; height: 34px; }
     .ghost-btn, .primary-btn, .cancel-btn { padding: 10px 14px; }
-  }
-  @media (max-width: 600px) {
-    #nav {
-      justify-content: space-between;
-      padding: 8px 10px;
-      gap: 14px;
-      overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
-    }
-    /* 테마 선택 버튼의 글자 라벨만 계속 숨겨서 공간을 아낀다 */
-    #nav .theme-picker-label, #nav .theme-picker-chevron { display: none; }
-
-    /* 아이콘 아래에 작은 글씨로 캡션을 붙여서, 사이드바가 펼쳐졌을 때 보이던
-       계정 이름 / 로그아웃까지 남은 시간 / 메뉴 이름을 여기서도 바로 알 수 있게 한다 */
-    .nav-btn, .nav-account-name, .nav-logout-btn {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 3px;
-      margin: 0;
-      flex-shrink: 0;
-    }
-    .nav-btn { padding: 9px 13px; font-size: 18px; }
-    .nav-btn .nav-text,
-    .nav-account-name .nav-text,
-    .nav-logout-btn .nav-text {
-      display: block !important;
-      font-size: 10px;
-      line-height: 1.15;
-      color: var(--text-faint);
-      white-space: nowrap;
-    }
-    .nav-btn.active .nav-text { color: #ffffff; }
-    .nav-btn.active::before { left: 4px; right: 4px; }
-
-    /* 아이콘 자체 크기를 키운다 (기본 15px → 22px) */
-    .nav-btn .icon-emo,
-    .nav-account-name .icon-emo,
-    .nav-logout-btn .icon-emo {
-      width: 22px;
-      height: 22px;
-    }
-
-    .nav-account {
-      flex-direction: row;
-      align-items: flex-start;
-      gap: 16px;
-      padding: 9px 0 0;
-    }
-    .nav-logout-wrap {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 3px;
-    }
-
-    .theme-toggle-wrap { flex-shrink: 0; }
-    .theme-picker-btn { padding: 5px; gap: 0; }
   }
 
