@@ -1433,64 +1433,80 @@
       if (loginForm) {
         loginForm.onsubmit = async (e) => {
           e.preventDefault();
-          const username = document.getElementById("login-username").value.trim();
-          const password = document.getElementById("login-password").value;
-          if (!username || !password) { uiState.error = "아이디와 비밀번호를 입력해주세요."; draw(); return; }
-          const account = findAccountByUsername(username);
-          if (!account) {
-            uiState.error = "아이디 또는 비밀번호가 올바르지 않아요.";
-            draw();
-            return;
-          }
-          let ok;
-          if (account.salt) {
-            ok = account.passwordHash === (await hashPassword(password, account.salt));
-          } else {
-            // salt가 없는 예전 계정: 예전 방식으로 한 번 확인하고, 맞으면 새 방식(salt+SHA-256)으로 조용히 업그레이드한다.
-            ok = account.passwordHash === legacyHash(password);
-            if (ok) {
-              const salt = genSalt();
-              const passwordHash = await hashPassword(password, salt);
-              const list = loadAccounts();
-              const idx = list.findIndex((a) => a.id === account.id);
-              if (idx !== -1) { list[idx] = { ...list[idx], salt, passwordHash }; saveAccounts(list); }
+          // 로그인 처리 중 예상 못 한 오류(네트워크 문제, 브라우저 제약 등)가 나면
+          // 예전에는 화면이 아무 반응 없이 그대로 멈춰서(콘솔에만 에러가 찍히고
+          // 사용자에게는 아무 안내도 없어서) 원인을 알기 어려웠다. 이제는 그런
+          // 경우에도 화면에 에러 문구를 띄우고, 콘솔에도 자세한 원인을 남긴다.
+          try {
+            const username = document.getElementById("login-username").value.trim();
+            const password = document.getElementById("login-password").value;
+            if (!username || !password) { uiState.error = "아이디와 비밀번호를 입력해주세요."; draw(); return; }
+            const account = findAccountByUsername(username);
+            if (!account) {
+              uiState.error = "아이디 또는 비밀번호가 올바르지 않아요.";
+              draw();
+              return;
             }
-          }
-          if (!ok) {
-            uiState.error = "아이디 또는 비밀번호가 올바르지 않아요.";
+            let ok;
+            if (account.salt) {
+              ok = account.passwordHash === (await hashPassword(password, account.salt));
+            } else {
+              // salt가 없는 예전 계정: 예전 방식으로 한 번 확인하고, 맞으면 새 방식(salt+SHA-256)으로 조용히 업그레이드한다.
+              ok = account.passwordHash === legacyHash(password);
+              if (ok) {
+                const salt = genSalt();
+                const passwordHash = await hashPassword(password, salt);
+                const list = loadAccounts();
+                const idx = list.findIndex((a) => a.id === account.id);
+                if (idx !== -1) { list[idx] = { ...list[idx], salt, passwordHash }; saveAccounts(list); }
+              }
+            }
+            if (!ok) {
+              uiState.error = "아이디 또는 비밀번호가 올바르지 않아요.";
+              draw();
+              return;
+            }
+            setSession(account.id);
+            touchLastActive();
+            try { sessionStorage.setItem("app:just-logged-in", "1"); } catch (e) {}
+            await flushCloudWrites();
+            location.reload();
+          } catch (err) {
+            console.error("로그인 처리 중 오류:", err);
+            uiState.error = `로그인 처리 중 문제가 발생했어요. (${err && err.message ? err.message : "알 수 없는 오류"}) 브라우저 콘솔(F12)을 확인해주세요.`;
             draw();
-            return;
           }
-          setSession(account.id);
-          touchLastActive();
-          try { sessionStorage.setItem("app:just-logged-in", "1"); } catch (e) {}
-          await flushCloudWrites();
-          location.reload();
         };
       }
       const signupForm = document.getElementById("signup-form");
       if (signupForm) {
         signupForm.onsubmit = async (e) => {
           e.preventDefault();
-          const username = document.getElementById("signup-username").value.trim();
-          const password = document.getElementById("signup-password").value;
-          const password2 = document.getElementById("signup-password2").value;
-          if (!username || !password) { uiState.error = "아이디와 비밀번호를 입력해주세요."; draw(); return; }
-          if (password.length < 4) { uiState.error = "비밀번호는 4자 이상으로 만들어주세요."; draw(); return; }
-          if (password !== password2) { uiState.error = "비밀번호 확인이 일치하지 않아요."; draw(); return; }
-          if (findAccountByUsername(username)) { uiState.error = "이미 사용 중인 아이디예요."; draw(); return; }
-          const accountsList = loadAccounts();
-          const wantsMaster = !accountsList.some((a) => a.isMaster) && !!document.getElementById("signup-master") && document.getElementById("signup-master").checked;
-          const salt = genSalt();
-          const passwordHash = await hashPassword(password, salt);
-          const newAccount = { id: genId(), username, salt, passwordHash, createdAt: new Date().toISOString(), isMaster: wantsMaster };
-          accountsList.push(newAccount);
-          saveAccounts(accountsList);
-          setSession(newAccount.id);
-          touchLastActive();
-          try { sessionStorage.setItem("app:just-logged-in", "1"); } catch (e) {}
-          await flushCloudWrites();
-          location.reload();
+          try {
+            const username = document.getElementById("signup-username").value.trim();
+            const password = document.getElementById("signup-password").value;
+            const password2 = document.getElementById("signup-password2").value;
+            if (!username || !password) { uiState.error = "아이디와 비밀번호를 입력해주세요."; draw(); return; }
+            if (password.length < 4) { uiState.error = "비밀번호는 4자 이상으로 만들어주세요."; draw(); return; }
+            if (password !== password2) { uiState.error = "비밀번호 확인이 일치하지 않아요."; draw(); return; }
+            if (findAccountByUsername(username)) { uiState.error = "이미 사용 중인 아이디예요."; draw(); return; }
+            const accountsList = loadAccounts();
+            const wantsMaster = !accountsList.some((a) => a.isMaster) && !!document.getElementById("signup-master") && document.getElementById("signup-master").checked;
+            const salt = genSalt();
+            const passwordHash = await hashPassword(password, salt);
+            const newAccount = { id: genId(), username, salt, passwordHash, createdAt: new Date().toISOString(), isMaster: wantsMaster };
+            accountsList.push(newAccount);
+            saveAccounts(accountsList);
+            setSession(newAccount.id);
+            touchLastActive();
+            try { sessionStorage.setItem("app:just-logged-in", "1"); } catch (e) {}
+            await flushCloudWrites();
+            location.reload();
+          } catch (err) {
+            console.error("계정 만들기 처리 중 오류:", err);
+            uiState.error = `계정을 만드는 중 문제가 발생했어요. (${err && err.message ? err.message : "알 수 없는 오류"}) 브라우저 콘솔(F12)을 확인해주세요.`;
+            draw();
+          }
         };
       }
     }
