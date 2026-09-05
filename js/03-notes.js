@@ -276,14 +276,14 @@
     const hasFolders = notesData.folders.length > 0;
 
     root.innerHTML = `
-      <div class="card">
       <div class="notes-header">
         <div class="notes-title">업무 정리</div>
         <div class="notes-actions">
-          <button class="ghost-btn" id="btn-new-folder">+ 새 폴더</button>
-          <button class="ghost-btn" id="btn-new-note">+ 새 메모</button>
+          <button class="ghost-btn solid-accent-btn" id="btn-new-folder">+ 새 폴더</button>
+          <button class="ghost-btn solid-accent-btn" id="btn-new-note">+ 새 메모</button>
         </div>
       </div>
+      <div class="card">
       <div class="status" id="notes-status" style="margin-bottom:10px;"></div>
 
       ${notesUi.showNewFolder ? `

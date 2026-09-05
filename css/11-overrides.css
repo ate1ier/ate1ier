@@ -7,8 +7,8 @@
   }
   *::-webkit-scrollbar-thumb:hover { background: var(--text-faint); background-clip: padding-box; }
 
-  .add-input, .todo-due-input, .agent-sort-select, .agent-filter-btn,
-  .type-btn, .note-content, .interview-textarea, .inline-form input[type="text"],
+  .add-input, .todo-due-input, .agent-sort-select,
+  .note-content, .interview-textarea, .inline-form input[type="text"],
   .inline-form select, .add-input, .range-row .date-input, .repeat-row .date-input, .repeat-row .repeat-select {
     border-radius: 10px !important;
   }
@@ -19,6 +19,43 @@
     border-color: var(--accent);
   }
 
+  /* ---- 검색창(상담사 검색 · 면담일지 검색 · 면담 대상/관리자 검색):
+     하단 내비게이션 독의 "이름 통합 검색"과 같은 글씨체·글씨 굵기·글자 크기·
+     세로 높이를 쓰고, 오른쪽에 같은 모양의 검색 아이콘을 붙인다.
+     가로 폭은 각 화면에서 쓰던 값을 그대로 유지한다(.agent-search-input의
+     기존 width 규칙, .agent-picker-input의 100% 폭은 아래에서 그대로 적용됨). */
+  .agent-search-input, .agent-picker-input {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--elevated);
+    border: 1px solid var(--hairline);
+    border-radius: 999px;
+    padding: 10px 16px;
+  }
+  .agent-picker-input { width: 100%; box-sizing: border-box; }
+  .agent-search-input:focus-within, .agent-picker-input:focus-within {
+    border-color: var(--accent);
+  }
+  .agent-search-input .icon-emo, .agent-picker-input .icon-emo {
+    flex-shrink: 0;
+    color: var(--text-faint);
+  }
+  .agent-search-input-field, .agent-picker-input-field {
+    flex: 1;
+    min-width: 0;
+    background: none;
+    border: none;
+    outline: none;
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 400;
+    padding: 0;
+  }
+  .agent-search-input-field::placeholder, .agent-picker-input-field::placeholder {
+    color: var(--text-faint);
+  }
+
   .login-tabs { border-radius: 12px; }
   .login-tab { border-radius: 10px; font-weight: 500; }
   .login-tab.active { box-shadow: 0 1px 3px rgba(0,0,0,0.18); }
@@ -26,3 +63,27 @@
   .badge, .badge-btn { font-weight: 500; }
 
   ::selection { background: var(--accent); color: #ffffff; }
+
+  /* ---- 공용 페이지네이션(상담사 관리 / 면담일지 목록 등) ---- */
+  .page-nav {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid var(--hairline);
+  }
+  .page-nav-btn {
+    background: var(--elevated);
+    border: 1px solid var(--hairline);
+    color: var(--text-dim);
+    border-radius: 999px;
+    padding: 7px 14px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: border-color 0.12s ease, color 0.12s ease, background 0.12s ease;
+  }
+  .page-nav-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+  .page-nav-btn:disabled { opacity: 0.4; cursor: default; }
+  .page-nav-info { font-size: 12.5px; color: var(--text-faint); min-width: 72px; text-align: center; }

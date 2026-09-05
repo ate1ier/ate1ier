@@ -21,34 +21,47 @@
   .home-col-status { height: 100%; }
   .home-col-status .card { height: 100%; display: flex; flex-direction: column; }
   .home-col-status .home-staff-list { flex: 1; }
-  .home-hero {
-    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px;
-    background: linear-gradient(120deg, var(--accent-dim-soft), transparent 65%);
-    border-left: 3px solid var(--accent);
+  .card.home-hero {
+    display: flex; flex-direction: column; gap: 0;
+    background: none; border: none; box-shadow: none; border-radius: 0;
+    padding: 10px 0 36px;
   }
-  .home-hero-date { font-size: 30px; font-weight: 700; letter-spacing: -0.01em; }
+  .home-hero-top {
+    display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 14px;
+    padding-bottom: 34px; margin-bottom: 30px; border-bottom: 1px solid var(--hairline);
+  }
+  .home-hero-date {
+    font-family: Georgia, 'Apple Myungjo', 'AppleGothic', 'Batang', 'Nanum Myeongjo', serif;
+    font-size: 42px; font-weight: 700; letter-spacing: -0.01em;
+  }
   .home-hero-date .wd {
-    display: inline-flex; align-items: center; margin-left: 10px; vertical-align: middle;
-    font-size: 13px; font-weight: 600; color: var(--accent); background: var(--accent-dim);
-    padding: 3px 11px; border-radius: 999px;
+    margin-left: 12px; font-size: 17px; font-weight: 500; color: var(--text-faint);
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro KR', 'Apple SD Gothic Neo', 'Malgun Gothic', 'KoPub Dotum', system-ui, sans-serif;
   }
-  .home-hero-sub { color: var(--text-dim); font-size: 14.5px; margin-top: 6px; }
+  .home-hero-sub { color: var(--text-faint); font-size: 14.5px; margin-top: 9px; }
   .home-holiday-tag {
-    font-size: 13px; color: var(--red); background: var(--red-dim);
+    font-size: 13px; color: var(--yellow); background: var(--yellow-dim);
     padding: 4px 12px; border-radius: 999px; white-space: nowrap;
   }
   .stat-grid {
-    display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px;
+    display: flex; align-items: stretch; flex-wrap: wrap;
   }
   .stat-item {
-    background: var(--elevated); border: 1px solid var(--hairline); border-radius: 16px;
-    padding: 16px 16px 14px; text-align: left;
+    flex: 1 1 0; min-width: 110px;
+    background: none; border: none; border-left: 1px solid var(--hairline);
+    border-radius: 0; padding: 6px 22px; text-align: left;
   }
-  .stat-item .stat-num { font-size: 26px; letter-spacing: -0.01em; }
-  .stat-item .stat-label { font-size: 12.5px; color: var(--text-faint); margin-top: 2px; }
-  .stat-item.warn .stat-num { color: var(--red); }
-  .stat-item.ok .stat-num { color: var(--green); }
-  .stat-item.accent .stat-num { color: var(--accent); }
+  .stat-item:first-child { padding-left: 0; border-left: none; }
+  .stat-item .stat-num {
+    font-family: Georgia, 'Apple Myungjo', 'AppleGothic', 'Batang', 'Nanum Myeongjo', serif;
+    font-size: 27px; letter-spacing: -0.01em; color: var(--text);
+  }
+  .stat-item .stat-label { font-size: 12.5px; color: var(--text-faint); margin-top: 4px; }
+  .stat-item.accent .stat-num { color: var(--yellow); }
+  @media (max-width: 700px) {
+    .stat-item { flex: 1 1 40%; border-left: none; border-top: 1px solid var(--hairline); padding: 14px 0 0; }
+    .stat-item:first-child { border-top: none; padding-top: 2px; }
+  }
 
   .home-section-title {
     display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;
@@ -87,7 +100,7 @@
   .home-staff-row.is-off { opacity: 0.6; }
   .home-more-btn {
     display: block; width: 100%; margin-top: 8px; padding: 7px 0;
-    background: none; border: 1px dashed var(--hairline); border-radius: 12px;
+    background: none; border: 1px dashed var(--hairline); border-radius: 999px;
     color: var(--text-faint); font-size: 12.5px; cursor: pointer;
   }
   .home-more-btn:hover { color: var(--accent); border-color: var(--accent); }

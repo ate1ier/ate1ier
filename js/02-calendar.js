@@ -336,6 +336,9 @@
     }
 
     root.innerHTML = `
+      <div class="calendar-page-header">
+        <div class="calendar-page-title">캘린더</div>
+      </div>
       <div class="shell">
         <div class="card">
           <div class="cal-header">

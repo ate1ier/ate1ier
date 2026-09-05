@@ -29,6 +29,9 @@
   const ICON_BACKUP = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.6 4.4c0-1 2.4-1.8 5.4-1.8s5.4.8 5.4 1.8-2.4 1.8-5.4 1.8-5.4-.8-5.4-1.8Z"/><path d="M2.6 4.4V8c0 1 2.4 1.8 5.4 1.8s5.4-.8 5.4-1.8V4.4"/><path d="M2.6 8v3.6c0 1 2.4 1.8 5.4 1.8s5.4-.8 5.4-1.8V8"/></svg>`;
   const ICON_REFRESH = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 8A5 5 0 1 1 11.4 4.3"/><path d="M13 2.6V6h-3.4"/></svg>`;
   const ICON_SETTINGS = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="2.1"/><path d="M8 2.4v1.5M8 12.1v1.5M13.6 8h-1.5M3.9 8H2.4M11.9 4.1l-1.05 1.05M5.15 10.85 4.1 11.9M11.9 11.9l-1.05-1.05M5.15 5.15 4.1 4.1"/></svg>`;
+  // 하단 독의 "이름 통합 검색"과 같은 모양의 작은 검색 아이콘. 다른 검색창들(상담사 검색,
+  // 면담일지 검색, 면담 대상/관리자 검색)에서도 오른쪽에 똑같이 붙여서 통일감을 준다.
+  const ICON_SEARCH_MINI = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="7" r="4.2"/><path d="M13 13l-2.9-2.9"/></svg>`;
   /* ===================== ☁️ 클라우드 동기화 (Supabase) =====================
      계정 목록과 각 계정의 데이터(할일/메모/상담사/면담일지/스케줄/캘린더)를
      Supabase의 kv_store 테이블에도 함께 저장해서, 다른 기기·다른 사람도
@@ -1111,6 +1114,41 @@
     return d.innerHTML;
   }
   function genId() { return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`; }
+
+  /* ===================== 공용 페이지네이션 ===================== */
+  // 목록이 길어질 때 10개 단위로 잘라서 보여주기 위한 공용 헬퍼.
+  const PAGE_SIZE = 10;
+  // list 전체와 원하는 page(1부터 시작)를 넣으면, 범위를 벗어난 page는 알아서
+  // 안쪽으로 보정해서 { items, page, totalPages }를 돌려준다.
+  function paginateList(list, page) {
+    const totalPages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
+    const safePage = Math.min(Math.max(1, page || 1), totalPages);
+    const start = (safePage - 1) * PAGE_SIZE;
+    return { items: list.slice(start, start + PAGE_SIZE), page: safePage, totalPages };
+  }
+  // actionName은 클릭 시 data-page-action 값으로 붙어서, 각 화면에서 이 값으로
+  // 자기 목록의 페이지 상태를 구분해 처리한다.
+  function renderPaginationHtml(page, totalPages, actionName) {
+    if (totalPages <= 1) return "";
+    return `
+      <div class="page-nav" data-page-action="${actionName}">
+        <button type="button" class="page-nav-btn" data-page-nav="prev" ${page <= 1 ? "disabled" : ""}>이전</button>
+        <span class="page-nav-info">${page} / ${totalPages}페이지</span>
+        <button type="button" class="page-nav-btn" data-page-nav="next" ${page >= totalPages ? "disabled" : ""}>다음</button>
+      </div>
+    `;
+  }
+  // renderPaginationHtml로 그려진 이전/다음 버튼에 동작을 붙인다.
+  // 버튼은 이미 범위를 벗어나면 disabled 처리되어 있으므로, 여기서는 그냥
+  // -1(이전)/+1(다음)만큼 페이지를 옮겨달라고 onDelta(delta)를 호출해주면 된다.
+  function attachPaginationHandlers(root, actionName, onDelta) {
+    const nav = root.querySelector(`.page-nav[data-page-action="${actionName}"]`);
+    if (!nav) return;
+    const prevBtn = nav.querySelector('[data-page-nav="prev"]');
+    const nextBtn = nav.querySelector('[data-page-nav="next"]');
+    if (prevBtn) prevBtn.onclick = () => onDelta(-1);
+    if (nextBtn) nextBtn.onclick = () => onDelta(1);
+  }
 
   /* ===================== 로그인(로컬 전용) 모듈 =====================
      지금은 서버 없이 이 브라우저의 localStorage에만 계정 정보를 저장하는

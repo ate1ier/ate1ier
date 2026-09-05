@@ -16,6 +16,7 @@
     sortBy: "shift", // "shift" | "custom" | "name" | "type" | "chat" | "night" | "created"
     interviewMode: "list", // "list" | "add" | "edit" — 상담사 상세의 면담 이력 섹션용
     interviewEditingId: null,
+    page: 1, // 고정 인원을 제외한 목록의 현재 페이지(10개씩)
   };
 
   let agentStatusTimer = null;
@@ -226,17 +227,15 @@
     const typeBadges = (a.workTypes || []).map((t) => `<span class="badge sm ${t === "유선" ? "voice" : "chat"}">${esc(t)}</span>`).join("");
     const groupBadge = `<span class="badge sm ${a.group === "night" ? "night" : "day"}">${a.group === "night" ? "야간" : "주간"}</span>`;
     const isResigned = a.status === "RESIGNED";
-    const statusToggle = `<button type="button" class="badge-btn sm ${isResigned ? "resigned" : "working"}" data-action="toggle-agent-status" data-id="${a.id}" title="클릭하면 재직 상태가 바로 바뀌어요">${isResigned ? "퇴사" : "근무중"}</button>`;
-    const badges = `<div class="agent-row-badges">${typeBadges}${groupBadge}${statusToggle}</div>`;
+    const statusBadge = `<button type="button" class="badge-btn sm ${isResigned ? "resigned" : "working"}" data-action="toggle-agent-status" data-id="${a.id}" title="클릭하면 재직 상태가 바로 바뀌어요">${isResigned ? "퇴사" : "근무중"}</button>`;
     return `
       <div class="agent-row ${selected ? "selected" : ""}" draggable="${draggable ? "true" : "false"}" data-agent-id="${a.id}" data-agent-section="${section}">
         <span class="drag-handle ${draggable ? "" : "drag-handle-disabled"}" title="${draggable ? "드래그해서 순서 변경" : "사용자 지정 정렬에서만 드래그할 수 있어요"}">⠿</span>
         <button class="pin-btn ${a.pinned ? "pinned" : ""}" data-action="pin-agent" data-id="${a.id}" title="${a.pinned ? "고정 해제" : "상단에 고정"}">${a.pinned ? "★" : "☆"}</button>
-        <button class="agent-row-main" data-action="select-agent" data-id="${a.id}">
-          <span class="agent-row-name">${esc(a.name)}${a.isAdmin ? ' <span class="badge sm admin">관리자</span>' : ""}</span>
-          <span class="agent-row-ldap">${esc(a.ldap)}</span>
-        </button>
-        ${badges}
+        <div class="agent-row-main" data-action="select-agent" data-id="${a.id}">
+          <span class="agent-row-name">${esc(a.name)}${a.isAdmin ? ' <span class="badge sm admin">관리자</span>' : ""}${a.ldap ? ` <span class="agent-row-ldap-inline">${esc(a.ldap)}</span>` : ""}</span>
+          <span class="agent-row-meta">${typeBadges}${groupBadge}${statusBadge}</span>
+        </div>
       </div>
     `;
   }
@@ -244,7 +243,9 @@
   function renderAgentDetail(agent) {
     return `
       <div class="agent-detail-header">
-        <div class="agent-detail-name">${esc(agent.name)}</div>
+        <div class="agent-detail-heading">
+          <div class="agent-detail-name">${esc(agent.name)}</div>
+        </div>
         <div class="agent-detail-actions">
           <button class="ghost-btn" data-action="edit-agent" data-id="${agent.id}">수정</button>
           <button class="ghost-btn danger" data-action="delete-agent" data-id="${agent.id}">삭제</button>
@@ -366,7 +367,13 @@
     } else if (filtered.length === 0) {
       listHtml = `<div class="agent-list-empty">검색 또는 필터 조건에 맞는 상담사가 없어요.</div>`;
     } else if (listAgents.length > 0) {
-      listHtml = `<div class="agent-list">${listAgents.map((a) => renderAgentRow(a, "list", draggable)).join("")}</div>`;
+      // 고정되지 않은 인원 목록은 10명씩 페이지를 나눠서 보여준다.
+      const { items, page, totalPages } = paginateList(listAgents, agentsUi.page);
+      agentsUi.page = page;
+      listHtml = `
+        <div class="agent-list">${items.map((a) => renderAgentRow(a, "list", draggable)).join("")}</div>
+        ${renderPaginationHtml(page, totalPages, "agent-list")}
+      `;
     }
 
     return `${pinnedHtml}${listHtml}`;
@@ -411,6 +418,10 @@
         toggleAgentStatus(btn.getAttribute("data-id"));
       };
     });
+    attachPaginationHandlers(root, "agent-list", (delta) => {
+      agentsUi.page = agentsUi.page + delta;
+      updateAgentListArea();
+    });
     attachAgentDragHandlers(root);
   }
 
@@ -437,15 +448,22 @@
 
     const controlsHtml = `
       <div class="agent-controls">
-        <input type="text" class="add-input agent-search-input" id="agent-search-input" placeholder="이름 또는 LDAP 검색" value="${esc(agentsUi.searchQuery)}" autocomplete="off">
-        <div class="agent-filter-row">
-          <button type="button" class="agent-filter-btn ${agentsUi.filterTypes.size === 0 ? "active" : ""}" data-filter="all">전체</button>
-          <button type="button" class="agent-filter-btn ${agentsUi.filterTypes.has("voice") ? "active" : ""}" data-filter="voice">유선만</button>
-          <button type="button" class="agent-filter-btn ${agentsUi.filterTypes.has("chat") ? "active" : ""}" data-filter="chat">채팅만</button>
-          <button type="button" class="agent-filter-btn ${agentsUi.filterTypes.has("day") ? "active" : ""}" data-filter="day">주간만</button>
-          <button type="button" class="agent-filter-btn ${agentsUi.filterTypes.has("night") ? "active" : ""}" data-filter="night">야간만</button>
-          <button type="button" class="agent-filter-btn ${agentsUi.filterTypes.has("working") ? "active" : ""}" data-filter="working">재직만</button>
-          <button type="button" class="agent-filter-btn ${agentsUi.filterTypes.has("resigned") ? "active" : ""}" data-filter="resigned">퇴사만</button>
+        <div class="agent-controls-top">
+          <div class="agent-filter-row">
+            <button type="button" class="agent-filter-btn ${agentsUi.filterTypes.size === 0 ? "active" : ""}" data-filter="all">전체</button>
+            <button type="button" class="agent-filter-btn ${agentsUi.filterTypes.has("voice") ? "active" : ""}" data-filter="voice">유선</button>
+            <button type="button" class="agent-filter-btn ${agentsUi.filterTypes.has("chat") ? "active" : ""}" data-filter="chat">챗</button>
+            <button type="button" class="agent-filter-btn ${agentsUi.filterTypes.has("day") ? "active" : ""}" data-filter="day">주간</button>
+            <button type="button" class="agent-filter-btn ${agentsUi.filterTypes.has("night") ? "active" : ""}" data-filter="night">야간</button>
+            <button type="button" class="agent-filter-btn ${agentsUi.filterTypes.has("working") ? "active" : ""}" data-filter="working">재직</button>
+            <button type="button" class="agent-filter-btn ${agentsUi.filterTypes.has("resigned") ? "active" : ""}" data-filter="resigned">퇴사</button>
+          </div>
+          <div class="agent-search-input">
+            <input type="text" class="agent-search-input-field" id="agent-search-input" placeholder="이름 또는 LDAP 검색" value="${esc(agentsUi.searchQuery)}" autocomplete="off">
+            ${ICON_SEARCH_MINI}
+          </div>
+        </div>
+        <div class="agent-sort-row">
           <select class="agent-sort-select" id="agent-sort-select">
             <option value="shift" ${agentsUi.sortBy === "shift" ? "selected" : ""}>기본순(주간→야간·업무·시간순)</option>
             <option value="custom" ${agentsUi.sortBy === "custom" ? "selected" : ""}>사용자 지정(드래그)</option>
@@ -474,14 +492,16 @@
     }
 
     root.innerHTML = `
+      <div class="agent-page-header">
+        <div class="agent-list-heading">
+          <div class="agent-list-title">상담사 관리</div>
+          ${agentsData.length > 0 ? summaryHtml : ""}
+        </div>
+        <button class="agent-add-btn" id="btn-agent-add">＋ 상담사 추가</button>
+      </div>
       <div class="agent-shell">
         <div class="card">
-          <div class="agent-list-header">
-            <div class="agent-list-title">상담사 관리</div>
-            <button class="ghost-btn" id="btn-agent-add">＋ 상담사 추가</button>
-          </div>
           <div class="status" id="agent-status"></div>
-          ${agentsData.length > 0 ? summaryHtml : ""}
           ${agentsData.length > 0 ? controlsHtml : ""}
           <div id="agent-list-area">${listAreaHtml}</div>
         </div>
@@ -546,6 +566,7 @@
       // - 매 입력마다 목록 영역을 갱신하므로 검색 결과가 타이핑 즉시 반영됨.
       searchInput.oninput = (e) => {
         agentsUi.searchQuery = e.target.value;
+        agentsUi.page = 1;
         updateAgentListArea();
       };
     }
@@ -559,6 +580,7 @@
         } else {
           agentsUi.filterTypes.add(key);
         }
+        agentsUi.page = 1;
         renderApp();
       };
     });
@@ -566,6 +588,7 @@
     if (sortSelect) {
       sortSelect.onchange = (e) => {
         agentsUi.sortBy = e.target.value;
+        agentsUi.page = 1;
         renderApp();
       };
     }

@@ -1,7 +1,7 @@
   /* ---------- 상담사 상세: 최근 QA 점수 미리보기 ---------- */
   .agent-qa-preview-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
   .agent-qa-cell {
-    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
     padding: 12px 8px; border: 1px solid var(--hairline); border-radius: var(--mac-radius);
     background: var(--elevated);
   }

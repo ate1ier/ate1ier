@@ -1,7 +1,7 @@
   /* ---------- 월별 스케줄 페이지 ---------- */
   .schedule-top {
     display: flex; align-items: center; justify-content: space-between;
-    flex-wrap: wrap; gap: 10px; margin-bottom: 6px;
+    flex-wrap: wrap; gap: 10px; margin-bottom: 24px;
   }
   .schedule-title { font-size: var(--page-title-size); font-weight: var(--page-title-weight); letter-spacing: -0.01em; }
   .schedule-month-nav { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
@@ -9,7 +9,7 @@
   .sch-delete-btn-small { font-size: 12px; padding: 4px 10px; }
   .schedule-month-btn {
     background: var(--elevated); border: 1px solid var(--hairline); color: var(--text-dim);
-    border-radius: 12px; width: 30px; height: 30px; cursor: pointer; font-size: 14px;
+    border-radius: 999px; width: 30px; height: 30px; cursor: pointer; font-size: 14px;
   }
   .schedule-month-btn:hover { border-color: var(--accent); color: var(--accent); }
   .schedule-month-label { font-size: 16px; color: var(--text); min-width: 96px; text-align: center; }
@@ -71,14 +71,14 @@
   .schedule-table tr.sch-group-row td, .schedule-table tr.sch-subgroup-row td { cursor: default; }
   .schedule-table tr.sch-group-row td.sch-row-th, .schedule-table tr.sch-subgroup-row td.sch-row-th { cursor: pointer; }
 
-  .schedule-table-wrap { overflow: hidden; border: 1px solid var(--hairline); border-radius: 16px; width: 100%; background: var(--panel); }
+  .schedule-table-wrap { overflow: hidden; -webkit-overflow-scrolling: touch; border: 1px solid var(--hairline); border-radius: 16px; width: 100%; background: var(--panel); }
   @media (max-width: 720px) {
     .schedule-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
   }
   .schedule-scale-inner { transform-origin: top left; }
-  .schedule-table { border-collapse: collapse; font-size: 12.5px; white-space: nowrap; background: var(--panel); }
+  .schedule-table { border-collapse: collapse; font-size: 13.5px; white-space: nowrap; background: var(--panel); }
   .schedule-table th, .schedule-table td {
-    border: 1px solid var(--hairline); padding: 5px 8px; text-align: center; background: var(--panel);
+    border: 1px solid var(--hairline); padding: 6px 10px; text-align: center; background: var(--panel);
   }
   .sch-cell { background: var(--sch-cell-bg); position: relative; }
   /* 메모가 남겨진 스케줄 셀 오른쪽 상단에 작게 표시되는 삼각형 표시.
@@ -103,7 +103,7 @@
     background: var(--elevated); color: var(--accent); font-weight: 600; text-align: left; position: relative;
   }
   .schedule-table tr.sch-subgroup-row td {
-    background: var(--hairline); color: var(--text-dim); font-weight: 500; text-align: left; font-size: 11.5px; letter-spacing: 0.02em;
+    background: var(--hairline); color: var(--text-dim); font-weight: 500; text-align: left; font-size: 12.5px; letter-spacing: 0.02em;
   }
   .schedule-table tr.sch-summary-row td {
     background: var(--accent-dim-soft); color: var(--text-dim); font-weight: 500;
@@ -128,7 +128,7 @@
   .sch-required-input {
     width: 100%; min-width: 34px; max-width: 52px; box-sizing: border-box;
     text-align: center; border: 1px solid var(--hairline); border-radius: 10px;
-    background: var(--elevated); color: var(--text); font-size: 12px; padding: 3px 2px;
+    background: var(--elevated); color: var(--text); font-size: 13px; padding: 3px 2px;
     -moz-appearance: textfield;
   }
   .sch-required-input:focus { border-color: var(--accent); }
@@ -185,17 +185,17 @@
   .schedule-table th.sch-col-absent {
     z-index: 4;
   }
-  .schedule-table .sch-col-nickname { left: 0; width: 88px; min-width: 88px; max-width: 88px; }
-  .schedule-table .sch-col-name { left: 88px; width: 56px; min-width: 56px; max-width: 56px; }
-  .schedule-table .sch-col-empno { left: 144px; width: 80px; min-width: 80px; max-width: 80px; }
-  .schedule-table .sch-col-hiredate { left: 224px; width: 88px; min-width: 88px; max-width: 88px; }
-  .schedule-table .sch-col-workhours { left: 312px; width: 88px; min-width: 88px; max-width: 88px; }
-  .schedule-table .sch-col-work { left: 400px; width: 46px; min-width: 46px; max-width: 46px; }
-  .schedule-table .sch-col-off { left: 446px; width: 46px; min-width: 46px; max-width: 46px; }
-  .schedule-table .sch-col-annual { left: 492px; width: 46px; min-width: 46px; max-width: 46px; }
-  .schedule-table .sch-col-daehyu { left: 538px; width: 46px; min-width: 46px; max-width: 46px; }
+  .schedule-table .sch-col-nickname { left: 0; width: 92px; min-width: 92px; max-width: 92px; }
+  .schedule-table .sch-col-name { left: 92px; width: 60px; min-width: 60px; max-width: 60px; }
+  .schedule-table .sch-col-empno { left: 152px; width: 84px; min-width: 84px; max-width: 84px; }
+  .schedule-table .sch-col-hiredate { left: 236px; width: 92px; min-width: 92px; max-width: 92px; }
+  .schedule-table .sch-col-workhours { left: 328px; width: 92px; min-width: 92px; max-width: 92px; }
+  .schedule-table .sch-col-work { left: 420px; width: 48px; min-width: 48px; max-width: 48px; }
+  .schedule-table .sch-col-off { left: 468px; width: 48px; min-width: 48px; max-width: 48px; }
+  .schedule-table .sch-col-annual { left: 516px; width: 48px; min-width: 48px; max-width: 48px; }
+  .schedule-table .sch-col-daehyu { left: 564px; width: 48px; min-width: 48px; max-width: 48px; }
   .schedule-table .sch-col-absent {
-    left: 584px; width: 46px; min-width: 46px; max-width: 46px;
+    left: 612px; width: 48px; min-width: 48px; max-width: 48px;
   }
   /* 고정 열 중 지금 화면에 보이는 마지막 열에 그림자를 줘서 스크롤 경계를 표시한다.
      (열을 개별로 접으면 이 자리가 바뀌므로, 특정 열 이름이 아니라 JS가 매번 계산해서 붙여주는 클래스) */

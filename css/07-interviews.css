@@ -1,12 +1,22 @@
   /* ---------- 면담일지 ---------- */
+  .solid-accent-btn {
+    background: var(--accent); border: 1px solid var(--accent); color: var(--accent-text);
+    font-weight: 600; box-shadow: 0 4px 14px var(--accent-dim);
+    transition: filter 0.12s ease, transform 0.08s ease;
+  }
+  .solid-accent-btn:hover { border-color: var(--accent); color: var(--accent-text); background: var(--accent); filter: brightness(1.06); }
+  .solid-accent-btn:active { transform: scale(0.97); }
   .badge.type-regular { color: var(--blue); background: var(--blue-dim); }
   .badge.type-adhoc { color: var(--green); background: var(--green-dim); }
   .badge.type-warning { color: var(--red); background: var(--red-dim); }
-  .interview-list { display: flex; flex-direction: column; gap: 10px; }
+  .interview-list { display: flex; flex-direction: column; }
   .interview-row {
-    background: var(--elevated); border: 1px solid var(--hairline);
-    border-radius: 14px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px;
+    background: transparent; border-bottom: 1px solid var(--hairline);
+    border-radius: 0; padding: 10px 4px; display: flex; flex-direction: column; gap: 6px;
+    transition: background 0.15s ease;
   }
+  .interview-list .interview-row:last-child { border-bottom: none; }
+  .interview-row:hover:not(.expanded) { background: var(--hairline); border-radius: 12px; }
   .interview-row-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; cursor: pointer; }
   .interview-row-chevron {
     display: flex; align-items: center; justify-content: center; flex: none;
@@ -14,12 +24,12 @@
   }
   .interview-row.expanded .interview-row-chevron { transform: rotate(90deg); color: var(--text-dim); }
   .interview-date { font-size: 14px; color: var(--text-dim); }
-  .interview-agent-name { font-size: 15px; color: var(--text); font-weight: 600; }
+  .interview-agent-name { font-size: 15.5px; color: var(--text); font-weight: 600; }
   .interview-agent-ldap { font-size: 13px; color: var(--text-faint); }
   .interview-agent-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
   .interview-agent-timezone { display: inline-flex; align-items: center; gap: 3px; font-size: 13px; color: var(--text-faint); }
-  .interview-row-actions { margin-left: auto; display: flex; gap: 6px; }
-  .interview-row-body { display: flex; flex-direction: column; gap: 6px; padding-top: 2px; padding-left: 24px; }
+  .interview-row-actions { margin-left: auto; display: flex; gap: 6px; flex-shrink: 0; }
+  .interview-row-body { display: flex; flex-direction: column; gap: 6px; padding: 6px 4px 4px 24px; }
   .interview-content { font-size: 14px; color: var(--text); white-space: pre-wrap; }
   .interview-followup { font-size: 13px; color: var(--text-dim); }
   .interview-textarea { width: 100%; min-height: 70px; resize: vertical; padding: 9px 12px; }
@@ -56,10 +66,14 @@
   .agent-interview-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
   .agent-interview-title { font-size: 15.5px; font-weight: 600; }
   .agent-interview-header-actions { display: flex; align-items: center; gap: 8px; }
-  .interview-export-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; margin-bottom: 14px; }
-  .interview-export-label { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; color: var(--text-dim); margin-right: 2px; }
-  .interview-export-select {
-    background: var(--elevated); border: 1px solid var(--hairline); color: var(--text);
-    border-radius: 12px; padding: 6px 10px; font-size: 13px; cursor: pointer;
-  }
+  .interview-summary-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+  .interview-summary-row .agent-summary { margin-bottom: 0; }
+  .interview-summary-row .agent-search-input { width: 240px; flex-shrink: 0; }
+  .agent-list-header-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .interview-export-menu { max-height: 320px; overflow-y: auto; min-width: 180px; }
+  .interview-export-menu button { display: flex; align-items: center; justify-content: space-between; gap: 8px; white-space: nowrap; }
+  .interview-export-menu button.interview-export-menu-item { justify-content: center; text-align: center; }
+  .interview-export-menu-ldap { font-size: 12px; color: var(--text-faint); }
+  .interview-export-menu-empty { display: block; padding: 7px 10px; font-size: 13px; color: var(--text-faint); }
+  .interview-export-menu-back { color: var(--text-faint); border-bottom: 1px solid var(--hairline); margin-bottom: 2px; padding-bottom: 8px; }
 

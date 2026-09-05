@@ -428,51 +428,29 @@
     const cBg = themeColor("--bg");
     const cText = themeColor("--text");
     const cTextDim = themeColor("--text-dim");
-    const cPanel = themeColor("--panel");
     const cHairline = themeColor("--hairline");
-    const cAccent = themeColor("--accent");
-    const cAccentSoft = themeColor("--accent-dim-soft");
-    const cFaint = themeColor("--text-faint");
-    const cGreen = themeColor("--green");
-    const cRed = themeColor("--red");
 
     const { year, monthIndex } = qaUi;
     const agentsList = qaFilterAgentsByMode(qaWorkingAgents(), captureMode);
     const lockedTag = qaIsMonthLocked(year, monthIndex) ? " · 확정됨" : "";
     const titleSuffix = captureMode === "ALL" ? "" : ` · ${modeName}`;
 
-    // 캡처용 통계 카드 한 칸. 화면용 .qa-stat-grid는 CSS grid를 쓰지만, html2canvas가
-    // fit-content 래퍼 안에서 grid 너비를 안정적으로 못 잡는 경우가 있어 캡처본은
-    // 고정 너비 flex 카드로 따로 그린다.
-    function qaCaptureStatCard(label, value, prevValue, accent) {
-      const isEmpty = value === null;
-      const numColor = isEmpty ? cFaint : (accent ? cAccent : cText);
-      const d = qaStatDiff(value, prevValue);
-      const diffColor = d ? (d.cls === "up" ? cGreen : d.cls === "down" ? cRed : cFaint) : null;
-      const diffHtml = d ? ` <span style="color:${diffColor};font-weight:600;">${d.sign} ${d.abs.toFixed(1)}</span>` : "";
-      return `
-        <div style="flex:0 0 130px;width:130px;box-sizing:border-box;background:${accent ? cAccentSoft : cPanel};border:1px solid ${accent ? cAccent : cHairline};border-radius:14px;padding:12px 10px;text-align:center;">
-          <div style="font-size:${isEmpty ? "15px" : "20px"};line-height:24px;letter-spacing:-0.01em;color:${numColor};">${isEmpty ? "데이터 없음" : value.toFixed(1)}</div>
-          <div style="font-size:11.5px;color:${cFaint};margin-top:4px;">${esc(label)}${diffHtml}</div>
-        </div>
-      `;
-    }
-
     // "전체 저장"일 때만 상단 평균 통계도 표 위에 같이 캡처되게 한다.
+    // 화면과 완전히 같은 마크업(qaStatItemHtml)을 그대로 재사용해서 스타일이 어긋나지 않게 한다.
     const stats = qaComputeStats(agentsList, year, monthIndex);
     const capturePrevYm = qaPrevMonth(year, monthIndex);
     const prevStats = qaComputeStats(agentsList, capturePrevYm.year, capturePrevYm.monthIndex);
     const statsHtml = captureMode === "ALL" ? `
-      <div class="qa-capture-stats" style="display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-bottom:18px;">
-        ${qaCaptureStatCard("전체 평균", stats.total, prevStats.total, true)}
-        ${qaCaptureStatCard("유선 점수 평균", stats.voice, prevStats.voice)}
-        ${qaCaptureStatCard("채팅 점수 평균", stats.chat, prevStats.chat)}
-        ${qaCaptureStatCard("주간 점수 평균", stats.day, prevStats.day)}
-        ${qaCaptureStatCard("야간 점수 평균", stats.night, prevStats.night)}
-        ${qaCaptureStatCard("주간 채팅 평균", stats.dayChat, prevStats.dayChat)}
-        ${qaCaptureStatCard("주간 유선 평균", stats.dayVoice, prevStats.dayVoice)}
-        ${qaCaptureStatCard("야간 채팅 평균", stats.nightChat, prevStats.nightChat)}
-        ${qaCaptureStatCard("야간 유선 평균", stats.nightVoice, prevStats.nightVoice)}
+      <div class="qa-stat-grid" style="margin-bottom:20px;padding-bottom:20px;border-bottom:1px solid ${cHairline};">
+        ${qaStatItemHtml("전체 평균", stats.total, prevStats.total, true)}
+        ${qaStatItemHtml("유선 점수 평균", stats.voice, prevStats.voice)}
+        ${qaStatItemHtml("채팅 점수 평균", stats.chat, prevStats.chat)}
+        ${qaStatItemHtml("주간 점수 평균", stats.day, prevStats.day)}
+        ${qaStatItemHtml("야간 점수 평균", stats.night, prevStats.night)}
+        ${qaStatItemHtml("주간 채팅 평균", stats.dayChat, prevStats.dayChat)}
+        ${qaStatItemHtml("주간 유선 평균", stats.dayVoice, prevStats.dayVoice)}
+        ${qaStatItemHtml("야간 채팅 평균", stats.nightChat, prevStats.nightChat)}
+        ${qaStatItemHtml("야간 유선 평균", stats.nightVoice, prevStats.nightVoice)}
       </div>
     ` : "";
 
@@ -504,17 +482,12 @@
 
     requestAnimationFrame(() => {
       // 표는 CSS(display:table + margin:auto)만으로 이미 표 크기에 맞춰 가운데 정렬된다.
-      // 통계 카드만 두 줄로 나누기 위해 너비를 계산해서 고정한다(카드 너비 130px, 간격
-      // 10px는 고정값이라 폰트 렌더링 차이 없이 항상 정확하게 계산된다).
-      const statsWrapEl = wrapper.querySelector(".qa-capture-stats");
-      if (statsWrapEl) {
-        // 통계 카드를 한 줄로 쭉 나열하면 표보다 훨씬 넓어져서 표 양옆에 공백이 생긴다.
-        // 카드를 두 줄로 나눠서 표 너비에 더 가깝게 만든다 (예: 9칸 → 5+4).
-        const cardCount = statsWrapEl.children.length;
-        const perRow = Math.ceil(cardCount / 2);
-        const w = perRow * 130 + Math.max(0, perRow - 1) * 10;
-        statsWrapEl.style.width = w + "px";
-        statsWrapEl.style.margin = "0 auto 18px auto";
+      // 통계 줄은 fit-content 래퍼 안에서는 justify-content:space-between이 퍼질 공간이
+      // 없으므로, 표의 실제 렌더링 너비에 맞춰 폭을 직접 지정해서 표와 나란히 맞춘다.
+      const statGridEl = wrapper.querySelector(".qa-stat-grid");
+      const tableWrapEl = wrapper.querySelector(".qa-table-wrap");
+      if (statGridEl && tableWrapEl) {
+        statGridEl.style.width = tableWrapEl.getBoundingClientRect().width + "px";
       }
 
       const fullW = wrapper.scrollWidth;

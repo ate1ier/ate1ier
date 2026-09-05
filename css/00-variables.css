@@ -1,40 +1,40 @@
   :root {
-    --bg: #1e1e22;
-    --panel: #29292e;
-    --elevated: #3b3b43;
-    --hairline: rgba(255, 255, 255, 0.14);
-    --hairline-strong: rgba(255, 255, 255, 0.22);
-    --text: #f5f5f6;
-    --text-dim: #c2c2c7;
-    --text-faint: #93939a;
-    --accent: #0a84ff;
-    --accent-dim: #0a84ff2e;
-    --accent-dim-soft: #0a84ff0c;
-    --accent-text: #ffffff;
-    --green: #30d158;
-    --green-dim: #30d1582e;
-    --red: #ff453a;
-    --red-dim: #ff453a2e;
-    --blue: #64d2ff;
-    --blue-dim: #64d2ff2e;
-    --orange: #ff9f0a;
-    --orange-dim: #ff9f0a2e;
-    --salmon: #ff6961;
-    --salmon-dim: #ff69612e;
-    --yellow: #ffd60a;
-    --yellow-dim: #ffd60a2e;
-    --teal: #40c8e0;
-    --teal-dim: #40c8e02e;
-    --purple: #bf5af2;
-    --purple-dim: #bf5af22e;
-    --pink: #ff375f;
-    --pink-dim: #ff375f2e;
-    --indigo: #5e5ce6;
-    --indigo-dim: #5e5ce62e;
-    --edu: #32d74b;
-    --edu-dim: #32d74b2e;
-    --weekend-tint: #29292d;
-    --sch-cell-bg: #313136;
+    --bg: #14161b;
+    --panel: #1c1f26;
+    --elevated: #242830;
+    --hairline: rgba(255, 255, 255, 0.07);
+    --hairline-strong: rgba(255, 255, 255, 0.13);
+    --text: #f1efe9;
+    --text-dim: #c7c5c0;
+    --text-faint: #8b8a8f;
+    --accent: #c9973f;
+    --accent-dim: #c9973f2e;
+    --accent-dim-soft: #c9973f0c;
+    --accent-text: #2a2205;
+    --green: #6faa78;
+    --green-dim: #6faa7829;
+    --red: #c9695f;
+    --red-dim: #c9695f29;
+    --blue: #5b9bc2;
+    --blue-dim: #5b9bc229;
+    --orange: #c68a4a;
+    --orange-dim: #c68a4a29;
+    --salmon: #c2766a;
+    --salmon-dim: #c2766a29;
+    --yellow: #c9973f;
+    --yellow-dim: #c9973f29;
+    --teal: #4a9791;
+    --teal-dim: #4a979129;
+    --purple: #9b7bc4;
+    --purple-dim: #9b7bc429;
+    --pink: #c26a86;
+    --pink-dim: #c26a8629;
+    --indigo: #7b7bc4;
+    --indigo-dim: #7b7bc429;
+    --edu: #6fae7a;
+    --edu-dim: #6fae7a29;
+    --weekend-tint: #1f2228;
+    --sch-cell-bg: #262a32;
     --native-color-scheme: dark;
     /* ---- 반경 스케일: 최신 macOS(리퀴드 글래스)처럼 더 둥글고 큼직하게 ---- */
     --radius-xs: 8px;
@@ -42,14 +42,14 @@
     --mac-radius: 14px;
     --mac-radius-lg: 22px;
     --radius-xl: 28px;
-    --mac-vibrancy: rgba(46, 46, 51, 0.66);
-    --mac-vibrancy-hairline: rgba(255, 255, 255, 0.12);
+    --mac-vibrancy: rgba(32, 35, 42, 0.66);
+    --mac-vibrancy-hairline: rgba(255, 255, 255, 0.09);
     --mac-glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.07);
     --mac-shadow: 0 24px 60px rgba(0, 0, 0, 0.30), 0 1px 0 rgba(255, 255, 255, 0.04) inset;
     --mac-shadow-sm: 0 6px 18px rgba(0, 0, 0, 0.22);
     --mac-shadow-float: 0 18px 44px rgba(0, 0, 0, 0.38), 0 1px 0 rgba(255, 255, 255, 0.08) inset;
     /* ---- 페이지 상단 제목(면담일지/업무 정리/상담사 관리 등)에 공통으로 쓰는 값 ---- */
-    --page-title-size: 24px;
+    --page-title-size: 28px;
     --page-title-weight: 600;
   }
   html[data-theme="light"] {
@@ -62,10 +62,10 @@
     --text: #1d1d1f;
     --text-dim: #55555b;
     --text-faint: #86868b;
-    --accent: #4a90e2;
-    --accent-dim: #4a90e224;
-    --accent-dim-soft: #4a90e20c;
-    --accent-text: #ffffff;
+    --accent: #a3791f;
+    --accent-dim: #a3791f22;
+    --accent-dim-soft: #a3791f0c;
+    --accent-text: #2a2205;
     --weekend-tint: #eef4fc;
     --native-color-scheme: light;
   }
@@ -108,8 +108,8 @@
     background: var(--bg);
     color: var(--text);
     color-scheme: var(--native-color-scheme, dark);
-    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro KR', 'Apple SD Gothic Neo', 'Malgun Gothic', 'KoPub Dotum', system-ui, sans-serif;
-    font-weight: 400;
+    font-family: 'KoPub Dotum', -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro KR', 'Apple SD Gothic Neo', 'Malgun Gothic', system-ui, sans-serif;
+    font-weight: 300;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
   }
@@ -118,5 +118,10 @@
   button:focus-visible, input:focus-visible, textarea:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
+  }
+  /* 각 페이지 상단 타이틀(상담사 관리·면담일지·업무 정리·품질 관리·월별 스케줄·캘린더 등) — KoPub 바탕체 Light */
+  .agent-list-title, .notes-title, .qa-title, .schedule-title, .calendar-page-title {
+    font-family: 'KoPub Batang', 'Apple Myungjo', 'AppleGothic', 'Batang', 'Nanum Myeongjo', serif;
+    font-weight: 300;
   }
 

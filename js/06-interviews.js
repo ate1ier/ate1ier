@@ -178,6 +178,62 @@
     const list = interviewsData.filter((r) => r.agentId === agentId);
     exportInterviewsToExcel(list, interviewExportFilename(agent.name), "interview-status");
   }
+
+  // ----- 면담일지 엑셀 다운로드 버튼: 클릭하면 옵션 목록이 뜨는 팝업 메뉴 -----
+  // 월별 스케줄의 "이미지로 저장 ▾" 메뉴와 같은 방식(sch-menu)을 그대로 재사용한다.
+  function closeInterviewExportMenu() {
+    const existing = document.getElementById("interview-export-menu");
+    if (existing) existing.remove();
+    document.removeEventListener("mousedown", interviewExportMenuOutsideHandler, true);
+  }
+  function interviewExportMenuOutsideHandler(e) {
+    const menu = document.getElementById("interview-export-menu");
+    if (menu && !menu.contains(e.target)) closeInterviewExportMenu();
+  }
+  function positionInterviewExportMenu(menu, anchorEl) {
+    const rect = anchorEl.getBoundingClientRect();
+    const top = Math.min(rect.bottom + 4, window.innerHeight - menu.offsetHeight - 8);
+    const left = Math.min(rect.left, window.innerWidth - menu.offsetWidth - 8);
+    menu.style.top = `${Math.max(8, top)}px`;
+    menu.style.left = `${Math.max(8, left)}px`;
+  }
+  function renderInterviewExportMenuMain(menu, anchorEl) {
+    menu.innerHTML = `
+      <button type="button" class="interview-export-menu-item" data-export-action="all">전체 다운로드</button>
+      <button type="button" class="interview-export-menu-item" data-export-action="day">주간 다운로드</button>
+      <button type="button" class="interview-export-menu-item" data-export-action="night">야간 다운로드</button>
+      <button type="button" class="interview-export-menu-item" data-export-action="by-agent">상담사별 다운로드 ›</button>
+    `;
+    menu.querySelector("[data-export-action='all']").onclick = () => { closeInterviewExportMenu(); downloadAllInterviews(); };
+    menu.querySelector("[data-export-action='day']").onclick = () => { closeInterviewExportMenu(); downloadInterviewsByGroup("day"); };
+    menu.querySelector("[data-export-action='night']").onclick = () => { closeInterviewExportMenu(); downloadInterviewsByGroup("night"); };
+    menu.querySelector("[data-export-action='by-agent']").onclick = () => renderInterviewExportMenuAgents(menu, anchorEl);
+    positionInterviewExportMenu(menu, anchorEl);
+  }
+  function renderInterviewExportMenuAgents(menu, anchorEl) {
+    const sortedAgents = agentsData.slice().sort((a, b) => a.name.localeCompare(b.name, "ko"));
+    menu.innerHTML = `
+      <button type="button" class="interview-export-menu-back" data-export-action="back">‹ 뒤로</button>
+      ${sortedAgents.length === 0
+        ? `<span class="interview-export-menu-empty">등록된 상담사가 없어요.</span>`
+        : sortedAgents.map((a) => `<button type="button" data-export-agent-id="${a.id}">${esc(a.name)} <span class="interview-export-menu-ldap">${esc(a.ldap || "-")}</span></button>`).join("")}
+    `;
+    menu.querySelector("[data-export-action='back']").onclick = () => renderInterviewExportMenuMain(menu, anchorEl);
+    menu.querySelectorAll("[data-export-agent-id]").forEach((btn) => {
+      btn.onclick = () => { closeInterviewExportMenu(); downloadInterviewsByAgent(btn.getAttribute("data-export-agent-id")); };
+    });
+    positionInterviewExportMenu(menu, anchorEl);
+  }
+  function openInterviewExportMenu(anchorEl) {
+    closeInterviewExportMenu();
+    const menu = document.createElement("div");
+    menu.id = "interview-export-menu";
+    menu.className = "sch-menu interview-export-menu";
+    document.body.appendChild(menu);
+    renderInterviewExportMenuMain(menu, anchorEl);
+    setTimeout(() => document.addEventListener("mousedown", interviewExportMenuOutsideHandler, true), 0);
+  }
+
   function interviewTypeBadgeClass(type) {
     if (type === "정기") return "type-regular";
     if (type === "경고") return "type-warning";
@@ -210,6 +266,7 @@
     searchQuery: "",
     typeFilter: "all", // "all" | "정기" | "수시" | "경고"
     expandedIds: new Set(), // 목록에서 펼쳐본 면담 기록 id들 (상담사 상세 화면과 공유)
+    page: 1, // 면담일지 목록의 현재 페이지(10건씩)
   };
 
   const homeUi = {
@@ -224,7 +281,10 @@
       <div class="agent-picker-field">
         <label class="agent-form-label">${label}
           <div class="agent-picker" id="${idPrefix}-${fieldKey}-picker">
-            <input type="text" class="add-input agent-picker-input" id="${idPrefix}-${fieldKey}-search" placeholder="${esc(placeholder)}" value="${esc(inputValue)}" autocomplete="off">
+            <div class="agent-picker-input">
+              <input type="text" class="agent-picker-input-field" id="${idPrefix}-${fieldKey}-search" placeholder="${esc(placeholder)}" value="${esc(inputValue)}" autocomplete="off">
+              ${ICON_SEARCH_MINI}
+            </div>
             <input type="hidden" id="${idPrefix}-${fieldKey}" value="${selectedAgent ? selectedAgent.id : ""}">
             <div class="agent-picker-list" id="${idPrefix}-${fieldKey}-list"></div>
           </div>
@@ -411,6 +471,7 @@
     );
 
     let bodyHtml;
+    let exportRowHtml = "";
     if (interviewsUi.mode === "add") {
       bodyHtml = `
         <div class="agent-form-title">새 면담 기록 추가</div>
@@ -438,41 +499,27 @@
       const typeFilterBtns = ["all", ...INTERVIEW_TYPES].map((t) => `
         <button type="button" class="agent-filter-btn ${interviewsUi.typeFilter === t ? "active" : ""}" data-interview-filter="${t}">${t === "all" ? "전체" : t}</button>
       `).join("");
-      const exportAgentOptionsHtml = agentsData
-        .slice()
-        .sort((a, b) => a.name.localeCompare(b.name, "ko"))
-        .map((a) => `<option value="${a.id}">${esc(a.name)} (${esc(a.ldap || "-")})</option>`)
-        .join("");
+      exportRowHtml = `<button class="ghost-btn" id="interview-export-btn">${ICON_DOWNLOAD} 엑셀로 다운로드 ▾</button>`;
       bodyHtml = `
-        <div class="interview-export-row">
-          <span class="interview-export-label">${ICON_DOWNLOAD} 엑셀 다운로드</span>
-          <button type="button" class="ghost-btn" id="interview-export-all">전체</button>
-          <button type="button" class="ghost-btn" id="interview-export-day">주간</button>
-          <button type="button" class="ghost-btn" id="interview-export-night">야간</button>
-          <select class="interview-export-select" id="interview-export-agent-select">
-            <option value="">상담사별 다운로드...</option>
-            ${exportAgentOptionsHtml}
-          </select>
-        </div>
         <div class="agent-controls">
-          <input type="text" class="add-input agent-search-input" id="interview-search-input" placeholder="상담사 이름 또는 LDAP 검색" value="${esc(interviewsUi.searchQuery)}" autocomplete="off">
           <div class="agent-filter-row">${typeFilterBtns}</div>
         </div>
         <div id="interview-list-area">
-          ${filtered.length === 0
-            ? `<div class="agent-list-empty">${interviewsData.length === 0 ? "등록된 면담 기록이 없어요." : "검색 또는 필터 조건에 맞는 면담 기록이 없어요."}</div>`
-            : `<div class="interview-list">${filtered.map((r) => renderInterviewRow(r, "page")).join("")}</div>`}
+          ${renderInterviewListAreaHtml(filtered)}
         </div>
       `;
     }
 
     root.innerHTML = `
+      <div class="agent-list-header">
+        <div class="agent-list-title">면담일지</div>
+        ${interviewsUi.mode === "list" ? `<div class="agent-list-header-actions">${exportRowHtml}<button class="ghost-btn solid-accent-btn" id="btn-interview-add">＋ 면담 기록 추가</button></div>` : ""}
+      </div>
       <div class="card">
-        <div class="agent-list-header">
-          <div class="agent-list-title">면담일지</div>
-          ${interviewsUi.mode === "list" ? `<button class="ghost-btn" id="btn-interview-add">＋ 면담 기록 추가</button>` : ""}
+        <div class="interview-summary-row">
+          <div class="agent-summary">전체 ${interviewsData.length}건${interviewsUi.mode === "list" && filtered.length !== interviewsData.length ? ` · 필터 결과 ${filtered.length}건` : ""}</div>
+          ${interviewsUi.mode === "list" ? `<div class="agent-search-input"><input type="text" class="agent-search-input-field" id="interview-search-input" placeholder="상담사 이름 또는 LDAP 검색" value="${esc(interviewsUi.searchQuery)}" autocomplete="off">${ICON_SEARCH_MINI}</div>` : ""}
         </div>
-        <div class="agent-summary">전체 ${interviewsData.length}건${interviewsUi.mode === "list" && filtered.length !== interviewsData.length ? ` · 필터 결과 ${filtered.length}건` : ""}</div>
         <div class="status" id="interview-status"></div>
         ${bodyHtml}
       </div>
@@ -481,15 +528,26 @@
     attachInterviewsPageEvents(root);
   }
 
+  // 면담일지 목록 영역(검색바 아래)의 내용을 만든다. 10건씩 페이지를 나눠서 보여준다.
+  function renderInterviewListAreaHtml(filtered) {
+    if (filtered.length === 0) {
+      return `<div class="agent-list-empty">${interviewsData.length === 0 ? "등록된 면담 기록이 없어요." : "검색 또는 필터 조건에 맞는 면담 기록이 없어요."}</div>`;
+    }
+    const { items, page, totalPages } = paginateList(filtered, interviewsUi.page);
+    interviewsUi.page = page;
+    return `
+      <div class="interview-list">${items.map((r) => renderInterviewRow(r, "page")).join("")}</div>
+      ${renderPaginationHtml(page, totalPages, "interview-list")}
+    `;
+  }
+
   function updateInterviewListArea() {
     const area = document.getElementById("interview-list-area");
     if (!area) return;
     const filtered = sortInterviews(
       interviewsData.filter((r) => interviewMatchesSearch(r, interviewsUi.searchQuery) && interviewMatchesType(r, interviewsUi.typeFilter))
     );
-    area.innerHTML = filtered.length === 0
-      ? `<div class="agent-list-empty">${interviewsData.length === 0 ? "등록된 면담 기록이 없어요." : "검색 또는 필터 조건에 맞는 면담 기록이 없어요."}</div>`
-      : `<div class="interview-list">${filtered.map((r) => renderInterviewRow(r, "page")).join("")}</div>`;
+    area.innerHTML = renderInterviewListAreaHtml(filtered);
     attachInterviewListAreaHandlers(area);
     const summaryEl = document.querySelector("#page-inner .agent-summary");
     if (summaryEl) {
@@ -499,6 +557,10 @@
 
   function attachInterviewListAreaHandlers(root) {
     attachInterviewRowToggles(root, updateInterviewListArea);
+    attachPaginationHandlers(root, "interview-list", (delta) => {
+      interviewsUi.page = interviewsUi.page + delta;
+      updateInterviewListArea();
+    });
     root.querySelectorAll("[data-action='page-download-interview']").forEach((btn) => {
       btn.onclick = () => downloadSingleInterview(btn.getAttribute("data-id"));
     });
@@ -533,29 +595,19 @@
     if (searchInput) {
       searchInput.oninput = (e) => {
         interviewsUi.searchQuery = e.target.value;
+        interviewsUi.page = 1;
         updateInterviewListArea();
       };
     }
     root.querySelectorAll("[data-interview-filter]").forEach((btn) => {
       btn.onclick = () => {
         interviewsUi.typeFilter = btn.getAttribute("data-interview-filter");
+        interviewsUi.page = 1;
         renderApp();
       };
     });
-    const exportAllBtn = document.getElementById("interview-export-all");
-    if (exportAllBtn) exportAllBtn.onclick = () => downloadAllInterviews();
-    const exportDayBtn = document.getElementById("interview-export-day");
-    if (exportDayBtn) exportDayBtn.onclick = () => downloadInterviewsByGroup("day");
-    const exportNightBtn = document.getElementById("interview-export-night");
-    if (exportNightBtn) exportNightBtn.onclick = () => downloadInterviewsByGroup("night");
-    const exportAgentSelect = document.getElementById("interview-export-agent-select");
-    if (exportAgentSelect) {
-      exportAgentSelect.onchange = () => {
-        const agentId = exportAgentSelect.value;
-        if (agentId) downloadInterviewsByAgent(agentId);
-        exportAgentSelect.value = "";
-      };
-    }
+    const exportBtn = document.getElementById("interview-export-btn");
+    if (exportBtn) exportBtn.onclick = (e) => openInterviewExportMenu(e.currentTarget);
     attachInterviewListAreaHandlers(root);
 
     const form = document.getElementById("interview-page-form");
@@ -620,7 +672,7 @@
         <div class="agent-interview-header">
           <div class="agent-interview-title">${ICON_CLIPBOARD} 면담 이력</div>
           <div class="agent-interview-header-actions">
-            ${agentsUi.interviewMode === "list" ? `<button class="ghost-btn" id="btn-agent-interview-add">＋ 면담 기록 추가</button>` : ""}
+            ${agentsUi.interviewMode === "list" ? `<button class="ghost-btn solid-accent-btn" id="btn-agent-interview-add">＋ 면담 기록 추가</button>` : ""}
             <button class="ghost-btn" data-action="agent-goto-interviews" data-id="${agent.id}">${ICON_CHEVRON_RIGHT} 면담일지 전체보기</button>
           </div>
         </div>
@@ -648,6 +700,7 @@
         interviewsUi.searchQuery = agent.name;
         interviewsUi.typeFilter = "all";
         interviewsUi.mode = "list";
+        interviewsUi.page = 1;
         setPage("interviews");
       };
     });

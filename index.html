@@ -9,6 +9,8 @@
 <link rel="icon" type="image/png" sizes="192x192" href="favicon-192x192.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/font-kopub@1.0/kopubdotum.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/font-kopub@1.0/kopubbatang.min.css">
+<link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -79,6 +81,9 @@
   const ICON_BACKUP = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.6 4.4c0-1 2.4-1.8 5.4-1.8s5.4.8 5.4 1.8-2.4 1.8-5.4 1.8-5.4-.8-5.4-1.8Z"/><path d="M2.6 4.4V8c0 1 2.4 1.8 5.4 1.8s5.4-.8 5.4-1.8V4.4"/><path d="M2.6 8v3.6c0 1 2.4 1.8 5.4 1.8s5.4-.8 5.4-1.8V8"/></svg>`;
   const ICON_REFRESH = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 8A5 5 0 1 1 11.4 4.3"/><path d="M13 2.6V6h-3.4"/></svg>`;
   const ICON_SETTINGS = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="2.1"/><path d="M8 2.4v1.5M8 12.1v1.5M13.6 8h-1.5M3.9 8H2.4M11.9 4.1l-1.05 1.05M5.15 10.85 4.1 11.9M11.9 11.9l-1.05-1.05M5.15 5.15 4.1 4.1"/></svg>`;
+  // 하단 독의 "이름 통합 검색"과 같은 모양의 작은 검색 아이콘. 다른 검색창들(상담사 검색,
+  // 면담일지 검색, 면담 대상/관리자 검색)에서도 오른쪽에 똑같이 붙여서 통일감을 준다.
+  const ICON_SEARCH_MINI = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="7" r="4.2"/><path d="M13 13l-2.9-2.9"/></svg>`;
   /* ===================== ☁️ 클라우드 동기화 (Supabase) =====================
      계정 목록과 각 계정의 데이터(할일/메모/상담사/면담일지/스케줄/캘린더)를
      Supabase의 kv_store 테이블에도 함께 저장해서, 다른 기기·다른 사람도
@@ -1161,6 +1166,41 @@
     return d.innerHTML;
   }
   function genId() { return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`; }
+
+  /* ===================== 공용 페이지네이션 ===================== */
+  // 목록이 길어질 때 10개 단위로 잘라서 보여주기 위한 공용 헬퍼.
+  const PAGE_SIZE = 10;
+  // list 전체와 원하는 page(1부터 시작)를 넣으면, 범위를 벗어난 page는 알아서
+  // 안쪽으로 보정해서 { items, page, totalPages }를 돌려준다.
+  function paginateList(list, page) {
+    const totalPages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
+    const safePage = Math.min(Math.max(1, page || 1), totalPages);
+    const start = (safePage - 1) * PAGE_SIZE;
+    return { items: list.slice(start, start + PAGE_SIZE), page: safePage, totalPages };
+  }
+  // actionName은 클릭 시 data-page-action 값으로 붙어서, 각 화면에서 이 값으로
+  // 자기 목록의 페이지 상태를 구분해 처리한다.
+  function renderPaginationHtml(page, totalPages, actionName) {
+    if (totalPages <= 1) return "";
+    return `
+      <div class="page-nav" data-page-action="${actionName}">
+        <button type="button" class="page-nav-btn" data-page-nav="prev" ${page <= 1 ? "disabled" : ""}>이전</button>
+        <span class="page-nav-info">${page} / ${totalPages}페이지</span>
+        <button type="button" class="page-nav-btn" data-page-nav="next" ${page >= totalPages ? "disabled" : ""}>다음</button>
+      </div>
+    `;
+  }
+  // renderPaginationHtml로 그려진 이전/다음 버튼에 동작을 붙인다.
+  // 버튼은 이미 범위를 벗어나면 disabled 처리되어 있으므로, 여기서는 그냥
+  // -1(이전)/+1(다음)만큼 페이지를 옮겨달라고 onDelta(delta)를 호출해주면 된다.
+  function attachPaginationHandlers(root, actionName, onDelta) {
+    const nav = root.querySelector(`.page-nav[data-page-action="${actionName}"]`);
+    if (!nav) return;
+    const prevBtn = nav.querySelector('[data-page-nav="prev"]');
+    const nextBtn = nav.querySelector('[data-page-nav="next"]');
+    if (prevBtn) prevBtn.onclick = () => onDelta(-1);
+    if (nextBtn) nextBtn.onclick = () => onDelta(1);
+  }
 
   /* ===================== 로그인(로컬 전용) 모듈 =====================
      지금은 서버 없이 이 브라우저의 localStorage에만 계정 정보를 저장하는
@@ -2300,6 +2340,9 @@
     }
 
     root.innerHTML = `
+      <div class="calendar-page-header">
+        <div class="calendar-page-title">캘린더</div>
+      </div>
       <div class="shell">
         <div class="card">
           <div class="cal-header">
@@ -3373,14 +3416,14 @@
     const hasFolders = notesData.folders.length > 0;
 
     root.innerHTML = `
-      <div class="card">
       <div class="notes-header">
         <div class="notes-title">업무 정리</div>
         <div class="notes-actions">
-          <button class="ghost-btn" id="btn-new-folder">+ 새 폴더</button>
-          <button class="ghost-btn" id="btn-new-note">+ 새 메모</button>
+          <button class="ghost-btn solid-accent-btn" id="btn-new-folder">+ 새 폴더</button>
+          <button class="ghost-btn solid-accent-btn" id="btn-new-note">+ 새 메모</button>
         </div>
       </div>
+      <div class="card">
       <div class="status" id="notes-status" style="margin-bottom:10px;"></div>
 
       ${notesUi.showNewFolder ? `
@@ -3504,6 +3547,7 @@
     sortBy: "shift", // "shift" | "custom" | "name" | "type" | "chat" | "night" | "created"
     interviewMode: "list", // "list" | "add" | "edit" — 상담사 상세의 면담 이력 섹션용
     interviewEditingId: null,
+    page: 1, // 고정 인원을 제외한 목록의 현재 페이지(10개씩)
   };
 
   let agentStatusTimer = null;
@@ -3714,17 +3758,15 @@
     const typeBadges = (a.workTypes || []).map((t) => `<span class="badge sm ${t === "유선" ? "voice" : "chat"}">${esc(t)}</span>`).join("");
     const groupBadge = `<span class="badge sm ${a.group === "night" ? "night" : "day"}">${a.group === "night" ? "야간" : "주간"}</span>`;
     const isResigned = a.status === "RESIGNED";
-    const statusToggle = `<button type="button" class="badge-btn sm ${isResigned ? "resigned" : "working"}" data-action="toggle-agent-status" data-id="${a.id}" title="클릭하면 재직 상태가 바로 바뀌어요">${isResigned ? "퇴사" : "근무중"}</button>`;
-    const badges = `<div class="agent-row-badges">${typeBadges}${groupBadge}${statusToggle}</div>`;
+    const statusBadge = `<button type="button" class="badge-btn sm ${isResigned ? "resigned" : "working"}" data-action="toggle-agent-status" data-id="${a.id}" title="클릭하면 재직 상태가 바로 바뀌어요">${isResigned ? "퇴사" : "근무중"}</button>`;
     return `
       <div class="agent-row ${selected ? "selected" : ""}" draggable="${draggable ? "true" : "false"}" data-agent-id="${a.id}" data-agent-section="${section}">
         <span class="drag-handle ${draggable ? "" : "drag-handle-disabled"}" title="${draggable ? "드래그해서 순서 변경" : "사용자 지정 정렬에서만 드래그할 수 있어요"}">⠿</span>
         <button class="pin-btn ${a.pinned ? "pinned" : ""}" data-action="pin-agent" data-id="${a.id}" title="${a.pinned ? "고정 해제" : "상단에 고정"}">${a.pinned ? "★" : "☆"}</button>
-        <button class="agent-row-main" data-action="select-agent" data-id="${a.id}">
-          <span class="agent-row-name">${esc(a.name)}${a.isAdmin ? ' <span class="badge sm admin">관리자</span>' : ""}</span>
-          <span class="agent-row-ldap">${esc(a.ldap)}</span>
-        </button>
-        ${badges}
+        <div class="agent-row-main" data-action="select-agent" data-id="${a.id}">
+          <span class="agent-row-name">${esc(a.name)}${a.isAdmin ? ' <span class="badge sm admin">관리자</span>' : ""}${a.ldap ? ` <span class="agent-row-ldap-inline">${esc(a.ldap)}</span>` : ""}</span>
+          <span class="agent-row-meta">${typeBadges}${groupBadge}${statusBadge}</span>
+        </div>
       </div>
     `;
   }
@@ -3732,7 +3774,9 @@
   function renderAgentDetail(agent) {
     return `
       <div class="agent-detail-header">
-        <div class="agent-detail-name">${esc(agent.name)}</div>
+        <div class="agent-detail-heading">
+          <div class="agent-detail-name">${esc(agent.name)}</div>
+        </div>
         <div class="agent-detail-actions">
           <button class="ghost-btn" data-action="edit-agent" data-id="${agent.id}">수정</button>
           <button class="ghost-btn danger" data-action="delete-agent" data-id="${agent.id}">삭제</button>
@@ -3854,7 +3898,13 @@
     } else if (filtered.length === 0) {
       listHtml = `<div class="agent-list-empty">검색 또는 필터 조건에 맞는 상담사가 없어요.</div>`;
     } else if (listAgents.length > 0) {
-      listHtml = `<div class="agent-list">${listAgents.map((a) => renderAgentRow(a, "list", draggable)).join("")}</div>`;
+      // 고정되지 않은 인원 목록은 10명씩 페이지를 나눠서 보여준다.
+      const { items, page, totalPages } = paginateList(listAgents, agentsUi.page);
+      agentsUi.page = page;
+      listHtml = `
+        <div class="agent-list">${items.map((a) => renderAgentRow(a, "list", draggable)).join("")}</div>
+        ${renderPaginationHtml(page, totalPages, "agent-list")}
+      `;
     }
 
     return `${pinnedHtml}${listHtml}`;
@@ -3899,6 +3949,10 @@
         toggleAgentStatus(btn.getAttribute("data-id"));
       };
     });
+    attachPaginationHandlers(root, "agent-list", (delta) => {
+      agentsUi.page = agentsUi.page + delta;
+      updateAgentListArea();
+    });
     attachAgentDragHandlers(root);
   }
 
@@ -3925,15 +3979,22 @@
 
     const controlsHtml = `
       <div class="agent-controls">
-        <input type="text" class="add-input agent-search-input" id="agent-search-input" placeholder="이름 또는 LDAP 검색" value="${esc(agentsUi.searchQuery)}" autocomplete="off">
-        <div class="agent-filter-row">
-          <button type="button" class="agent-filter-btn ${agentsUi.filterTypes.size === 0 ? "active" : ""}" data-filter="all">전체</button>
-          <button type="button" class="agent-filter-btn ${agentsUi.filterTypes.has("voice") ? "active" : ""}" data-filter="voice">유선만</button>
-          <button type="button" class="agent-filter-btn ${agentsUi.filterTypes.has("chat") ? "active" : ""}" data-filter="chat">채팅만</button>
-          <button type="button" class="agent-filter-btn ${agentsUi.filterTypes.has("day") ? "active" : ""}" data-filter="day">주간만</button>
-          <button type="button" class="agent-filter-btn ${agentsUi.filterTypes.has("night") ? "active" : ""}" data-filter="night">야간만</button>
-          <button type="button" class="agent-filter-btn ${agentsUi.filterTypes.has("working") ? "active" : ""}" data-filter="working">재직만</button>
-          <button type="button" class="agent-filter-btn ${agentsUi.filterTypes.has("resigned") ? "active" : ""}" data-filter="resigned">퇴사만</button>
+        <div class="agent-controls-top">
+          <div class="agent-filter-row">
+            <button type="button" class="agent-filter-btn ${agentsUi.filterTypes.size === 0 ? "active" : ""}" data-filter="all">전체</button>
+            <button type="button" class="agent-filter-btn ${agentsUi.filterTypes.has("voice") ? "active" : ""}" data-filter="voice">유선</button>
+            <button type="button" class="agent-filter-btn ${agentsUi.filterTypes.has("chat") ? "active" : ""}" data-filter="chat">챗</button>
+            <button type="button" class="agent-filter-btn ${agentsUi.filterTypes.has("day") ? "active" : ""}" data-filter="day">주간</button>
+            <button type="button" class="agent-filter-btn ${agentsUi.filterTypes.has("night") ? "active" : ""}" data-filter="night">야간</button>
+            <button type="button" class="agent-filter-btn ${agentsUi.filterTypes.has("working") ? "active" : ""}" data-filter="working">재직</button>
+            <button type="button" class="agent-filter-btn ${agentsUi.filterTypes.has("resigned") ? "active" : ""}" data-filter="resigned">퇴사</button>
+          </div>
+          <div class="agent-search-input">
+            <input type="text" class="agent-search-input-field" id="agent-search-input" placeholder="이름 또는 LDAP 검색" value="${esc(agentsUi.searchQuery)}" autocomplete="off">
+            ${ICON_SEARCH_MINI}
+          </div>
+        </div>
+        <div class="agent-sort-row">
           <select class="agent-sort-select" id="agent-sort-select">
             <option value="shift" ${agentsUi.sortBy === "shift" ? "selected" : ""}>기본순(주간→야간·업무·시간순)</option>
             <option value="custom" ${agentsUi.sortBy === "custom" ? "selected" : ""}>사용자 지정(드래그)</option>
@@ -3962,14 +4023,16 @@
     }
 
     root.innerHTML = `
+      <div class="agent-page-header">
+        <div class="agent-list-heading">
+          <div class="agent-list-title">상담사 관리</div>
+          ${agentsData.length > 0 ? summaryHtml : ""}
+        </div>
+        <button class="agent-add-btn" id="btn-agent-add">＋ 상담사 추가</button>
+      </div>
       <div class="agent-shell">
         <div class="card">
-          <div class="agent-list-header">
-            <div class="agent-list-title">상담사 관리</div>
-            <button class="ghost-btn" id="btn-agent-add">＋ 상담사 추가</button>
-          </div>
           <div class="status" id="agent-status"></div>
-          ${agentsData.length > 0 ? summaryHtml : ""}
           ${agentsData.length > 0 ? controlsHtml : ""}
           <div id="agent-list-area">${listAreaHtml}</div>
         </div>
@@ -4034,6 +4097,7 @@
       // - 매 입력마다 목록 영역을 갱신하므로 검색 결과가 타이핑 즉시 반영됨.
       searchInput.oninput = (e) => {
         agentsUi.searchQuery = e.target.value;
+        agentsUi.page = 1;
         updateAgentListArea();
       };
     }
@@ -4047,6 +4111,7 @@
         } else {
           agentsUi.filterTypes.add(key);
         }
+        agentsUi.page = 1;
         renderApp();
       };
     });
@@ -4054,6 +4119,7 @@
     if (sortSelect) {
       sortSelect.onchange = (e) => {
         agentsUi.sortBy = e.target.value;
+        agentsUi.page = 1;
         renderApp();
       };
     }
@@ -4555,51 +4621,29 @@
     const cBg = themeColor("--bg");
     const cText = themeColor("--text");
     const cTextDim = themeColor("--text-dim");
-    const cPanel = themeColor("--panel");
     const cHairline = themeColor("--hairline");
-    const cAccent = themeColor("--accent");
-    const cAccentSoft = themeColor("--accent-dim-soft");
-    const cFaint = themeColor("--text-faint");
-    const cGreen = themeColor("--green");
-    const cRed = themeColor("--red");
 
     const { year, monthIndex } = qaUi;
     const agentsList = qaFilterAgentsByMode(qaWorkingAgents(), captureMode);
     const lockedTag = qaIsMonthLocked(year, monthIndex) ? " · 확정됨" : "";
     const titleSuffix = captureMode === "ALL" ? "" : ` · ${modeName}`;
 
-    // 캡처용 통계 카드 한 칸. 화면용 .qa-stat-grid는 CSS grid를 쓰지만, html2canvas가
-    // fit-content 래퍼 안에서 grid 너비를 안정적으로 못 잡는 경우가 있어 캡처본은
-    // 고정 너비 flex 카드로 따로 그린다.
-    function qaCaptureStatCard(label, value, prevValue, accent) {
-      const isEmpty = value === null;
-      const numColor = isEmpty ? cFaint : (accent ? cAccent : cText);
-      const d = qaStatDiff(value, prevValue);
-      const diffColor = d ? (d.cls === "up" ? cGreen : d.cls === "down" ? cRed : cFaint) : null;
-      const diffHtml = d ? ` <span style="color:${diffColor};font-weight:600;">${d.sign} ${d.abs.toFixed(1)}</span>` : "";
-      return `
-        <div style="flex:0 0 130px;width:130px;box-sizing:border-box;background:${accent ? cAccentSoft : cPanel};border:1px solid ${accent ? cAccent : cHairline};border-radius:14px;padding:12px 10px;text-align:center;">
-          <div style="font-size:${isEmpty ? "15px" : "20px"};line-height:24px;letter-spacing:-0.01em;color:${numColor};">${isEmpty ? "데이터 없음" : value.toFixed(1)}</div>
-          <div style="font-size:11.5px;color:${cFaint};margin-top:4px;">${esc(label)}${diffHtml}</div>
-        </div>
-      `;
-    }
-
     // "전체 저장"일 때만 상단 평균 통계도 표 위에 같이 캡처되게 한다.
+    // 화면과 완전히 같은 마크업(qaStatItemHtml)을 그대로 재사용해서 스타일이 어긋나지 않게 한다.
     const stats = qaComputeStats(agentsList, year, monthIndex);
     const capturePrevYm = qaPrevMonth(year, monthIndex);
     const prevStats = qaComputeStats(agentsList, capturePrevYm.year, capturePrevYm.monthIndex);
     const statsHtml = captureMode === "ALL" ? `
-      <div class="qa-capture-stats" style="display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-bottom:18px;">
-        ${qaCaptureStatCard("전체 평균", stats.total, prevStats.total, true)}
-        ${qaCaptureStatCard("유선 점수 평균", stats.voice, prevStats.voice)}
-        ${qaCaptureStatCard("채팅 점수 평균", stats.chat, prevStats.chat)}
-        ${qaCaptureStatCard("주간 점수 평균", stats.day, prevStats.day)}
-        ${qaCaptureStatCard("야간 점수 평균", stats.night, prevStats.night)}
-        ${qaCaptureStatCard("주간 채팅 평균", stats.dayChat, prevStats.dayChat)}
-        ${qaCaptureStatCard("주간 유선 평균", stats.dayVoice, prevStats.dayVoice)}
-        ${qaCaptureStatCard("야간 채팅 평균", stats.nightChat, prevStats.nightChat)}
-        ${qaCaptureStatCard("야간 유선 평균", stats.nightVoice, prevStats.nightVoice)}
+      <div class="qa-stat-grid" style="margin-bottom:20px;padding-bottom:20px;border-bottom:1px solid ${cHairline};">
+        ${qaStatItemHtml("전체 평균", stats.total, prevStats.total, true)}
+        ${qaStatItemHtml("유선 점수 평균", stats.voice, prevStats.voice)}
+        ${qaStatItemHtml("채팅 점수 평균", stats.chat, prevStats.chat)}
+        ${qaStatItemHtml("주간 점수 평균", stats.day, prevStats.day)}
+        ${qaStatItemHtml("야간 점수 평균", stats.night, prevStats.night)}
+        ${qaStatItemHtml("주간 채팅 평균", stats.dayChat, prevStats.dayChat)}
+        ${qaStatItemHtml("주간 유선 평균", stats.dayVoice, prevStats.dayVoice)}
+        ${qaStatItemHtml("야간 채팅 평균", stats.nightChat, prevStats.nightChat)}
+        ${qaStatItemHtml("야간 유선 평균", stats.nightVoice, prevStats.nightVoice)}
       </div>
     ` : "";
 
@@ -4631,17 +4675,12 @@
 
     requestAnimationFrame(() => {
       // 표는 CSS(display:table + margin:auto)만으로 이미 표 크기에 맞춰 가운데 정렬된다.
-      // 통계 카드만 두 줄로 나누기 위해 너비를 계산해서 고정한다(카드 너비 130px, 간격
-      // 10px는 고정값이라 폰트 렌더링 차이 없이 항상 정확하게 계산된다).
-      const statsWrapEl = wrapper.querySelector(".qa-capture-stats");
-      if (statsWrapEl) {
-        // 통계 카드를 한 줄로 쭉 나열하면 표보다 훨씬 넓어져서 표 양옆에 공백이 생긴다.
-        // 카드를 두 줄로 나눠서 표 너비에 더 가깝게 만든다 (예: 9칸 → 5+4).
-        const cardCount = statsWrapEl.children.length;
-        const perRow = Math.ceil(cardCount / 2);
-        const w = perRow * 130 + Math.max(0, perRow - 1) * 10;
-        statsWrapEl.style.width = w + "px";
-        statsWrapEl.style.margin = "0 auto 18px auto";
+      // 통계 줄은 fit-content 래퍼 안에서는 justify-content:space-between이 퍼질 공간이
+      // 없으므로, 표의 실제 렌더링 너비에 맞춰 폭을 직접 지정해서 표와 나란히 맞춘다.
+      const statGridEl = wrapper.querySelector(".qa-stat-grid");
+      const tableWrapEl = wrapper.querySelector(".qa-table-wrap");
+      if (statGridEl && tableWrapEl) {
+        statGridEl.style.width = tableWrapEl.getBoundingClientRect().width + "px";
       }
 
       const fullW = wrapper.scrollWidth;
@@ -4850,6 +4889,62 @@
     const list = interviewsData.filter((r) => r.agentId === agentId);
     exportInterviewsToExcel(list, interviewExportFilename(agent.name), "interview-status");
   }
+
+  // ----- 면담일지 엑셀 다운로드 버튼: 클릭하면 옵션 목록이 뜨는 팝업 메뉴 -----
+  // 월별 스케줄의 "이미지로 저장 ▾" 메뉴와 같은 방식(sch-menu)을 그대로 재사용한다.
+  function closeInterviewExportMenu() {
+    const existing = document.getElementById("interview-export-menu");
+    if (existing) existing.remove();
+    document.removeEventListener("mousedown", interviewExportMenuOutsideHandler, true);
+  }
+  function interviewExportMenuOutsideHandler(e) {
+    const menu = document.getElementById("interview-export-menu");
+    if (menu && !menu.contains(e.target)) closeInterviewExportMenu();
+  }
+  function positionInterviewExportMenu(menu, anchorEl) {
+    const rect = anchorEl.getBoundingClientRect();
+    const top = Math.min(rect.bottom + 4, window.innerHeight - menu.offsetHeight - 8);
+    const left = Math.min(rect.left, window.innerWidth - menu.offsetWidth - 8);
+    menu.style.top = `${Math.max(8, top)}px`;
+    menu.style.left = `${Math.max(8, left)}px`;
+  }
+  function renderInterviewExportMenuMain(menu, anchorEl) {
+    menu.innerHTML = `
+      <button type="button" class="interview-export-menu-item" data-export-action="all">전체 다운로드</button>
+      <button type="button" class="interview-export-menu-item" data-export-action="day">주간 다운로드</button>
+      <button type="button" class="interview-export-menu-item" data-export-action="night">야간 다운로드</button>
+      <button type="button" class="interview-export-menu-item" data-export-action="by-agent">상담사별 다운로드 ›</button>
+    `;
+    menu.querySelector("[data-export-action='all']").onclick = () => { closeInterviewExportMenu(); downloadAllInterviews(); };
+    menu.querySelector("[data-export-action='day']").onclick = () => { closeInterviewExportMenu(); downloadInterviewsByGroup("day"); };
+    menu.querySelector("[data-export-action='night']").onclick = () => { closeInterviewExportMenu(); downloadInterviewsByGroup("night"); };
+    menu.querySelector("[data-export-action='by-agent']").onclick = () => renderInterviewExportMenuAgents(menu, anchorEl);
+    positionInterviewExportMenu(menu, anchorEl);
+  }
+  function renderInterviewExportMenuAgents(menu, anchorEl) {
+    const sortedAgents = agentsData.slice().sort((a, b) => a.name.localeCompare(b.name, "ko"));
+    menu.innerHTML = `
+      <button type="button" class="interview-export-menu-back" data-export-action="back">‹ 뒤로</button>
+      ${sortedAgents.length === 0
+        ? `<span class="interview-export-menu-empty">등록된 상담사가 없어요.</span>`
+        : sortedAgents.map((a) => `<button type="button" data-export-agent-id="${a.id}">${esc(a.name)} <span class="interview-export-menu-ldap">${esc(a.ldap || "-")}</span></button>`).join("")}
+    `;
+    menu.querySelector("[data-export-action='back']").onclick = () => renderInterviewExportMenuMain(menu, anchorEl);
+    menu.querySelectorAll("[data-export-agent-id]").forEach((btn) => {
+      btn.onclick = () => { closeInterviewExportMenu(); downloadInterviewsByAgent(btn.getAttribute("data-export-agent-id")); };
+    });
+    positionInterviewExportMenu(menu, anchorEl);
+  }
+  function openInterviewExportMenu(anchorEl) {
+    closeInterviewExportMenu();
+    const menu = document.createElement("div");
+    menu.id = "interview-export-menu";
+    menu.className = "sch-menu interview-export-menu";
+    document.body.appendChild(menu);
+    renderInterviewExportMenuMain(menu, anchorEl);
+    setTimeout(() => document.addEventListener("mousedown", interviewExportMenuOutsideHandler, true), 0);
+  }
+
   function interviewTypeBadgeClass(type) {
     if (type === "정기") return "type-regular";
     if (type === "경고") return "type-warning";
@@ -4882,6 +4977,7 @@
     searchQuery: "",
     typeFilter: "all", // "all" | "정기" | "수시" | "경고"
     expandedIds: new Set(), // 목록에서 펼쳐본 면담 기록 id들 (상담사 상세 화면과 공유)
+    page: 1, // 면담일지 목록의 현재 페이지(10건씩)
   };
 
   const homeUi = {
@@ -4896,7 +4992,10 @@
       <div class="agent-picker-field">
         <label class="agent-form-label">${label}
           <div class="agent-picker" id="${idPrefix}-${fieldKey}-picker">
-            <input type="text" class="add-input agent-picker-input" id="${idPrefix}-${fieldKey}-search" placeholder="${esc(placeholder)}" value="${esc(inputValue)}" autocomplete="off">
+            <div class="agent-picker-input">
+              <input type="text" class="agent-picker-input-field" id="${idPrefix}-${fieldKey}-search" placeholder="${esc(placeholder)}" value="${esc(inputValue)}" autocomplete="off">
+              ${ICON_SEARCH_MINI}
+            </div>
             <input type="hidden" id="${idPrefix}-${fieldKey}" value="${selectedAgent ? selectedAgent.id : ""}">
             <div class="agent-picker-list" id="${idPrefix}-${fieldKey}-list"></div>
           </div>
@@ -5083,6 +5182,7 @@
     );
 
     let bodyHtml;
+    let exportRowHtml = "";
     if (interviewsUi.mode === "add") {
       bodyHtml = `
         <div class="agent-form-title">새 면담 기록 추가</div>
@@ -5110,41 +5210,27 @@
       const typeFilterBtns = ["all", ...INTERVIEW_TYPES].map((t) => `
         <button type="button" class="agent-filter-btn ${interviewsUi.typeFilter === t ? "active" : ""}" data-interview-filter="${t}">${t === "all" ? "전체" : t}</button>
       `).join("");
-      const exportAgentOptionsHtml = agentsData
-        .slice()
-        .sort((a, b) => a.name.localeCompare(b.name, "ko"))
-        .map((a) => `<option value="${a.id}">${esc(a.name)} (${esc(a.ldap || "-")})</option>`)
-        .join("");
+      exportRowHtml = `<button class="ghost-btn" id="interview-export-btn">${ICON_DOWNLOAD} 엑셀로 다운로드 ▾</button>`;
       bodyHtml = `
-        <div class="interview-export-row">
-          <span class="interview-export-label">${ICON_DOWNLOAD} 엑셀 다운로드</span>
-          <button type="button" class="ghost-btn" id="interview-export-all">전체</button>
-          <button type="button" class="ghost-btn" id="interview-export-day">주간</button>
-          <button type="button" class="ghost-btn" id="interview-export-night">야간</button>
-          <select class="interview-export-select" id="interview-export-agent-select">
-            <option value="">상담사별 다운로드...</option>
-            ${exportAgentOptionsHtml}
-          </select>
-        </div>
         <div class="agent-controls">
-          <input type="text" class="add-input agent-search-input" id="interview-search-input" placeholder="상담사 이름 또는 LDAP 검색" value="${esc(interviewsUi.searchQuery)}" autocomplete="off">
           <div class="agent-filter-row">${typeFilterBtns}</div>
         </div>
         <div id="interview-list-area">
-          ${filtered.length === 0
-            ? `<div class="agent-list-empty">${interviewsData.length === 0 ? "등록된 면담 기록이 없어요." : "검색 또는 필터 조건에 맞는 면담 기록이 없어요."}</div>`
-            : `<div class="interview-list">${filtered.map((r) => renderInterviewRow(r, "page")).join("")}</div>`}
+          ${renderInterviewListAreaHtml(filtered)}
         </div>
       `;
     }
 
     root.innerHTML = `
+      <div class="agent-list-header">
+        <div class="agent-list-title">면담일지</div>
+        ${interviewsUi.mode === "list" ? `<div class="agent-list-header-actions">${exportRowHtml}<button class="ghost-btn solid-accent-btn" id="btn-interview-add">＋ 면담 기록 추가</button></div>` : ""}
+      </div>
       <div class="card">
-        <div class="agent-list-header">
-          <div class="agent-list-title">면담일지</div>
-          ${interviewsUi.mode === "list" ? `<button class="ghost-btn" id="btn-interview-add">＋ 면담 기록 추가</button>` : ""}
+        <div class="interview-summary-row">
+          <div class="agent-summary">전체 ${interviewsData.length}건${interviewsUi.mode === "list" && filtered.length !== interviewsData.length ? ` · 필터 결과 ${filtered.length}건` : ""}</div>
+          ${interviewsUi.mode === "list" ? `<div class="agent-search-input"><input type="text" class="agent-search-input-field" id="interview-search-input" placeholder="상담사 이름 또는 LDAP 검색" value="${esc(interviewsUi.searchQuery)}" autocomplete="off">${ICON_SEARCH_MINI}</div>` : ""}
         </div>
-        <div class="agent-summary">전체 ${interviewsData.length}건${interviewsUi.mode === "list" && filtered.length !== interviewsData.length ? ` · 필터 결과 ${filtered.length}건` : ""}</div>
         <div class="status" id="interview-status"></div>
         ${bodyHtml}
       </div>
@@ -5153,15 +5239,26 @@
     attachInterviewsPageEvents(root);
   }
 
+  // 면담일지 목록 영역(검색바 아래)의 내용을 만든다. 10건씩 페이지를 나눠서 보여준다.
+  function renderInterviewListAreaHtml(filtered) {
+    if (filtered.length === 0) {
+      return `<div class="agent-list-empty">${interviewsData.length === 0 ? "등록된 면담 기록이 없어요." : "검색 또는 필터 조건에 맞는 면담 기록이 없어요."}</div>`;
+    }
+    const { items, page, totalPages } = paginateList(filtered, interviewsUi.page);
+    interviewsUi.page = page;
+    return `
+      <div class="interview-list">${items.map((r) => renderInterviewRow(r, "page")).join("")}</div>
+      ${renderPaginationHtml(page, totalPages, "interview-list")}
+    `;
+  }
+
   function updateInterviewListArea() {
     const area = document.getElementById("interview-list-area");
     if (!area) return;
     const filtered = sortInterviews(
       interviewsData.filter((r) => interviewMatchesSearch(r, interviewsUi.searchQuery) && interviewMatchesType(r, interviewsUi.typeFilter))
     );
-    area.innerHTML = filtered.length === 0
-      ? `<div class="agent-list-empty">${interviewsData.length === 0 ? "등록된 면담 기록이 없어요." : "검색 또는 필터 조건에 맞는 면담 기록이 없어요."}</div>`
-      : `<div class="interview-list">${filtered.map((r) => renderInterviewRow(r, "page")).join("")}</div>`;
+    area.innerHTML = renderInterviewListAreaHtml(filtered);
     attachInterviewListAreaHandlers(area);
     const summaryEl = document.querySelector("#page-inner .agent-summary");
     if (summaryEl) {
@@ -5171,6 +5268,10 @@
 
   function attachInterviewListAreaHandlers(root) {
     attachInterviewRowToggles(root, updateInterviewListArea);
+    attachPaginationHandlers(root, "interview-list", (delta) => {
+      interviewsUi.page = interviewsUi.page + delta;
+      updateInterviewListArea();
+    });
     root.querySelectorAll("[data-action='page-download-interview']").forEach((btn) => {
       btn.onclick = () => downloadSingleInterview(btn.getAttribute("data-id"));
     });
@@ -5205,29 +5306,19 @@
     if (searchInput) {
       searchInput.oninput = (e) => {
         interviewsUi.searchQuery = e.target.value;
+        interviewsUi.page = 1;
         updateInterviewListArea();
       };
     }
     root.querySelectorAll("[data-interview-filter]").forEach((btn) => {
       btn.onclick = () => {
         interviewsUi.typeFilter = btn.getAttribute("data-interview-filter");
+        interviewsUi.page = 1;
         renderApp();
       };
     });
-    const exportAllBtn = document.getElementById("interview-export-all");
-    if (exportAllBtn) exportAllBtn.onclick = () => downloadAllInterviews();
-    const exportDayBtn = document.getElementById("interview-export-day");
-    if (exportDayBtn) exportDayBtn.onclick = () => downloadInterviewsByGroup("day");
-    const exportNightBtn = document.getElementById("interview-export-night");
-    if (exportNightBtn) exportNightBtn.onclick = () => downloadInterviewsByGroup("night");
-    const exportAgentSelect = document.getElementById("interview-export-agent-select");
-    if (exportAgentSelect) {
-      exportAgentSelect.onchange = () => {
-        const agentId = exportAgentSelect.value;
-        if (agentId) downloadInterviewsByAgent(agentId);
-        exportAgentSelect.value = "";
-      };
-    }
+    const exportBtn = document.getElementById("interview-export-btn");
+    if (exportBtn) exportBtn.onclick = (e) => openInterviewExportMenu(e.currentTarget);
     attachInterviewListAreaHandlers(root);
 
     const form = document.getElementById("interview-page-form");
@@ -5292,7 +5383,7 @@
         <div class="agent-interview-header">
           <div class="agent-interview-title">${ICON_CLIPBOARD} 면담 이력</div>
           <div class="agent-interview-header-actions">
-            ${agentsUi.interviewMode === "list" ? `<button class="ghost-btn" id="btn-agent-interview-add">＋ 면담 기록 추가</button>` : ""}
+            ${agentsUi.interviewMode === "list" ? `<button class="ghost-btn solid-accent-btn" id="btn-agent-interview-add">＋ 면담 기록 추가</button>` : ""}
             <button class="ghost-btn" data-action="agent-goto-interviews" data-id="${agent.id}">${ICON_CHEVRON_RIGHT} 면담일지 전체보기</button>
           </div>
         </div>
@@ -5320,6 +5411,7 @@
         interviewsUi.searchQuery = agent.name;
         interviewsUi.typeFilter = "all";
         interviewsUi.mode = "list";
+        interviewsUi.page = 1;
         setPage("interviews");
       };
     });
@@ -5804,16 +5896,16 @@
   // 다시 계산해서 밀어주기 때문. summaryOnly는 이미지 캡처(hideSummaryCols=true)에서는
   // 아예 마크업에서 빠지는 근무~결근 집계 열 5개를 표시한다.
   const SCHEDULE_INFO_COLS = [
-    { key: "nickname", label: "닉네임", width: 88 },
-    { key: "name", label: "이름", width: 56 },
-    { key: "empno", label: "사번", width: 80 },
-    { key: "hiredate", label: "입사일자", width: 88 },
-    { key: "workhours", label: "근무시간", width: 88 },
-    { key: "work", label: "근무", width: 46, summaryOnly: true },
-    { key: "off", label: "오프", width: 46, summaryOnly: true },
-    { key: "annual", label: "연차", width: 46, summaryOnly: true },
-    { key: "daehyu", label: "대휴", width: 46, summaryOnly: true },
-    { key: "absent", label: "결근", width: 46, summaryOnly: true },
+    { key: "nickname", label: "닉네임", width: 92 },
+    { key: "name", label: "이름", width: 60 },
+    { key: "empno", label: "사번", width: 84 },
+    { key: "hiredate", label: "입사일자", width: 92 },
+    { key: "workhours", label: "근무시간", width: 92 },
+    { key: "work", label: "근무", width: 48, summaryOnly: true },
+    { key: "off", label: "오프", width: 48, summaryOnly: true },
+    { key: "annual", label: "연차", width: 48, summaryOnly: true },
+    { key: "daehyu", label: "대휴", width: 48, summaryOnly: true },
+    { key: "absent", label: "결근", width: 48, summaryOnly: true },
   ];
   // 지금 화면(hideSummaryCols=false 기준)에서, 접히지 않은 고정 열들이 각각 왼쪽에서
   // 몇 px 위치에 붙어야 하는지 계산한다. 접힌 열은 폭이 0이 되므로 뒤 열들이 그만큼 당겨진다.
@@ -6753,6 +6845,9 @@
 
   // 메인 페이지의 월별 스케줄 표는 가로 스크롤 없이 항상 한 화면에 다 보이도록,
   // 표를 원래 크기로 그린 뒤 폭에 맞춰 JS로 축소(scale)한다.
+  // (예전엔 축소 비율이 일정 밑으로 내려가면 더 줄이지 않고 가로 스크롤로 넘기게 했었는데,
+  //  그러면 오른쪽 날짜 칸들이 화면 밖으로 잘려서 안 보이는 문제가 있었다. 그래서 지금은
+  //  글씨가 아무리 작아지더라도 항상 폭에 딱 맞춰 전체 날짜가 한 번에 다 보이게 한다.)
   function fitScheduleTable() {
     const wrap = document.querySelector("#schedule-table-area .schedule-table-wrap");
     const inner = wrap ? wrap.querySelector(".schedule-scale-inner") : null;
@@ -6771,10 +6866,12 @@
     const availW = wrap.clientWidth;
     if (naturalW <= 0 || availW <= 0) return;
     const scale = Math.min(availW / naturalW, 1);
-    const offsetX = Math.max(0, (availW - naturalW * scale) / 2);
+    const scaledW = naturalW * scale;
+    const offsetX = Math.max(0, (availW - scaledW) / 2);
     inner.style.width = `${naturalW}px`;
     inner.style.height = `${naturalH}px`;
     inner.style.transform = `translateX(${offsetX}px) scale(${scale})`;
+    wrap.style.overflowX = "hidden";
     wrap.style.height = `${naturalH * scale}px`;
   }
 
@@ -7955,14 +8052,13 @@
 
     root.innerHTML = `
       <div class="card home-hero">
-        <div>
-          <div class="home-hero-date">${y}년 ${m + 1}월 ${d}일 <span class="wd">${wd}요일</span></div>
-          <div class="home-hero-sub">오늘 하루를 한눈에 확인해보세요</div>
+        <div class="home-hero-top">
+          <div>
+            <div class="home-hero-date">${m + 1}월 ${d}일 <span class="wd">${wd}요일</span></div>
+            <div class="home-hero-sub">오늘 하루를 한눈에 확인해보세요</div>
+          </div>
+          ${holiday ? `<span class="home-holiday-tag">${esc(holiday)}</span>` : ""}
         </div>
-        ${holiday ? `<span class="home-holiday-tag">${esc(holiday)}</span>` : ""}
-      </div>
-
-      <div class="card" style="margin-top:16px;">
         <div class="stat-grid">
           <div class="stat-item ok"><div class="stat-num">${working.length}</div><div class="stat-label">오늘 근무</div></div>
           <div class="stat-item warn"><div class="stat-num">${lateList.length + absentList.length}</div><div class="stat-label">지각·결근</div></div>

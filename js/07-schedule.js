@@ -423,16 +423,16 @@
   // 다시 계산해서 밀어주기 때문. summaryOnly는 이미지 캡처(hideSummaryCols=true)에서는
   // 아예 마크업에서 빠지는 근무~결근 집계 열 5개를 표시한다.
   const SCHEDULE_INFO_COLS = [
-    { key: "nickname", label: "닉네임", width: 88 },
-    { key: "name", label: "이름", width: 56 },
-    { key: "empno", label: "사번", width: 80 },
-    { key: "hiredate", label: "입사일자", width: 88 },
-    { key: "workhours", label: "근무시간", width: 88 },
-    { key: "work", label: "근무", width: 46, summaryOnly: true },
-    { key: "off", label: "오프", width: 46, summaryOnly: true },
-    { key: "annual", label: "연차", width: 46, summaryOnly: true },
-    { key: "daehyu", label: "대휴", width: 46, summaryOnly: true },
-    { key: "absent", label: "결근", width: 46, summaryOnly: true },
+    { key: "nickname", label: "닉네임", width: 92 },
+    { key: "name", label: "이름", width: 60 },
+    { key: "empno", label: "사번", width: 84 },
+    { key: "hiredate", label: "입사일자", width: 92 },
+    { key: "workhours", label: "근무시간", width: 92 },
+    { key: "work", label: "근무", width: 48, summaryOnly: true },
+    { key: "off", label: "오프", width: 48, summaryOnly: true },
+    { key: "annual", label: "연차", width: 48, summaryOnly: true },
+    { key: "daehyu", label: "대휴", width: 48, summaryOnly: true },
+    { key: "absent", label: "결근", width: 48, summaryOnly: true },
   ];
   // 지금 화면(hideSummaryCols=false 기준)에서, 접히지 않은 고정 열들이 각각 왼쪽에서
   // 몇 px 위치에 붙어야 하는지 계산한다. 접힌 열은 폭이 0이 되므로 뒤 열들이 그만큼 당겨진다.
@@ -1372,6 +1372,9 @@
 
   // 메인 페이지의 월별 스케줄 표는 가로 스크롤 없이 항상 한 화면에 다 보이도록,
   // 표를 원래 크기로 그린 뒤 폭에 맞춰 JS로 축소(scale)한다.
+  // (예전엔 축소 비율이 일정 밑으로 내려가면 더 줄이지 않고 가로 스크롤로 넘기게 했었는데,
+  //  그러면 오른쪽 날짜 칸들이 화면 밖으로 잘려서 안 보이는 문제가 있었다. 그래서 지금은
+  //  글씨가 아무리 작아지더라도 항상 폭에 딱 맞춰 전체 날짜가 한 번에 다 보이게 한다.)
   function fitScheduleTable() {
     const wrap = document.querySelector("#schedule-table-area .schedule-table-wrap");
     const inner = wrap ? wrap.querySelector(".schedule-scale-inner") : null;
@@ -1390,10 +1393,12 @@
     const availW = wrap.clientWidth;
     if (naturalW <= 0 || availW <= 0) return;
     const scale = Math.min(availW / naturalW, 1);
-    const offsetX = Math.max(0, (availW - naturalW * scale) / 2);
+    const scaledW = naturalW * scale;
+    const offsetX = Math.max(0, (availW - scaledW) / 2);
     inner.style.width = `${naturalW}px`;
     inner.style.height = `${naturalH}px`;
     inner.style.transform = `translateX(${offsetX}px) scale(${scale})`;
+    wrap.style.overflowX = "hidden";
     wrap.style.height = `${naturalH * scale}px`;
   }
 

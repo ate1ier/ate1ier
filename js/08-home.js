@@ -117,14 +117,13 @@
 
     root.innerHTML = `
       <div class="card home-hero">
-        <div>
-          <div class="home-hero-date">${y}년 ${m + 1}월 ${d}일 <span class="wd">${wd}요일</span></div>
-          <div class="home-hero-sub">오늘 하루를 한눈에 확인해보세요</div>
+        <div class="home-hero-top">
+          <div>
+            <div class="home-hero-date">${m + 1}월 ${d}일 <span class="wd">${wd}요일</span></div>
+            <div class="home-hero-sub">오늘 하루를 한눈에 확인해보세요</div>
+          </div>
+          ${holiday ? `<span class="home-holiday-tag">${esc(holiday)}</span>` : ""}
         </div>
-        ${holiday ? `<span class="home-holiday-tag">${esc(holiday)}</span>` : ""}
-      </div>
-
-      <div class="card" style="margin-top:16px;">
         <div class="stat-grid">
           <div class="stat-item ok"><div class="stat-num">${working.length}</div><div class="stat-label">오늘 근무</div></div>
           <div class="stat-item warn"><div class="stat-num">${lateList.length + absentList.length}</div><div class="stat-label">지각·결근</div></div>

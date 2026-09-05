@@ -1,34 +1,46 @@
   /* ---------- 품질 관리 페이지 ---------- */
   .qa-top {
     display: flex; align-items: center; justify-content: space-between;
-    flex-wrap: wrap; gap: 10px; margin-bottom: 6px;
+    flex-wrap: wrap; gap: 10px; margin-bottom: 24px;
   }
   .qa-title { font-size: var(--page-title-size); font-weight: var(--page-title-weight); letter-spacing: -0.01em; }
+  /* 카드형 박스 대신, 캡처 이미지처럼 테두리 없이 숫자를 크게 나열하는 방식.
+     justify-content:space-between으로 아래 표와 같은 너비에 맞춰 양 끝까지 고르게 펼친다. */
   .qa-stat-grid {
-    display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-    gap: 10px; margin-bottom: 18px;
+    display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between;
+    gap: 20px 28px; margin-bottom: 26px; padding-bottom: 22px;
+    border-bottom: 1px solid var(--hairline);
   }
   .qa-stat-item {
-    background: var(--panel); border: 1px solid var(--hairline); border-radius: 14px;
-    padding: 12px 10px; text-align: center;
+    background: none; border: none; border-radius: 0;
+    padding: 0; text-align: left; min-width: 92px;
   }
-  .qa-stat-item .qa-stat-num { font-size: 20px; line-height: 24px; letter-spacing: -0.01em; color: var(--text); }
+  /* 통계 숫자·라벨은 페이지 제목과 같은 세리프 계열로 */
+  .qa-stat-item .qa-stat-num, .qa-stat-item .qa-stat-label {
+    font-family: 'KoPub Batang', 'Apple Myungjo', 'AppleGothic', 'Batang', 'Nanum Myeongjo', serif;
+  }
+  .qa-stat-item .qa-stat-num { font-size: 30px; font-weight: 800; line-height: 1.15; letter-spacing: -0.02em; color: var(--text); }
   .qa-stat-item .qa-stat-num.empty {
-    color: var(--text-faint); font-size: 15px; line-height: 24px;
+    color: var(--text-faint); font-size: 15px; font-weight: 600; line-height: 1.6;
     /* 전역 .empty 규칙(패딩/배경/테두리/여백/기울임체)이 여기로 새어 들어와
-       "데이터 없음" 칸만 알약 모양으로 부풀어 오르며 카드 세로 정렬이 어긋나던 문제를 바로잡는다.
-       + 글자 크기가 작아 줄 높이가 달라지는 것도 line-height를 숫자 칸과 동일하게 고정해서 맞춘다. */
+       "데이터 없음" 칸만 알약 모양으로 부풀어 오르며 카드 세로 정렬이 어긋나던 문제를 바로잡는다. */
     font-style: normal; padding: 0; margin-bottom: 0; background: none; border: none; border-radius: 0;
   }
-  .qa-stat-item .qa-stat-label { font-size: 11.5px; color: var(--text-faint); margin-top: 4px; }
+  .qa-stat-item .qa-stat-label { font-size: 12px; color: var(--text-faint); margin-top: 6px; }
   .qa-stat-diff { font-weight: 600; }
   .qa-stat-diff.up { color: var(--green); }
   .qa-stat-diff.down { color: var(--red); }
   .qa-stat-diff.flat { color: var(--text-faint); }
-  .qa-stat-item.accent { border-color: var(--accent); background: var(--accent-dim-soft); }
   .qa-stat-item.accent .qa-stat-num { color: var(--accent); }
+  @media (max-width: 700px) {
+    .qa-stat-grid { gap: 18px 24px; }
+  }
   .qa-table-wrap { overflow-x: auto; border: 1px solid var(--hairline); border-radius: 16px; background: var(--panel); }
-  .qa-table { border-collapse: collapse; width: 100%; font-size: 13px; white-space: nowrap; }
+  .qa-table {
+    border-collapse: collapse; width: 100%; white-space: nowrap;
+    font-family: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+    font-size: 14px;
+  }
   /* 이미지로 저장할 때는 표가 fit-content 래퍼 안에서 화면 너비만큼 억지로 늘어나면서
      오른쪽에 빈 공간이 생기고 가운데 정렬도 깨지는 문제가 있었다. 캡처용 래퍼 안에서는
      표 너비를 내용에 맞게(auto) 되돌려서 이미지가 표 크기에 딱 맞게 잡히도록 한다. */
@@ -38,14 +50,14 @@
      이 방식은 그런 오차 없이 항상 표 크기에 정확히 맞는다. margin:auto로 가운데 정렬. */
   .sch-capture-flatten .qa-table-wrap { display: table; width: auto; margin: 0 auto; overflow: visible; }
   .sch-capture-flatten .qa-table { width: auto; }
-  .qa-table th, .qa-table td { border: none; border-bottom: 1px solid var(--hairline); padding: 10px 12px; text-align: center; vertical-align: middle; }
-  .qa-table thead th { background: var(--elevated); color: var(--text-dim); font-weight: 600; border-bottom: 1px solid var(--hairline-strong); }
+  .qa-table th, .qa-table td { border: none; border-bottom: 1px solid var(--hairline); padding: 12px 22px; text-align: center; vertical-align: middle; }
+  .qa-table thead th { background: none; color: var(--text-faint); font-weight: 500; font-size: 12.5px; border-bottom: 1px solid var(--hairline-strong); }
   .qa-table tbody tr { background: var(--panel); transition: background 0.12s ease; }
   .qa-table tbody tr:last-child td { border-bottom: none; }
   .qa-table tbody tr:hover { background: var(--accent-dim-soft); }
   .qa-table tbody tr.qa-row-highlight { background: var(--accent-dim); transition: background 1.8s ease; }
   .qa-table td.qa-col-name { color: var(--text); font-weight: 600; }
-  .qa-table td.qa-col-ldap { color: var(--text-dim); }
+  .qa-table td.qa-col-ldap { color: var(--text-dim); font-weight: 400; }
   .qa-table td.qa-empty { text-align: center; color: var(--text-faint); padding: 24px; background: var(--panel); }
   .qa-score-input {
     width: 64px; box-sizing: border-box; text-align: center; border: 1px solid var(--hairline);
@@ -61,4 +73,5 @@
   .qa-diff.up { color: var(--green); }
   .qa-diff.down { color: var(--red); }
   .qa-diff.flat { color: var(--text-faint); }
+
 
