@@ -9,9 +9,15 @@
 <link rel="icon" type="image/png" sizes="192x192" href="favicon-192x192.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/font-kopub@1.0/kopubdotum.min.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<!-- html2canvas/exceljs/jszip은 화면 캡처·엑셀 내보내기 버튼을 눌렀을 때만 쓰이는
+     라이브러리라(js/05-qa.js, js/06-interviews.js, js/07-schedule.js, js/07b-holiday-doc.js
+     참고) defer로 불러온다. HTML 파싱과 첫 화면 렌더링을 막지 않으면서도, 페이지 로드가
+     끝나기 전에 준비되므로 실제 사용 시점에는 항상 로드가 끝나 있다. Supabase는 body
+     하단의 앱 스크립트가 시작하자마자 곧바로 사용하므로 순서를 지키기 위해 그대로
+     동기 로드한다. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <link rel="stylesheet" href="css/00-variables.css">
 <link rel="stylesheet" href="css/01-shell-nav.css">
@@ -100,6 +106,10 @@
     "app-theme-mode",
     "personal-app:session",
     "personal-app:master-origin",
+    // 로그인 유지 하트비트(15초마다 갱신, js/12-init.js)는 "이 탭이 아직 열려있는지"만
+    // 브라우저 안에서 판단하는 값이라 다른 기기와 공유할 필요가 없다. 제외하지 않으면
+    // 탭을 열어둔 내내 15초마다 불필요한 Supabase 쓰기가 계속 발생한다.
+    "personal-app:last-active",
   ]);
   function isCloudSynced(key) {
     if (!cloud) return false;
@@ -119,7 +129,32 @@
     promise.then(clear, clear);
     return promise;
   }
+  // 타이핑처럼 짧은 시간에 같은 키가 계속 저장될 때, 그때마다 곧바로 Supabase에
+  // 쏘지 않고 마지막 입력에서 잠깐(DEBOUNCE) 조용하면 그때 한 번만 보낸다. 로컬
+  // 저장(localStorage)은 이 대기와 무관하게 항상 즉시 이뤄지므로 화면/새로고침
+  // 안정성에는 영향이 없고, 네트워크 요청 횟수만 크게 줄어든다.
+  const CLOUD_PUSH_DEBOUNCE_MS = 800;
+  const _cloudPushDebounceTimers = {};
+  const _cloudPushPendingValue = {};
+  function _flushCloudPushDebounce(key) {
+    if (!(key in _cloudPushPendingValue)) return;
+    clearTimeout(_cloudPushDebounceTimers[key]);
+    delete _cloudPushDebounceTimers[key];
+    const value = _cloudPushPendingValue[key];
+    delete _cloudPushPendingValue[key];
+    cloudPush(key, value);
+  }
+  function scheduleCloudPush(key, value) {
+    if (!isCloudSynced(key)) return;
+    notifyCloudSyncStart(); // 대기 중에도 "동기화 중…"으로 즉시 피드백을 준다.
+    _cloudPushPendingValue[key] = value;
+    clearTimeout(_cloudPushDebounceTimers[key]);
+    _cloudPushDebounceTimers[key] = setTimeout(() => _flushCloudPushDebounce(key), CLOUD_PUSH_DEBOUNCE_MS);
+  }
   async function flushCloudWrites() {
+    // location.reload() 등 페이지를 떠나기 직전에는 아직 디바운스로 대기 중인
+    // 저장도 놓치지 않도록 먼저 전부 즉시 실행으로 전환한 뒤 완료를 기다린다.
+    Object.keys(_cloudPushPendingValue).forEach(_flushCloudPushDebounce);
     if (!_pendingCloudWrites.size) return;
     await Promise.allSettled(Array.from(_pendingCloudWrites));
   }
@@ -608,10 +643,15 @@
   // 필요한 키만 조용히 Supabase에도 함께 저장/삭제한다 (실패해도 화면엔 영향 없음).
   localStorage.setItem = function (key, value) {
     _origSetItem(key, value);
-    cloudPush(key, value);
+    scheduleCloudPush(key, value);
   };
   localStorage.removeItem = function (key) {
     _origRemoveItem(key);
+    // 방금 지운 값이 디바운스 대기 중이었다면, 잠시 뒤 그 값이 되살아나 클라우드에
+    // 다시 올라가지 않도록 대기 중인 저장을 취소하고 곧바로 삭제를 반영한다.
+    clearTimeout(_cloudPushDebounceTimers[key]);
+    delete _cloudPushDebounceTimers[key];
+    delete _cloudPushPendingValue[key];
     cloudDelete(key);
   };
   await cloudHydrate();
@@ -1161,6 +1201,30 @@
     return d.innerHTML;
   }
   function genId() { return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`; }
+  // 캘린더·할일·메모·상담사·QA·면담일지·스케줄 등 여러 화면에 "저장됨" 같은 상태 메시지를
+  // 잠깐 보여줬다가 자동으로 지우는 코드가 화면마다 (요소 id, 유지 시간만 다르고) 똑같이
+  // 반복돼 있던 것을 하나로 합쳤다. elId별로 타이머를 따로 관리해서 서로 다른 상태 표시줄이
+  // 있는 화면을 오가도 꼬이지 않는다. 표시 도중에 더 최근 메시지로 다시 호출되면, 오래된
+  // 타이머가 나중에 발동하더라도 그 최신 메시지를 지우지 않는다.
+  const _statusFlashTimers = {};
+  function flashStatusMessage(elId, msg, ms) {
+    const el = document.getElementById(elId);
+    if (!el) return;
+    el.textContent = msg;
+    clearTimeout(_statusFlashTimers[elId]);
+    _statusFlashTimers[elId] = setTimeout(() => {
+      if (el.textContent === msg) el.textContent = "";
+    }, ms || 1200);
+  }
+  // 셀 우클릭 메뉴, 헤더 선택 메뉴, 캡처/삭제 메뉴 등 화면 곳곳의 팝오버가 뷰포트 밖으로
+  // 넘어가지 않게 위치를 잡아주는 계산이 거의 똑같이 반복돼 있던 것을 하나로 합쳤다.
+  // (x, y)는 메뉴를 띄우고 싶은 기준점(우클릭 좌표 또는 버튼의 바깥쪽 아래·왼쪽 모서리).
+  function positionFloatingMenu(menu, x, y) {
+    const top = Math.min(y, window.innerHeight - menu.offsetHeight - 8);
+    const left = Math.min(x, window.innerWidth - menu.offsetWidth - 8);
+    menu.style.top = `${Math.max(8, top)}px`;
+    menu.style.left = `${Math.max(8, left)}px`;
+  }
 
   /* ===================== 로그인(로컬 전용) 모듈 =====================
      지금은 서버 없이 이 브라우저의 localStorage에만 계정 정보를 저장하는
@@ -2010,14 +2074,7 @@
   }
   function loadMonth(y, m) { cal.monthData = readMonthRaw(y, m); }
 
-  let calStatusTimer = null;
-  function flashCalStatus(msg) {
-    const el = document.getElementById("cal-status");
-    if (!el) return;
-    el.textContent = msg;
-    clearTimeout(calStatusTimer);
-    calStatusTimer = setTimeout(() => { el.textContent = ""; }, 1500);
-  }
+  function flashCalStatus(msg) { flashStatusMessage("cal-status", msg, 1500); }
   function saveCurrentMonth() {
     const ok = writeMonthRaw(cal.year, cal.monthIndex, cal.monthData);
     flashCalStatus(ok ? "저장됨" : "저장 실패");
@@ -2826,14 +2883,7 @@
   }
   let todos = loadTodos();
 
-  let todoStatusTimer = null;
-  function flashTodoStatus(msg) {
-    const el = document.getElementById("todo-status");
-    if (!el) return;
-    el.textContent = msg;
-    clearTimeout(todoStatusTimer);
-    todoStatusTimer = setTimeout(() => { el.textContent = ""; }, 1200);
-  }
+  function flashTodoStatus(msg) { flashStatusMessage("todo-status", msg, 1200); }
   function saveTodos() {
     try { localStorage.setItem(TODO_KEY, JSON.stringify(todos)); flashTodoStatus("저장됨"); }
     catch (e) { flashTodoStatus("저장 실패"); }
@@ -3113,14 +3163,7 @@
   }
   const notesData = loadNotesData();
 
-  let notesStatusTimer = null;
-  function flashNotesStatus(msg) {
-    const el = document.getElementById("notes-status");
-    if (!el) return;
-    el.textContent = msg;
-    clearTimeout(notesStatusTimer);
-    notesStatusTimer = setTimeout(() => { el.textContent = ""; }, 1500);
-  }
+  function flashNotesStatus(msg) { flashStatusMessage("notes-status", msg, 1500); }
   function saveNotesData() {
     try {
       localStorage.setItem(NOTES_KEY, JSON.stringify(notesData));
@@ -3506,21 +3549,14 @@
     interviewEditingId: null,
   };
 
-  let agentStatusTimer = null;
-  function flashAgentStatus(msg) {
-    const el = document.getElementById("agent-status");
-    if (!el) return;
-    el.textContent = msg;
-    clearTimeout(agentStatusTimer);
-    agentStatusTimer = setTimeout(() => { el.textContent = ""; }, 1200);
-  }
+  function flashAgentStatus(msg) { flashStatusMessage("agent-status", msg, 1200); }
   function saveAgentsData() {
     try { localStorage.setItem(AGENTS_KEY, JSON.stringify(agentsData)); flashAgentStatus("저장됨"); }
     catch (e) { flashAgentStatus("저장 실패"); }
     // 상담사 관리 목록이 바뀔 때마다 월별 스케줄의 인원 목록도 자동으로 맞춰준다.
+    // (실제로 스케줄 쪽 데이터가 바뀌었을 때만 다시 저장한다)
     if (typeof syncScheduleStaffFromAgents === "function") {
-      syncScheduleStaffFromAgents();
-      saveScheduleData();
+      if (syncScheduleStaffFromAgents()) saveScheduleData();
     }
   }
 
@@ -4136,14 +4172,7 @@
   // 월별 스케줄과 동일한 방식의 "월별 잠금". 잠긴 달은 점수 입력이 막힌다.
   if (!qaData.monthLocks || typeof qaData.monthLocks !== "object") qaData.monthLocks = {};
 
-  let qaStatusTimer = null;
-  function flashQAStatus(msg) {
-    const el = document.getElementById("qa-status");
-    if (!el) return;
-    el.textContent = msg;
-    clearTimeout(qaStatusTimer);
-    qaStatusTimer = setTimeout(() => { el.textContent = ""; }, 1200);
-  }
+  function flashQAStatus(msg) { flashStatusMessage("qa-status", msg, 1200); }
   function saveQAData() {
     try { localStorage.setItem(QA_KEY, JSON.stringify(qaData)); flashQAStatus("저장됨"); }
     catch (e) { flashQAStatus("저장 실패"); }
@@ -4524,10 +4553,7 @@
       `<button type="button" data-capture-mode="${o.key}">${ICON_CAMERA} ${o.label}</button>`
     ).join("");
     document.body.appendChild(menu);
-    const top = Math.min(rect.bottom + 4, window.innerHeight - menu.offsetHeight - 8);
-    const left = Math.min(rect.left, window.innerWidth - menu.offsetWidth - 8);
-    menu.style.top = `${Math.max(8, top)}px`;
-    menu.style.left = `${Math.max(8, left)}px`;
+    positionFloatingMenu(menu, rect.left, rect.bottom + 4);
     menu.querySelectorAll("button[data-capture-mode]").forEach((btn) => {
       btn.onclick = () => {
         const mode = btn.getAttribute("data-capture-mode");
@@ -4630,39 +4656,46 @@
     }
 
     requestAnimationFrame(() => {
-      // 표는 CSS(display:table + margin:auto)만으로 이미 표 크기에 맞춰 가운데 정렬된다.
-      // 통계 카드만 두 줄로 나누기 위해 너비를 계산해서 고정한다(카드 너비 130px, 간격
-      // 10px는 고정값이라 폰트 렌더링 차이 없이 항상 정확하게 계산된다).
-      const statsWrapEl = wrapper.querySelector(".qa-capture-stats");
-      if (statsWrapEl) {
-        // 통계 카드를 한 줄로 쭉 나열하면 표보다 훨씬 넓어져서 표 양옆에 공백이 생긴다.
-        // 카드를 두 줄로 나눠서 표 너비에 더 가깝게 만든다 (예: 9칸 → 5+4).
-        const cardCount = statsWrapEl.children.length;
-        const perRow = Math.ceil(cardCount / 2);
-        const w = perRow * 130 + Math.max(0, perRow - 1) * 10;
-        statsWrapEl.style.width = w + "px";
-        statsWrapEl.style.margin = "0 auto 18px auto";
-      }
+      try {
+        // 표는 CSS(display:table + margin:auto)만으로 이미 표 크기에 맞춰 가운데 정렬된다.
+        // 통계 카드만 두 줄로 나누기 위해 너비를 계산해서 고정한다(카드 너비 130px, 간격
+        // 10px는 고정값이라 폰트 렌더링 차이 없이 항상 정확하게 계산된다).
+        const statsWrapEl = wrapper.querySelector(".qa-capture-stats");
+        if (statsWrapEl) {
+          // 통계 카드를 한 줄로 쭉 나열하면 표보다 훨씬 넓어져서 표 양옆에 공백이 생긴다.
+          // 카드를 두 줄로 나눠서 표 너비에 더 가깝게 만든다 (예: 9칸 → 5+4).
+          const cardCount = statsWrapEl.children.length;
+          const perRow = Math.ceil(cardCount / 2);
+          const w = perRow * 130 + Math.max(0, perRow - 1) * 10;
+          statsWrapEl.style.width = w + "px";
+          statsWrapEl.style.margin = "0 auto 18px auto";
+        }
 
-      const fullW = wrapper.scrollWidth;
-      const fullH = wrapper.scrollHeight;
-      html2canvas(wrapper, {
-        backgroundColor: cBg,
-        scale: 2,
-        width: fullW,
-        height: fullH,
-        windowWidth: fullW,
-        windowHeight: fullH,
-      }).then((canvas) => {
-        const fileSuffix = captureMode === "ALL" ? "" : `_${modeName}`;
-        const filename = `품질관리${fileSuffix}_${year}-${pad2(monthIndex + 1)}.png`;
-        const dataUrl = canvas.toDataURL("image/png");
-        cleanup("");
-        openQAPreview(dataUrl, filename, captureMode === "ALL" ? null : modeName);
-      }).catch((err) => {
+        const fullW = wrapper.scrollWidth;
+        const fullH = wrapper.scrollHeight;
+        html2canvas(wrapper, {
+          backgroundColor: cBg,
+          scale: 2,
+          width: fullW,
+          height: fullH,
+          windowWidth: fullW,
+          windowHeight: fullH,
+        }).then((canvas) => {
+          const fileSuffix = captureMode === "ALL" ? "" : `_${modeName}`;
+          const filename = `품질관리${fileSuffix}_${year}-${pad2(monthIndex + 1)}.png`;
+          const dataUrl = canvas.toDataURL("image/png");
+          cleanup("");
+          openQAPreview(dataUrl, filename, captureMode === "ALL" ? null : modeName);
+        }).catch((err) => {
+          console.error(err);
+          cleanup("캡처 실패");
+        });
+      } catch (err) {
+        // html2canvas를 부르기 전 단계(카드 너비 계산 등)에서 예외가 나도 버튼이
+        // "이미지 생성 중..."에 영원히 멈춰있지 않도록 여기서도 반드시 정리한다.
         console.error(err);
         cleanup("캡처 실패");
-      });
+      }
     });
   }
 
@@ -4679,14 +4712,7 @@
   }
   let interviewsData = loadInterviewsData();
 
-  let interviewStatusTimer = null;
-  function flashInterviewStatus(msg, elId) {
-    const el = document.getElementById(elId || "interview-status");
-    if (!el) return;
-    el.textContent = msg;
-    clearTimeout(interviewStatusTimer);
-    interviewStatusTimer = setTimeout(() => { if (el.textContent === msg) el.textContent = ""; }, 1600);
-  }
+  function flashInterviewStatus(msg, elId) { flashStatusMessage(elId || "interview-status", msg, 1600); }
   function saveInterviewsData() {
     try { localStorage.setItem(INTERVIEWS_KEY, JSON.stringify(interviewsData)); }
     catch (e) {}
@@ -5460,7 +5486,11 @@
   // 이름/사번/입사일/근무시간/업무구분(채팅·유선)/조(주간·야간) 모두
   // 상담사 관리 쪽 값을 그대로 따라간다. 조는 스케줄 화면에서도 바로
   // 바꿀 수 있는데, 그 경우 "상담사 관리" 쪽 값도 함께 바뀌어 항상 서로 일치한다.
+  // 반환값(changed): 실제로 scheduleData 내용이 바뀌었는지 여부. 앱을 열 때마다(js/12-init.js)
+  // 항상 호출되는 함수라서, 바뀐 게 없는데도 매번 saveScheduleData()로 (특히 클라우드까지) 다시
+  // 저장하는 낭비를 피하려고 변경 여부를 추적한다.
   function syncScheduleStaffFromAgents() {
+    let changed = false;
     // 실제 오늘 날짜가 이전에 동기화했던 달을 지나 새 달로 넘어갔다면,
     // 그 이전 달은 이제 "지나간 달"이므로 지금까지의 실시간 인원 데이터를
     // 스냅샷으로 고정해서 남겨둔다. (해당 달을 아직 한 번도 안 열어봤어도
@@ -5469,14 +5499,18 @@
     if (scheduleData.lastSyncMonthKey && scheduleData.lastSyncMonthKey !== currentMonthKey) {
       if (!scheduleData.staffHistory[scheduleData.lastSyncMonthKey]) {
         scheduleData.staffHistory[scheduleData.lastSyncMonthKey] = JSON.parse(JSON.stringify(scheduleData.staff));
+        changed = true;
       }
     }
-    scheduleData.lastSyncMonthKey = currentMonthKey;
+    if (scheduleData.lastSyncMonthKey !== currentMonthKey) {
+      scheduleData.lastSyncMonthKey = currentMonthKey;
+      changed = true;
+    }
 
     // 월별 스케줄에는 "근무중" 상태인 인원만 반영한다. "퇴사"로 표시된 인원은
     // 상담사 관리 목록에는 남아있어도 이번 달/앞으로의 스케줄에는 나타나지 않는다.
     // (단, 이미 지나간 달에 대한 기록·스냅샷은 그대로 보존된다)
-    scheduleData.staff = agentsData.filter((a) => a.status !== "RESIGNED").map((a) => ({
+    const nextStaff = agentsData.filter((a) => a.status !== "RESIGNED").map((a) => ({
       id: a.id,
       nickname: a.ldap || a.name,
       name: a.name,
@@ -5487,6 +5521,12 @@
       types: a.workTypes || [],
       isAdmin: !!a.isAdmin,
     }));
+    // 인원 목록 자체가 실제로 달라졌을 때만 교체한다(매번 새 배열을 만들어 대입하면
+    // 값이 똑같아도 "바뀐 것"으로 취급하게 되므로, 내용을 비교해서 진짜 변경만 반영).
+    if (JSON.stringify(nextStaff) !== JSON.stringify(scheduleData.staff)) {
+      scheduleData.staff = nextStaff;
+      changed = true;
+    }
     // 기록(근무/오프/지각 등)을 지울 때는, 지금 "상담사 관리"에 없는 인원이라도
     // 지나간 달의 스냅샷에 남아있는 인원이면 그 달 기록은 지우지 않는다.
     // (지나간 달을 고정해두는 의미가 없어지지 않도록)
@@ -5497,12 +5537,13 @@
     });
     Object.keys(scheduleData.records).forEach((key) => {
       const staffId = key.split("|")[0];
-      if (!validIds[staffId]) delete scheduleData.records[key];
+      if (!validIds[staffId]) { delete scheduleData.records[key]; changed = true; }
     });
     Object.keys(scheduleData.memos).forEach((key) => {
       const staffId = key.split("|")[0];
-      if (!validIds[staffId]) delete scheduleData.memos[key];
+      if (!validIds[staffId]) { delete scheduleData.memos[key]; changed = true; }
     });
+    return changed;
   }
 
   function saveScheduleData() {
@@ -5510,14 +5551,7 @@
     catch (e) { flashScheduleStatus("저장 실패"); }
   }
 
-  let scheduleStatusTimer = null;
-  function flashScheduleStatus(msg) {
-    const el = document.getElementById("schedule-status");
-    if (!el) return;
-    el.textContent = msg;
-    clearTimeout(scheduleStatusTimer);
-    scheduleStatusTimer = setTimeout(() => { el.textContent = ""; }, 1200);
-  }
+  function flashScheduleStatus(msg) { flashStatusMessage("schedule-status", msg, 1200); }
 
   const scheduleUi = {
     year: today.getFullYear(),
@@ -5670,10 +5704,7 @@
     document.body.appendChild(menu);
     const clientX = e ? e.clientX : window.innerWidth / 2;
     const clientY = e ? e.clientY : window.innerHeight / 2;
-    const top = Math.min(clientY + 4, window.innerHeight - menu.offsetHeight - 8);
-    const left = Math.min(clientX, window.innerWidth - menu.offsetWidth - 8);
-    menu.style.top = `${Math.max(8, top)}px`;
-    menu.style.left = `${Math.max(8, left)}px`;
+    positionFloatingMenu(menu, clientX, clientY + 4);
     menu.querySelector("[data-collapse-header-sel]").onclick = () => scheduleCollapseHeaderSelection();
     const clearBtn = menu.querySelector("[data-clear-header-sel]");
     clearBtn.onclick = () => { closeScheduleMenu(); scheduleClearHeaderSelection(); };
@@ -6895,25 +6926,32 @@
     }
 
     requestAnimationFrame(() => {
-      const fullW = wrapper.scrollWidth;
-      const fullH = wrapper.scrollHeight;
-      html2canvas(wrapper, {
-        backgroundColor: cBg,
-        scale: 2,
-        width: fullW,
-        height: fullH,
-        windowWidth: fullW,
-        windowHeight: fullH,
-      }).then((canvas) => {
-        const fileSuffix = captureMode === "ALL" ? "" : `_${modeName}`;
-        const filename = `상담사_스케줄${fileSuffix}_${scheduleUi.year}-${pad2(scheduleUi.monthIndex + 1)}.png`;
-        const dataUrl = canvas.toDataURL("image/png");
-        cleanup("");
-        openSchedulePreview(dataUrl, filename, captureMode === "ALL" ? null : modeName);
-      }).catch((err) => {
+      try {
+        const fullW = wrapper.scrollWidth;
+        const fullH = wrapper.scrollHeight;
+        html2canvas(wrapper, {
+          backgroundColor: cBg,
+          scale: 2,
+          width: fullW,
+          height: fullH,
+          windowWidth: fullW,
+          windowHeight: fullH,
+        }).then((canvas) => {
+          const fileSuffix = captureMode === "ALL" ? "" : `_${modeName}`;
+          const filename = `상담사_스케줄${fileSuffix}_${scheduleUi.year}-${pad2(scheduleUi.monthIndex + 1)}.png`;
+          const dataUrl = canvas.toDataURL("image/png");
+          cleanup("");
+          openSchedulePreview(dataUrl, filename, captureMode === "ALL" ? null : modeName);
+        }).catch((err) => {
+          console.error(err);
+          cleanup("캡처 실패");
+        });
+      } catch (err) {
+        // html2canvas를 부르기 전 단계에서 예외가 나도 버튼이 "이미지 생성 중..."에
+        // 영원히 멈춰있지 않도록 여기서도 반드시 정리한다.
         console.error(err);
         cleanup("캡처 실패");
-      });
+      }
     });
   }
 
@@ -7014,10 +7052,7 @@
     document.body.appendChild(menu);
     const clientX = evt ? evt.clientX : window.innerWidth / 2;
     const clientY = evt ? evt.clientY : window.innerHeight / 2;
-    const top = Math.min(clientY + 4, window.innerHeight - menu.offsetHeight - 8);
-    const left = Math.min(clientX, window.innerWidth - menu.offsetWidth - 8);
-    menu.style.top = `${Math.max(8, top)}px`;
-    menu.style.left = `${Math.max(8, left)}px`;
+    positionFloatingMenu(menu, clientX, clientY + 4);
     function applyAndClose(status, attendance) {
       scheduleApplyBulk(cells, { status, attendance: attendance || null });
       closeScheduleMenu();
@@ -7073,10 +7108,7 @@
       + memoDeleteBtnHtml
       + `<button type="button" class="sch-menu-reset" data-reset="1">기본값(근무)으로</button>`;
     document.body.appendChild(menu);
-    const top = Math.min(rect.bottom + 4, window.innerHeight - menu.offsetHeight - 8);
-    const left = Math.min(rect.left, window.innerWidth - menu.offsetWidth - 8);
-    menu.style.top = `${Math.max(8, top)}px`;
-    menu.style.left = `${Math.max(8, left)}px`;
+    positionFloatingMenu(menu, rect.left, rect.bottom + 4);
     menu.querySelectorAll("button[data-status]").forEach((btn) => {
       btn.onclick = () => {
         setScheduleRecord(staffId, dateKey, { status: btn.getAttribute("data-status"), attendance: btn.getAttribute("data-attendance") || null });
@@ -7312,10 +7344,7 @@
       return `${divider}<button type="button" class="${o.danger ? "sch-menu-danger" : ""}" data-scope="${o.key}">${o.danger ? ICON_TRASH + " " : ""}${o.label}</button>`;
     }).join("");
     document.body.appendChild(menu);
-    const top = Math.min(rect.bottom + 4, window.innerHeight - menu.offsetHeight - 8);
-    const left = Math.min(rect.left, window.innerWidth - menu.offsetWidth - 8);
-    menu.style.top = `${Math.max(8, top)}px`;
-    menu.style.left = `${Math.max(8, left)}px`;
+    positionFloatingMenu(menu, rect.left, rect.bottom + 4);
     menu.querySelectorAll("button[data-scope]").forEach((btn) => {
       btn.onclick = () => {
         const scope = btn.getAttribute("data-scope");
@@ -7394,10 +7423,7 @@
       `<button type="button" data-capture-mode="${o.key}">${ICON_CAMERA} ${o.label}</button>`
     ).join("");
     document.body.appendChild(menu);
-    const top = Math.min(rect.bottom + 4, window.innerHeight - menu.offsetHeight - 8);
-    const left = Math.min(rect.left, window.innerWidth - menu.offsetWidth - 8);
-    menu.style.top = `${Math.max(8, top)}px`;
-    menu.style.left = `${Math.max(8, left)}px`;
+    positionFloatingMenu(menu, rect.left, rect.bottom + 4);
     menu.querySelectorAll("button[data-capture-mode]").forEach((btn) => {
       btn.onclick = () => {
         const mode = btn.getAttribute("data-capture-mode");
@@ -8830,8 +8856,9 @@
   }
 
   // 앱을 처음 열 때도 월별 스케줄 인원 목록을 상담사 관리 목록과 맞춰준다.
-  syncScheduleStaffFromAgents();
-  saveScheduleData();
+  // (실제로 바뀐 내용이 있을 때만 저장 — 매번 열 때마다 변경 없이도 스케줄 데이터
+  // 전체를 다시 저장/클라우드 전송하는 낭비를 피한다)
+  if (syncScheduleStaffFromAgents()) saveScheduleData();
 
   renderApp();
 

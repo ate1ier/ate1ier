@@ -16,14 +16,7 @@
   }
   const notesData = loadNotesData();
 
-  let notesStatusTimer = null;
-  function flashNotesStatus(msg) {
-    const el = document.getElementById("notes-status");
-    if (!el) return;
-    el.textContent = msg;
-    clearTimeout(notesStatusTimer);
-    notesStatusTimer = setTimeout(() => { el.textContent = ""; }, 1500);
-  }
+  function flashNotesStatus(msg) { flashStatusMessage("notes-status", msg, 1500); }
   function saveNotesData() {
     try {
       localStorage.setItem(NOTES_KEY, JSON.stringify(notesData));

@@ -79,7 +79,11 @@
   // 이름/사번/입사일/근무시간/업무구분(채팅·유선)/조(주간·야간) 모두
   // 상담사 관리 쪽 값을 그대로 따라간다. 조는 스케줄 화면에서도 바로
   // 바꿀 수 있는데, 그 경우 "상담사 관리" 쪽 값도 함께 바뀌어 항상 서로 일치한다.
+  // 반환값(changed): 실제로 scheduleData 내용이 바뀌었는지 여부. 앱을 열 때마다(js/12-init.js)
+  // 항상 호출되는 함수라서, 바뀐 게 없는데도 매번 saveScheduleData()로 (특히 클라우드까지) 다시
+  // 저장하는 낭비를 피하려고 변경 여부를 추적한다.
   function syncScheduleStaffFromAgents() {
+    let changed = false;
     // 실제 오늘 날짜가 이전에 동기화했던 달을 지나 새 달로 넘어갔다면,
     // 그 이전 달은 이제 "지나간 달"이므로 지금까지의 실시간 인원 데이터를
     // 스냅샷으로 고정해서 남겨둔다. (해당 달을 아직 한 번도 안 열어봤어도
@@ -88,14 +92,18 @@
     if (scheduleData.lastSyncMonthKey && scheduleData.lastSyncMonthKey !== currentMonthKey) {
       if (!scheduleData.staffHistory[scheduleData.lastSyncMonthKey]) {
         scheduleData.staffHistory[scheduleData.lastSyncMonthKey] = JSON.parse(JSON.stringify(scheduleData.staff));
+        changed = true;
       }
     }
-    scheduleData.lastSyncMonthKey = currentMonthKey;
+    if (scheduleData.lastSyncMonthKey !== currentMonthKey) {
+      scheduleData.lastSyncMonthKey = currentMonthKey;
+      changed = true;
+    }
 
     // 월별 스케줄에는 "근무중" 상태인 인원만 반영한다. "퇴사"로 표시된 인원은
     // 상담사 관리 목록에는 남아있어도 이번 달/앞으로의 스케줄에는 나타나지 않는다.
     // (단, 이미 지나간 달에 대한 기록·스냅샷은 그대로 보존된다)
-    scheduleData.staff = agentsData.filter((a) => a.status !== "RESIGNED").map((a) => ({
+    const nextStaff = agentsData.filter((a) => a.status !== "RESIGNED").map((a) => ({
       id: a.id,
       nickname: a.ldap || a.name,
       name: a.name,
@@ -106,6 +114,12 @@
       types: a.workTypes || [],
       isAdmin: !!a.isAdmin,
     }));
+    // 인원 목록 자체가 실제로 달라졌을 때만 교체한다(매번 새 배열을 만들어 대입하면
+    // 값이 똑같아도 "바뀐 것"으로 취급하게 되므로, 내용을 비교해서 진짜 변경만 반영).
+    if (JSON.stringify(nextStaff) !== JSON.stringify(scheduleData.staff)) {
+      scheduleData.staff = nextStaff;
+      changed = true;
+    }
     // 기록(근무/오프/지각 등)을 지울 때는, 지금 "상담사 관리"에 없는 인원이라도
     // 지나간 달의 스냅샷에 남아있는 인원이면 그 달 기록은 지우지 않는다.
     // (지나간 달을 고정해두는 의미가 없어지지 않도록)
@@ -116,12 +130,13 @@
     });
     Object.keys(scheduleData.records).forEach((key) => {
       const staffId = key.split("|")[0];
-      if (!validIds[staffId]) delete scheduleData.records[key];
+      if (!validIds[staffId]) { delete scheduleData.records[key]; changed = true; }
     });
     Object.keys(scheduleData.memos).forEach((key) => {
       const staffId = key.split("|")[0];
-      if (!validIds[staffId]) delete scheduleData.memos[key];
+      if (!validIds[staffId]) { delete scheduleData.memos[key]; changed = true; }
     });
+    return changed;
   }
 
   function saveScheduleData() {
@@ -129,14 +144,7 @@
     catch (e) { flashScheduleStatus("저장 실패"); }
   }
 
-  let scheduleStatusTimer = null;
-  function flashScheduleStatus(msg) {
-    const el = document.getElementById("schedule-status");
-    if (!el) return;
-    el.textContent = msg;
-    clearTimeout(scheduleStatusTimer);
-    scheduleStatusTimer = setTimeout(() => { el.textContent = ""; }, 1200);
-  }
+  function flashScheduleStatus(msg) { flashStatusMessage("schedule-status", msg, 1200); }
 
   const scheduleUi = {
     year: today.getFullYear(),
@@ -289,10 +297,7 @@
     document.body.appendChild(menu);
     const clientX = e ? e.clientX : window.innerWidth / 2;
     const clientY = e ? e.clientY : window.innerHeight / 2;
-    const top = Math.min(clientY + 4, window.innerHeight - menu.offsetHeight - 8);
-    const left = Math.min(clientX, window.innerWidth - menu.offsetWidth - 8);
-    menu.style.top = `${Math.max(8, top)}px`;
-    menu.style.left = `${Math.max(8, left)}px`;
+    positionFloatingMenu(menu, clientX, clientY + 4);
     menu.querySelector("[data-collapse-header-sel]").onclick = () => scheduleCollapseHeaderSelection();
     const clearBtn = menu.querySelector("[data-clear-header-sel]");
     clearBtn.onclick = () => { closeScheduleMenu(); scheduleClearHeaderSelection(); };
@@ -1514,25 +1519,32 @@
     }
 
     requestAnimationFrame(() => {
-      const fullW = wrapper.scrollWidth;
-      const fullH = wrapper.scrollHeight;
-      html2canvas(wrapper, {
-        backgroundColor: cBg,
-        scale: 2,
-        width: fullW,
-        height: fullH,
-        windowWidth: fullW,
-        windowHeight: fullH,
-      }).then((canvas) => {
-        const fileSuffix = captureMode === "ALL" ? "" : `_${modeName}`;
-        const filename = `상담사_스케줄${fileSuffix}_${scheduleUi.year}-${pad2(scheduleUi.monthIndex + 1)}.png`;
-        const dataUrl = canvas.toDataURL("image/png");
-        cleanup("");
-        openSchedulePreview(dataUrl, filename, captureMode === "ALL" ? null : modeName);
-      }).catch((err) => {
+      try {
+        const fullW = wrapper.scrollWidth;
+        const fullH = wrapper.scrollHeight;
+        html2canvas(wrapper, {
+          backgroundColor: cBg,
+          scale: 2,
+          width: fullW,
+          height: fullH,
+          windowWidth: fullW,
+          windowHeight: fullH,
+        }).then((canvas) => {
+          const fileSuffix = captureMode === "ALL" ? "" : `_${modeName}`;
+          const filename = `상담사_스케줄${fileSuffix}_${scheduleUi.year}-${pad2(scheduleUi.monthIndex + 1)}.png`;
+          const dataUrl = canvas.toDataURL("image/png");
+          cleanup("");
+          openSchedulePreview(dataUrl, filename, captureMode === "ALL" ? null : modeName);
+        }).catch((err) => {
+          console.error(err);
+          cleanup("캡처 실패");
+        });
+      } catch (err) {
+        // html2canvas를 부르기 전 단계에서 예외가 나도 버튼이 "이미지 생성 중..."에
+        // 영원히 멈춰있지 않도록 여기서도 반드시 정리한다.
         console.error(err);
         cleanup("캡처 실패");
-      });
+      }
     });
   }
 
@@ -1633,10 +1645,7 @@
     document.body.appendChild(menu);
     const clientX = evt ? evt.clientX : window.innerWidth / 2;
     const clientY = evt ? evt.clientY : window.innerHeight / 2;
-    const top = Math.min(clientY + 4, window.innerHeight - menu.offsetHeight - 8);
-    const left = Math.min(clientX, window.innerWidth - menu.offsetWidth - 8);
-    menu.style.top = `${Math.max(8, top)}px`;
-    menu.style.left = `${Math.max(8, left)}px`;
+    positionFloatingMenu(menu, clientX, clientY + 4);
     function applyAndClose(status, attendance) {
       scheduleApplyBulk(cells, { status, attendance: attendance || null });
       closeScheduleMenu();
@@ -1692,10 +1701,7 @@
       + memoDeleteBtnHtml
       + `<button type="button" class="sch-menu-reset" data-reset="1">기본값(근무)으로</button>`;
     document.body.appendChild(menu);
-    const top = Math.min(rect.bottom + 4, window.innerHeight - menu.offsetHeight - 8);
-    const left = Math.min(rect.left, window.innerWidth - menu.offsetWidth - 8);
-    menu.style.top = `${Math.max(8, top)}px`;
-    menu.style.left = `${Math.max(8, left)}px`;
+    positionFloatingMenu(menu, rect.left, rect.bottom + 4);
     menu.querySelectorAll("button[data-status]").forEach((btn) => {
       btn.onclick = () => {
         setScheduleRecord(staffId, dateKey, { status: btn.getAttribute("data-status"), attendance: btn.getAttribute("data-attendance") || null });
@@ -1931,10 +1937,7 @@
       return `${divider}<button type="button" class="${o.danger ? "sch-menu-danger" : ""}" data-scope="${o.key}">${o.danger ? ICON_TRASH + " " : ""}${o.label}</button>`;
     }).join("");
     document.body.appendChild(menu);
-    const top = Math.min(rect.bottom + 4, window.innerHeight - menu.offsetHeight - 8);
-    const left = Math.min(rect.left, window.innerWidth - menu.offsetWidth - 8);
-    menu.style.top = `${Math.max(8, top)}px`;
-    menu.style.left = `${Math.max(8, left)}px`;
+    positionFloatingMenu(menu, rect.left, rect.bottom + 4);
     menu.querySelectorAll("button[data-scope]").forEach((btn) => {
       btn.onclick = () => {
         const scope = btn.getAttribute("data-scope");
@@ -2013,10 +2016,7 @@
       `<button type="button" data-capture-mode="${o.key}">${ICON_CAMERA} ${o.label}</button>`
     ).join("");
     document.body.appendChild(menu);
-    const top = Math.min(rect.bottom + 4, window.innerHeight - menu.offsetHeight - 8);
-    const left = Math.min(rect.left, window.innerWidth - menu.offsetWidth - 8);
-    menu.style.top = `${Math.max(8, top)}px`;
-    menu.style.left = `${Math.max(8, left)}px`;
+    positionFloatingMenu(menu, rect.left, rect.bottom + 4);
     menu.querySelectorAll("button[data-capture-mode]").forEach((btn) => {
       btn.onclick = () => {
         const mode = btn.getAttribute("data-capture-mode");

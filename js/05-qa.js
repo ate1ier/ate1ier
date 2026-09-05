@@ -9,14 +9,7 @@
   // 월별 스케줄과 동일한 방식의 "월별 잠금". 잠긴 달은 점수 입력이 막힌다.
   if (!qaData.monthLocks || typeof qaData.monthLocks !== "object") qaData.monthLocks = {};
 
-  let qaStatusTimer = null;
-  function flashQAStatus(msg) {
-    const el = document.getElementById("qa-status");
-    if (!el) return;
-    el.textContent = msg;
-    clearTimeout(qaStatusTimer);
-    qaStatusTimer = setTimeout(() => { el.textContent = ""; }, 1200);
-  }
+  function flashQAStatus(msg) { flashStatusMessage("qa-status", msg, 1200); }
   function saveQAData() {
     try { localStorage.setItem(QA_KEY, JSON.stringify(qaData)); flashQAStatus("저장됨"); }
     catch (e) { flashQAStatus("저장 실패"); }
@@ -397,10 +390,7 @@
       `<button type="button" data-capture-mode="${o.key}">${ICON_CAMERA} ${o.label}</button>`
     ).join("");
     document.body.appendChild(menu);
-    const top = Math.min(rect.bottom + 4, window.innerHeight - menu.offsetHeight - 8);
-    const left = Math.min(rect.left, window.innerWidth - menu.offsetWidth - 8);
-    menu.style.top = `${Math.max(8, top)}px`;
-    menu.style.left = `${Math.max(8, left)}px`;
+    positionFloatingMenu(menu, rect.left, rect.bottom + 4);
     menu.querySelectorAll("button[data-capture-mode]").forEach((btn) => {
       btn.onclick = () => {
         const mode = btn.getAttribute("data-capture-mode");
@@ -503,39 +493,46 @@
     }
 
     requestAnimationFrame(() => {
-      // 표는 CSS(display:table + margin:auto)만으로 이미 표 크기에 맞춰 가운데 정렬된다.
-      // 통계 카드만 두 줄로 나누기 위해 너비를 계산해서 고정한다(카드 너비 130px, 간격
-      // 10px는 고정값이라 폰트 렌더링 차이 없이 항상 정확하게 계산된다).
-      const statsWrapEl = wrapper.querySelector(".qa-capture-stats");
-      if (statsWrapEl) {
-        // 통계 카드를 한 줄로 쭉 나열하면 표보다 훨씬 넓어져서 표 양옆에 공백이 생긴다.
-        // 카드를 두 줄로 나눠서 표 너비에 더 가깝게 만든다 (예: 9칸 → 5+4).
-        const cardCount = statsWrapEl.children.length;
-        const perRow = Math.ceil(cardCount / 2);
-        const w = perRow * 130 + Math.max(0, perRow - 1) * 10;
-        statsWrapEl.style.width = w + "px";
-        statsWrapEl.style.margin = "0 auto 18px auto";
-      }
+      try {
+        // 표는 CSS(display:table + margin:auto)만으로 이미 표 크기에 맞춰 가운데 정렬된다.
+        // 통계 카드만 두 줄로 나누기 위해 너비를 계산해서 고정한다(카드 너비 130px, 간격
+        // 10px는 고정값이라 폰트 렌더링 차이 없이 항상 정확하게 계산된다).
+        const statsWrapEl = wrapper.querySelector(".qa-capture-stats");
+        if (statsWrapEl) {
+          // 통계 카드를 한 줄로 쭉 나열하면 표보다 훨씬 넓어져서 표 양옆에 공백이 생긴다.
+          // 카드를 두 줄로 나눠서 표 너비에 더 가깝게 만든다 (예: 9칸 → 5+4).
+          const cardCount = statsWrapEl.children.length;
+          const perRow = Math.ceil(cardCount / 2);
+          const w = perRow * 130 + Math.max(0, perRow - 1) * 10;
+          statsWrapEl.style.width = w + "px";
+          statsWrapEl.style.margin = "0 auto 18px auto";
+        }
 
-      const fullW = wrapper.scrollWidth;
-      const fullH = wrapper.scrollHeight;
-      html2canvas(wrapper, {
-        backgroundColor: cBg,
-        scale: 2,
-        width: fullW,
-        height: fullH,
-        windowWidth: fullW,
-        windowHeight: fullH,
-      }).then((canvas) => {
-        const fileSuffix = captureMode === "ALL" ? "" : `_${modeName}`;
-        const filename = `품질관리${fileSuffix}_${year}-${pad2(monthIndex + 1)}.png`;
-        const dataUrl = canvas.toDataURL("image/png");
-        cleanup("");
-        openQAPreview(dataUrl, filename, captureMode === "ALL" ? null : modeName);
-      }).catch((err) => {
+        const fullW = wrapper.scrollWidth;
+        const fullH = wrapper.scrollHeight;
+        html2canvas(wrapper, {
+          backgroundColor: cBg,
+          scale: 2,
+          width: fullW,
+          height: fullH,
+          windowWidth: fullW,
+          windowHeight: fullH,
+        }).then((canvas) => {
+          const fileSuffix = captureMode === "ALL" ? "" : `_${modeName}`;
+          const filename = `품질관리${fileSuffix}_${year}-${pad2(monthIndex + 1)}.png`;
+          const dataUrl = canvas.toDataURL("image/png");
+          cleanup("");
+          openQAPreview(dataUrl, filename, captureMode === "ALL" ? null : modeName);
+        }).catch((err) => {
+          console.error(err);
+          cleanup("캡처 실패");
+        });
+      } catch (err) {
+        // html2canvas를 부르기 전 단계(카드 너비 계산 등)에서 예외가 나도 버튼이
+        // "이미지 생성 중..."에 영원히 멈춰있지 않도록 여기서도 반드시 정리한다.
         console.error(err);
         cleanup("캡처 실패");
-      });
+      }
     });
   }
 
