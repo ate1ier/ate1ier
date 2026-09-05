@@ -13,9 +13,8 @@
   }
 
   // 앱을 처음 열 때도 월별 스케줄 인원 목록을 상담사 관리 목록과 맞춰준다.
-  // (실제로 바뀐 내용이 있을 때만 저장 — 매번 열 때마다 변경 없이도 스케줄 데이터
-  // 전체를 다시 저장/클라우드 전송하는 낭비를 피한다)
-  if (syncScheduleStaffFromAgents()) saveScheduleData();
+  syncScheduleStaffFromAgents();
+  saveScheduleData();
 
   renderApp();
 

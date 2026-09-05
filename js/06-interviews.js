@@ -7,7 +7,14 @@
   }
   let interviewsData = loadInterviewsData();
 
-  function flashInterviewStatus(msg, elId) { flashStatusMessage(elId || "interview-status", msg, 1600); }
+  let interviewStatusTimer = null;
+  function flashInterviewStatus(msg, elId) {
+    const el = document.getElementById(elId || "interview-status");
+    if (!el) return;
+    el.textContent = msg;
+    clearTimeout(interviewStatusTimer);
+    interviewStatusTimer = setTimeout(() => { if (el.textContent === msg) el.textContent = ""; }, 1600);
+  }
   function saveInterviewsData() {
     try { localStorage.setItem(INTERVIEWS_KEY, JSON.stringify(interviewsData)); }
     catch (e) {}

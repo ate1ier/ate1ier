@@ -18,14 +18,21 @@
     interviewEditingId: null,
   };
 
-  function flashAgentStatus(msg) { flashStatusMessage("agent-status", msg, 1200); }
+  let agentStatusTimer = null;
+  function flashAgentStatus(msg) {
+    const el = document.getElementById("agent-status");
+    if (!el) return;
+    el.textContent = msg;
+    clearTimeout(agentStatusTimer);
+    agentStatusTimer = setTimeout(() => { el.textContent = ""; }, 1200);
+  }
   function saveAgentsData() {
     try { localStorage.setItem(AGENTS_KEY, JSON.stringify(agentsData)); flashAgentStatus("저장됨"); }
     catch (e) { flashAgentStatus("저장 실패"); }
     // 상담사 관리 목록이 바뀔 때마다 월별 스케줄의 인원 목록도 자동으로 맞춰준다.
-    // (실제로 스케줄 쪽 데이터가 바뀌었을 때만 다시 저장한다)
     if (typeof syncScheduleStaffFromAgents === "function") {
-      if (syncScheduleStaffFromAgents()) saveScheduleData();
+      syncScheduleStaffFromAgents();
+      saveScheduleData();
     }
   }
 

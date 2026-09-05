@@ -50,10 +50,6 @@
     "app-theme-mode",
     "personal-app:session",
     "personal-app:master-origin",
-    // 로그인 유지 하트비트(15초마다 갱신, js/12-init.js)는 "이 탭이 아직 열려있는지"만
-    // 브라우저 안에서 판단하는 값이라 다른 기기와 공유할 필요가 없다. 제외하지 않으면
-    // 탭을 열어둔 내내 15초마다 불필요한 Supabase 쓰기가 계속 발생한다.
-    "personal-app:last-active",
   ]);
   function isCloudSynced(key) {
     if (!cloud) return false;
@@ -73,32 +69,7 @@
     promise.then(clear, clear);
     return promise;
   }
-  // 타이핑처럼 짧은 시간에 같은 키가 계속 저장될 때, 그때마다 곧바로 Supabase에
-  // 쏘지 않고 마지막 입력에서 잠깐(DEBOUNCE) 조용하면 그때 한 번만 보낸다. 로컬
-  // 저장(localStorage)은 이 대기와 무관하게 항상 즉시 이뤄지므로 화면/새로고침
-  // 안정성에는 영향이 없고, 네트워크 요청 횟수만 크게 줄어든다.
-  const CLOUD_PUSH_DEBOUNCE_MS = 800;
-  const _cloudPushDebounceTimers = {};
-  const _cloudPushPendingValue = {};
-  function _flushCloudPushDebounce(key) {
-    if (!(key in _cloudPushPendingValue)) return;
-    clearTimeout(_cloudPushDebounceTimers[key]);
-    delete _cloudPushDebounceTimers[key];
-    const value = _cloudPushPendingValue[key];
-    delete _cloudPushPendingValue[key];
-    cloudPush(key, value);
-  }
-  function scheduleCloudPush(key, value) {
-    if (!isCloudSynced(key)) return;
-    notifyCloudSyncStart(); // 대기 중에도 "동기화 중…"으로 즉시 피드백을 준다.
-    _cloudPushPendingValue[key] = value;
-    clearTimeout(_cloudPushDebounceTimers[key]);
-    _cloudPushDebounceTimers[key] = setTimeout(() => _flushCloudPushDebounce(key), CLOUD_PUSH_DEBOUNCE_MS);
-  }
   async function flushCloudWrites() {
-    // location.reload() 등 페이지를 떠나기 직전에는 아직 디바운스로 대기 중인
-    // 저장도 놓치지 않도록 먼저 전부 즉시 실행으로 전환한 뒤 완료를 기다린다.
-    Object.keys(_cloudPushPendingValue).forEach(_flushCloudPushDebounce);
     if (!_pendingCloudWrites.size) return;
     await Promise.allSettled(Array.from(_pendingCloudWrites));
   }
@@ -587,15 +558,10 @@
   // 필요한 키만 조용히 Supabase에도 함께 저장/삭제한다 (실패해도 화면엔 영향 없음).
   localStorage.setItem = function (key, value) {
     _origSetItem(key, value);
-    scheduleCloudPush(key, value);
+    cloudPush(key, value);
   };
   localStorage.removeItem = function (key) {
     _origRemoveItem(key);
-    // 방금 지운 값이 디바운스 대기 중이었다면, 잠시 뒤 그 값이 되살아나 클라우드에
-    // 다시 올라가지 않도록 대기 중인 저장을 취소하고 곧바로 삭제를 반영한다.
-    clearTimeout(_cloudPushDebounceTimers[key]);
-    delete _cloudPushDebounceTimers[key];
-    delete _cloudPushPendingValue[key];
     cloudDelete(key);
   };
   await cloudHydrate();
@@ -1145,30 +1111,6 @@
     return d.innerHTML;
   }
   function genId() { return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`; }
-  // 캘린더·할일·메모·상담사·QA·면담일지·스케줄 등 여러 화면에 "저장됨" 같은 상태 메시지를
-  // 잠깐 보여줬다가 자동으로 지우는 코드가 화면마다 (요소 id, 유지 시간만 다르고) 똑같이
-  // 반복돼 있던 것을 하나로 합쳤다. elId별로 타이머를 따로 관리해서 서로 다른 상태 표시줄이
-  // 있는 화면을 오가도 꼬이지 않는다. 표시 도중에 더 최근 메시지로 다시 호출되면, 오래된
-  // 타이머가 나중에 발동하더라도 그 최신 메시지를 지우지 않는다.
-  const _statusFlashTimers = {};
-  function flashStatusMessage(elId, msg, ms) {
-    const el = document.getElementById(elId);
-    if (!el) return;
-    el.textContent = msg;
-    clearTimeout(_statusFlashTimers[elId]);
-    _statusFlashTimers[elId] = setTimeout(() => {
-      if (el.textContent === msg) el.textContent = "";
-    }, ms || 1200);
-  }
-  // 셀 우클릭 메뉴, 헤더 선택 메뉴, 캡처/삭제 메뉴 등 화면 곳곳의 팝오버가 뷰포트 밖으로
-  // 넘어가지 않게 위치를 잡아주는 계산이 거의 똑같이 반복돼 있던 것을 하나로 합쳤다.
-  // (x, y)는 메뉴를 띄우고 싶은 기준점(우클릭 좌표 또는 버튼의 바깥쪽 아래·왼쪽 모서리).
-  function positionFloatingMenu(menu, x, y) {
-    const top = Math.min(y, window.innerHeight - menu.offsetHeight - 8);
-    const left = Math.min(x, window.innerWidth - menu.offsetWidth - 8);
-    menu.style.top = `${Math.max(8, top)}px`;
-    menu.style.left = `${Math.max(8, left)}px`;
-  }
 
   /* ===================== 로그인(로컬 전용) 모듈 =====================
      지금은 서버 없이 이 브라우저의 localStorage에만 계정 정보를 저장하는
@@ -1433,80 +1375,64 @@
       if (loginForm) {
         loginForm.onsubmit = async (e) => {
           e.preventDefault();
-          // 로그인 처리 중 예상 못 한 오류(네트워크 문제, 브라우저 제약 등)가 나면
-          // 예전에는 화면이 아무 반응 없이 그대로 멈춰서(콘솔에만 에러가 찍히고
-          // 사용자에게는 아무 안내도 없어서) 원인을 알기 어려웠다. 이제는 그런
-          // 경우에도 화면에 에러 문구를 띄우고, 콘솔에도 자세한 원인을 남긴다.
-          try {
-            const username = document.getElementById("login-username").value.trim();
-            const password = document.getElementById("login-password").value;
-            if (!username || !password) { uiState.error = "아이디와 비밀번호를 입력해주세요."; draw(); return; }
-            const account = findAccountByUsername(username);
-            if (!account) {
-              uiState.error = "아이디 또는 비밀번호가 올바르지 않아요.";
-              draw();
-              return;
-            }
-            let ok;
-            if (account.salt) {
-              ok = account.passwordHash === (await hashPassword(password, account.salt));
-            } else {
-              // salt가 없는 예전 계정: 예전 방식으로 한 번 확인하고, 맞으면 새 방식(salt+SHA-256)으로 조용히 업그레이드한다.
-              ok = account.passwordHash === legacyHash(password);
-              if (ok) {
-                const salt = genSalt();
-                const passwordHash = await hashPassword(password, salt);
-                const list = loadAccounts();
-                const idx = list.findIndex((a) => a.id === account.id);
-                if (idx !== -1) { list[idx] = { ...list[idx], salt, passwordHash }; saveAccounts(list); }
-              }
-            }
-            if (!ok) {
-              uiState.error = "아이디 또는 비밀번호가 올바르지 않아요.";
-              draw();
-              return;
-            }
-            setSession(account.id);
-            touchLastActive();
-            try { sessionStorage.setItem("app:just-logged-in", "1"); } catch (e) {}
-            await flushCloudWrites();
-            location.reload();
-          } catch (err) {
-            console.error("로그인 처리 중 오류:", err);
-            uiState.error = `로그인 처리 중 문제가 발생했어요. (${err && err.message ? err.message : "알 수 없는 오류"}) 브라우저 콘솔(F12)을 확인해주세요.`;
+          const username = document.getElementById("login-username").value.trim();
+          const password = document.getElementById("login-password").value;
+          if (!username || !password) { uiState.error = "아이디와 비밀번호를 입력해주세요."; draw(); return; }
+          const account = findAccountByUsername(username);
+          if (!account) {
+            uiState.error = "아이디 또는 비밀번호가 올바르지 않아요.";
             draw();
+            return;
           }
+          let ok;
+          if (account.salt) {
+            ok = account.passwordHash === (await hashPassword(password, account.salt));
+          } else {
+            // salt가 없는 예전 계정: 예전 방식으로 한 번 확인하고, 맞으면 새 방식(salt+SHA-256)으로 조용히 업그레이드한다.
+            ok = account.passwordHash === legacyHash(password);
+            if (ok) {
+              const salt = genSalt();
+              const passwordHash = await hashPassword(password, salt);
+              const list = loadAccounts();
+              const idx = list.findIndex((a) => a.id === account.id);
+              if (idx !== -1) { list[idx] = { ...list[idx], salt, passwordHash }; saveAccounts(list); }
+            }
+          }
+          if (!ok) {
+            uiState.error = "아이디 또는 비밀번호가 올바르지 않아요.";
+            draw();
+            return;
+          }
+          setSession(account.id);
+          touchLastActive();
+          try { sessionStorage.setItem("app:just-logged-in", "1"); } catch (e) {}
+          await flushCloudWrites();
+          location.reload();
         };
       }
       const signupForm = document.getElementById("signup-form");
       if (signupForm) {
         signupForm.onsubmit = async (e) => {
           e.preventDefault();
-          try {
-            const username = document.getElementById("signup-username").value.trim();
-            const password = document.getElementById("signup-password").value;
-            const password2 = document.getElementById("signup-password2").value;
-            if (!username || !password) { uiState.error = "아이디와 비밀번호를 입력해주세요."; draw(); return; }
-            if (password.length < 4) { uiState.error = "비밀번호는 4자 이상으로 만들어주세요."; draw(); return; }
-            if (password !== password2) { uiState.error = "비밀번호 확인이 일치하지 않아요."; draw(); return; }
-            if (findAccountByUsername(username)) { uiState.error = "이미 사용 중인 아이디예요."; draw(); return; }
-            const accountsList = loadAccounts();
-            const wantsMaster = !accountsList.some((a) => a.isMaster) && !!document.getElementById("signup-master") && document.getElementById("signup-master").checked;
-            const salt = genSalt();
-            const passwordHash = await hashPassword(password, salt);
-            const newAccount = { id: genId(), username, salt, passwordHash, createdAt: new Date().toISOString(), isMaster: wantsMaster };
-            accountsList.push(newAccount);
-            saveAccounts(accountsList);
-            setSession(newAccount.id);
-            touchLastActive();
-            try { sessionStorage.setItem("app:just-logged-in", "1"); } catch (e) {}
-            await flushCloudWrites();
-            location.reload();
-          } catch (err) {
-            console.error("계정 만들기 처리 중 오류:", err);
-            uiState.error = `계정을 만드는 중 문제가 발생했어요. (${err && err.message ? err.message : "알 수 없는 오류"}) 브라우저 콘솔(F12)을 확인해주세요.`;
-            draw();
-          }
+          const username = document.getElementById("signup-username").value.trim();
+          const password = document.getElementById("signup-password").value;
+          const password2 = document.getElementById("signup-password2").value;
+          if (!username || !password) { uiState.error = "아이디와 비밀번호를 입력해주세요."; draw(); return; }
+          if (password.length < 4) { uiState.error = "비밀번호는 4자 이상으로 만들어주세요."; draw(); return; }
+          if (password !== password2) { uiState.error = "비밀번호 확인이 일치하지 않아요."; draw(); return; }
+          if (findAccountByUsername(username)) { uiState.error = "이미 사용 중인 아이디예요."; draw(); return; }
+          const accountsList = loadAccounts();
+          const wantsMaster = !accountsList.some((a) => a.isMaster) && !!document.getElementById("signup-master") && document.getElementById("signup-master").checked;
+          const salt = genSalt();
+          const passwordHash = await hashPassword(password, salt);
+          const newAccount = { id: genId(), username, salt, passwordHash, createdAt: new Date().toISOString(), isMaster: wantsMaster };
+          accountsList.push(newAccount);
+          saveAccounts(accountsList);
+          setSession(newAccount.id);
+          touchLastActive();
+          try { sessionStorage.setItem("app:just-logged-in", "1"); } catch (e) {}
+          await flushCloudWrites();
+          location.reload();
         };
       }
     }

@@ -9,13 +9,7 @@
 <link rel="icon" type="image/png" sizes="192x192" href="favicon-192x192.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/font-kopub@1.0/kopubdotum.min.css">
-<!-- html2canvas/exceljs/jszip은 화면 캡처·엑셀 내보내기 버튼을 눌렀을 때만 쓰이는
-     라이브러리라(js/05-qa.js, js/06-interviews.js, js/07-schedule.js, js/07b-holiday-doc.js
-     참고) defer로 불러온다. HTML 파싱과 첫 화면 렌더링을 막지 않으면서도, 페이지 로드가
-     끝나기 전에 준비되므로 실제 사용 시점에는 항상 로드가 끝나 있다. Supabase는 body
-     하단의 앱 스크립트가 시작하자마자 곧바로 사용하므로 순서를 지키기 위해 그대로
-     동기 로드한다. -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
-<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js" defer></script>
-<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>

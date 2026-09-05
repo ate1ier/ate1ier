@@ -46,7 +46,14 @@
   }
   function loadMonth(y, m) { cal.monthData = readMonthRaw(y, m); }
 
-  function flashCalStatus(msg) { flashStatusMessage("cal-status", msg, 1500); }
+  let calStatusTimer = null;
+  function flashCalStatus(msg) {
+    const el = document.getElementById("cal-status");
+    if (!el) return;
+    el.textContent = msg;
+    clearTimeout(calStatusTimer);
+    calStatusTimer = setTimeout(() => { el.textContent = ""; }, 1500);
+  }
   function saveCurrentMonth() {
     const ok = writeMonthRaw(cal.year, cal.monthIndex, cal.monthData);
     flashCalStatus(ok ? "저장됨" : "저장 실패");
@@ -855,7 +862,14 @@
   }
   let todos = loadTodos();
 
-  function flashTodoStatus(msg) { flashStatusMessage("todo-status", msg, 1200); }
+  let todoStatusTimer = null;
+  function flashTodoStatus(msg) {
+    const el = document.getElementById("todo-status");
+    if (!el) return;
+    el.textContent = msg;
+    clearTimeout(todoStatusTimer);
+    todoStatusTimer = setTimeout(() => { el.textContent = ""; }, 1200);
+  }
   function saveTodos() {
     try { localStorage.setItem(TODO_KEY, JSON.stringify(todos)); flashTodoStatus("저장됨"); }
     catch (e) { flashTodoStatus("저장 실패"); }
