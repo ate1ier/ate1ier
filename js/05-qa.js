@@ -451,7 +451,12 @@
         <div class="qa-detail-meta">${metaText}</div>
         <div class="qa-detail-rounds">
           ${detail.rounds.map((round, idx) => {
-            const isPerfect = (round.itemCount || 0) === 0;
+            // itemCount가 없는 예전 데이터(이 필드가 생기기 전에 저장된 회차)는
+            // items 개수로 대신 판단한다. items도 없다면(정말 원문이 없는 경우) 0으로 취급.
+            const effectiveItemCount = (round.itemCount !== undefined && round.itemCount !== null)
+              ? round.itemCount
+              : (round.items ? round.items.length : 0);
+            const isPerfect = effectiveItemCount === 0 && !round.aiSummary;
             const rawGone = !isPerfect && round.items.length === 0; // 원문 만료로 사라진 경우
             const showButton = round.items.length > 0; // 원문이 남아있을 때만 (다시) 요약 가능
             let bodyBlock;
