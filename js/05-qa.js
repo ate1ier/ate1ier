@@ -322,8 +322,29 @@
         );
         renderApp();
       };
-      input.onkeydown = (e) => { if (e.key === "Enter") input.blur(); };
+      // 엑셀처럼 Enter/Tab으로 다음(아래) 칸, Shift+Enter/Shift+Tab으로 이전(위) 칸으로
+      // 바로 이동한다. blur()를 호출하면 값이 바뀐 경우 change 이벤트가 이 안에서
+      // 그대로(동기적으로) 발생해서 저장 + 표 다시 그리기까지 끝나므로, blur() 호출이
+      // 끝난 뒤에 다음 칸을 찾아 포커스를 옮기면 된다(다시 그려졌든 안 그려졌든 그
+      // 시점엔 이미 최종 DOM이 갖춰져 있다).
+      input.onkeydown = (e) => {
+        if (e.key !== "Enter" && e.key !== "Tab") return;
+        e.preventDefault();
+        const idx = agentsList.findIndex((a) => a.id === input.getAttribute("data-qa-agent"));
+        const delta = e.shiftKey ? -1 : 1;
+        const nextAgent = idx !== -1 ? agentsList[idx + delta] : null;
+        input.blur();
+        if (nextAgent) qaFocusScoreInput(nextAgent.id);
+      };
     });
+  }
+  // 특정 상담사의 점수 입력칸에 포커스를 주고 기존 값을 선택 상태로 만든다
+  // (Enter/Tab으로 다음 칸으로 넘어갈 때, 바로 덮어쓸 수 있게).
+  function qaFocusScoreInput(agentId) {
+    const el = document.querySelector(`.qa-score-input[data-qa-agent="${CSS.escape(agentId)}"]`);
+    if (!el || el.disabled) return;
+    el.focus();
+    el.select();
   }
 
   // ----- 품질 관리 표를 이미지로 저장: 전체/주간/야간/유선/채팅 -----
