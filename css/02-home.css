@@ -1,41 +1,78 @@
   /* ---------- 홈(메인) 페이지 ---------- */
   .home-grid {
     display: grid;
-    grid-template-columns: 1.4fr 1fr;
+    grid-template-columns: 0.85fr 1fr 1fr;
     gap: 20px;
     align-items: start;
   }
-  .home-grid.has-status-col {
-    grid-template-columns: 0.85fr 1fr 1fr;
-    align-items: stretch;
-  }
-  .home-grid.has-status-col .home-col-status > .card:last-child { flex: 1; }
   @media (max-width: 1200px) {
-    .home-grid.has-status-col { grid-template-columns: 1fr 1fr; }
+    .home-grid { grid-template-columns: 1fr 1fr; }
   }
   @media (max-width: 900px) {
     .home-grid { grid-template-columns: 1fr; }
-    .home-grid.has-status-col .home-col-status { grid-column: auto; }
   }
-  .home-col { display: flex; flex-direction: column; gap: 20px; }
-  .home-col-status { height: 100%; }
-  .home-col-status .card { height: 100%; display: flex; flex-direction: column; }
-  .home-col-status .home-staff-list { flex: 1; }
+  .home-col { display: flex; flex-direction: column; gap: 20px; min-height: 40px; }
+  .home-col:empty {
+    border: 1px dashed var(--hairline-strong); border-radius: var(--mac-radius-lg);
+    min-height: 90px;
+  }
+
+  /* 히어로는 컬러 그라디언트로 "타이틀" 느낌을, 아래 카드들은 무채색 텍스처만 얹어
+     "보조" 느낌을 주면서 같은 점무늬 언어로 통일감을 유지한다. */
+  .home-grid .card {
+    position: relative;
+    overflow: hidden;
+  }
+  .home-grid .card::before {
+    content: "";
+    position: absolute; inset: 0;
+    background-image: radial-gradient(var(--hairline) 1px, transparent 1px);
+    background-size: 13px 13px;
+    opacity: 0.5;
+    -webkit-mask-image: linear-gradient(160deg, #000 0%, transparent 75%);
+    mask-image: linear-gradient(160deg, #000 0%, transparent 75%);
+    pointer-events: none;
+  }
+  .home-grid .card > * { position: relative; z-index: 1; }
+  /* 위 규칙(.home-grid .card > *)이 클래스 2개라 .home-card-draghandle(클래스 1개)의
+     position:absolute를 밀어내고 position:relative로 덮어써버려서, 핸들이 카드 모서리에
+     고정되지 않고 콘텐츠 순서상 제목 바로 위에 흘러가는 문제가 있었다.
+     선택자 특이도를 더 높여서 absolute가 확실히 이기도록 한다. */
+  .home-grid .card > .home-card-draghandle { position: absolute; z-index: 2; }
   .card.home-hero {
+    position: relative;
     display: flex; flex-direction: column; gap: 0;
-    background: none; border: none; box-shadow: none; border-radius: 0;
-    padding: 10px 0 36px;
+    overflow: hidden;
+    background:
+      radial-gradient(circle at 88% -18%, var(--accent-dim) 0%, transparent 52%),
+      radial-gradient(circle at -6% 118%, var(--blue-dim) 0%, transparent 48%),
+      var(--panel);
+    border: 1px solid var(--hairline);
+    border-radius: var(--mac-radius-lg);
+    box-shadow: var(--mac-shadow-sm);
+    padding: 28px 30px 32px;
   }
+  .card.home-hero::before {
+    content: "";
+    position: absolute; inset: 0;
+    background-image: radial-gradient(var(--hairline-strong) 1px, transparent 1px);
+    background-size: 20px 20px;
+    -webkit-mask-image: linear-gradient(180deg, #000 0%, transparent 65%);
+    mask-image: linear-gradient(180deg, #000 0%, transparent 65%);
+    opacity: 0.5;
+    pointer-events: none;
+  }
+  .home-hero-top, .home-hero-top ~ .stat-grid { position: relative; z-index: 1; }
   .home-hero-top {
     display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 14px;
-    padding-bottom: 34px; margin-bottom: 30px; border-bottom: 1px solid var(--hairline);
+    padding-bottom: 26px; margin-bottom: 24px; border-bottom: 1px solid var(--hairline);
   }
   .home-hero-date {
     font-family: Georgia, 'Apple Myungjo', 'AppleGothic', 'Batang', 'Nanum Myeongjo', serif;
-    font-size: 42px; font-weight: 700; letter-spacing: -0.01em;
+    font-size: 50px; font-weight: 700; letter-spacing: -0.01em;
   }
   .home-hero-date .wd {
-    margin-left: 12px; font-size: 17px; font-weight: 500; color: var(--text-faint);
+    margin-left: 12px; font-size: 19px; font-weight: 500; color: var(--text-faint);
     font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro KR', 'Apple SD Gothic Neo', 'Malgun Gothic', 'KoPub Dotum', system-ui, sans-serif;
   }
   .home-hero-sub { color: var(--text-faint); font-size: 14.5px; margin-top: 9px; }
@@ -54,9 +91,9 @@
   .stat-item:first-child { padding-left: 0; border-left: none; }
   .stat-item .stat-num {
     font-family: Georgia, 'Apple Myungjo', 'AppleGothic', 'Batang', 'Nanum Myeongjo', serif;
-    font-size: 27px; letter-spacing: -0.01em; color: var(--text);
+    font-size: 33px; letter-spacing: -0.01em; color: var(--text);
   }
-  .stat-item .stat-label { font-size: 12.5px; color: var(--text-faint); margin-top: 4px; }
+  .stat-item .stat-label { font-size: 14.5px; color: var(--text-faint); margin-top: 4px; }
   .stat-item.accent .stat-num { color: var(--yellow); }
   @media (max-width: 700px) {
     .stat-item { flex: 1 1 40%; border-left: none; border-top: 1px solid var(--hairline); padding: 14px 0 0; }
@@ -73,10 +110,52 @@
   }
   .home-section-link:hover { color: var(--accent); }
 
+  /* ---- 카드 드래그로 순서 바꾸기 ---- */
+  .home-card-draghandle {
+    position: absolute; top: 8px; left: 8px; z-index: 2;
+    display: flex; align-items: center; justify-content: center;
+    width: 18px; height: 18px; padding: 0;
+    background: none; border: none; box-shadow: none;
+    color: var(--text-faint); cursor: grab; touch-action: none;
+    opacity: 0; transition: opacity 0.15s ease, color 0.12s ease;
+  }
+  .home-grid .card:hover .home-card-draghandle,
+  .home-card-draghandle:focus-visible { opacity: 1; }
+  .home-card-draghandle:hover { color: var(--accent); }
+  .home-grid .card.dragging {
+    cursor: grabbing;
+    box-shadow: var(--mac-shadow-float);
+    opacity: 0.94;
+  }
+  .home-grid .card.dragging .home-card-draghandle { opacity: 1; cursor: grabbing; }
+  /* 모바일에서는 .card의 padding-top이 18px로 줄어들어 핸들(top:10px~30px)이
+     타이틀과 겹쳐 보인다. 홈 카드만 상단 여백을 넉넉히 줘서 핸들이 제목과
+     겹치지 않고 모서리 안쪽에 깔끔하게 자리잡게 한다. */
+  @media (max-width: 720px) {
+    .home-grid .card { padding-top: 34px; }
+  }
+  .home-card-placeholder {
+    border: 1px dashed var(--hairline-strong); border-radius: var(--mac-radius-lg);
+    background: var(--accent-dim-soft);
+  }
+  body.home-card-drag-active { cursor: grabbing; }
+  body.home-card-drag-active * { user-select: none; }
+
   .home-empty {
     color: var(--text-faint); font-size: 13.5px; font-style: italic; padding: 16px 4px;
     text-align: center; background: var(--elevated); border: 1px dashed var(--hairline-strong); border-radius: 14px;
   }
+
+  /* ---- 홈 QA 평균 점수 카드 ---- */
+  .home-qa-summary { padding: 10px 2px 4px; }
+  .home-qa-score {
+    font-family: Georgia, 'Apple Myungjo', 'AppleGothic', 'Batang', 'Nanum Myeongjo', serif;
+    font-size: 38px; font-weight: 700; letter-spacing: -0.01em; color: var(--text);
+  }
+  .home-qa-score-unit { font-size: 16px; font-weight: 500; color: var(--text-faint); margin-left: 3px; }
+  .home-qa-sub { font-size: 13px; color: var(--text-faint); margin-top: 6px; }
+  /* 홈 카드 안에서는 마지막 요소라 아래쪽 구분선/여백이 필요 없다 */
+  .home-qa-trend-block { margin: 10px 2px 0; padding-bottom: 0; border-bottom: none; }
 
   .staff-group-label {
     font-size: 12.5px; color: var(--text-faint); letter-spacing: 0.04em;
@@ -131,6 +210,39 @@
   }
   .home-note-row:hover { border-color: var(--accent); }
   .home-note-row .snippet { font-size: 12.5px; color: var(--text-faint); margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* ---------- 홈 화면 진입 애니메이션 ---------- */
+  @keyframes home-card-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes home-row-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+  .card.home-hero, .home-grid .card {
+    opacity: 0; animation: home-card-in 0.5s cubic-bezier(.2,.9,.3,1) forwards;
+  }
+  .card.home-hero { animation-delay: 0s; }
+  .home-col:nth-child(1) .card:nth-child(1) { animation-delay: .07s; }
+  .home-col:nth-child(1) .card:nth-child(2) { animation-delay: .13s; }
+  .home-col:nth-child(2) .card:nth-child(1) { animation-delay: .11s; }
+  .home-col:nth-child(2) .card:nth-child(2) { animation-delay: .17s; }
+  .home-col:nth-child(3) .card:nth-child(1) { animation-delay: .15s; }
+  .home-col:nth-child(3) .card:nth-child(2) { animation-delay: .21s; }
+
+  .home-staff-row, .home-entry-row, .home-todo-row, .home-note-row {
+    opacity: 0; animation: home-row-in 0.36s ease forwards;
+    transition: border-color 0.12s ease, transform 0.12s ease;
+  }
+  .home-staff-row:hover, .home-entry-row:hover, .home-todo-row:hover { border-color: var(--hairline-strong); transform: translateX(2px); }
+  .home-staff-row:nth-child(1), .home-entry-row:nth-child(1), .home-todo-row:nth-child(1), .home-note-row:nth-child(1) { animation-delay: .22s; }
+  .home-staff-row:nth-child(2), .home-entry-row:nth-child(2), .home-todo-row:nth-child(2), .home-note-row:nth-child(2) { animation-delay: .26s; }
+  .home-staff-row:nth-child(3), .home-entry-row:nth-child(3), .home-todo-row:nth-child(3), .home-note-row:nth-child(3) { animation-delay: .30s; }
+  .home-staff-row:nth-child(4), .home-entry-row:nth-child(4), .home-todo-row:nth-child(4), .home-note-row:nth-child(4) { animation-delay: .34s; }
+  .home-staff-row:nth-child(5), .home-entry-row:nth-child(5), .home-todo-row:nth-child(5), .home-note-row:nth-child(5) { animation-delay: .38s; }
+  .home-staff-row:nth-child(6), .home-entry-row:nth-child(6), .home-todo-row:nth-child(6), .home-note-row:nth-child(6) { animation-delay: .42s; }
+  .home-staff-row:nth-child(n+7), .home-entry-row:nth-child(n+7), .home-todo-row:nth-child(n+7), .home-note-row:nth-child(n+7) { animation-delay: .46s; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .card.home-hero, .home-grid .card, .home-staff-row, .home-entry-row, .home-todo-row, .home-note-row {
+      animation: none; opacity: 1;
+    }
+  }
 
   /* ---------- 로그인 직후 뜨는 "오늘의 브리핑" 히어로 팝업 ---------- */
   .today-brief-overlay {

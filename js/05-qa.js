@@ -191,6 +191,89 @@
     return { year: y, monthIndex: m };
   }
 
+  /* ---- 홈 화면 QA 카드: "이번 달"이 아니라 "점수가 입력된 가장 최근 달" 찾기 ----
+     달이 막 바뀌면 그 달 점수는 한동안 입력이 안 되어 있는 게 정상이라, 이번 달
+     기준으로만 보면 계속 "점수 없음"으로 보인다. 이번 달부터 거꾸로 훑어서 전체
+     평균이 있는 첫 달을 찾아 그 달 기준으로 보여준다. */
+  const QA_HOME_LATEST_LOOKBACK_MONTHS = 12;
+  function qaHomeFindLatestMonthWithData(agentsList, year, monthIndex) {
+    let y = year, m = monthIndex;
+    for (let i = 0; i < QA_HOME_LATEST_LOOKBACK_MONTHS; i++) {
+      const stats = qaComputeStats(agentsList, y, m);
+      if (stats.total !== null) return { year: y, monthIndex: m, stats };
+      const prev = qaPrevMonth(y, m);
+      y = prev.year; m = prev.monthIndex;
+    }
+    return null;
+  }
+
+  /* ---- 홈 화면 QA 카드: 최근 N개월 전체 평균 추이 꺾은선 그래프 ----
+     qaTrendSvgHtml(개인별)과 같은 방식이지만, 인원 개인이 아니라 매달 전체
+     평균(qaComputeStats(...).total)을 점으로 찍는다. */
+  const QA_HOME_TREND_MONTHS = 6;
+  function qaHomeComputeTrend(agentsList, year, monthIndex, count) {
+    const months = [];
+    for (let i = count - 1; i >= 0; i--) {
+      let m = monthIndex - i;
+      let y = year;
+      while (m < 0) { m += 12; y -= 1; }
+      months.push({ year: y, monthIndex: m, score: qaComputeStats(agentsList, y, m).total });
+    }
+    return months;
+  }
+  function qaHomeTrendSvgHtml(agentsList, year, monthIndex) {
+    const months = qaHomeComputeTrend(agentsList, year, monthIndex, QA_HOME_TREND_MONTHS);
+    const validScores = months.map((mo) => mo.score).filter((s) => s !== null);
+    if (validScores.length === 0) return "";
+
+    const W = 560, H = 148, padL = 10, padR = 10, padT = 22, padB = 24;
+    const plotW = W - padL - padR, plotH = H - padT - padB;
+    const n = months.length;
+    const xAt = (i) => padL + (n === 1 ? plotW / 2 : (plotW * i) / (n - 1));
+    let min = Math.min(...validScores);
+    let max = Math.max(...validScores);
+    if (min === max) { min -= 5; max += 5; } else { const pad = (max - min) * 0.2; min -= pad; max += pad; }
+    min = Math.max(0, min);
+    max = Math.min(100, max);
+    if (max - min < 1) max = min + 1;
+    const yAt = (score) => padT + plotH - ((score - min) / (max - min)) * plotH;
+
+    const segments = [];
+    let cur = [];
+    months.forEach((mo, i) => {
+      if (mo.score === null) { if (cur.length) segments.push(cur); cur = []; }
+      else cur.push({ x: xAt(i), y: yAt(mo.score) });
+    });
+    if (cur.length) segments.push(cur);
+    const pathHtml = segments.map((seg) => {
+      const d = seg.map((p, idx) => `${idx === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
+      return `<path d="${d}" fill="none" stroke="var(--accent)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>`;
+    }).join("");
+
+    const dotHtml = months.map((mo, i) => {
+      if (mo.score === null) return "";
+      const x = xAt(i), y = yAt(mo.score);
+      return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.6" fill="var(--accent)"/><text x="${x.toFixed(1)}" y="${(y - 10).toFixed(1)}" text-anchor="middle" class="qa-trend-value">${mo.score.toFixed(1)}</text>`;
+    }).join("");
+
+    const labelHtml = months.map((mo, i) => {
+      const x = xAt(i);
+      const isCurrent = mo.year === year && mo.monthIndex === monthIndex;
+      return `<text x="${x.toFixed(1)}" y="${H - 6}" text-anchor="middle" class="qa-trend-month${isCurrent ? " current" : ""}">${mo.monthIndex + 1}월</text>`;
+    }).join("");
+
+    return `
+      <div class="qa-trend-block home-qa-trend-block">
+        <div class="qa-trend-title">최근 ${QA_HOME_TREND_MONTHS}개월 전체 평균 추이</div>
+        <svg viewBox="0 0 ${W} ${H}" class="qa-trend-svg" preserveAspectRatio="xMidYMid meet">
+          ${pathHtml}
+          ${dotHtml}
+          ${labelHtml}
+        </svg>
+      </div>
+    `;
+  }
+
   /* ===================== QA 평가 엑셀 업로드 → 점수/상세 자동 반영 ===================== */
   // 파일마다 "평균" 행, "총점" 열, "구분" 열의 실제 위치(행/열)가 달라질 수 있어서
   // 매번 셀 값을 직접 탐색해서 찾는다(고정된 셀 주소를 쓰지 않음).

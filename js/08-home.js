@@ -1,3 +1,90 @@
+  /* ===================== 홈 카드 배치(드래그로 순서 변경) =====================
+     사용자가 카드를 원하는 위치로 옮기면 그 배치를 계정별로 저장해서 다음에
+     들어와도 유지되게 한다. 계정 데이터라 클라우드 동기화 대상에도 자동으로
+     포함된다(CLOUD_EXCLUDED_KEYS에 없는 키라서). */
+  const HOME_LAYOUT_KEY = acctKey("home:card-layout");
+  const HOME_CARD_IDS = ["status", "calendar", "interviews", "todos", "notes", "qa"];
+  function defaultHomeLayout() {
+    return [["status", "qa"], ["calendar", "interviews"], ["todos", "notes"]];
+  }
+  function loadHomeLayout() {
+    try {
+      const raw = localStorage.getItem(HOME_LAYOUT_KEY);
+      if (!raw) return defaultHomeLayout();
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed) || parsed.length === 0) return defaultHomeLayout();
+      const cleaned = parsed.map((col) => (Array.isArray(col) ? col.filter((id) => HOME_CARD_IDS.includes(id)) : []));
+      const flat = cleaned.flat();
+      const missing = HOME_CARD_IDS.filter((id) => !flat.includes(id));
+      if (missing.length) cleaned[0] = (cleaned[0] || []).concat(missing); // 새로 생긴 카드 종류는 첫 칸에 추가
+      while (cleaned.length < 3) cleaned.push([]);
+      return cleaned;
+    } catch (e) { return defaultHomeLayout(); }
+  }
+  function saveHomeLayout(layout) {
+    try { localStorage.setItem(HOME_LAYOUT_KEY, JSON.stringify(layout)); } catch (e) {}
+  }
+  function bindHomeCardDrag(grid) {
+    if (!grid) return;
+    grid.querySelectorAll("[data-drag-handle]").forEach((handle) => {
+      handle.addEventListener("pointerdown", (e) => {
+        if (e.button !== undefined && e.button !== 0) return;
+        const card = handle.closest(".card[data-home-card]");
+        if (!card) return;
+        e.preventDefault();
+        const rect = card.getBoundingClientRect();
+        const offsetX = e.clientX - rect.left, offsetY = e.clientY - rect.top;
+        // 진입 애니메이션(opacity 0→1, forwards)을 끄면 카드가 애니메이션 시작 전 값인
+        // opacity:0으로 되돌아가버려서 드래그 중 안 보이게 된다. 애니메이션은 끄되
+        // opacity는 명시적으로 1로 고정해서 카드가 계속 보이게 한다.
+        card.style.animation = "none";
+        card.style.opacity = "1";
+        const placeholder = document.createElement("div");
+        placeholder.className = "home-card-placeholder";
+        placeholder.style.height = rect.height + "px";
+        card.parentNode.insertBefore(placeholder, card.nextSibling);
+        card.classList.add("dragging");
+        Object.assign(card.style, {
+          position: "fixed", width: rect.width + "px", left: rect.left + "px", top: rect.top + "px", zIndex: 500,
+        });
+        document.body.classList.add("home-card-drag-active");
+
+        function onMove(ev) {
+          card.style.left = (ev.clientX - offsetX) + "px";
+          card.style.top = (ev.clientY - offsetY) + "px";
+          card.style.pointerEvents = "none";
+          const elUnder = document.elementFromPoint(ev.clientX, ev.clientY);
+          card.style.pointerEvents = "";
+          if (!elUnder) return;
+          const overCard = elUnder.closest(".card[data-home-card]");
+          const overCol = elUnder.closest(".home-col");
+          if (overCard && overCard !== card) {
+            const rectOver = overCard.getBoundingClientRect();
+            const before = (ev.clientY - rectOver.top) < rectOver.height / 2;
+            overCard.parentNode.insertBefore(placeholder, before ? overCard : overCard.nextSibling);
+          } else if (overCol && !overCard) {
+            overCol.appendChild(placeholder);
+          }
+        }
+        function onUp() {
+          document.removeEventListener("pointermove", onMove);
+          document.removeEventListener("pointerup", onUp);
+          document.body.classList.remove("home-card-drag-active");
+          placeholder.parentNode.insertBefore(card, placeholder);
+          placeholder.remove();
+          card.classList.remove("dragging");
+          Object.assign(card.style, { position: "", width: "", left: "", top: "", zIndex: "" });
+          const newLayout = Array.from(grid.querySelectorAll(".home-col")).map((col) =>
+            Array.from(col.querySelectorAll(".card[data-home-card]")).map((c) => c.getAttribute("data-home-card"))
+          );
+          saveHomeLayout(newLayout);
+        }
+        document.addEventListener("pointermove", onMove);
+        document.addEventListener("pointerup", onUp, { once: true });
+      });
+    });
+  }
+
   function renderHomePage(root) {
     const y = today.getFullYear(), m = today.getMonth(), d = today.getDate();
     const iso = todayISO();
@@ -115,6 +202,51 @@
             ${homeUi.interviewAlertExpanded ? "접기 ▲" : `전체 ${staleInterviewAgents.length}명 보기 ▾`}
           </button>` : ""}`;
 
+    /* ---- QA(품질 관리) 전체 평균 점수 ----
+       이번 달 점수가 아직 입력 안 된 경우가 많으므로(달이 막 바뀐 시점 등),
+       이번 달부터 거꾸로 훑어서 점수가 입력된 가장 최근 달을 찾아 보여준다. */
+    const qaAgentsList = qaWorkingAgents();
+    const qaLatest = qaHomeFindLatestMonthWithData(qaAgentsList, y, m);
+    let qaSummaryHtml;
+    if (!qaLatest) {
+      qaSummaryHtml = `<div class="home-empty">최근 QA 점수가 아직 없어요.</div>`;
+    } else {
+      const qaPrevYm = qaPrevMonth(qaLatest.year, qaLatest.monthIndex);
+      const qaStatsPrev = qaComputeStats(qaAgentsList, qaPrevYm.year, qaPrevYm.monthIndex);
+      const qaHomeDiff = qaStatDiff(qaLatest.stats.total, qaStatsPrev.total);
+      const qaHomeDiffHtml = qaHomeDiff ? ` <span class="qa-stat-diff ${qaHomeDiff.cls}">${qaHomeDiff.sign} ${qaHomeDiff.abs.toFixed(1)}</span>` : "";
+      const qaIsCurrentMonth = qaLatest.year === y && qaLatest.monthIndex === m;
+      qaSummaryHtml = `<div class="home-qa-summary">
+          <div class="home-qa-score">${qaLatest.stats.total.toFixed(1)}<span class="home-qa-score-unit">점</span></div>
+          <div class="home-qa-sub">${qaIsCurrentMonth ? "" : `${qaLatest.year}년 `}${qaLatest.monthIndex + 1}월 전체 평균${qaHomeDiffHtml}</div>
+        </div>`;
+    }
+    const qaHomeTrendHtml = qaHomeTrendSvgHtml(qaAgentsList, y, m);
+    if (qaHomeTrendHtml) qaSummaryHtml += qaHomeTrendHtml;
+
+    /* ---- 카드별 제목/링크/내용 정의 → 저장된 배치 순서대로 조립 ---- */
+    const cardMeta = {
+      status: { icon: ICON_USERS, label: "오늘 근무 현황", link: { nav: "schedule", label: "스케줄 보기 ›" }, content: scheduleSectionHtml },
+      calendar: { icon: ICON_CALENDAR, label: "오늘 일정", link: { nav: "calendar", label: "캘린더 보기 ›" }, content: entriesHtml },
+      interviews: { icon: ICON_BELL, label: "면담 필요 알림", link: { nav: "interviews", label: "면담일지 보기 ›" }, content: staleInterviewHtml },
+      todos: { icon: ICON_CHECK, label: "할 일", link: null, content: todoHtml },
+      notes: { icon: ICON_PIN, label: "고정 메모", link: { nav: "notes", label: "업무 정리 보기 ›" }, content: notesHtml },
+      qa: { icon: ICON_QA, label: "QA 평균 점수", link: { nav: "qa", label: "품질 관리 보기 ›" }, content: qaSummaryHtml },
+    };
+    function cardHtml(id) {
+      const meta = cardMeta[id];
+      if (!meta) return "";
+      const linkHtml = meta.link ? `<button class="home-section-link" data-nav="${meta.link.nav}">${meta.link.label}</button>` : "";
+      return `
+        <div class="card" data-home-card="${id}">
+          <button type="button" class="home-card-draghandle" data-drag-handle title="드래그해서 순서 바꾸기" aria-label="카드 위치 이동">${ICON_DRAG_HANDLE}</button>
+          <div class="home-section-title"><h3>${meta.icon} ${meta.label}</h3>${linkHtml}</div>
+          ${meta.content}
+        </div>`;
+    }
+    const homeLayout = loadHomeLayout();
+    const homeColumnsHtml = homeLayout.map((colIds, i) => `<div class="home-col" data-home-col="${i}">${colIds.map(cardHtml).join("")}</div>`).join("");
+
     root.innerHTML = `
       <div class="card home-hero">
         <div class="home-hero-top">
@@ -133,34 +265,7 @@
         </div>
       </div>
 
-      <div class="home-grid has-status-col" style="margin-top:20px;">
-        <div class="home-col home-col-status">
-          <div class="card">
-            <div class="home-section-title"><h3>${ICON_USERS} 오늘 근무 현황</h3><button class="home-section-link" data-nav="schedule">스케줄 보기 ›</button></div>
-            ${scheduleSectionHtml}
-          </div>
-        </div>
-        <div class="home-col">
-          <div class="card">
-            <div class="home-section-title"><h3>${ICON_CALENDAR} 오늘 일정</h3><button class="home-section-link" data-nav="calendar">캘린더 보기 ›</button></div>
-            ${entriesHtml}
-          </div>
-          <div class="card">
-            <div class="home-section-title"><h3>${ICON_BELL} 면담 필요 알림</h3><button class="home-section-link" data-nav="interviews">면담일지 보기 ›</button></div>
-            ${staleInterviewHtml}
-          </div>
-        </div>
-        <div class="home-col">
-          <div class="card">
-            <div class="home-section-title"><h3>${ICON_CHECK} 할 일</h3></div>
-            ${todoHtml}
-          </div>
-          <div class="card">
-            <div class="home-section-title"><h3>${ICON_PIN} 고정 메모</h3><button class="home-section-link" data-nav="notes">업무 정리 보기 ›</button></div>
-            ${notesHtml}
-          </div>
-        </div>
-      </div>
+      <div class="home-grid" id="home-card-grid" style="margin-top:20px;">${homeColumnsHtml}</div>
     `;
 
     root.querySelectorAll("[data-nav]").forEach((btn) => {
@@ -182,6 +287,7 @@
         renderHomePage(root);
       };
     });
+    bindHomeCardDrag(document.getElementById("home-card-grid"));
   }
 
   /* ===================== 오늘의 브리핑 히어로 팝업 =====================

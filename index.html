@@ -66,6 +66,7 @@
   const ICON_SUN = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="2.7"/><path d="M8 1.8v1.5M8 12.7v1.5M14.2 8h-1.5M3.3 8H1.8M12.3 3.7l-1.1 1.1M4.8 11.2l-1.1 1.1M12.3 12.3l-1.1-1.1M4.8 4.8l-1.1-1.1"/></svg>`;
   const ICON_QA = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1.6l1.8 3.7 4 .6-2.9 2.8.7 4-3.6-1.9-3.6 1.9.7-4-2.9-2.8 4-.6z"/></svg>`;
   const ICON_PIN = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2.4 12 6l-1.9 1.9v3.5L8 13.6l-2.1-2.2V7.9L4 6z"/></svg>`;
+  const ICON_DRAG_HANDLE = `<svg class="icon-emo" viewBox="0 0 16 16" width="13" height="13" fill="currentColor"><circle cx="5.3" cy="3.6" r="1.15"/><circle cx="10.7" cy="3.6" r="1.15"/><circle cx="5.3" cy="8" r="1.15"/><circle cx="10.7" cy="8" r="1.15"/><circle cx="5.3" cy="12.4" r="1.15"/><circle cx="10.7" cy="12.4" r="1.15"/></svg>`;
 
   /* ---- 내비게이션 독 아이콘: macOS 스타일 스퀄클 플랫 아이콘 (메인 좌측 메뉴 전용) ---- */
   const NAV_ICON_HOME = `<svg class="nav-dock-icon" viewBox="0 0 512 512" aria-hidden="true"><defs><clipPath id="nih"><path d="M512 256L511 369L508 405L504 430L498 450L489 466L479 479L466 489L450 498L430 504L405 508L369 511L256 512L143 511L107 508L82 504L62 498L46 489L33 479L23 466L14 450L8 430L4 405L1 369L0 256L1 143L4 107L8 82L14 62L23 46L33 33L46 23L62 14L82 8L107 4L143 1L256 0L369 1L405 4L430 8L450 14L466 23L479 33L489 46L498 62L504 82L508 107L511 143L512 256Z"/></clipPath></defs><path d="M512 256L511 369L508 405L504 430L498 450L489 466L479 479L466 489L450 498L430 504L405 508L369 511L256 512L143 511L107 508L82 504L62 498L46 489L33 479L23 466L14 450L8 430L4 405L1 369L0 256L1 143L4 107L8 82L14 62L23 46L33 33L46 23L62 14L82 8L107 4L143 1L256 0L369 1L405 4L430 8L450 14L466 23L479 33L489 46L498 62L504 82L508 107L511 143L512 256Z" fill="#c1683f"/><g clip-path="url(#nih)"><path d="M130 260L256 160L382 260" fill="none" stroke="#fdf3e5" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"/><path d="M162 236V366H350V236" fill="#fdf3e5"/><rect x="240" y="292" width="32" height="74" fill="#c1683f"/></g></svg>`;
@@ -4598,6 +4599,89 @@
     return { year: y, monthIndex: m };
   }
 
+  /* ---- 홈 화면 QA 카드: "이번 달"이 아니라 "점수가 입력된 가장 최근 달" 찾기 ----
+     달이 막 바뀌면 그 달 점수는 한동안 입력이 안 되어 있는 게 정상이라, 이번 달
+     기준으로만 보면 계속 "점수 없음"으로 보인다. 이번 달부터 거꾸로 훑어서 전체
+     평균이 있는 첫 달을 찾아 그 달 기준으로 보여준다. */
+  const QA_HOME_LATEST_LOOKBACK_MONTHS = 12;
+  function qaHomeFindLatestMonthWithData(agentsList, year, monthIndex) {
+    let y = year, m = monthIndex;
+    for (let i = 0; i < QA_HOME_LATEST_LOOKBACK_MONTHS; i++) {
+      const stats = qaComputeStats(agentsList, y, m);
+      if (stats.total !== null) return { year: y, monthIndex: m, stats };
+      const prev = qaPrevMonth(y, m);
+      y = prev.year; m = prev.monthIndex;
+    }
+    return null;
+  }
+
+  /* ---- 홈 화면 QA 카드: 최근 N개월 전체 평균 추이 꺾은선 그래프 ----
+     qaTrendSvgHtml(개인별)과 같은 방식이지만, 인원 개인이 아니라 매달 전체
+     평균(qaComputeStats(...).total)을 점으로 찍는다. */
+  const QA_HOME_TREND_MONTHS = 6;
+  function qaHomeComputeTrend(agentsList, year, monthIndex, count) {
+    const months = [];
+    for (let i = count - 1; i >= 0; i--) {
+      let m = monthIndex - i;
+      let y = year;
+      while (m < 0) { m += 12; y -= 1; }
+      months.push({ year: y, monthIndex: m, score: qaComputeStats(agentsList, y, m).total });
+    }
+    return months;
+  }
+  function qaHomeTrendSvgHtml(agentsList, year, monthIndex) {
+    const months = qaHomeComputeTrend(agentsList, year, monthIndex, QA_HOME_TREND_MONTHS);
+    const validScores = months.map((mo) => mo.score).filter((s) => s !== null);
+    if (validScores.length === 0) return "";
+
+    const W = 560, H = 148, padL = 10, padR = 10, padT = 22, padB = 24;
+    const plotW = W - padL - padR, plotH = H - padT - padB;
+    const n = months.length;
+    const xAt = (i) => padL + (n === 1 ? plotW / 2 : (plotW * i) / (n - 1));
+    let min = Math.min(...validScores);
+    let max = Math.max(...validScores);
+    if (min === max) { min -= 5; max += 5; } else { const pad = (max - min) * 0.2; min -= pad; max += pad; }
+    min = Math.max(0, min);
+    max = Math.min(100, max);
+    if (max - min < 1) max = min + 1;
+    const yAt = (score) => padT + plotH - ((score - min) / (max - min)) * plotH;
+
+    const segments = [];
+    let cur = [];
+    months.forEach((mo, i) => {
+      if (mo.score === null) { if (cur.length) segments.push(cur); cur = []; }
+      else cur.push({ x: xAt(i), y: yAt(mo.score) });
+    });
+    if (cur.length) segments.push(cur);
+    const pathHtml = segments.map((seg) => {
+      const d = seg.map((p, idx) => `${idx === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
+      return `<path d="${d}" fill="none" stroke="var(--accent)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>`;
+    }).join("");
+
+    const dotHtml = months.map((mo, i) => {
+      if (mo.score === null) return "";
+      const x = xAt(i), y = yAt(mo.score);
+      return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.6" fill="var(--accent)"/><text x="${x.toFixed(1)}" y="${(y - 10).toFixed(1)}" text-anchor="middle" class="qa-trend-value">${mo.score.toFixed(1)}</text>`;
+    }).join("");
+
+    const labelHtml = months.map((mo, i) => {
+      const x = xAt(i);
+      const isCurrent = mo.year === year && mo.monthIndex === monthIndex;
+      return `<text x="${x.toFixed(1)}" y="${H - 6}" text-anchor="middle" class="qa-trend-month${isCurrent ? " current" : ""}">${mo.monthIndex + 1}월</text>`;
+    }).join("");
+
+    return `
+      <div class="qa-trend-block home-qa-trend-block">
+        <div class="qa-trend-title">최근 ${QA_HOME_TREND_MONTHS}개월 전체 평균 추이</div>
+        <svg viewBox="0 0 ${W} ${H}" class="qa-trend-svg" preserveAspectRatio="xMidYMid meet">
+          ${pathHtml}
+          ${dotHtml}
+          ${labelHtml}
+        </svg>
+      </div>
+    `;
+  }
+
   /* ===================== QA 평가 엑셀 업로드 → 점수/상세 자동 반영 ===================== */
   // 파일마다 "평균" 행, "총점" 열, "구분" 열의 실제 위치(행/열)가 달라질 수 있어서
   // 매번 셀 값을 직접 탐색해서 찾는다(고정된 셀 주소를 쓰지 않음).
@@ -8909,6 +8993,93 @@
     }
   }
 
+  /* ===================== 홈 카드 배치(드래그로 순서 변경) =====================
+     사용자가 카드를 원하는 위치로 옮기면 그 배치를 계정별로 저장해서 다음에
+     들어와도 유지되게 한다. 계정 데이터라 클라우드 동기화 대상에도 자동으로
+     포함된다(CLOUD_EXCLUDED_KEYS에 없는 키라서). */
+  const HOME_LAYOUT_KEY = acctKey("home:card-layout");
+  const HOME_CARD_IDS = ["status", "calendar", "interviews", "todos", "notes", "qa"];
+  function defaultHomeLayout() {
+    return [["status", "qa"], ["calendar", "interviews"], ["todos", "notes"]];
+  }
+  function loadHomeLayout() {
+    try {
+      const raw = localStorage.getItem(HOME_LAYOUT_KEY);
+      if (!raw) return defaultHomeLayout();
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed) || parsed.length === 0) return defaultHomeLayout();
+      const cleaned = parsed.map((col) => (Array.isArray(col) ? col.filter((id) => HOME_CARD_IDS.includes(id)) : []));
+      const flat = cleaned.flat();
+      const missing = HOME_CARD_IDS.filter((id) => !flat.includes(id));
+      if (missing.length) cleaned[0] = (cleaned[0] || []).concat(missing); // 새로 생긴 카드 종류는 첫 칸에 추가
+      while (cleaned.length < 3) cleaned.push([]);
+      return cleaned;
+    } catch (e) { return defaultHomeLayout(); }
+  }
+  function saveHomeLayout(layout) {
+    try { localStorage.setItem(HOME_LAYOUT_KEY, JSON.stringify(layout)); } catch (e) {}
+  }
+  function bindHomeCardDrag(grid) {
+    if (!grid) return;
+    grid.querySelectorAll("[data-drag-handle]").forEach((handle) => {
+      handle.addEventListener("pointerdown", (e) => {
+        if (e.button !== undefined && e.button !== 0) return;
+        const card = handle.closest(".card[data-home-card]");
+        if (!card) return;
+        e.preventDefault();
+        const rect = card.getBoundingClientRect();
+        const offsetX = e.clientX - rect.left, offsetY = e.clientY - rect.top;
+        // 진입 애니메이션(opacity 0→1, forwards)을 끄면 카드가 애니메이션 시작 전 값인
+        // opacity:0으로 되돌아가버려서 드래그 중 안 보이게 된다. 애니메이션은 끄되
+        // opacity는 명시적으로 1로 고정해서 카드가 계속 보이게 한다.
+        card.style.animation = "none";
+        card.style.opacity = "1";
+        const placeholder = document.createElement("div");
+        placeholder.className = "home-card-placeholder";
+        placeholder.style.height = rect.height + "px";
+        card.parentNode.insertBefore(placeholder, card.nextSibling);
+        card.classList.add("dragging");
+        Object.assign(card.style, {
+          position: "fixed", width: rect.width + "px", left: rect.left + "px", top: rect.top + "px", zIndex: 500,
+        });
+        document.body.classList.add("home-card-drag-active");
+
+        function onMove(ev) {
+          card.style.left = (ev.clientX - offsetX) + "px";
+          card.style.top = (ev.clientY - offsetY) + "px";
+          card.style.pointerEvents = "none";
+          const elUnder = document.elementFromPoint(ev.clientX, ev.clientY);
+          card.style.pointerEvents = "";
+          if (!elUnder) return;
+          const overCard = elUnder.closest(".card[data-home-card]");
+          const overCol = elUnder.closest(".home-col");
+          if (overCard && overCard !== card) {
+            const rectOver = overCard.getBoundingClientRect();
+            const before = (ev.clientY - rectOver.top) < rectOver.height / 2;
+            overCard.parentNode.insertBefore(placeholder, before ? overCard : overCard.nextSibling);
+          } else if (overCol && !overCard) {
+            overCol.appendChild(placeholder);
+          }
+        }
+        function onUp() {
+          document.removeEventListener("pointermove", onMove);
+          document.removeEventListener("pointerup", onUp);
+          document.body.classList.remove("home-card-drag-active");
+          placeholder.parentNode.insertBefore(card, placeholder);
+          placeholder.remove();
+          card.classList.remove("dragging");
+          Object.assign(card.style, { position: "", width: "", left: "", top: "", zIndex: "" });
+          const newLayout = Array.from(grid.querySelectorAll(".home-col")).map((col) =>
+            Array.from(col.querySelectorAll(".card[data-home-card]")).map((c) => c.getAttribute("data-home-card"))
+          );
+          saveHomeLayout(newLayout);
+        }
+        document.addEventListener("pointermove", onMove);
+        document.addEventListener("pointerup", onUp, { once: true });
+      });
+    });
+  }
+
   function renderHomePage(root) {
     const y = today.getFullYear(), m = today.getMonth(), d = today.getDate();
     const iso = todayISO();
@@ -9026,6 +9197,51 @@
             ${homeUi.interviewAlertExpanded ? "접기 ▲" : `전체 ${staleInterviewAgents.length}명 보기 ▾`}
           </button>` : ""}`;
 
+    /* ---- QA(품질 관리) 전체 평균 점수 ----
+       이번 달 점수가 아직 입력 안 된 경우가 많으므로(달이 막 바뀐 시점 등),
+       이번 달부터 거꾸로 훑어서 점수가 입력된 가장 최근 달을 찾아 보여준다. */
+    const qaAgentsList = qaWorkingAgents();
+    const qaLatest = qaHomeFindLatestMonthWithData(qaAgentsList, y, m);
+    let qaSummaryHtml;
+    if (!qaLatest) {
+      qaSummaryHtml = `<div class="home-empty">최근 QA 점수가 아직 없어요.</div>`;
+    } else {
+      const qaPrevYm = qaPrevMonth(qaLatest.year, qaLatest.monthIndex);
+      const qaStatsPrev = qaComputeStats(qaAgentsList, qaPrevYm.year, qaPrevYm.monthIndex);
+      const qaHomeDiff = qaStatDiff(qaLatest.stats.total, qaStatsPrev.total);
+      const qaHomeDiffHtml = qaHomeDiff ? ` <span class="qa-stat-diff ${qaHomeDiff.cls}">${qaHomeDiff.sign} ${qaHomeDiff.abs.toFixed(1)}</span>` : "";
+      const qaIsCurrentMonth = qaLatest.year === y && qaLatest.monthIndex === m;
+      qaSummaryHtml = `<div class="home-qa-summary">
+          <div class="home-qa-score">${qaLatest.stats.total.toFixed(1)}<span class="home-qa-score-unit">점</span></div>
+          <div class="home-qa-sub">${qaIsCurrentMonth ? "" : `${qaLatest.year}년 `}${qaLatest.monthIndex + 1}월 전체 평균${qaHomeDiffHtml}</div>
+        </div>`;
+    }
+    const qaHomeTrendHtml = qaHomeTrendSvgHtml(qaAgentsList, y, m);
+    if (qaHomeTrendHtml) qaSummaryHtml += qaHomeTrendHtml;
+
+    /* ---- 카드별 제목/링크/내용 정의 → 저장된 배치 순서대로 조립 ---- */
+    const cardMeta = {
+      status: { icon: ICON_USERS, label: "오늘 근무 현황", link: { nav: "schedule", label: "스케줄 보기 ›" }, content: scheduleSectionHtml },
+      calendar: { icon: ICON_CALENDAR, label: "오늘 일정", link: { nav: "calendar", label: "캘린더 보기 ›" }, content: entriesHtml },
+      interviews: { icon: ICON_BELL, label: "면담 필요 알림", link: { nav: "interviews", label: "면담일지 보기 ›" }, content: staleInterviewHtml },
+      todos: { icon: ICON_CHECK, label: "할 일", link: null, content: todoHtml },
+      notes: { icon: ICON_PIN, label: "고정 메모", link: { nav: "notes", label: "업무 정리 보기 ›" }, content: notesHtml },
+      qa: { icon: ICON_QA, label: "QA 평균 점수", link: { nav: "qa", label: "품질 관리 보기 ›" }, content: qaSummaryHtml },
+    };
+    function cardHtml(id) {
+      const meta = cardMeta[id];
+      if (!meta) return "";
+      const linkHtml = meta.link ? `<button class="home-section-link" data-nav="${meta.link.nav}">${meta.link.label}</button>` : "";
+      return `
+        <div class="card" data-home-card="${id}">
+          <button type="button" class="home-card-draghandle" data-drag-handle title="드래그해서 순서 바꾸기" aria-label="카드 위치 이동">${ICON_DRAG_HANDLE}</button>
+          <div class="home-section-title"><h3>${meta.icon} ${meta.label}</h3>${linkHtml}</div>
+          ${meta.content}
+        </div>`;
+    }
+    const homeLayout = loadHomeLayout();
+    const homeColumnsHtml = homeLayout.map((colIds, i) => `<div class="home-col" data-home-col="${i}">${colIds.map(cardHtml).join("")}</div>`).join("");
+
     root.innerHTML = `
       <div class="card home-hero">
         <div class="home-hero-top">
@@ -9044,34 +9260,7 @@
         </div>
       </div>
 
-      <div class="home-grid has-status-col" style="margin-top:20px;">
-        <div class="home-col home-col-status">
-          <div class="card">
-            <div class="home-section-title"><h3>${ICON_USERS} 오늘 근무 현황</h3><button class="home-section-link" data-nav="schedule">스케줄 보기 ›</button></div>
-            ${scheduleSectionHtml}
-          </div>
-        </div>
-        <div class="home-col">
-          <div class="card">
-            <div class="home-section-title"><h3>${ICON_CALENDAR} 오늘 일정</h3><button class="home-section-link" data-nav="calendar">캘린더 보기 ›</button></div>
-            ${entriesHtml}
-          </div>
-          <div class="card">
-            <div class="home-section-title"><h3>${ICON_BELL} 면담 필요 알림</h3><button class="home-section-link" data-nav="interviews">면담일지 보기 ›</button></div>
-            ${staleInterviewHtml}
-          </div>
-        </div>
-        <div class="home-col">
-          <div class="card">
-            <div class="home-section-title"><h3>${ICON_CHECK} 할 일</h3></div>
-            ${todoHtml}
-          </div>
-          <div class="card">
-            <div class="home-section-title"><h3>${ICON_PIN} 고정 메모</h3><button class="home-section-link" data-nav="notes">업무 정리 보기 ›</button></div>
-            ${notesHtml}
-          </div>
-        </div>
-      </div>
+      <div class="home-grid" id="home-card-grid" style="margin-top:20px;">${homeColumnsHtml}</div>
     `;
 
     root.querySelectorAll("[data-nav]").forEach((btn) => {
@@ -9093,6 +9282,7 @@
         renderHomePage(root);
       };
     });
+    bindHomeCardDrag(document.getElementById("home-card-grid"));
   }
 
   /* ===================== 오늘의 브리핑 히어로 팝업 =====================
