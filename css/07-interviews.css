@@ -30,9 +30,9 @@
   .interview-agent-timezone { display: inline-flex; align-items: center; gap: 3px; font-size: 13px; color: var(--text-faint); }
   .interview-row-actions { margin-left: auto; display: flex; gap: 6px; flex-shrink: 0; }
   .interview-row-body { display: flex; flex-direction: column; gap: 6px; padding: 6px 4px 4px 24px; }
-  .interview-content { font-size: 14px; color: var(--text); white-space: pre-wrap; }
-  .interview-followup { font-size: 13px; color: var(--text-dim); }
-  .interview-textarea { width: 100%; min-height: 70px; resize: vertical; padding: 9px 12px; }
+  .interview-content { font-size: 14px; color: var(--text); white-space: pre-wrap; line-height: 1.75; }
+  .interview-followup { font-size: 13px; color: var(--text-dim); line-height: 1.75; }
+  .interview-textarea { width: 100%; min-height: 70px; resize: vertical; padding: 9px 12px; line-height: 1.6; }
   .interview-textarea-content { min-height: 160px; }
   .agent-form-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 13px; }
   @media (max-width: 620px) { .agent-form-row-2 { grid-template-columns: 1fr; } }
