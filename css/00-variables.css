@@ -112,6 +112,11 @@
     font-weight: 300;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
+    /* 브라우저 기본값은 한글 음절 사이 아무 데서나 줄바꿈해서(예: "올려주세요"가
+       "올" / "려주세요"로 쪼개짐) 어색하게 보인다. 단어(띄어쓰기) 단위로만
+       줄바꿈되도록 사이트 전체에 적용한다. */
+    word-break: keep-all;
+    overflow-wrap: break-word;
   }
   body { display: block; }
   button, input, textarea { font-family: inherit; }

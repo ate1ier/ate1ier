@@ -311,7 +311,7 @@
     font-size: 11.5px; padding: 1px 2px; text-decoration: underline;
   }
   .repeat-clear-btn:hover { color: var(--red); }
-  .entry .text { font-size: 16px; line-height: 1.45; word-break: break-word; }
+  .entry .text { font-size: 16px; line-height: 1.45; word-break: keep-all; overflow-wrap: break-word; }
   .entry.done .text { text-decoration: line-through; color: var(--text-faint); }
   .entry-title-btn, .todo-title-btn {
     display: flex; align-items: center; gap: 6px; width: 100%; text-align: left;
@@ -326,7 +326,7 @@
   .entry-detail-card, .todo-detail-card {
     margin-top: 8px; background: var(--bg); border: 1px solid var(--hairline);
     border-radius: 10px; padding: 10px 12px; font-size: 13.5px; line-height: 1.6;
-    color: var(--text-dim); white-space: pre-wrap; word-break: break-word;
+    color: var(--text-dim); white-space: pre-wrap; word-break: keep-all; overflow-wrap: break-word;
     animation: detail-card-in 0.18s ease;
   }
   @keyframes detail-card-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
@@ -507,7 +507,7 @@
     background: var(--red-dim);
   }
   .todo-item .todo-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
-  .todo-text { font-size: 14.5px; line-height: 1.4; word-break: break-word; }
+  .todo-text { font-size: 14.5px; line-height: 1.4; word-break: keep-all; overflow-wrap: break-word; }
   .todo-item.done .todo-text { text-decoration: line-through; color: var(--text-faint); }
   .todo-item.done .check-btn { background: var(--accent); border-color: var(--accent); }
   .todo-item:not(.done) .check-btn:hover { border-color: var(--accent); }

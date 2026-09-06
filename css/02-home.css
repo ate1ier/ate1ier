@@ -112,7 +112,7 @@
   }
   .home-entry-row.event { border-left-color: var(--green); }
   .home-entry-row .time { font-size: 12px; color: var(--text-dim); flex-shrink: 0; }
-  .home-entry-row .text { font-size: 14.5px; flex: 1; min-width: 0; word-break: break-word; }
+  .home-entry-row .text { font-size: 14.5px; flex: 1; min-width: 0; word-break: keep-all; overflow-wrap: break-word; }
   .home-entry-row .star { color: var(--red); flex-shrink: 0; }
 
   .home-todo-list { display: flex; flex-direction: column; gap: 6px; }
