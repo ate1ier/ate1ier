@@ -8,6 +8,51 @@
   let qaData = loadQAData();
   // 월별 스케줄과 동일한 방식의 "월별 잠금". 잠긴 달은 점수 입력이 막힌다.
   if (!qaData.monthLocks || typeof qaData.monthLocks !== "object") qaData.monthLocks = {};
+  // 엑셀 업로드로 뽑아낸 상세 QA 내역(회차별 감점/코멘트 원문 + AI 요약 캐시).
+  // qaData(=계정별 클라우드 동기화 대상) 안에 같이 저장한다.
+  if (!qaData.details || typeof qaData.details !== "object") qaData.details = {};
+
+  // ----- 업로드한 엑셀 원문의 자동 만료 -----
+  // 업로드일로부터 2개월이 지나면 회차별 원문(감점 항목/코멘트)은 자동으로 지운다.
+  // 단, 그 전에 만들어둔 AI 요약(aiSummary)은 원문이 사라져도 그대로 남는다("박제").
+  const QA_DETAIL_EXPIRY_MONTHS = 2;
+  function qaDetailExpiryDate(detail) {
+    if (!detail || !detail.uploadedAt) return null;
+    const d = new Date(detail.uploadedAt);
+    if (isNaN(d.getTime())) return null;
+    d.setMonth(d.getMonth() + QA_DETAIL_EXPIRY_MONTHS);
+    return d;
+  }
+  function qaIsDetailExpired(detail) {
+    const exp = qaDetailExpiryDate(detail);
+    return !!exp && new Date() >= exp;
+  }
+  function qaPurgeExpiredDetails() {
+    let changed = false;
+    Object.keys(qaData.details).forEach((key) => {
+      const detail = qaData.details[key];
+      if (!detail || detail.purged) return;
+      if (!qaIsDetailExpired(detail)) return;
+      (detail.rounds || []).forEach((round) => { round.items = []; });
+      detail.fileName = "";
+      detail.purged = true;
+      changed = true;
+    });
+    if (changed) saveQAData();
+  }
+  qaPurgeExpiredDetails();
+
+  // ----- AI 요약은 Supabase Edge Function(qa-groq-summary)이 대신 처리한다. -----
+  // Groq API 키는 그 서버 함수의 환경변수에만 있고, 이 저장소(공개 저장소 포함)나
+  // 브라우저 어디에도 등장하지 않는다. 이 파일은 그 함수를 호출하기만 한다.
+  const QA_AI_SUMMARY_FN = "qa-groq-summary";
+
+  function qaDetailKey(agentId, year, monthIndex) { return `${agentId}|${qaMonthKey(year, monthIndex)}`; }
+  function getQADetail(agentId, year, monthIndex) { return qaData.details[qaDetailKey(agentId, year, monthIndex)] || null; }
+  function setQADetail(agentId, year, monthIndex, detailObj) {
+    qaData.details[qaDetailKey(agentId, year, monthIndex)] = detailObj;
+    saveQAData();
+  }
 
   let qaStatusTimer = null;
   function flashQAStatus(msg) {
@@ -131,6 +176,332 @@
     return { year: y, monthIndex: m };
   }
 
+  /* ===================== QA 평가 엑셀 업로드 → 점수/상세 자동 반영 ===================== */
+  // 파일마다 "평균" 행, "총점" 열, "구분" 열의 실제 위치(행/열)가 달라질 수 있어서
+  // 매번 셀 값을 직접 탐색해서 찾는다(고정된 셀 주소를 쓰지 않음).
+
+  function qaColLetterToNum(letters) {
+    let n = 0;
+    for (let i = 0; i < letters.length; i++) n = n * 26 + (letters.charCodeAt(i) - 64);
+    return n;
+  }
+  // 병합 셀·수식 셀 어디서든 "실제로 화면에 보이는 값"을 안전하게 꺼낸다.
+  function qaCellRawValue(ws, row, col) {
+    const cell = ws.getRow(row).getCell(col);
+    let val = cell.value;
+    if (cell.isMerged && cell.master && cell.master !== cell) val = cell.master.value;
+    if (val && typeof val === "object") {
+      if (val instanceof Date) return val;
+      if (Object.prototype.hasOwnProperty.call(val, "result")) val = val.result;
+      else if (Array.isArray(val.richText)) val = val.richText.map((t) => t.text).join("");
+      else if (Object.prototype.hasOwnProperty.call(val, "text")) val = val.text;
+      else if (Object.prototype.hasOwnProperty.call(val, "error")) val = null;
+    }
+    return val;
+  }
+  function qaCellText(ws, row, col) {
+    const v = qaCellRawValue(ws, row, col);
+    if (v === null || v === undefined) return "";
+    if (v instanceof Date) return "";
+    return String(v).trim();
+  }
+  // 시트 전체(또는 위쪽 몇 줄)에서 특정 텍스트와 정확히 일치하는 칸을 찾는다.
+  function qaFindCell(ws, targetText, opts) {
+    opts = opts || {};
+    const maxRow = opts.maxRow || ws.rowCount;
+    const maxCol = opts.maxCol || ws.columnCount;
+    for (let r = 1; r <= maxRow; r++) {
+      for (let c = 1; c <= maxCol; c++) {
+        if (qaCellText(ws, r, c) === targetText) return { row: r, col: c };
+      }
+    }
+    return null;
+  }
+  // 위와 같지만 "포함" 여부로 찾는다(칸 이름이 "상담ID", "상담 ID" 등으로 조금씩 달라도 잡히게).
+  function qaFindCellContains(ws, targetText, opts) {
+    opts = opts || {};
+    const maxRow = opts.maxRow || ws.rowCount;
+    const maxCol = opts.maxCol || ws.columnCount;
+    for (let r = 1; r <= maxRow; r++) {
+      for (let c = 1; c <= maxCol; c++) {
+        const t = qaCellText(ws, r, c).replace(/\s+/g, "");
+        if (t && t.indexOf(targetText) !== -1) return { row: r, col: c };
+      }
+    }
+    return null;
+  }
+
+  // 시트 하나를 분석해서 { totalScore, rounds } 형태로 돌려준다.
+  // rounds: 구분 열의 "1차/2차/…" 라벨이 여러 행에 걸쳐 병합된 블록마다,
+  // 그 블록 안에서 2칸 이상 가로로 병합된(=서술형 코멘트) 칸의 내용을 모은 것.
+  function qaParseWorksheet(ws) {
+    const avgCell = qaFindCell(ws, "평균");
+    const totalCell = qaFindCell(ws, "총점", { maxRow: 12 });
+    if (!avgCell || !totalCell) throw new Error("'평균' 행 또는 '총점' 열을 찾지 못했어요.");
+    const rawScore = qaCellRawValue(ws, avgCell.row, totalCell.col);
+    const score = Number(rawScore);
+    if (rawScore === null || rawScore === undefined || isNaN(score)) throw new Error("평균×총점 칸의 값이 숫자가 아니에요.");
+
+    const merges = (ws.model && ws.model.merges ? ws.model.merges : [])
+      .map((rangeStr) => {
+        const m = /^([A-Z]+)(\d+):([A-Z]+)(\d+)$/.exec(rangeStr);
+        if (!m) return null;
+        return { c1: qaColLetterToNum(m[1]), r1: parseInt(m[2], 10), c2: qaColLetterToNum(m[3]), r2: parseInt(m[4], 10) };
+      })
+      .filter(Boolean);
+
+    const gubunCell = qaFindCell(ws, "구분");
+    const gubunCol = gubunCell ? gubunCell.col : 2;
+
+    const roundBlocks = merges
+      .filter((mg) => mg.c1 === gubunCol && mg.c2 === gubunCol && mg.r2 > mg.r1)
+      .map((mg) => ({ label: qaCellText(ws, mg.r1, mg.c1).replace(/\s+/g, ""), startRow: mg.r1, endRow: mg.r2 }))
+      .filter((b) => /^\d+차$/.test(b.label))
+      .sort((a, b) => a.startRow - b.startRow);
+
+    const roundSummaryRows = [];
+    for (let r = 1; r <= ws.rowCount; r++) {
+      const label = qaCellText(ws, r, gubunCol).replace(/\s+/g, "");
+      if (!/^\d+차$/.test(label)) continue;
+      if (roundBlocks.some((b) => r >= b.startRow && r <= b.endRow)) continue;
+      roundSummaryRows.push({ label, row: r });
+    }
+    const dateCell = qaFindCell(ws, "상담일", { maxRow: 12 });
+    const idCell = qaFindCell(ws, "상담ID", { maxRow: 12 }) || qaFindCellContains(ws, "상담ID", { maxRow: 12 });
+    // 서술형 피드백 칸은 항상 "총점" 열에서 끝나는 가로 병합(예: S19:X19)으로 되어 있다.
+    // (카테고리 라벨처럼 폭이 좁은 다른 가로 병합과 구분하기 위한 기준)
+    const feedbackMerges = merges.filter((mg) => mg.c2 > mg.c1 && mg.r1 === mg.r2 && mg.c2 === totalCell.col);
+    const guidelineRe = /^\[-?\d+\]\s*/;
+
+    const rounds = roundBlocks.map((block) => {
+      const summary = roundSummaryRows.find((s) => s.label === block.label);
+      let dateVal = summary && dateCell ? qaCellRawValue(ws, summary.row, dateCell.col) : null;
+      if (dateVal instanceof Date) dateVal = `${dateVal.getFullYear()}-${pad2(dateVal.getMonth() + 1)}-${pad2(dateVal.getDate())}`;
+      else dateVal = dateVal ? String(dateVal).trim() : "";
+      let idVal = summary && idCell ? qaCellRawValue(ws, summary.row, idCell.col) : null;
+      idVal = (idVal === null || idVal === undefined) ? "" : String(idVal).trim();
+      const roundScoreRaw = summary ? qaCellRawValue(ws, summary.row, totalCell.col) : null;
+      const roundScoreNum = Number(roundScoreRaw);
+      const roundScore = (roundScoreRaw === null || roundScoreRaw === undefined || isNaN(roundScoreNum)) ? null : roundScoreNum;
+
+      const items = [];
+      for (let r = block.startRow; r <= block.endRow; r++) {
+        const fbMerge = feedbackMerges.find((mg) => mg.r1 === r);
+        const feedbackText = fbMerge ? qaCellText(ws, fbMerge.r1, fbMerge.c1) : "";
+        if (!feedbackText) continue; // 코멘트가 없는(만점) 항목은 요약 대상에서 제외
+        let guideline = "";
+        const rowWidth = Math.min(ws.columnCount, 40);
+        for (let c = 1; c <= rowWidth; c++) {
+          const t = qaCellText(ws, r, c);
+          if (t && guidelineRe.test(t)) { guideline = t.replace(guidelineRe, "").trim(); break; }
+        }
+        items.push({ guideline, feedback: feedbackText });
+      }
+      // itemCount는 원문이 나중에 만료되어 items가 비워져도 "원래 감점 항목이 있었는지"를
+      // 계속 구분할 수 있도록 별도로 남겨둔다.
+      return { label: block.label, date: dateVal, consultId: idVal, score: roundScore, items, itemCount: items.length };
+    });
+
+    return { totalScore: score, rounds };
+  }
+
+  // 여러 개의 xlsx 파일(상담사 1명당 1개, 또는 여러 상담사가 시트로 나뉜 파일 모두 지원)을
+  // 한 번에 받아서, 시트 이름(없으면 파일명)을 상담사 이름과 맞춰 자동으로 반영한다.
+  async function qaHandleExcelFiles(fileList) {
+    const files = Array.from(fileList || []);
+    if (!files.length) return;
+    const { year, monthIndex } = qaUi;
+    if (qaIsMonthLocked(year, monthIndex)) { flashQAStatus("잠긴 달이에요. 잠금을 해제한 뒤 업로드해주세요."); return; }
+    if (typeof ExcelJS === "undefined") { flashQAStatus("엑셀 처리 기능을 불러오지 못했어요 (인터넷 연결 확인)"); return; }
+
+    const allAgents = agentsData.filter((a) => !a.isAdmin);
+    const normName = (s) => String(s || "").trim().replace(/\s+/g, "");
+    const matchAgentByName = (name) => {
+      const target = normName(name);
+      if (!target) return null;
+      return allAgents.find((a) => normName(a.name) === target) || null;
+    };
+
+    let okCount = 0;
+    const failList = [];
+    flashQAStatus("엑셀을 분석하고 있어요...");
+
+    for (const file of files) {
+      let wb;
+      try {
+        const buf = await file.arrayBuffer();
+        wb = new ExcelJS.Workbook();
+        await wb.xlsx.load(buf);
+      } catch (readErr) {
+        console.error(readErr);
+        failList.push(`${file.name}: 파일을 읽지 못했어요 (.xlsx 파일이 맞는지 확인해주세요)`);
+        continue;
+      }
+      const sheets = wb.worksheets || [];
+      if (!sheets.length) { failList.push(`${file.name}: 시트를 찾지 못했어요.`); continue; }
+      let matchedAny = false;
+      for (const ws of sheets) {
+        let agent = matchAgentByName(ws.name);
+        if (!agent && sheets.length === 1) agent = matchAgentByName(file.name.replace(/\.xlsx$/i, ""));
+        if (!agent) continue;
+        matchedAny = true;
+        try {
+          const parsed = qaParseWorksheet(ws);
+          setQAScore(agent.id, year, monthIndex, String(parsed.totalScore));
+          setQADetail(agent.id, year, monthIndex, {
+            fileName: file.name,
+            sheetName: ws.name,
+            uploadedAt: new Date().toISOString(),
+            rounds: parsed.rounds,
+          });
+          okCount++;
+        } catch (parseErr) {
+          failList.push(`${ws.name || file.name}: ${parseErr.message}`);
+        }
+      }
+      if (!matchedAny) failList.push(`${file.name}: 이름이 일치하는 상담사를 찾지 못했어요 (시트명 또는 파일명을 상담사 이름과 맞춰주세요)`);
+    }
+
+    renderApp();
+    if (failList.length) {
+      flashQAStatus(`${okCount}명 반영됨 · ${failList.length}건 실패`);
+      alert(`엑셀 업로드 결과\n\n반영됨: ${okCount}건\n실패: ${failList.length}건\n\n${failList.join("\n")}`);
+    } else {
+      flashQAStatus(`${okCount}명 반영됨`);
+    }
+  }
+
+  /* ===================== 상담사 이름 클릭 → QA 상세 카드 팝업 (Groq AI 요약) ===================== */
+  function qaFormatSummaryHtml(text) {
+    return esc(text || "").replace(/\n/g, "<br>");
+  }
+
+  async function qaRunGroqSummary(agentId, year, monthIndex, roundIdx, btnEl) {
+    const detail = getQADetail(agentId, year, monthIndex);
+    if (!detail || !detail.rounds || !detail.rounds[roundIdx]) return;
+    const round = detail.rounds[roundIdx];
+    if (!round.items || !round.items.length) { flashQAStatus("원문이 만료되어 요약할 내용이 없어요."); return; }
+    if (!cloud) { flashQAStatus("AI 요약 서버에 연결할 수 없어요 (네트워크 확인)."); return; }
+    const box = document.getElementById(`qa-round-summary-${roundIdx}`);
+    const originalBtnText = btnEl.textContent;
+    btnEl.disabled = true;
+    btnEl.textContent = "요약 중...";
+    if (box) box.innerHTML = `<span class="qa-round-hint">AI에게 요약을 요청하고 있어요...</span>`;
+    try {
+      const itemsText = round.items.map((it, i) => `${i + 1}. ${it.guideline ? `[${it.guideline}] ` : ""}${it.feedback}`).join("\n\n");
+      const prompt = `다음은 콜센터 상담사 QA(품질 관리) 평가에서 감점되었거나 코멘트가 남은 항목들의 원문입니다.\n\n${itemsText}\n\n위 내용을 한국어로, 아래와 같이 정확히 두 개 섹션으로만 정리해주세요. 불필요한 서론·결론 문장은 쓰지 마세요.\n\n[차감된 요소]\n- (항목별로 무엇 때문에 감점되었는지 한 줄씩, 최대한 간결하게)\n\n[피드백이 필요한 내용]\n- (다음 상담에서 개선하면 좋을 점을 실행 가능한 조언 형태로, 한 줄씩 간결하게)`;
+      // 실제 Groq API 키는 이 브라우저가 아니라 Supabase Edge Function(qa-groq-summary)
+      // 서버 쪽 환경변수에만 있다. 여기서는 그 함수를 호출하기만 한다.
+      const { data, error } = await cloud.functions.invoke(QA_AI_SUMMARY_FN, { body: { prompt } });
+      if (error) {
+        let msg = error.message || "요청 실패";
+        try {
+          const ctx = error.context && typeof error.context.json === "function" ? await error.context.json() : null;
+          if (ctx && ctx.error) msg = ctx.error;
+        } catch (_e) {}
+        throw new Error(msg);
+      }
+      const text = (data && data.text) ? String(data.text).trim() : "";
+      if (!text) throw new Error("응답에서 요약 내용을 찾지 못했어요.");
+      round.aiSummary = { text, generatedAt: new Date().toISOString() };
+      setQADetail(agentId, year, monthIndex, detail);
+      if (box) box.innerHTML = qaFormatSummaryHtml(text);
+      btnEl.textContent = "다시 요약";
+    } catch (err) {
+      console.error(err);
+      if (box) box.innerHTML = `<span class="qa-round-hint" style="color:var(--red);">요약 실패: ${esc(err.message || String(err))}</span>`;
+      btnEl.textContent = originalBtnText;
+    } finally {
+      btnEl.disabled = false;
+    }
+  }
+
+
+  function qaRoundSummaryLine(round) {
+    const scoreText = (round.score === null || round.score === undefined) ? "-" : round.score;
+    const dateText = round.date ? ` · ${esc(round.date)}` : "";
+    const idText = round.consultId ? ` · 상담ID ${esc(round.consultId)}` : "";
+    return `${esc(round.label)}${dateText}${idText} · 총점 ${esc(String(scoreText))}`;
+  }
+
+  function closeQADetailModal() {
+    const existing = document.getElementById("qa-detail-overlay");
+    if (existing) existing.remove();
+    document.removeEventListener("keydown", qaDetailEscHandler, true);
+  }
+  function qaDetailEscHandler(e) { if (e.key === "Escape") closeQADetailModal(); }
+
+  function openQADetailModal(agentId) {
+    closeQADetailModal();
+    qaPurgeExpiredDetails();
+    const agent = agentsData.find((a) => a.id === agentId);
+    if (!agent) return;
+    const { year, monthIndex } = qaUi;
+    const detail = getQADetail(agentId, year, monthIndex);
+
+    const metaText = detail && detail.purged
+      ? `원본 엑셀은 업로드 후 ${QA_DETAIL_EXPIRY_MONTHS}개월이 지나 자동 삭제됐어요 · 차수 ${detail.rounds.length}개`
+      : detail
+        ? `${esc(detail.fileName || "")} 업로드됨 · 차수 ${detail.rounds.length}개 (원문은 업로드 후 ${QA_DETAIL_EXPIRY_MONTHS}개월 뒤 자동 삭제되며, AI 요약은 그대로 남아요)`
+        : "";
+
+    const bodyHtml = (!detail || !detail.rounds || !detail.rounds.length)
+      ? `<div class="qa-detail-empty">이번 달(${esc(qaMonthLabel())})에 업로드된 QA 평가 엑셀이 없어요. 상단 "${esc("엑셀 업로드")}" 버튼으로 이 상담사의 평가표를 올려주세요.</div>`
+      : `
+        <div class="qa-detail-meta">${metaText}</div>
+        <div class="qa-detail-rounds">
+          ${detail.rounds.map((round, idx) => {
+            const isPerfect = (round.itemCount || 0) === 0;
+            const rawGone = !isPerfect && round.items.length === 0; // 원문 만료로 사라진 경우
+            const showButton = round.items.length > 0; // 원문이 남아있을 때만 (다시) 요약 가능
+            let bodyBlock;
+            if (isPerfect) {
+              bodyBlock = `<div class="qa-round-empty">감점/코멘트 항목이 없어요 (만점 처리된 차수예요).</div>`;
+            } else if (rawGone) {
+              bodyBlock = `<div class="qa-round-summary-box" id="qa-round-summary-${idx}">${round.aiSummary
+                ? qaFormatSummaryHtml(round.aiSummary.text)
+                : `<span class="qa-round-hint" style="color:var(--red);">원문이 만료되어 삭제됐어요. 만료 전에 요약해두지 않아 남은 내용이 없어요.</span>`}</div>`;
+            } else {
+              bodyBlock = `<div class="qa-round-summary-box" id="qa-round-summary-${idx}">${round.aiSummary ? qaFormatSummaryHtml(round.aiSummary.text) : `<span class="qa-round-hint">원문 ${round.items.length}건 · 요약 버튼을 눌러 정리해보세요.</span>`}</div>`;
+            }
+            return `
+            <div class="qa-round-card">
+              <div class="qa-round-head">
+                <div class="qa-round-title">${qaRoundSummaryLine(round)}</div>
+                ${showButton ? `<button type="button" class="ghost-btn" data-qa-summarize="${idx}">${round.aiSummary ? "다시 요약" : "AI로 요약하기"}</button>` : ""}
+              </div>
+              ${bodyBlock}
+            </div>
+          `;
+          }).join("")}
+        </div>
+      `;
+
+    const overlay = document.createElement("div");
+    overlay.id = "qa-detail-overlay";
+    overlay.className = "sch-preview-overlay";
+    overlay.innerHTML = `
+      <div class="sch-preview-box qa-detail-box">
+        <div class="sch-preview-head">
+          <span>${esc(agent.name)} · ${esc(qaMonthLabel())} QA 상세</span>
+          <button type="button" class="sch-preview-close" id="qa-detail-close-x" aria-label="닫기">✕</button>
+        </div>
+        <div class="sch-preview-body qa-detail-body">
+          ${bodyHtml}
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    overlay.onclick = (e) => { if (e.target === overlay) closeQADetailModal(); };
+    document.getElementById("qa-detail-close-x").onclick = () => closeQADetailModal();
+
+    overlay.querySelectorAll("[data-qa-summarize]").forEach((btn) => {
+      btn.onclick = () => qaRunGroqSummary(agentId, year, monthIndex, Number(btn.getAttribute("data-qa-summarize")), btn);
+    });
+
+    setTimeout(() => document.addEventListener("keydown", qaDetailEscHandler, true), 0);
+  }
+
   function qaScoreCellHtml(agent, year, monthIndex) {
     const val = getQAScore(agent.id, year, monthIndex);
     const locked = qaIsMonthLocked(year, monthIndex);
@@ -244,7 +615,7 @@
               const highlight = !forCapture && qaHighlightAgentId === a.id;
               return `
                 <tr data-qa-row-agent="${a.id}" class="${highlight ? "qa-row-highlight" : ""}">
-                  <td class="qa-col-name">${esc(a.name)}</td>
+                  <td class="qa-col-name"${forCapture ? "" : ` data-qa-name-click="${a.id}"`}>${esc(a.name)}</td>
                   <td class="qa-col-ldap">${esc(a.ldap || "-")}</td>
                   <td>${esc(a.timezone || "-")}</td>
                   <td class="qa-col-badges">${typeBadges || "-"}</td>
@@ -276,9 +647,12 @@
           <div class="schedule-month-label">${qaMonthLabel()}${locked ? ` <span class="sch-locked-badge">${ICON_LOCK} 확정됨</span>` : ""}</div>
           <button class="schedule-month-btn" id="qa-next-month">›</button>
           <button class="ghost-btn sch-lock-toggle-btn ${locked ? "locked" : ""}" id="qa-lock-btn" style="margin-left:8px;">${locked ? `${ICON_UNLOCK} 잠금 해제` : `${ICON_LOCK} 이 달 잠그기`}</button>
+          <button class="ghost-btn" id="qa-excel-upload-btn">${ICON_UPLOAD} 엑셀 업로드</button>
+          <input type="file" id="qa-excel-input" accept=".xlsx" multiple style="display:none;">
           <button class="ghost-btn" id="qa-capture-btn">${ICON_CAMERA} 이미지로 저장 ▾</button>
         </div>
       </div>
+      <div class="qa-help-text">QA 평가 엑셀(.xlsx)을 올리면 "평균" 행 × "총점" 열 값을 자동으로 점수에 반영해요. 상담사 1명당 파일 1개(시트명 또는 파일명 = 상담사 이름)도, 여러 상담사가 시트로 나뉜 파일 하나도 모두 지원돼요. 이름을 누르면 회차별 상세 내용을 볼 수 있어요.</div>
       <div class="status" id="qa-status"></div>
       <div class="qa-stat-grid">
         ${qaStatItemHtml("전체 평균", stats.total, prevStats.total, true)}
@@ -310,6 +684,16 @@
     document.getElementById("qa-next-month").onclick = () => qaShiftMonth(1);
     document.getElementById("qa-lock-btn").onclick = () => qaToggleMonthLock(year, monthIndex);
     document.getElementById("qa-capture-btn").onclick = (e) => openQACaptureMenu(e.currentTarget);
+    document.getElementById("qa-excel-upload-btn").onclick = () => document.getElementById("qa-excel-input").click();
+    document.getElementById("qa-excel-input").onchange = (e) => {
+      const files = e.target.files;
+      e.target.value = "";
+      qaHandleExcelFiles(files);
+    };
+
+    root.querySelectorAll("[data-qa-name-click]").forEach((el) => {
+      el.onclick = () => openQADetailModal(el.getAttribute("data-qa-name-click"));
+    });
 
     root.querySelectorAll(".qa-score-input").forEach((input) => {
       // 필요인력 입력칸과 같은 방식: blur(포커스 아웃) 또는 Enter일 때만 저장해서
