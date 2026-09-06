@@ -375,6 +375,15 @@
           </div>
         </div>
       </div>
+      <div class="interview-draft-helper">
+        <label class="agent-form-label">AI 초안 정리 (선택)
+          <textarea class="add-input interview-textarea" id="${idPrefix}-draft" placeholder="면담 중/직후 대충 메모해두세요. 예: 오늘 콜 응대 느리다고 얘기함, 담달까지 지켜보기로"></textarea>
+        </label>
+        <div class="interview-draft-actions">
+          <button type="button" class="ghost-btn" id="${idPrefix}-draft-btn">AI로 다듬기</button>
+          <span class="interview-draft-status" id="${idPrefix}-draft-status"></span>
+        </div>
+      </div>
       <label class="agent-form-label">면담 내용
         <textarea class="add-input interview-textarea interview-textarea-content" id="${idPrefix}-content" placeholder="면담에서 나눈 내용을 적어주세요">${esc(v.content || "")}</textarea>
       </label>
@@ -392,6 +401,7 @@
     }
     const managerCandidates = agentsData.filter((a) => a.isAdmin).sort((a, b) => a.name.localeCompare(b.name, "ko"));
     attachAgentPickerField(idPrefix, "manager", managerCandidates);
+    attachInterviewDraftHelper(idPrefix);
   }
 
   function readInterviewFormValues(idPrefix, lockAgentId) {
@@ -763,6 +773,61 @@
   // (qa-groq-summary)의 서버 환경변수에만 있다. 그 함수는 prompt 텍스트를 넘기면
   // Groq 응답 텍스트를 돌려주는 범용 함수라서, 면담일지에서도 그대로 재사용한다.
   const INTERVIEW_AI_SUMMARY_FN = "qa-groq-summary";
+
+  // "[면담 내용]\n...\n[후속조치]\n..." 형태로 온 AI 응답을, 두 필드에 넣을 순수 텍스트로 쪼갠다.
+  function parseInterviewDraftSummary(text) {
+    const clean = String(text || "").replace(/\*\*/g, "").trim();
+    const contentMatch = clean.match(/\[면담\s*내용\]\s*([\s\S]*?)(?=\n?\s*\[후속\s*조치[^\]]*\]|$)/);
+    const followUpMatch = clean.match(/\[후속\s*조치[^\]]*\]\s*([\s\S]*)$/);
+    const content = (contentMatch ? contentMatch[1] : clean).trim();
+    const followUp = followUpMatch ? followUpMatch[1].trim() : "";
+    return { content, followUp };
+  }
+
+  // 면담 기록 폼의 "AI 초안 정리" 버튼: 대충 적은 메모를 "면담 내용"/"후속조치" 두 필드로 정리해서 채워준다.
+  function attachInterviewDraftHelper(idPrefix) {
+    const btn = document.getElementById(`${idPrefix}-draft-btn`);
+    const draftEl = document.getElementById(`${idPrefix}-draft`);
+    const statusEl = document.getElementById(`${idPrefix}-draft-status`);
+    if (!btn || !draftEl) return;
+    btn.onclick = async () => {
+      const draft = draftEl.value.trim();
+      if (statusEl) statusEl.textContent = "";
+      if (!draft) { if (statusEl) statusEl.textContent = "먼저 메모를 입력해주세요."; return; }
+      if (!cloud) { if (statusEl) statusEl.textContent = "AI 서버에 연결할 수 없어요 (네트워크 확인)."; return; }
+      const contentEl = document.getElementById(`${idPrefix}-content`);
+      const followUpEl = document.getElementById(`${idPrefix}-followup`);
+      const originalText = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = "정리 중...";
+      try {
+        const prompt = `다음은 콜센터 관리자가 상담사와의 면담 중/직후 대충 적어둔 메모입니다.\n\n${draft}\n\n위 메모를 바탕으로, 실제 면담 기록에 남길 문장으로 정리해주세요. 한국어로, 아래처럼 정확히 두 개 섹션으로만 답하세요. 각 섹션은 개조식 나열이 아니라 자연스럽게 이어지는 문단으로 쓰고, 불필요한 서론·결론은 쓰지 마세요. 마크다운 기호(**, *, -, # 등)는 절대 쓰지 마세요.\n\n[면담 내용]\n(메모에서 실제로 나눈 이야기를 정중한 기록체 문장으로 정리하세요. "~함", "~라고 언급함", "~하기로 함"처럼 자연스러운 보고체로 쓰세요.)\n\n[후속조치]\n(다음에 확인하거나 챙겨야 할 사항을 문장으로 정리하세요. 메모에 후속조치로 볼 만한 내용이 없다면 "특별한 후속조치 없음"이라고만 쓰세요.)`;
+        // 실제 Groq API 키는 이 브라우저가 아니라 Supabase Edge Function(qa-groq-summary)
+        // 서버 쪽 환경변수에만 있다. 여기서는 그 함수를 호출하기만 한다.
+        const { data, error } = await cloud.functions.invoke(INTERVIEW_AI_SUMMARY_FN, { body: { prompt } });
+        if (error) {
+          let msg = error.message || "요청 실패";
+          try {
+            const ctx = error.context && typeof error.context.json === "function" ? await error.context.json() : null;
+            if (ctx && ctx.error) msg = ctx.error;
+          } catch (_e) {}
+          throw new Error(msg);
+        }
+        const text = (data && data.text) ? String(data.text).trim() : "";
+        if (!text) throw new Error("응답에서 정리된 내용을 찾지 못했어요.");
+        const { content, followUp } = parseInterviewDraftSummary(text);
+        if (contentEl && content) contentEl.value = content;
+        if (followUpEl && followUp) followUpEl.value = followUp;
+        if (statusEl) statusEl.textContent = "정리했어요. 필요하면 직접 다듬어주세요.";
+      } catch (err) {
+        console.error(err);
+        if (statusEl) statusEl.textContent = `정리 실패: ${err.message || String(err)}`;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = originalText;
+      }
+    };
+  }
 
   // 면담 기록이 1건 이상 있는 상담사만, 가장 최근 면담일이 최신인 순서로 정렬해 돌려준다.
   function interviewAiAgentCandidates() {
