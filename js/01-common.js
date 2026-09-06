@@ -62,6 +62,10 @@
     "app-theme-mode",
     "personal-app:session",
     "personal-app:master-origin",
+    "personal-app:last-active", // 로그인 유지용 하트비트. 이 브라우저(탭)에서만 의미 있는
+    // 값인데 빠져 있어서, 15초마다 모든 사람의 탭에서 클라우드에 저장을 시도하고 있었다.
+    // 그 하트비트는 계정 구분 없이 하나의 키를 공유해서, 다른 사람이 그냥 탭을 열어두기만
+    // 해도 계속 클라우드 쓰기가 발생하는 원인 중 하나였다.
   ]);
   function isCloudSynced(key) {
     if (!cloud) return false;
@@ -153,7 +157,6 @@
   const _ourWriteTimestamps = {};
   const _pushChains = {};
   const _conflictedKeys = new Set(); // 자동 병합도 실패해서 정말로 물어봐야 하는 키
-  const _remoteChangedKeys = new Set(); // 남이 고쳤는데 아직 화면엔 반영 안 한 키
   const _fieldConflictNotices = new Map(); // key -> 자동 병합은 됐지만 "이 부분은 겹쳤어요"라고 알려줄 경로들
 
   /* ---- 저장 충돌 자동 병합 ----
@@ -366,10 +369,33 @@
   // 지금 어딘가에 글자를 입력 중인지(텍스트칸에 커서가 가 있는지) 확인한다. 입력 중일 때
   // 화면을 억지로 다시 그리면 커서 위치나 아직 저장 안 된 입력 내용이 날아갈 수 있어서,
   // 그럴 때는 그 자리에서 바로 반영하지 않고 예전처럼 "새로고침" 배너로만 알린다.
+  // 예외: 하단 내비게이션의 "이름 통합 검색"(#global-search-root 안, #gs-input)은
+  // renderApp()이 다시 그리는 #page-inner 밖에 따로 떠 있고, 그 자체 로직도 renderApp()과
+  // 무관하게 매번 자기 결과 패널만 갱신하도록 만들어져 있어서(13-global-search.js 상단 주석
+  // 참고) — renderApp()이 실행돼도 이 입력창의 값이나 커서는 전혀 건드리지 않는다. 그런데도
+  // 이 검사에 포함시키면, 검색창에 커서만 가 있어도(실제로는 아무 데이터도 편집 중이 아닌데)
+  // 다른 사람이 전혀 무관한 걸 저장할 때마다 "다른 관리자가 방금 수정했어요" 배너가 매번
+  // 떠서, 마치 같은 항목을 동시에 고친 것처럼 잘못 보이는 문제가 있었다. 그래서 이 검색창은
+  // "편집 중"으로 치지 않는다.
   function _hasActiveEditableFocus() {
     const el = document.activeElement;
     if (!el) return false;
+    if (el.id === "gs-input") return false;
+    // 목록 화면의 검색/필터 입력칸(면담일지 "상담사 이름 또는 LDAP 검색", 상담사 관리
+    // 검색 등)도 위 gs-input과 똑같은 이유로 예외 처리한다: 이 칸에 값이 있어도 그건
+    // interviewsUi.searchQuery 같은 상태값에 그대로 남아있고 다시 그릴 때도 그 값 그대로
+    // 복원되므로, 화면을 다시 그린다고 해서 "입력 중이던 내용"이 사라지지 않는다. 이런
+    // 칸에 커서만 가 있어도 무관한 저장 때마다 마치 편집 중인 것처럼 취급되는 걸 막는다.
+    if (el.classList && el.classList.contains("agent-search-input-field")) return false;
     return el.tagName === "TEXTAREA" || el.tagName === "INPUT" || !!el.isContentEditable;
+  }
+  // 지금 이 브라우저 탭이 실제로 화면에 보이고 있는지. 탭을 다른 곳으로 전환해도
+  // document.activeElement는 그대로 남아있어서(포커스가 자동으로 풀리지 않음),
+  // 백그라운드 탭에 있는 동안 들어온 변경까지 "지금 입력 중"으로 오판해 팝업을
+  // 만들어버리는 문제가 있었다. 화면이 실제로 보이는 상태인지까지 함께 확인해서,
+  // 안 보이는 동안 생긴 변경은 조용히 메모리에만 반영하고 팝업 없이 넘어가게 한다.
+  function _isTabVisible() {
+    return document.visibilityState === "visible" && document.hasFocus();
   }
 
   /* ---- 배너 UI: "남이 방금 고쳤어요" / "저장 충돌" 을 화면 위쪽에 띄운다.
@@ -416,33 +442,18 @@
       }
     };
   }
-  function _renderRemoteUpdateBanner() {
-    let el = document.getElementById("cloud-remote-banner");
-    if (!_remoteChangedKeys.size) { if (el) el.remove(); return; }
-    if (!el) {
-      el = document.createElement("div");
-      el.id = "cloud-remote-banner";
-      el.className = "cloud-live-banner";
-      _liveBannerWrap().appendChild(el);
-    }
-    const labels = Array.from(_remoteChangedKeys).map(cloudKeyLabel).join(", ");
-    el.innerHTML = `
-      ${ICON_BELL}
-      <div class="cloud-live-banner-body">
-        <div class="cloud-live-banner-title">다른 관리자가 방금 수정했어요</div>
-        <div class="cloud-live-banner-desc"><b>${esc(labels)}</b>이(가) 방금 바뀌었어요. 지금 화면은 예전 내용일 수 있어요.</div>
-        <div class="cloud-live-banner-actions">
-          <button type="button" class="primary-btn" id="cloud-remote-reload">새로고침</button>
-        </div>
-      </div>
-      <button type="button" class="cloud-live-banner-close" id="cloud-remote-dismiss" aria-label="닫기">✕</button>
-    `;
-    document.getElementById("cloud-remote-reload").onclick = () => location.reload();
-    document.getElementById("cloud-remote-dismiss").onclick = () => {
-      _remoteChangedKeys.clear();
-      _renderRemoteUpdateBanner();
-    };
-  }
+  // 예전에는 여기에 "다른 관리자가 방금 수정했어요"라는 배너가 하나 더 있었다. 그런데
+  // 이 배너는 "지금 이 화면과 관련된 데이터가 바뀌었고, 마침 내가 뭔가 입력 중이었다"는
+  // 것만 볼 뿐 실제로 내가 지금 만지고 있는 항목·필드와 겹쳤는지는 전혀 확인하지
+  // 않았다. 그래서 완전히 무관한 항목이 추가/수정돼도(예: 다른 상담사의 면담 기록을
+  // 새로 추가) 화면 아무 입력칸에 커서만 가 있으면(심지어 검색창이거나, 다른 브라우저
+  // 탭으로 넘어가기 전에 마지막으로 커서를 뒀던 칸이어도) 마치 뭔가 겹친 것처럼
+  // 떠버렸다. 진짜로 같은 항목의 같은 필드를 동시에 고쳤는지는 저장 시점의 3-way
+  // 병합(_merge3)이 훨씬 정확하게 판단할 수 있으므로, 이 추측성 배너는 없앴다.
+  // 대신 원격 변경은 아래 실시간 구독 핸들러에서 메모리(및 로컬 저장소)에는 항상
+  // 즉시 반영해두고, 화면을 다시 그리는 것만 "지금 입력 중이 아닐 때"로 미룬다 —
+  // 편집을 마치고 저장하면 그 시점에 자동 병합/충돌 감지가 실제로 겹친 부분만
+  // 정확히 짚어서 알려준다(_renderFieldConflictBanner, _renderConflictBanner).
   // "저장은 정상적으로 진행됐지만, 그중 일부 지점만 다른 관리자와 겹쳐서 내가 방금
   // 저장한 값으로 정했어요"를 알려주는 가벼운 배너. _renderConflictBanner(저장 충돌)와
   // 달리 저장을 막지 않으며, 확인 버튼을 누르면 그냥 사라진다.
@@ -607,22 +618,36 @@
           _knownServerUpdatedAt[row.key] = row.updated_at;
           _knownServerValue[row.key] = row.value;
           if (localStorage.getItem(row.key) === row.value) return; // 이미 같은 내용이면 반영할 필요 없음
-          _origSetItem(row.key, row.value); // 로컬 저장소에도 최신 내용 반영 (다른 화면 갔다 왔을 때를 대비)
+          _origSetItem(row.key, row.value); // 로컬 저장소에는 언제나 즉시 최신 내용 반영 (탭이 안 보이는 동안에도 마찬가지)
           let affectedPages = [];
           try { affectedPages = _applyRemoteChangeToMemory(row.key); } catch (e) {}
           const isCurrentPageAffected = affectedPages.indexOf(state.page) !== -1;
-          if (isCurrentPageAffected && !_hasActiveEditableFocus()) {
-            renderApp(); // 지금 보고 있는 화면 데이터인데 입력 중이 아니라면 새로고침 없이 그 자리에서 갱신
-            return;
-          }
-          if (isCurrentPageAffected) {
-            _remoteChangedKeys.add(row.key); // 입력 중이라 화면을 억지로 바꾸지 않고 배너로만 알림
-            _renderRemoteUpdateBanner();
+          // 화면(그림)을 다시 그리는 것만 "지금 이 탭이 실제로 보이고 있고 + 뭔가
+          // 입력 중인 칸에 커서가 가 있지 않을 때"로 미룬다. 데이터 자체(메모리·로컬
+          // 저장소)는 위에서 이미 최신 상태로 반영해뒀으니, 지금 당장 다시 그리지
+          // 않아도 잃어버리는 내용은 없다 — 나중에 화면이 다시 그려질 때(탭으로
+          // 돌아오거나, 입력을 마치거나, 다른 조작으로 renderApp이 호출될 때) 자동으로
+          // 최신 내용이 보인다. 겹쳤는지 여부를 추측해서 알리는 배너는 띄우지 않는다:
+          // 진짜로 같은 항목·같은 필드가 겹친 경우는 저장 시점의 3-way 병합이 정확하게
+          // 잡아내서 _renderFieldConflictBanner / _renderConflictBanner로 알려준다.
+          if (isCurrentPageAffected && !_hasActiveEditableFocus() && _isTabVisible()) {
+            renderApp();
           }
         }
       )
       .subscribe();
   }
+  // 탭이 백그라운드에 있는 동안에도 데이터(메모리·로컬 저장소)는 이미 최신으로
+  // 반영해뒀지만, 화면을 다시 그리는 것만 미뤄뒀을 수 있다. 탭이 다시 보이게 되거나
+  // 입력 중이던 칸에서 포커스가 빠지면, 지금 화면이 안전하게 다시 그릴 수 있는
+  // 상태인지 확인해서 최신 내용으로 갱신한다 — 그래야 "다른 탭 보고 오니 화면이
+  // 예전 내용"인 채로 남아있는 일이 없다. 배너 없이 조용히 갱신만 한다.
+  function _catchUpRenderIfSafe() {
+    if (!_isTabVisible() || _hasActiveEditableFocus()) return;
+    try { renderApp(); } catch (e) {}
+  }
+  document.addEventListener("visibilitychange", _catchUpRenderIfSafe);
+  window.addEventListener("focus", _catchUpRenderIfSafe);
 
   /* ===================== ↩️ 실행 취소(Undo) =====================
      스케줄 셀 상태 변경 · 일괄 적용 · 일괄 붙여넣기 · 일괄 삭제, 그리고 메모·폴더·
