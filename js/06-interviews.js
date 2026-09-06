@@ -774,24 +774,22 @@
   // Groq 응답 텍스트를 돌려주는 범용 함수라서, 면담일지에서도 그대로 재사용한다.
   const INTERVIEW_AI_SUMMARY_FN = "qa-groq-summary";
 
-  // "[면담 내용]\n...\n[후속조치]\n..." 형태로 온 AI 응답을, 두 필드에 넣을 순수 텍스트로 쪼갠다.
+  // AI 응답에서 대괄호 제목/불필요한 여백을 걷어내고, "- "로 시작하는 개조식 줄 목록으로 다듬는다.
   function parseInterviewDraftSummary(text) {
-    const clean = String(text || "").replace(/\*\*/g, "").trim();
-    const contentMatch = clean.match(/\[면담\s*내용\]\s*([\s\S]*?)(?=\n?\s*\[후속\s*조치[^\]]*\]|$)/);
-    const followUpMatch = clean.match(/\[후속\s*조치[^\]]*\]\s*([\s\S]*)$/);
-    // 섹션 안의 각 줄을 다듬는다: 앞뒤 공백 제거, 빈 줄 제거, "-"로 시작하지 않는 줄엔 붙여준다.
-    const tidy = (block) => block
+    const clean = String(text || "")
+      .replace(/\*\*/g, "")
+      .replace(/^\s*\[[^\[\]]+\]\s*/m, "") // 혹시 모델이 "[면담 내용]" 같은 제목을 붙여 보내도 제거
+      .trim();
+    return clean
       .split("\n")
       .map((line) => line.trim())
       .filter((line) => line.length > 0)
       .map((line) => (line.startsWith("-") ? line : `- ${line}`))
       .join("\n");
-    const content = tidy(contentMatch ? contentMatch[1] : clean);
-    const followUp = followUpMatch ? tidy(followUpMatch[1]) : "";
-    return { content, followUp };
   }
 
-  // 면담 기록 폼의 "AI 초안 정리" 버튼: 대충 적은 메모를 "면담 내용"/"후속조치" 두 필드로 정리해서 채워준다.
+  // 면담 기록 폼의 "AI 초안 정리" 버튼: 대충 적은 메모를 "면담 내용" 필드로 정리해서 채워준다.
+  // 후속조치는 AI가 건드리지 않고, 관리자가 직접 작성하는 칸으로 남겨둔다.
   function attachInterviewDraftHelper(idPrefix) {
     const btn = document.getElementById(`${idPrefix}-draft-btn`);
     const draftEl = document.getElementById(`${idPrefix}-draft`);
@@ -803,12 +801,11 @@
       if (!draft) { if (statusEl) statusEl.textContent = "먼저 메모를 입력해주세요."; return; }
       if (!cloud) { if (statusEl) statusEl.textContent = "AI 서버에 연결할 수 없어요 (네트워크 확인)."; return; }
       const contentEl = document.getElementById(`${idPrefix}-content`);
-      const followUpEl = document.getElementById(`${idPrefix}-followup`);
       const originalText = btn.textContent;
       btn.disabled = true;
       btn.textContent = "정리 중...";
       try {
-        const prompt = `다음은 콜센터 관리자가 상담사와의 면담 중/직후 대충 적어둔 메모입니다.\n\n${draft}\n\n위 메모를 바탕으로, 실제 면담 기록에 남길 내용으로 정리해주세요. 한국어로, 아래처럼 정확히 두 개 섹션으로만 답하세요. 각 섹션은 하나의 문단이 아니라 항목별로 줄을 나눠서 쓰고, 모든 줄은 반드시 "- "로 시작하세요. 문장은 정중한 존댓말이 아니라 "~함", "~됨", "~하기로 함"처럼 짧고 담백한 개조식 종결형으로 쓰고, 한 줄에는 하나의 내용만 담으세요. 불필요한 서론·결론은 쓰지 말고, 마크다운 기호(**, *, # 등)는 절대 쓰지 마세요.\n\n[면담 내용]\n- (메모에서 실제로 나눈 이야기를 항목별로 한 줄씩. 예: "QA 점수가 85점을 넘지 못하고 있음을 확인함")\n\n[후속조치]\n- (다음에 확인하거나 챙겨야 할 사항을 항목별로 한 줄씩. 예: "다음 면담까지 QA 90점 달성 여부 점검하기로 함". 메모에 후속조치로 볼 만한 내용이 없다면 "- 특별한 후속조치 없음" 한 줄만 쓰세요.)`;
+        const prompt = `다음은 콜센터 관리자가 상담사와의 면담 중/직후 대충 적어둔 메모입니다.\n\n${draft}\n\n위 메모를 바탕으로, 실제 면담 기록의 "면담 내용" 칸에 남길 내용을 정리해주세요. 한국어로, 하나의 문단이 아니라 항목별로 줄을 나눠서 쓰고, 모든 줄은 반드시 "- "로 시작하세요. 문장은 정중한 존댓말이 아니라 "~함", "~됨", "~하기로 함"처럼 짧고 담백한 개조식 종결형으로 쓰고, 한 줄에는 하나의 내용만 담으세요. 불필요한 서론·결론이나 섹션 제목은 쓰지 말고, 순수하게 "- "로 시작하는 줄들만 나열하세요. 마크다운 기호(**, *, # 등)는 절대 쓰지 마세요.\n\n예시:\n- QA 점수가 85점을 넘지 못하고 있음을 확인함\n- 상담 시간과 후처리 시간은 기준 이내로 안정적임`;
         // 실제 Groq API 키는 이 브라우저가 아니라 Supabase Edge Function(qa-groq-summary)
         // 서버 쪽 환경변수에만 있다. 여기서는 그 함수를 호출하기만 한다.
         const { data, error } = await cloud.functions.invoke(INTERVIEW_AI_SUMMARY_FN, { body: { prompt } });
@@ -822,9 +819,8 @@
         }
         const text = (data && data.text) ? String(data.text).trim() : "";
         if (!text) throw new Error("응답에서 정리된 내용을 찾지 못했어요.");
-        const { content, followUp } = parseInterviewDraftSummary(text);
+        const content = parseInterviewDraftSummary(text);
         if (contentEl && content) contentEl.value = content;
-        if (followUpEl && followUp) followUpEl.value = followUp;
         if (statusEl) statusEl.textContent = "정리했어요. 필요하면 직접 다듬어주세요.";
       } catch (err) {
         console.error(err);
