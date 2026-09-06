@@ -33,7 +33,8 @@
   .interview-content { font-size: 14px; color: var(--text); white-space: pre-wrap; line-height: 1.75; }
   .interview-followup { font-size: 13px; color: var(--text-dim); line-height: 1.75; }
   .interview-textarea { width: 100%; min-height: 70px; resize: vertical; padding: 9px 12px; line-height: 1.6; }
-  .interview-textarea-content { min-height: 160px; }
+  .interview-textarea-draft { min-height: 130px; }
+  .interview-textarea-content { min-height: 260px; }
   .agent-form-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 13px; }
   @media (max-width: 620px) { .agent-form-row-2 { grid-template-columns: 1fr; } }
   .agent-form-row-2-date-type { align-items: center; }

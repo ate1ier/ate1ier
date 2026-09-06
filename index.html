@@ -5781,7 +5781,7 @@
       </div>
       <div class="interview-draft-helper">
         <label class="agent-form-label">AI 초안 정리 (선택)
-          <textarea class="add-input interview-textarea" id="${idPrefix}-draft" placeholder="면담 중/직후 대충 메모해두세요. 예: 오늘 콜 응대 느리다고 얘기함, 담달까지 지켜보기로"></textarea>
+          <textarea class="add-input interview-textarea interview-textarea-draft" id="${idPrefix}-draft" placeholder="면담 중/직후 대충 메모해두세요. 예: 오늘 콜 응대 느리다고 얘기함, 담달까지 지켜보기로"></textarea>
         </label>
         <div class="interview-draft-actions">
           <button type="button" class="ghost-btn" id="${idPrefix}-draft-btn">AI로 다듬기</button>
@@ -6183,8 +6183,15 @@
     const clean = String(text || "").replace(/\*\*/g, "").trim();
     const contentMatch = clean.match(/\[면담\s*내용\]\s*([\s\S]*?)(?=\n?\s*\[후속\s*조치[^\]]*\]|$)/);
     const followUpMatch = clean.match(/\[후속\s*조치[^\]]*\]\s*([\s\S]*)$/);
-    const content = (contentMatch ? contentMatch[1] : clean).trim();
-    const followUp = followUpMatch ? followUpMatch[1].trim() : "";
+    // 섹션 안의 각 줄을 다듬는다: 앞뒤 공백 제거, 빈 줄 제거, "-"로 시작하지 않는 줄엔 붙여준다.
+    const tidy = (block) => block
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0)
+      .map((line) => (line.startsWith("-") ? line : `- ${line}`))
+      .join("\n");
+    const content = tidy(contentMatch ? contentMatch[1] : clean);
+    const followUp = followUpMatch ? tidy(followUpMatch[1]) : "";
     return { content, followUp };
   }
 
@@ -6205,7 +6212,7 @@
       btn.disabled = true;
       btn.textContent = "정리 중...";
       try {
-        const prompt = `다음은 콜센터 관리자가 상담사와의 면담 중/직후 대충 적어둔 메모입니다.\n\n${draft}\n\n위 메모를 바탕으로, 실제 면담 기록에 남길 문장으로 정리해주세요. 한국어로, 아래처럼 정확히 두 개 섹션으로만 답하세요. 각 섹션은 개조식 나열이 아니라 자연스럽게 이어지는 문단으로 쓰고, 불필요한 서론·결론은 쓰지 마세요. 마크다운 기호(**, *, -, # 등)는 절대 쓰지 마세요.\n\n[면담 내용]\n(메모에서 실제로 나눈 이야기를 정중한 기록체 문장으로 정리하세요. "~함", "~라고 언급함", "~하기로 함"처럼 자연스러운 보고체로 쓰세요.)\n\n[후속조치]\n(다음에 확인하거나 챙겨야 할 사항을 문장으로 정리하세요. 메모에 후속조치로 볼 만한 내용이 없다면 "특별한 후속조치 없음"이라고만 쓰세요.)`;
+        const prompt = `다음은 콜센터 관리자가 상담사와의 면담 중/직후 대충 적어둔 메모입니다.\n\n${draft}\n\n위 메모를 바탕으로, 실제 면담 기록에 남길 내용으로 정리해주세요. 한국어로, 아래처럼 정확히 두 개 섹션으로만 답하세요. 각 섹션은 하나의 문단이 아니라 항목별로 줄을 나눠서 쓰고, 모든 줄은 반드시 "- "로 시작하세요. 문장은 정중한 존댓말이 아니라 "~함", "~됨", "~하기로 함"처럼 짧고 담백한 개조식 종결형으로 쓰고, 한 줄에는 하나의 내용만 담으세요. 불필요한 서론·결론은 쓰지 말고, 마크다운 기호(**, *, # 등)는 절대 쓰지 마세요.\n\n[면담 내용]\n- (메모에서 실제로 나눈 이야기를 항목별로 한 줄씩. 예: "QA 점수가 85점을 넘지 못하고 있음을 확인함")\n\n[후속조치]\n- (다음에 확인하거나 챙겨야 할 사항을 항목별로 한 줄씩. 예: "다음 면담까지 QA 90점 달성 여부 점검하기로 함". 메모에 후속조치로 볼 만한 내용이 없다면 "- 특별한 후속조치 없음" 한 줄만 쓰세요.)`;
         // 실제 Groq API 키는 이 브라우저가 아니라 Supabase Edge Function(qa-groq-summary)
         // 서버 쪽 환경변수에만 있다. 여기서는 그 함수를 호출하기만 한다.
         const { data, error } = await cloud.functions.invoke(INTERVIEW_AI_SUMMARY_FN, { body: { prompt } });
