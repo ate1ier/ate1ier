@@ -425,7 +425,7 @@
       ${ICON_BELL}
       <div class="cloud-live-banner-body">
         <div class="cloud-live-banner-title">저장 충돌</div>
-        <div class="cloud-live-banner-desc"><b>${esc(labels)}</b>의 같은 항목을 다른 관리자(또는 다른 탭)가 거의 같은 순간에 고쳐서, 자동으로 합칠 수 없었어요. 내가 방금 한 변경이 아직 저장되지 못했어요.</div>
+        <div class="cloud-live-banner-desc"><b>${esc(labels)}</b>의 같은 항목을 다른 관리자(또는 다른 탭)가 거의 같은 순간에 고쳐서, 자동으로 합칠 수 없었어요.<br>내가 방금 한 변경이 아직 저장되지 못했어요.</div>
         <div class="cloud-live-banner-actions">
           <button type="button" class="ghost-btn" id="cloud-conflict-reload">최신 내용 불러오기</button>
           <button type="button" class="primary-btn" id="cloud-conflict-force">내 변경으로 덮어쓰기</button>
@@ -472,7 +472,7 @@
       ${ICON_BELL}
       <div class="cloud-live-banner-body">
         <div class="cloud-live-banner-title">일부 항목이 거의 동시에 수정됐어요</div>
-        <div class="cloud-live-banner-desc"><b>${esc(labels)}</b>에서 ${spotCount}곳을 다른 관리자(또는 다른 탭)와 겹쳐서 고쳤어요. 겹치지 않은 나머지 변경은 자동으로 함께 합쳐 저장했고, 겹친 부분만 방금 내가 저장한 값으로 반영됐어요. 혹시 다른 관리자가 그 부분을 다르게 고치려던 거였다면 다시 확인해 주세요.</div>
+        <div class="cloud-live-banner-desc"><b>${esc(labels)}</b>에서 ${spotCount}곳을 다른 관리자(또는 다른 탭)와 겹쳐서 고쳤어요.<br>겹치지 않은 나머지 변경은 자동으로 함께 합쳐 저장했고, 겹친 부분만 방금 내가 저장한 값으로 반영됐어요.<br>혹시 다른 관리자가 그 부분을 다르게 고치려던 거였다면 다시 확인해 주세요.</div>
         <div class="cloud-live-banner-actions">
           <button type="button" class="primary-btn" id="cloud-field-conflict-dismiss">확인</button>
         </div>
@@ -1552,7 +1552,7 @@
                 </label>
                 <button type="submit" class="primary-btn login-submit">로그인</button>
               </form>
-              <div class="login-accounts-hint">${accounts.length ? `등록된 계정: ${accounts.map((a) => esc(a.username)).join(", ")}` : `아직 등록된 계정이 없어요. "계정 만들기" 탭에서 먼저 계정을 만들어주세요.`}</div>
+              <div class="login-accounts-hint">${accounts.length ? `등록된 계정: ${accounts.map((a) => esc(a.username)).join(", ")}` : `아직 등록된 계정이 없어요.<br>"계정 만들기" 탭에서 먼저 계정을 만들어주세요.`}</div>
             ` : `
               <form class="login-form" id="signup-form">
                 <label class="login-field"><span>아이디</span>

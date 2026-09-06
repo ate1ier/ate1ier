@@ -473,7 +473,7 @@
         : "";
 
     const bodyHtml = (!detail || !detail.rounds || !detail.rounds.length)
-      ? `<div class="qa-detail-empty">이번 달(${esc(qaMonthLabel())})에 업로드된 QA 평가 엑셀이 없어요. 상단 "${esc("엑셀 업로드")}" 버튼으로 이 상담사의 평가표를 올려주세요.</div>`
+      ? `<div class="qa-detail-empty">이번 달(${esc(qaMonthLabel())})에 업로드된 QA 평가 엑셀이 없어요.<br>상단 "${esc("엑셀 업로드")}" 버튼으로 이 상담사의 평가표를 올려주세요.</div>`
       : `
         <div class="qa-detail-meta">${metaText}</div>
         <div class="qa-detail-rounds">
@@ -492,7 +492,7 @@
             } else if (rawGone) {
               bodyBlock = `<div class="qa-round-summary-box" id="qa-round-summary-${idx}">${round.aiSummary
                 ? qaFormatSummaryHtml(round.aiSummary.text)
-                : `<span class="qa-round-hint" style="color:var(--red);">원문이 만료되어 삭제됐어요. 만료 전에 요약해두지 않아 남은 내용이 없어요.</span>`}</div>`;
+                : `<span class="qa-round-hint" style="color:var(--red);">원문이 만료되어 삭제됐어요.<br>만료 전에 요약해두지 않아 남은 내용이 없어요.</span>`}</div>`;
             } else {
               bodyBlock = `<div class="qa-round-summary-box" id="qa-round-summary-${idx}">${round.aiSummary ? qaFormatSummaryHtml(round.aiSummary.text) : `<span class="qa-round-hint">원문 ${round.items.length}건 · 요약 버튼을 눌러 정리해보세요.</span>`}</div>`;
             }
@@ -719,7 +719,7 @@
           <button class="ghost-btn" id="qa-capture-btn">${ICON_CAMERA} 이미지로 저장 ▾</button>
         </div>
       </div>
-      <div class="qa-help-text">QA 평가 엑셀(.xlsx)을 올리면 "평균" 행 × "총점" 열 값을 자동으로 점수에 반영해요. 상담사 1명당 파일 1개(시트명 또는 파일명 = 상담사 이름)도, 여러 상담사가 시트로 나뉜 파일 하나도 모두 지원돼요. 이름을 누르면 회차별 상세 내용을 볼 수 있어요.</div>
+      <div class="qa-help-text">QA 평가 엑셀(.xlsx)을 올리면 "평균" 행 × "총점" 열 값을 자동으로 점수에 반영해요.<br>상담사 1명당 파일 1개(시트명 또는 파일명 = 상담사 이름)도, 여러 상담사가 시트로 나뉜 파일 하나도 모두 지원돼요.<br>이름을 누르면 회차별 상세 내용을 볼 수 있어요.</div>
       <div class="status" id="qa-status"></div>
       <div class="qa-stat-grid">
         ${qaStatItemHtml("전체 평균", stats.total, prevStats.total, true)}

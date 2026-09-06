@@ -40,7 +40,7 @@
 
     let scheduleSectionHtml;
     if (staffList.length === 0) {
-      scheduleSectionHtml = `<div class="home-empty">등록된 상담사가 없어요. "상담사 관리"에서 추가해보세요.</div>`;
+      scheduleSectionHtml = `<div class="home-empty">등록된 상담사가 없어요.<br>"상담사 관리"에서 추가해보세요.</div>`;
     } else {
       const parts = [];
       if (dayWorking.length) parts.push(`<div class="staff-group-label">${ICON_SUN} 주간 근무 (${dayWorking.length}명)</div><div class="home-staff-list">${dayWorking.map(staffRowHtml).join("")}</div>`);

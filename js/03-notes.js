@@ -265,7 +265,7 @@
           ${collapsed ? "" : `
           <div class="folder-body" data-folder-drop="${f.key}">
             ${notesInFolder.length === 0
-              ? `<div class="folder-empty">이 폴더에는 아직 메모가 없어요. 다른 메모를 여기로 드래그해서 옮길 수도 있어요.</div>`
+              ? `<div class="folder-empty">이 폴더에는 아직 메모가 없어요.<br>다른 메모를 여기로 드래그해서 옮길 수도 있어요.</div>`
               : notesInFolder.map((n) => renderNoteRow(n, `folder:${f.key}`)).join("")}
           </div>`}
         </div>
