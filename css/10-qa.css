@@ -78,6 +78,9 @@
 
   .qa-table td.qa-col-name[data-qa-name-click] { cursor: pointer; }
   .qa-table td.qa-col-name[data-qa-name-click]:hover { text-decoration: underline; color: var(--accent); }
+  .qa-name-search-icon { display: inline-flex; vertical-align: -2px; margin-left: 5px; color: var(--text-faint); opacity: .7; }
+  .qa-name-search-icon svg { width: 12px; height: 12px; }
+  .qa-table td.qa-col-name[data-qa-name-click]:hover .qa-name-search-icon { color: var(--accent); opacity: 1; }
 
   /* ---------- 상담사 QA 상세 카드 팝업 ---------- */
   .qa-detail-box { width: min(640px, 94vw); }

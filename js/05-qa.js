@@ -390,7 +390,17 @@
 
   /* ===================== 상담사 이름 클릭 → QA 상세 카드 팝업 (Groq AI 요약) ===================== */
   function qaFormatSummaryHtml(text) {
-    return esc(text || "").replace(/\n/g, "<br>");
+    return esc(text || "")
+      .split("\n")
+      .map((line) => {
+        // 모델이 마크다운 강조 기호(**)를 붙여 보내도 화면엔 남지 않게 제거한다.
+        const clean = line.replace(/\*\*/g, "");
+        const trimmed = clean.trim();
+        // "[차감된 요소]", "[피드백이 필요한 내용]" 같은 대괄호 제목 줄은 굵게 표시한다.
+        if (/^\[[^\[\]]+\]$/.test(trimmed)) return `<strong>${trimmed}</strong>`;
+        return clean;
+      })
+      .join("<br>");
   }
 
   async function qaRunGroqSummary(agentId, year, monthIndex, roundIdx, btnEl) {
@@ -406,7 +416,7 @@
     if (box) box.innerHTML = `<span class="qa-round-hint">AI에게 요약을 요청하고 있어요...</span>`;
     try {
       const itemsText = round.items.map((it, i) => `${i + 1}. ${it.guideline ? `[${it.guideline}] ` : ""}${it.feedback}`).join("\n\n");
-      const prompt = `다음은 콜센터 상담사 QA(품질 관리) 평가에서 감점되었거나 코멘트가 남은 항목들의 원문입니다.\n\n${itemsText}\n\n위 내용을 한국어로, 아래와 같이 정확히 두 개 섹션으로만 정리해주세요. 불필요한 서론·결론 문장은 쓰지 마세요.\n\n[차감된 요소]\n- (항목별로 무엇 때문에 감점되었는지 한 줄씩, 최대한 간결하게)\n\n[피드백이 필요한 내용]\n- (다음 상담에서 개선하면 좋을 점을 실행 가능한 조언 형태로, 한 줄씩 간결하게)`;
+      const prompt = `다음은 콜센터 상담사 QA(품질 관리) 평가에서 감점되었거나 코멘트가 남은 항목들의 원문입니다.\n\n${itemsText}\n\n위 내용을 한국어로, 아래와 같이 정확히 두 개 섹션으로만 정리해주세요. 불필요한 서론·결론 문장은 쓰지 마세요. 마크다운 기호(**, *, # 등)는 절대 쓰지 말고, 아래처럼 대괄호로 된 제목만 그대로 써주세요.\n\n[차감된 요소]\n- (항목별로 무엇 때문에 감점되었는지 한 줄씩, 최대한 간결하게. 문장은 "~하세요/~마세요" 같은 권유형이 아니라 "~함", "~됨"처럼 개조식 명사형 종결로 쓰세요. 예: "필요 이상으로 신원을 확인함")\n\n[피드백이 필요한 내용]\n- (다음 상담에서 개선하면 좋을 점을 한 줄씩 간결하게. "~하세요", "~주세요", "~마세요" 같은 권유형은 쓰지 말고 "~필요", "~해야 함"처럼 개조식 명사형 종결로 쓰세요. 예: "재탐색 없이 즉시 활용 필요")`;
       // 실제 Groq API 키는 이 브라우저가 아니라 Supabase Edge Function(qa-groq-summary)
       // 서버 쪽 환경변수에만 있다. 여기서는 그 함수를 호출하기만 한다.
       const { data, error } = await cloud.functions.invoke(QA_AI_SUMMARY_FN, { body: { prompt } });
@@ -671,7 +681,7 @@
               const highlight = !forCapture && qaHighlightAgentId === a.id;
               return `
                 <tr data-qa-row-agent="${a.id}" class="${highlight ? "qa-row-highlight" : ""}">
-                  <td class="qa-col-name"${forCapture ? "" : ` data-qa-name-click="${a.id}"`}>${esc(a.name)}</td>
+                  <td class="qa-col-name"${forCapture ? "" : ` data-qa-name-click="${a.id}"`}>${esc(a.name)}${forCapture ? "" : `<span class="qa-name-search-icon">${ICON_SEARCH_MINI}</span>`}</td>
                   <td class="qa-col-ldap">${esc(a.ldap || "-")}</td>
                   <td>${esc(a.timezone || "-")}</td>
                   <td class="qa-col-badges">${typeBadges || "-"}</td>
