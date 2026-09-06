@@ -3,6 +3,7 @@
     const uiState = {
       tab: "accounts", resettingId: null, renamingId: null, error: "", renameError: "",
       logAccountFilter: "all", expandedLogIds: new Set(),
+      backupList: null, backupLoading: false, expandedBackupDates: new Set(),
     };
 
     function draw() {
@@ -10,9 +11,10 @@
         <div class="agent-list-header">
           <div class="agent-list-title">마스터 계정 관리</div>
         </div>
-        <div class="login-tabs" style="max-width:280px; margin-bottom:16px;">
+        <div class="login-tabs" style="max-width:420px; margin-bottom:16px;">
           <button type="button" class="login-tab ${uiState.tab === "accounts" ? "active" : ""}" data-master-tab="accounts">계정 관리</button>
           <button type="button" class="login-tab ${uiState.tab === "activity" ? "active" : ""}" data-master-tab="activity">활동 로그</button>
+          <button type="button" class="login-tab ${uiState.tab === "backups" ? "active" : ""}" data-master-tab="backups">자동 백업</button>
         </div>
         <div id="master-tab-body"></div>
       `;
@@ -21,6 +23,7 @@
       });
       const body = document.getElementById("master-tab-body");
       if (uiState.tab === "activity") drawActivityLog(body);
+      else if (uiState.tab === "backups") drawBackups(body);
       else drawAccounts(body);
     }
 
@@ -161,8 +164,8 @@
       const shown = filtered.slice(0, 200);
       const rows = shown.map((e) => {
         const isExpanded = uiState.expandedLogIds.has(e.id);
-        const startLabel = e.at ? esc(e.at.replace("T", " ").slice(0, 16)) : "-";
-        const endLabel = e.endedAt ? esc(e.endedAt.replace("T", " ").slice(11, 16)) : "";
+        const startLabel = e.at ? esc(formatKSTDateTime(e.at)) : "-";
+        const endLabel = e.endedAt ? esc(formatKSTTime(e.endedAt)) : "";
         const dt = endLabel && endLabel !== startLabel.slice(-5) ? `${startLabel} ~ ${endLabel}` : startLabel;
         const whereLabel = esc(e.subLabel ? `${e.categoryLabel} · ${e.subLabel}` : (e.categoryLabel || "기타"));
         return `
@@ -185,8 +188,8 @@
 
       root.innerHTML = `
         <div class="agent-summary">
-          각 계정에서 데이터가 바뀔 때마다 자동으로 기록돼요. 목록을 누르면 자세한 변경 내용을 볼 수 있어요.
-          총 ${filtered.length}건${filtered.length > shown.length ? ` (최근 ${shown.length}건만 표시)` : ""}.
+          각 계정에서 데이터가 바뀔 때마다 자동으로 기록돼요(시각은 한국 표준시 기준). 목록을 누르면 자세한 변경 내용을 볼 수 있어요.
+          ${ACTIVITY_LOG_RETENTION_DAYS}일 지난 로그는 자동으로 정리돼요. 총 ${filtered.length}건${filtered.length > shown.length ? ` (최근 ${shown.length}건만 표시)` : ""}.
         </div>
         <div style="display:flex; gap:8px; align-items:center; margin-bottom:14px; flex-wrap:wrap;">
           <select class="agent-sort-select" id="log-account-filter">
@@ -219,6 +222,106 @@
           draw();
         };
       });
+    }
+
+    // ----- 자동 백업 탭: 매일 자정 이후 자동으로 남겨진 스냅샷 목록 -----
+    function drawBackups(root) {
+      if (uiState.backupList === null && !uiState.backupLoading) {
+        uiState.backupLoading = true;
+        fetchBackupList().then((list) => {
+          uiState.backupList = list;
+          uiState.backupLoading = false;
+          if (uiState.tab === "backups") draw();
+        });
+      }
+      if (uiState.backupLoading) {
+        root.innerHTML = `<div class="agent-summary">불러오는 중…</div>`;
+        return;
+      }
+      const list = uiState.backupList || [];
+      const rows = list.map((day) => {
+        const isExpanded = uiState.expandedBackupDates.has(day.date);
+        const accountRows = Object.keys(day.accounts).map((accountId) => {
+          const acc = day.accounts[accountId];
+          const cats = (acc.categories || []).map((c) => `
+            <button type="button" class="badge sm working" style="cursor:pointer; border:none;" data-backup-cat-download="${esc(accountId)}|${esc(c.key)}|${esc(day.date)}">${esc(c.label)} ⬇</button>
+          `).join(" ");
+          return `
+            <div class="agent-row master-account-row" style="padding:10px 14px;">
+              <div class="agent-row-main" style="cursor:default;">
+                <span class="agent-row-name">${esc(acc.accountName || "(삭제된 계정)")}</span>
+                <span class="agent-row-ldap">그날 바뀐 항목만 개별 다운로드</span>
+              </div>
+              <div class="agent-row-badges" style="flex-wrap:wrap;">${cats || `<span class="agent-row-ldap">-</span>`}</div>
+            </div>
+          `;
+        }).join("");
+        return `
+          <div class="interview-row ${isExpanded ? "expanded" : ""}">
+            <div class="interview-row-top" data-action="toggle-backup-date" data-date="${esc(day.date)}">
+              <span class="interview-row-chevron">${ICON_CHEVRON_RIGHT}</span>
+              <span class="interview-date">${esc(day.date)}</span>
+              <span class="badge sm working">변경 있던 계정 ${Object.keys(day.accounts).length}개</span>
+              ${day.all ? `<button type="button" class="ghost-btn" style="margin-left:auto;" data-backup-all-download="${esc(day.date)}">${ICON_BACKUP} 전체 백업 다운로드</button>` : ""}
+            </div>
+            ${isExpanded ? `
+              <div class="interview-row-body">
+                ${accountRows || `<div class="agent-list-empty">이 날짜에는 변경이 있던 계정이 없어요.</div>`}
+              </div>
+            ` : ""}
+          </div>
+        `;
+      }).join("");
+
+      root.innerHTML = `
+        <div class="agent-summary">
+          자정이 지난 뒤 처음 접속이 있을 때, 어제 하루치 데이터를 자동으로 스냅샷으로 남겨요.
+          매일 "전체 백업"이 하나씩 쌓이고, 그날 실제로 뭔가를 바꾼 계정이 있으면 그 계정의 바뀐 항목만 따로도 받을 수 있어요.
+          최근 ${BACKUP_RETENTION_DAYS}일치만 보관되고 그 이전은 자동으로 정리돼요.
+        </div>
+        <div class="interview-list">${rows || `<div class="agent-list-empty">아직 쌓인 자동 백업이 없어요. (자정이 한 번 지나야 첫 백업이 생겨요)</div>`}</div>
+      `;
+
+      root.querySelectorAll("[data-action='toggle-backup-date']").forEach((row) => {
+        row.onclick = () => {
+          const date = row.getAttribute("data-date");
+          if (uiState.expandedBackupDates.has(date)) uiState.expandedBackupDates.delete(date);
+          else uiState.expandedBackupDates.add(date);
+          draw();
+        };
+      });
+      root.querySelectorAll("[data-backup-all-download]").forEach((btn) => {
+        btn.onclick = (e) => {
+          e.stopPropagation();
+          const date = btn.getAttribute("data-backup-all-download");
+          const day = list.find((d) => d.date === date);
+          if (!day || !day.all) return;
+          downloadJsonPayload(day.all, `자동백업_전체_${date}.json`);
+        };
+      });
+      root.querySelectorAll("[data-backup-cat-download]").forEach((btn) => {
+        btn.onclick = (e) => {
+          e.stopPropagation();
+          const [accountId, catKey, date] = btn.getAttribute("data-backup-cat-download").split("|");
+          const day = list.find((d) => d.date === date);
+          const acc = day && day.accounts[accountId];
+          const payload = acc && acc.catData && acc.catData[catKey];
+          if (!payload) return;
+          downloadJsonPayload(payload, `자동백업_${sanitizeFilenamePart(payload.accountName || accountId)}_${sanitizeFilenamePart(payload.categoryLabel || catKey)}_${date}.json`);
+        };
+      });
+    }
+    function downloadJsonPayload(payload, filename) {
+      const json = JSON.stringify(payload, null, 2);
+      const blob = new Blob([json], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
     }
 
     draw();

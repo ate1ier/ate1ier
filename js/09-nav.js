@@ -21,13 +21,13 @@
           <span class="nav-master-mode-sub">계정 관리 전용</span>
         </div>
       ` : `
-        <button class="nav-btn ${state.page === "home" ? "active" : ""}" data-nav="home" title="홈">${ICON_HOME} <span class="nav-text">홈</span></button>
-        <button class="nav-btn ${state.page === "calendar" ? "active" : ""}" data-nav="calendar" title="캘린더">${ICON_CALENDAR} <span class="nav-text">캘린더</span></button>
-        <button class="nav-btn ${state.page === "agents" ? "active" : ""}" data-nav="agents" title="상담사 관리">${ICON_USERS} <span class="nav-text">상담사 관리</span></button>
-        <button class="nav-btn ${state.page === "notes" ? "active" : ""}" data-nav="notes" title="업무 정리">${ICON_NOTE} <span class="nav-text">업무 정리</span></button>
-        <button class="nav-btn ${state.page === "interviews" ? "active" : ""}" data-nav="interviews" title="면담일지">${ICON_CLIPBOARD} <span class="nav-text">면담일지</span></button>
-        <button class="nav-btn ${state.page === "qa" ? "active" : ""}" data-nav="qa" title="품질 관리">${ICON_QA} <span class="nav-text">품질 관리</span></button>
-        <button class="nav-btn ${state.page === "schedule" ? "active" : ""}" data-nav="schedule" title="월별 스케줄">${ICON_CHART} <span class="nav-text">월별 스케줄</span></button>
+        <button class="nav-btn ${state.page === "home" ? "active" : ""}" data-nav="home" title="홈">${NAV_ICON_HOME} <span class="nav-text">홈</span></button>
+        <button class="nav-btn ${state.page === "calendar" ? "active" : ""}" data-nav="calendar" title="캘린더">${NAV_ICON_CALENDAR} <span class="nav-text">캘린더</span></button>
+        <button class="nav-btn ${state.page === "agents" ? "active" : ""}" data-nav="agents" title="상담사 관리">${NAV_ICON_AGENTS} <span class="nav-text">상담사 관리</span></button>
+        <button class="nav-btn ${state.page === "notes" ? "active" : ""}" data-nav="notes" title="업무 정리">${NAV_ICON_NOTES} <span class="nav-text">업무 정리</span></button>
+        <button class="nav-btn ${state.page === "interviews" ? "active" : ""}" data-nav="interviews" title="면담일지">${NAV_ICON_INTERVIEWS} <span class="nav-text">면담일지</span></button>
+        <button class="nav-btn ${state.page === "qa" ? "active" : ""}" data-nav="qa" title="품질 관리">${NAV_ICON_QA} <span class="nav-text">품질 관리</span></button>
+        <button class="nav-btn ${state.page === "schedule" ? "active" : ""}" data-nav="schedule" title="월별 스케줄">${NAV_ICON_SCHEDULE} <span class="nav-text">월별 스케줄</span></button>
       `}
       <div class="nav-spacer"></div>
     `;

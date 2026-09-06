@@ -14,6 +14,15 @@
   const ICON_SUN = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="2.7"/><path d="M8 1.8v1.5M8 12.7v1.5M14.2 8h-1.5M3.3 8H1.8M12.3 3.7l-1.1 1.1M4.8 11.2l-1.1 1.1M12.3 12.3l-1.1-1.1M4.8 4.8l-1.1-1.1"/></svg>`;
   const ICON_QA = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1.6l1.8 3.7 4 .6-2.9 2.8.7 4-3.6-1.9-3.6 1.9.7-4-2.9-2.8 4-.6z"/></svg>`;
   const ICON_PIN = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2.4 12 6l-1.9 1.9v3.5L8 13.6l-2.1-2.2V7.9L4 6z"/></svg>`;
+
+  /* ---- 내비게이션 독 아이콘: macOS 스타일 스퀄클 플랫 아이콘 (메인 좌측 메뉴 전용) ---- */
+  const NAV_ICON_HOME = `<svg class="nav-dock-icon" viewBox="0 0 512 512" aria-hidden="true"><defs><clipPath id="nih"><path d="M512 256L511 369L508 405L504 430L498 450L489 466L479 479L466 489L450 498L430 504L405 508L369 511L256 512L143 511L107 508L82 504L62 498L46 489L33 479L23 466L14 450L8 430L4 405L1 369L0 256L1 143L4 107L8 82L14 62L23 46L33 33L46 23L62 14L82 8L107 4L143 1L256 0L369 1L405 4L430 8L450 14L466 23L479 33L489 46L498 62L504 82L508 107L511 143L512 256Z"/></clipPath></defs><path d="M512 256L511 369L508 405L504 430L498 450L489 466L479 479L466 489L450 498L430 504L405 508L369 511L256 512L143 511L107 508L82 504L62 498L46 489L33 479L23 466L14 450L8 430L4 405L1 369L0 256L1 143L4 107L8 82L14 62L23 46L33 33L46 23L62 14L82 8L107 4L143 1L256 0L369 1L405 4L430 8L450 14L466 23L479 33L489 46L498 62L504 82L508 107L511 143L512 256Z" fill="#c1683f"/><g clip-path="url(#nih)"><path d="M130 260L256 160L382 260" fill="none" stroke="#fdf3e5" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"/><path d="M162 236V366H350V236" fill="#fdf3e5"/><rect x="240" y="292" width="32" height="74" fill="#c1683f"/></g></svg>`;
+  const NAV_ICON_CALENDAR = `<svg class="nav-dock-icon" viewBox="0 0 512 512" aria-hidden="true"><defs><clipPath id="nic"><path d="M512 256L511 369L508 405L504 430L498 450L489 466L479 479L466 489L450 498L430 504L405 508L369 511L256 512L143 511L107 508L82 504L62 498L46 489L33 479L23 466L14 450L8 430L4 405L1 369L0 256L1 143L4 107L8 82L14 62L23 46L33 33L46 23L62 14L82 8L107 4L143 1L256 0L369 1L405 4L430 8L450 14L466 23L479 33L489 46L498 62L504 82L508 107L511 143L512 256Z"/></clipPath></defs><path d="M512 256L511 369L508 405L504 430L498 450L489 466L479 479L466 489L450 498L430 504L405 508L369 511L256 512L143 511L107 508L82 504L62 498L46 489L33 479L23 466L14 450L8 430L4 405L1 369L0 256L1 143L4 107L8 82L14 62L23 46L33 33L46 23L62 14L82 8L107 4L143 1L256 0L369 1L405 4L430 8L450 14L466 23L479 33L489 46L498 62L504 82L508 107L511 143L512 256Z" fill="#33363d"/><g clip-path="url(#nic)"><rect x="126" y="118" width="260" height="288" fill="#f2ead9"/><rect x="126" y="118" width="260" height="56" fill="#c1683f"/><rect x="168" y="90" width="18" height="46" rx="9" fill="#f2ead9"/><rect x="326" y="90" width="18" height="46" rx="9" fill="#f2ead9"/><text x="256" y="330" font-family="Georgia, 'Times New Roman', serif" font-size="170" font-weight="700" fill="#33363d" text-anchor="middle">6</text></g></svg>`;
+  const NAV_ICON_AGENTS = `<svg class="nav-dock-icon" viewBox="0 0 512 512" aria-hidden="true"><defs><clipPath id="nia"><path d="M512 256L511 369L508 405L504 430L498 450L489 466L479 479L466 489L450 498L430 504L405 508L369 511L256 512L143 511L107 508L82 504L62 498L46 489L33 479L23 466L14 450L8 430L4 405L1 369L0 256L1 143L4 107L8 82L14 62L23 46L33 33L46 23L62 14L82 8L107 4L143 1L256 0L369 1L405 4L430 8L450 14L466 23L479 33L489 46L498 62L504 82L508 107L511 143L512 256Z"/></clipPath></defs><path d="M512 256L511 369L508 405L504 430L498 450L489 466L479 479L466 489L450 498L430 504L405 508L369 511L256 512L143 511L107 508L82 504L62 498L46 489L33 479L23 466L14 450L8 430L4 405L1 369L0 256L1 143L4 107L8 82L14 62L23 46L33 33L46 23L62 14L82 8L107 4L143 1L256 0L369 1L405 4L430 8L450 14L466 23L479 33L489 46L498 62L504 82L508 107L511 143L512 256Z" fill="#5f6fae"/><g clip-path="url(#nia)"><circle cx="200" cy="200" r="62" fill="#f2ead9"/><path d="M104 396Q104 300 200 300Q296 300 296 396Z" fill="#f2ead9"/><circle cx="342" cy="222" r="46" fill="#e3d9be"/><path d="M282 400Q282 322 342 310Q402 322 402 400" fill="#e3d9be"/></g></svg>`;
+  const NAV_ICON_NOTES = `<svg class="nav-dock-icon" viewBox="0 0 512 512" aria-hidden="true"><defs><clipPath id="nin"><path d="M512 256L511 369L508 405L504 430L498 450L489 466L479 479L466 489L450 498L430 504L405 508L369 511L256 512L143 511L107 508L82 504L62 498L46 489L33 479L23 466L14 450L8 430L4 405L1 369L0 256L1 143L4 107L8 82L14 62L23 46L33 33L46 23L62 14L82 8L107 4L143 1L256 0L369 1L405 4L430 8L450 14L466 23L479 33L489 46L498 62L504 82L508 107L511 143L512 256Z"/></clipPath></defs><path d="M512 256L511 369L508 405L504 430L498 450L489 466L479 479L466 489L450 498L430 504L405 508L369 511L256 512L143 511L107 508L82 504L62 498L46 489L33 479L23 466L14 450L8 430L4 405L1 369L0 256L1 143L4 107L8 82L14 62L23 46L33 33L46 23L62 14L82 8L107 4L143 1L256 0L369 1L405 4L430 8L450 14L466 23L479 33L489 46L498 62L504 82L508 107L511 143L512 256Z" fill="#d3a03f"/><g clip-path="url(#nin)"><rect x="128" y="96" width="256" height="320" fill="#fdf6e7"/><rect x="164" y="164" width="184" height="16" fill="#d3a03f"/><rect x="164" y="212" width="184" height="16" fill="#d3a03f"/><rect x="164" y="260" width="120" height="16" fill="#d3a03f"/><g transform="translate(300,320) rotate(45)"><rect x="-14" y="-84" width="28" height="140" fill="#33363d"/><polygon points="-14,56 14,56 0,90" fill="#d3a03f"/></g></g></svg>`;
+  const NAV_ICON_INTERVIEWS = `<svg class="nav-dock-icon" viewBox="0 0 512 512" aria-hidden="true"><defs><clipPath id="nii"><path d="M512 256L511 369L508 405L504 430L498 450L489 466L479 479L466 489L450 498L430 504L405 508L369 511L256 512L143 511L107 508L82 504L62 498L46 489L33 479L23 466L14 450L8 430L4 405L1 369L0 256L1 143L4 107L8 82L14 62L23 46L33 33L46 23L62 14L82 8L107 4L143 1L256 0L369 1L405 4L430 8L450 14L466 23L479 33L489 46L498 62L504 82L508 107L511 143L512 256Z"/></clipPath></defs><path d="M512 256L511 369L508 405L504 430L498 450L489 466L479 479L466 489L450 498L430 504L405 508L369 511L256 512L143 511L107 508L82 504L62 498L46 489L33 479L23 466L14 450L8 430L4 405L1 369L0 256L1 143L4 107L8 82L14 62L23 46L33 33L46 23L62 14L82 8L107 4L143 1L256 0L369 1L405 4L430 8L450 14L466 23L479 33L489 46L498 62L504 82L508 107L511 143L512 256Z" fill="#3f8f86"/><g clip-path="url(#nii)"><rect x="146" y="100" width="220" height="312" fill="#f2ead9"/><rect x="198" y="80" width="116" height="42" fill="#e3d9be"/><rect x="178" y="192" width="160" height="14" fill="#3f8f86"/><rect x="178" y="234" width="160" height="14" fill="#3f8f86"/><rect x="178" y="276" width="104" height="14" fill="#3f8f86"/><circle cx="330" cy="352" r="42" fill="#33363d"/><path d="M312 352L324 366L350 336" fill="none" stroke="#f2ead9" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/></g></svg>`;
+  const NAV_ICON_QA = `<svg class="nav-dock-icon" viewBox="0 0 512 512" aria-hidden="true"><defs><clipPath id="niq"><path d="M512 256L511 369L508 405L504 430L498 450L489 466L479 479L466 489L450 498L430 504L405 508L369 511L256 512L143 511L107 508L82 504L62 498L46 489L33 479L23 466L14 450L8 430L4 405L1 369L0 256L1 143L4 107L8 82L14 62L23 46L33 33L46 23L62 14L82 8L107 4L143 1L256 0L369 1L405 4L430 8L450 14L466 23L479 33L489 46L498 62L504 82L508 107L511 143L512 256Z"/></clipPath></defs><path d="M512 256L511 369L508 405L504 430L498 450L489 466L479 479L466 489L450 498L430 504L405 508L369 511L256 512L143 511L107 508L82 504L62 498L46 489L33 479L23 466L14 450L8 430L4 405L1 369L0 256L1 143L4 107L8 82L14 62L23 46L33 33L46 23L62 14L82 8L107 4L143 1L256 0L369 1L405 4L430 8L450 14L466 23L479 33L489 46L498 62L504 82L508 107L511 143L512 256Z" fill="#c26a86"/><g clip-path="url(#niq)"><path d="M256 114L294 219L406 227L320 297L347 405L256 344L165 405L192 297L106 227L218 219Z" fill="#fdf6e7"/><circle cx="256" cy="246" r="48" fill="#c26a86"/><path d="M236 246L250 260L278 228" fill="none" stroke="#fdf6e7" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/></g></svg>`;
+  const NAV_ICON_SCHEDULE = `<svg class="nav-dock-icon" viewBox="0 0 512 512" aria-hidden="true"><defs><clipPath id="nis"><path d="M512 256L511 369L508 405L504 430L498 450L489 466L479 479L466 489L450 498L430 504L405 508L369 511L256 512L143 511L107 508L82 504L62 498L46 489L33 479L23 466L14 450L8 430L4 405L1 369L0 256L1 143L4 107L8 82L14 62L23 46L33 33L46 23L62 14L82 8L107 4L143 1L256 0L369 1L405 4L430 8L450 14L466 23L479 33L489 46L498 62L504 82L508 107L511 143L512 256Z"/></clipPath></defs><path d="M512 256L511 369L508 405L504 430L498 450L489 466L479 479L466 489L450 498L430 504L405 508L369 511L256 512L143 511L107 508L82 504L62 498L46 489L33 479L23 466L14 450L8 430L4 405L1 369L0 256L1 143L4 107L8 82L14 62L23 46L33 33L46 23L62 14L82 8L107 4L143 1L256 0L369 1L405 4L430 8L450 14L466 23L479 33L489 46L498 62L504 82L508 107L511 143L512 256Z" fill="#6fa07a"/><g clip-path="url(#nis)"><rect x="120" y="398" width="272" height="14" fill="#f2ead9"/><rect x="146" y="322" width="52" height="76" fill="#f2ead9"/><rect x="230" y="240" width="52" height="158" fill="#f2ead9"/><rect x="314" y="280" width="52" height="118" fill="#f2ead9"/></g></svg>`;
   const ICON_CHECK = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2.6" y="2.6" width="10.8" height="10.8" rx="2.4"/><path d="M5 8.2 7 10.1 11 5.9"/></svg>`;
   const ICON_LOCK = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.6" y="7.2" width="8.8" height="6.4" rx="1.4"/><path d="M5.4 7.2V5.2a2.6 2.6 0 0 1 5.2 0v2"/></svg>`;
   const ICON_UNLOCK = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.6" y="7.2" width="8.8" height="6.4" rx="1.4"/><path d="M5.4 7.2V5.2a2.6 2.6 0 0 1 4.8-1.9"/></svg>`;
@@ -568,6 +577,7 @@
     cloudDelete(key);
   };
   await cloudHydrate();
+  runDailyAutoBackupIfNeeded().catch(() => {}); // 자정이 지난 뒤 처음 여는 경우, 어제치 백업을 조용히 만들어둠(화면엔 영향 없음)
 
   /* ---- 실시간 구독: 다른 사람(또는 다른 탭)이 저장하면 곧바로 반영한다.
      - 우선 로컬 저장소(localStorage)에도 최신 값을 바로 써둔다. 이렇게 해야 지금 다른
@@ -924,6 +934,143 @@
     if (count === 0) return { ok: false, reason: "이 백업 파일에서 가져올 수 있는 데이터를 찾지 못했어요." };
     await flushCloudWrites();
     return { ok: true, count };
+  }
+
+  /* ===================== 🗄️ 자동 일일 백업 =====================
+     서버에 진짜 "정확히 자정 0시"에 실행되는 스케줄러가 있는 게 아니라, 자정이 지난
+     뒤 누군가(어떤 계정이든) 앱을 맨 처음 열 때 "어제 하루치" 백업이 아직 없으면
+     그 시점에 만든다. 그래서 실제로 만들어지는 시각은 자정보다 조금 늦어질 수 있지만
+     (예: 새벽엔 아무도 안 열고 오전 9시에 첫 출근자가 열면 그때 만들어짐), 내용 자체는
+     "그 날짜가 끝난 시점의 데이터" 그대로를 담는다. 같은 날짜는 marker 키로 한 번만
+     만들어지게 막는다. 별도 DB 테이블 없이 기존 kv_store에 다음 키들로 함께 저장한다.
+       - backup:all:{yyyy-mm-dd}                모든 계정의 전체 데이터 스냅샷 (그날 변경 여부와 무관하게 매일)
+       - backup:acct:{accountId}:{yyyy-mm-dd}    그 계정이 그날 바꾼 카테고리 목록(메타데이터)
+       - backup:cat:{accountId}:{category}:{yyyy-mm-dd}  그 계정의 그 카테고리만 담은 개별 스냅샷(바뀐 것만)
+       - backup:marker:{yyyy-mm-dd}              중복 생성 방지용 표시 */
+  const BACKUP_RETENTION_DAYS = 30;
+  function _localDateStr(d) {
+    return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+  }
+  function _prevLocalDateStr() {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    return _localDateStr(d);
+  }
+  function _dateStrMinusOne(dateStr) {
+    const d = new Date(`${dateStr}T00:00:00`);
+    d.setDate(d.getDate() - 1);
+    return _localDateStr(d);
+  }
+  // 특정 계정(대상 계정 아무나)의, 주어진 접두어들에 해당하는 상대 키만 모아 온다.
+  // (기존 buildBackupPayload는 "지금 로그인한 계정"만 다뤘는데, 여기서는 모든 계정을 다뤄야 해서 별도로 둔다.)
+  function _accountCategoryEntries(accountId, prefixes) {
+    const acctPrefix = `acct:${accountId}:`;
+    const entries = {};
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (!k || k.indexOf(acctPrefix) !== 0) continue;
+        const rel = k.slice(acctPrefix.length);
+        if (!prefixes.some((p) => rel.indexOf(p) === 0)) continue;
+        const v = localStorage.getItem(k);
+        if (v !== null) entries[rel] = v;
+      }
+    } catch (e) { /* 접근 실패 시 빈 결과로 진행 */ }
+    return entries;
+  }
+  async function runDailyAutoBackupIfNeeded() {
+    if (!cloud) return;
+    const targetDate = _prevLocalDateStr(); // "어제"를 기준으로 하루치를 남긴다
+    const markerKey = `backup:marker:${targetDate}`;
+    try {
+      const { data } = await cloud.from("kv_store").select("key").eq("key", markerKey).maybeSingle();
+      if (data) return; // 이미 다른 사람이 만들어둔 날짜
+    } catch (e) { return; } // 확인 자체가 안 되면(오프라인 등) 시도하지 않고, 다음에 여는 사람에게 맡긴다
+    try {
+      const accounts = loadAccounts();
+      // 1) 계정 무관 전체 스냅샷 — 바뀐 게 있든 없든 매일 남긴다.
+      const allSnapshot = { createdAt: new Date().toISOString(), date: targetDate, accounts: {} };
+      accounts.forEach((acc) => {
+        const entries = _accountCategoryEntries(acc.id, backupAllPrefixes());
+        if (Object.keys(entries).length) allSnapshot.accounts[acc.id] = { accountName: acc.username, data: entries };
+      });
+      await cloud.from("kv_store").upsert({ key: `backup:all:${targetDate}`, value: JSON.stringify(allSnapshot), updated_at: new Date().toISOString() });
+
+      // 2) 전날 스냅샷과 비교해서, 계정별로 실제 바뀐 카테고리만 개별 저장한다.
+      let prevAllSnapshot = null;
+      try {
+        const { data } = await cloud.from("kv_store").select("value").eq("key", `backup:all:${_dateStrMinusOne(targetDate)}`).maybeSingle();
+        if (data && data.value) prevAllSnapshot = JSON.parse(data.value);
+      } catch (e) { /* 전날 스냅샷이 없으면(첫 백업 등) 전부 "새로 생김" 취급 */ }
+      for (const acc of accounts) {
+        const changedCats = [];
+        const prevAcctData = (prevAllSnapshot && prevAllSnapshot.accounts[acc.id] && prevAllSnapshot.accounts[acc.id].data) || {};
+        for (const cat of BACKUP_CATEGORIES) {
+          const curEntries = _accountCategoryEntries(acc.id, cat.keyPrefixes);
+          if (!Object.keys(curEntries).length) continue;
+          const prevForCat = {};
+          Object.keys(prevAcctData).forEach((k) => { if (cat.keyPrefixes.some((p) => k.indexOf(p) === 0)) prevForCat[k] = prevAcctData[k]; });
+          if (JSON.stringify(curEntries) === JSON.stringify(prevForCat)) continue; // 안 바뀐 카테고리는 건너뜀
+          changedCats.push({ key: cat.key, label: cat.label });
+          await cloud.from("kv_store").upsert({
+            key: `backup:cat:${acc.id}:${cat.key}:${targetDate}`,
+            value: JSON.stringify({ createdAt: new Date().toISOString(), date: targetDate, accountId: acc.id, accountName: acc.username, category: cat.key, categoryLabel: cat.label, data: curEntries }),
+            updated_at: new Date().toISOString(),
+          });
+        }
+        if (changedCats.length) {
+          await cloud.from("kv_store").upsert({
+            key: `backup:acct:${acc.id}:${targetDate}`,
+            value: JSON.stringify({ createdAt: new Date().toISOString(), date: targetDate, accountId: acc.id, accountName: acc.username, categories: changedCats }),
+            updated_at: new Date().toISOString(),
+          });
+        }
+      }
+      await cloud.from("kv_store").upsert({ key: markerKey, value: "1", updated_at: new Date().toISOString() });
+      await _pruneOldBackups();
+    } catch (e) { /* 실패해도 평소 앱 사용에는 영향 없음 — 다음에 여는 사람이 다시 시도하게 된다 */ }
+  }
+  async function _pruneOldBackups() {
+    if (!cloud) return;
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - BACKUP_RETENTION_DAYS);
+    const cutoffStr = _localDateStr(cutoff);
+    try {
+      const { data } = await cloud.from("kv_store").select("key").like("key", "backup:%");
+      if (!data) return;
+      const toDelete = data.filter((r) => {
+        const m = /:(\d{4}-\d{2}-\d{2})$/.exec(r.key);
+        return m && m[1] < cutoffStr;
+      }).map((r) => r.key);
+      for (const k of toDelete) { try { await cloud.from("kv_store").delete().eq("key", k); } catch (e) {} }
+    } catch (e) {}
+  }
+  // 마스터 화면의 "자동 백업" 탭에서 쓸 목록: 날짜별로 묶어서 최신순으로 돌려준다.
+  async function fetchBackupList() {
+    if (!cloud) return [];
+    const { data, error } = await cloud.from("kv_store").select("key,value").like("key", "backup:%");
+    if (error || !data) return [];
+    const byDate = {};
+    data.forEach((row) => {
+      if (/^backup:marker:/.test(row.key)) return;
+      let m;
+      if ((m = /^backup:all:(\d{4}-\d{2}-\d{2})$/.exec(row.key))) {
+        const date = m[1];
+        byDate[date] = byDate[date] || { date, all: null, accounts: {} };
+        try { byDate[date].all = JSON.parse(row.value); } catch (e) {}
+      } else if ((m = /^backup:acct:([^:]+):(\d{4}-\d{2}-\d{2})$/.exec(row.key))) {
+        const [, accountId, date] = m;
+        byDate[date] = byDate[date] || { date, all: null, accounts: {} };
+        try { byDate[date].accounts[accountId] = Object.assign({ categories: [] }, JSON.parse(row.value), { catData: (byDate[date].accounts[accountId] || {}).catData || {} }); } catch (e) {}
+      } else if ((m = /^backup:cat:([^:]+):([^:]+):(\d{4}-\d{2}-\d{2})$/.exec(row.key))) {
+        const [, accountId, catKey, date] = m;
+        byDate[date] = byDate[date] || { date, all: null, accounts: {} };
+        byDate[date].accounts[accountId] = byDate[date].accounts[accountId] || { categories: [], catData: {} };
+        if (!byDate[date].accounts[accountId].catData) byDate[date].accounts[accountId].catData = {};
+        try { byDate[date].accounts[accountId].catData[catKey] = JSON.parse(row.value); } catch (e) {}
+      }
+    });
+    return Object.values(byDate).sort((a, b) => b.date.localeCompare(a.date));
   }
 
   // 새로고침 버튼: 백업 버튼이 있던 오른쪽 아래 자리에 항상 떠 있는 고정 버튼으로 표시.
@@ -1514,8 +1661,39 @@
      브라우저에서 생긴 활동도 마스터 계정이라면 새로고침 후 같이 볼 수 있다.
      계정 목록 자체를 다루는 동작(비밀번호 초기화·이름 변경·삭제)은 acct: 접두어를
      쓰지 않으므로, 해당 함수(resetAccountPassword 등) 안에서 직접 기록한다. */
+  /* ---- 시각 표시는 항상 한국 표준시(KST, UTC+9)로 ----
+     저장은 new Date().toISOString()(UTC)로 하고, 화면에 보여줄 때 이 함수들을 거쳐
+     KST로 변환한다. 이렇게 해야 보고 있는 사람의 브라우저 시간대 설정과 무관하게
+     항상 한국 시간 기준으로 보인다. (한국은 서머타임이 없어서 항상 UTC+9 고정이면 된다.) */
+  function _toKSTParts(iso) {
+    if (!iso) return null;
+    const t = Date.parse(iso);
+    if (isNaN(t)) return null;
+    const kst = new Date(t + 9 * 60 * 60 * 1000);
+    return {
+      y: kst.getUTCFullYear(), mo: pad2(kst.getUTCMonth() + 1), da: pad2(kst.getUTCDate()),
+      h: pad2(kst.getUTCHours()), mi: pad2(kst.getUTCMinutes()),
+    };
+  }
+  function formatKSTDateTime(iso) {
+    const p = _toKSTParts(iso);
+    return p ? `${p.y}-${p.mo}-${p.da} ${p.h}:${p.mi}` : "-";
+  }
+  function formatKSTTime(iso) {
+    const p = _toKSTParts(iso);
+    return p ? `${p.h}:${p.mi}` : "";
+  }
+
   const ACTIVITY_LOG_KEY = "activity-log:entries";
   const ACTIVITY_LOG_MAX = 500; // 너무 오래 쌓이지 않도록 최신 N건만 유지
+  const ACTIVITY_LOG_RETENTION_DAYS = 30; // 이보다 오래된 로그는 자동으로 정리
+  function _pruneOldActivityEntries(list) {
+    const cutoff = Date.now() - ACTIVITY_LOG_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+    return list.filter((e) => {
+      const ts = Date.parse(e.endedAt || e.at || "");
+      return isNaN(ts) ? true : ts >= cutoff; // 날짜를 못 읽으면 안전하게 남겨둔다
+    });
+  }
   function loadActivityLog() {
     try {
       const raw = localStorage.getItem(ACTIVITY_LOG_KEY);
@@ -1525,11 +1703,21 @@
   }
   function appendActivityLog(entry) {
     try {
-      const list = loadActivityLog();
+      let list = loadActivityLog();
       list.unshift(Object.assign({ id: genId(), at: new Date().toISOString() }, entry));
+      list = _pruneOldActivityEntries(list);
       if (list.length > ACTIVITY_LOG_MAX) list.length = ACTIVITY_LOG_MAX;
       localStorage.setItem(ACTIVITY_LOG_KEY, JSON.stringify(list));
     } catch (e) { /* 로그 저장 실패가 실제 데이터 저장에 영향을 주면 안 된다 */ }
+  }
+  // 새 활동이 한동안 없어도(=appendActivityLog가 한동안 안 불려도) 30일 지난
+  // 로그는 앱을 열 때마다 한 번씩 조용히 정리한다.
+  function pruneActivityLogIfStale() {
+    try {
+      const list = loadActivityLog();
+      const pruned = _pruneOldActivityEntries(list);
+      if (pruned.length !== list.length) localStorage.setItem(ACTIVITY_LOG_KEY, JSON.stringify(pruned));
+    } catch (e) {}
   }
   function clearActivityLog() {
     try { localStorage.setItem(ACTIVITY_LOG_KEY, JSON.stringify([])); } catch (e) {}
@@ -1666,7 +1854,7 @@
     const categoryLabel = whereLabels.length <= 2 ? whereLabels.join(", ") : `${whereLabels.slice(0, 2).join(", ")} 외 ${whereLabels.length - 2}곳`;
     const diffLines = [];
     batch.changes.forEach((c) => {
-      const timeLabel = c.at ? c.at.slice(11, 16) : "";
+      const timeLabel = c.at ? formatKSTTime(c.at) : "";
       const where = c.subLabel ? `${c.categoryLabel} · ${c.subLabel}` : c.categoryLabel;
       (c.diff && c.diff.length ? c.diff : ["내용이 바뀌었어요."]).forEach((line) => diffLines.push(`[${timeLabel}] ${where} — ${line}`));
     });
@@ -1723,6 +1911,7 @@
     });
   }
   resumePendingActivityBatches();
+  pruneActivityLogIfStale();
 
   // acct:{계정id}:{나머지 키} 형태의 저장에만 반응해서 활동 로그를 남긴다. 계정 목록
   // (비밀번호/이름/삭제)처럼 이 접두어를 쓰지 않는 값은 여기서 잡히지 않고, 해당
