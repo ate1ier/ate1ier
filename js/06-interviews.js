@@ -513,7 +513,7 @@
     root.innerHTML = `
       <div class="agent-list-header">
         <div class="agent-list-title">면담일지</div>
-        ${interviewsUi.mode === "list" ? `<div class="agent-list-header-actions">${exportRowHtml}<button class="ghost-btn solid-accent-btn" id="btn-interview-add">＋ 면담 기록 추가</button></div>` : ""}
+        ${interviewsUi.mode === "list" ? `<div class="agent-list-header-actions">${exportRowHtml}<button class="ghost-btn" id="btn-interview-ai-summary">AI 요약</button><button class="ghost-btn solid-accent-btn" id="btn-interview-add">＋ 면담 기록 추가</button></div>` : ""}
       </div>
       <div class="card">
         <div class="interview-summary-row">
@@ -591,6 +591,8 @@
         renderApp();
       };
     }
+    const aiSummaryBtn = document.getElementById("btn-interview-ai-summary");
+    if (aiSummaryBtn) aiSummaryBtn.onclick = () => openInterviewAiModal();
     const searchInput = document.getElementById("interview-search-input");
     if (searchInput) {
       searchInput.oninput = (e) => {
@@ -753,6 +755,144 @@
           renderApp();
         };
       }
+    }
+  }
+
+  /* ===================== 면담일지 AI 요약 (Groq) ===================== */
+  // 실제 Groq API 키는 브라우저에 없고, QA AI 요약과 동일한 Supabase Edge Function
+  // (qa-groq-summary)의 서버 환경변수에만 있다. 그 함수는 prompt 텍스트를 넘기면
+  // Groq 응답 텍스트를 돌려주는 범용 함수라서, 면담일지에서도 그대로 재사용한다.
+  const INTERVIEW_AI_SUMMARY_FN = "qa-groq-summary";
+
+  // 면담 기록이 1건 이상 있는 상담사만, 가장 최근 면담일이 최신인 순서로 정렬해 돌려준다.
+  function interviewAiAgentCandidates() {
+    const list = agentsData
+      .map((agent) => ({ agent, records: sortInterviews(interviewsData.filter((r) => r.agentId === agent.id)) }))
+      .filter((entry) => entry.records.length > 0);
+    list.sort((a, b) => (b.records[0].date || "").localeCompare(a.records[0].date || ""));
+    return list;
+  }
+
+  function closeInterviewAiModal() {
+    const existing = document.getElementById("interview-ai-overlay");
+    if (existing) existing.remove();
+    document.removeEventListener("keydown", interviewAiEscHandler, true);
+  }
+  function interviewAiEscHandler(e) { if (e.key === "Escape") closeInterviewAiModal(); }
+
+  function openInterviewAiModal() {
+    closeInterviewAiModal();
+    const overlay = document.createElement("div");
+    overlay.id = "interview-ai-overlay";
+    overlay.className = "sch-preview-overlay";
+    document.body.appendChild(overlay);
+    overlay.onclick = (e) => { if (e.target === overlay) closeInterviewAiModal(); };
+    document.addEventListener("keydown", interviewAiEscHandler, true);
+    renderInterviewAiAgentStep(overlay, "");
+  }
+
+  // 1단계: AI 요약을 돌릴 상담사를 검색해서 고르는 화면.
+  function renderInterviewAiAgentStep(overlay, query) {
+    const q = query || "";
+    const candidates = interviewAiAgentCandidates();
+    const matches = q.trim() ? candidates.filter((entry) => agentMatchesSearch(entry.agent, q)) : candidates;
+
+    const listHtml = candidates.length === 0
+      ? `<div class="agent-picker-empty">면담 기록이 있는 상담사가 없어요.</div>`
+      : matches.length === 0
+        ? `<div class="agent-picker-empty">일치하는 상담사가 없어요.</div>`
+        : matches.map(({ agent, records }) => `
+            <div class="interview-ai-agent-item" data-id="${agent.id}">
+              <span class="interview-ai-agent-name">${esc(agent.name)}</span>
+              <span class="interview-ai-agent-ldap">${esc(agent.ldap || "")}</span>
+              <span class="interview-ai-agent-count">최근 ${esc(records[0].date || "-")} · 총 ${records.length}건</span>
+            </div>
+          `).join("");
+
+    overlay.innerHTML = `
+      <div class="sch-preview-box interview-ai-box">
+        <div class="sch-preview-head">
+          <span>면담일지 AI 요약 · 상담사 선택</span>
+          <button type="button" class="sch-preview-close" id="interview-ai-close-x" aria-label="닫기">✕</button>
+        </div>
+        <div class="sch-preview-body interview-ai-body">
+          <div class="agent-picker-input interview-ai-search-row">
+            <input type="text" class="agent-picker-input-field" id="interview-ai-search" placeholder="이름, LDAP, 초성으로 검색" value="${esc(q)}" autocomplete="off">
+            ${ICON_SEARCH_MINI}
+          </div>
+          <div class="interview-ai-agent-list">${listHtml}</div>
+        </div>
+      </div>
+    `;
+    document.getElementById("interview-ai-close-x").onclick = () => closeInterviewAiModal();
+    const searchInput = document.getElementById("interview-ai-search");
+    searchInput.oninput = () => renderInterviewAiAgentStep(overlay, searchInput.value);
+    searchInput.focus();
+    overlay.querySelectorAll("[data-id]").forEach((item) => {
+      item.onclick = () => {
+        const agent = agentsData.find((a) => a.id === item.getAttribute("data-id"));
+        if (agent) runInterviewAiSummary(overlay, agent);
+      };
+    });
+  }
+
+  // 2단계: 선택한 상담사의 최근 면담 3건을 Groq에게 요약시켜 보여준다.
+  async function runInterviewAiSummary(overlay, agent) {
+    const records = sortInterviews(interviewsData.filter((r) => r.agentId === agent.id)).slice(0, 3);
+    overlay.innerHTML = `
+      <div class="sch-preview-box interview-ai-box">
+        <div class="sch-preview-head">
+          <span>${esc(agent.name)} · 최근 면담 ${records.length}건 AI 요약</span>
+          <button type="button" class="sch-preview-close" id="interview-ai-close-x" aria-label="닫기">✕</button>
+        </div>
+        <div class="sch-preview-body interview-ai-body">
+          <button type="button" class="ghost-btn interview-ai-back-btn" id="interview-ai-back-btn">← 다른 상담사 선택</button>
+          ${records.length ? `
+            <div class="interview-ai-source-list">
+              ${records.map((r) => `
+                <div class="interview-ai-source-item">
+                  <span class="interview-date">${esc(r.date || "-")}</span>
+                  <span class="badge sm ${interviewTypeBadgeClass(r.type)}">${esc(r.type || "수시")}</span>
+                </div>
+              `).join("")}
+            </div>
+          ` : ""}
+          <div class="interview-ai-summary-box qa-round-summary-box" id="interview-ai-summary-box">
+            <span class="qa-round-hint">AI에게 요약을 요청하고 있어요...</span>
+          </div>
+        </div>
+      </div>
+    `;
+    document.getElementById("interview-ai-close-x").onclick = () => closeInterviewAiModal();
+    document.getElementById("interview-ai-back-btn").onclick = () => renderInterviewAiAgentStep(overlay, "");
+
+    const box = document.getElementById("interview-ai-summary-box");
+    if (!records.length) { box.innerHTML = `<span class="qa-round-hint">면담 기록이 없어요.</span>`; return; }
+    if (!cloud) { box.innerHTML = `<span class="qa-round-hint" style="color:var(--red);">AI 요약 서버에 연결할 수 없어요 (네트워크 확인).</span>`; return; }
+
+    try {
+      // 오래된 순으로 정리해서, AI가 시간 흐름을 따라 이해할 수 있게 한다.
+      const recordsText = records.slice().reverse().map((r, i) => (
+        `${i + 1}. [${r.date || "날짜 미상"} · ${r.type || "수시"}]\n내용: ${r.content || "(내용 없음)"}\n후속조치: ${r.followUp || "없음"}`
+      )).join("\n\n");
+      const prompt = `다음은 콜센터 상담사 "${agent.name}"님과 나눈 최근 면담 ${records.length}건의 기록입니다(오래된 순).\n\n${recordsText}\n\n위 내용을 한국어로, 아래와 같이 정확히 세 개 섹션으로만 정리해주세요. 불필요한 서론·결론 문장은 쓰지 마세요. 마크다운 기호(**, *, # 등)는 절대 쓰지 말고, 아래처럼 대괄호로 된 제목만 그대로 써주세요.\n\n[면담 흐름 요약]\n- (여러 회차에 걸친 면담 내용을 시간 순으로 간결하게 정리하세요. 문장은 "~하세요/~마세요" 같은 권유형이 아니라 "~함", "~됨"처럼 개조식 명사형 종결로 쓰세요.)\n\n[반복되는 이슈]\n- (여러 면담에서 공통적으로 나온 문제나 패턴이 있다면 한 줄씩. 없다면 "특별히 반복되는 이슈는 없음" 한 줄만 쓰세요.)\n\n[후속 조치 필요 사항]\n- (아직 해결되지 않았거나 다음 면담에서 계속 챙겨야 할 점을 한 줄씩. "~하세요", "~주세요" 같은 권유형은 쓰지 말고 "~필요", "~해야 함"처럼 개조식 명사형 종결로 쓰세요.)`;
+      // 실제 Groq API 키는 이 브라우저가 아니라 Supabase Edge Function(qa-groq-summary)
+      // 서버 쪽 환경변수에만 있다. 여기서는 그 함수를 호출하기만 한다.
+      const { data, error } = await cloud.functions.invoke(INTERVIEW_AI_SUMMARY_FN, { body: { prompt } });
+      if (error) {
+        let msg = error.message || "요청 실패";
+        try {
+          const ctx = error.context && typeof error.context.json === "function" ? await error.context.json() : null;
+          if (ctx && ctx.error) msg = ctx.error;
+        } catch (_e) {}
+        throw new Error(msg);
+      }
+      const text = (data && data.text) ? String(data.text).trim() : "";
+      if (!text) throw new Error("응답에서 요약 내용을 찾지 못했어요.");
+      box.innerHTML = qaFormatSummaryHtml(text);
+    } catch (err) {
+      console.error(err);
+      box.innerHTML = `<span class="qa-round-hint" style="color:var(--red);">요약 실패: ${esc(err.message || String(err))}</span>`;
     }
   }
 

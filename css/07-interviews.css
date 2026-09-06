@@ -77,3 +77,22 @@
   .interview-export-menu-empty { display: block; padding: 7px 10px; font-size: 13px; color: var(--text-faint); }
   .interview-export-menu-back { color: var(--text-faint); border-bottom: 1px solid var(--hairline); margin-bottom: 2px; padding-bottom: 8px; }
 
+  /* ---- 면담일지 AI 요약 모달 ---- */
+  .interview-ai-box { width: min(560px, 94vw); }
+  .interview-ai-body { display: flex; flex-direction: column; gap: 14px; text-align: left; }
+  .interview-ai-search-row { margin-bottom: 2px; }
+  .interview-ai-agent-list { display: flex; flex-direction: column; gap: 4px; max-height: min(50vh, 420px); overflow-y: auto; }
+  .interview-ai-agent-item {
+    display: flex; align-items: baseline; gap: 8px; padding: 10px 12px; border-radius: 12px;
+    cursor: pointer; flex-wrap: wrap;
+  }
+  .interview-ai-agent-item:hover { background: var(--accent-dim); }
+  .interview-ai-agent-item:hover .interview-ai-agent-name { color: var(--accent); }
+  .interview-ai-agent-name { font-size: 14.5px; font-weight: 600; color: var(--text); }
+  .interview-ai-agent-ldap { font-size: 12.5px; color: var(--text-faint); }
+  .interview-ai-agent-count { margin-left: auto; font-size: 12px; color: var(--text-faint); }
+  .interview-ai-back-btn { align-self: flex-start; }
+  .interview-ai-source-list { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .interview-ai-source-item { display: flex; align-items: center; gap: 6px; padding: 5px 10px; border: 1px solid var(--hairline); border-radius: 999px; }
+  .interview-ai-summary-box { margin-top: 0; }
+
