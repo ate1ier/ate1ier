@@ -53,6 +53,21 @@
     qaData.details[qaDetailKey(agentId, year, monthIndex)] = detailObj;
     saveQAData();
   }
+  // 상담사 1명의 등록된 엑셀(원문+AI 요약 전부)을 완전히 삭제한다.
+  function deleteQADetail(agentId, year, monthIndex) {
+    delete qaData.details[qaDetailKey(agentId, year, monthIndex)];
+    saveQAData();
+  }
+  // 해당 달에 등록된 모든 상담사의 엑셀(원문+AI 요약 전부)을 한 번에 삭제한다.
+  function deleteAllQADetails(year, monthIndex) {
+    const suffix = `|${qaMonthKey(year, monthIndex)}`;
+    let count = 0;
+    Object.keys(qaData.details).forEach((key) => {
+      if (key.endsWith(suffix)) { delete qaData.details[key]; count++; }
+    });
+    if (count > 0) saveQAData();
+    return count;
+  }
 
   let qaStatusTimer = null;
   function flashQAStatus(msg) {
@@ -267,7 +282,9 @@
       roundSummaryRows.push({ label, row: r });
     }
     const dateCell = qaFindCell(ws, "상담일", { maxRow: 12 });
-    const idCell = qaFindCell(ws, "상담ID", { maxRow: 12 }) || qaFindCellContains(ws, "상담ID", { maxRow: 12 });
+    // "상담ID"의 실제 헤더가 "상담 ID"처럼 띄어쓰기가 다르거나, 맨 위 12행이 아니라
+    // 각 차수 표 근처(더 아래쪽)에 있을 수도 있어서 시트 전체를 대상으로 찾는다.
+    const idCell = qaFindCell(ws, "상담ID") || qaFindCellContains(ws, "상담ID") || qaFindCellContains(ws, "상담아이디");
     // 서술형 피드백 칸은 항상 "총점" 열에서 끝나는 가로 병합(예: S19:X19)으로 되어 있다.
     // (카테고리 라벨처럼 폭이 좁은 다른 가로 병합과 구분하기 위한 기준)
     const feedbackMerges = merges.filter((mg) => mg.c2 > mg.c1 && mg.r1 === mg.r2 && mg.c2 === totalCell.col);
@@ -471,11 +488,13 @@
             }
             return `
             <div class="qa-round-card">
-              <div class="qa-round-head">
-                <div class="qa-round-title">${qaRoundSummaryLine(round)}</div>
+              <div class="qa-round-head" data-qa-round-toggle="${idx}">
+                <div class="qa-round-title"><span class="qa-round-chevron" id="qa-round-chevron-${idx}">▶</span>${qaRoundSummaryLine(round)}</div>
                 ${showButton ? `<button type="button" class="ghost-btn" data-qa-summarize="${idx}">${round.aiSummary ? "다시 요약" : "AI로 요약하기"}</button>` : ""}
               </div>
-              ${bodyBlock}
+              <div class="qa-round-body" id="qa-round-body-${idx}" style="display:none;">
+                ${bodyBlock}
+              </div>
             </div>
           `;
           }).join("")}
@@ -489,7 +508,10 @@
       <div class="sch-preview-box qa-detail-box">
         <div class="sch-preview-head">
           <span>${esc(agent.name)} · ${esc(qaMonthLabel())} QA 상세</span>
-          <button type="button" class="sch-preview-close" id="qa-detail-close-x" aria-label="닫기">✕</button>
+          <div class="qa-detail-head-actions">
+            ${detail ? `<button type="button" class="ghost-btn qa-detail-delete-btn" id="qa-detail-delete-btn">${ICON_TRASH} 엑셀 삭제</button>` : ""}
+            <button type="button" class="sch-preview-close" id="qa-detail-close-x" aria-label="닫기">✕</button>
+          </div>
         </div>
         <div class="sch-preview-body qa-detail-body">
           ${bodyHtml}
@@ -499,9 +521,38 @@
     document.body.appendChild(overlay);
     overlay.onclick = (e) => { if (e.target === overlay) closeQADetailModal(); };
     document.getElementById("qa-detail-close-x").onclick = () => closeQADetailModal();
+    const deleteBtn = document.getElementById("qa-detail-delete-btn");
+    if (deleteBtn) {
+      deleteBtn.onclick = () => {
+        if (!confirm(`${agent.name}님의 ${qaMonthLabel()} QA 엑셀 데이터를 삭제할까요?\n원문과 AI 요약이 모두 함께 삭제되며, 되돌릴 수 없어요.`)) return;
+        deleteQADetail(agentId, year, monthIndex);
+        flashQAStatus("삭제됐어요.");
+        openQADetailModal(agentId); // 모달을 "업로드된 엑셀 없음" 상태로 다시 그림
+      };
+    }
 
     overlay.querySelectorAll("[data-qa-summarize]").forEach((btn) => {
-      btn.onclick = () => qaRunGroqSummary(agentId, year, monthIndex, Number(btn.getAttribute("data-qa-summarize")), btn);
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        const idx = Number(btn.getAttribute("data-qa-summarize"));
+        const body = document.getElementById(`qa-round-body-${idx}`);
+        const chevron = document.getElementById(`qa-round-chevron-${idx}`);
+        if (body && body.style.display === "none") { body.style.display = ""; if (chevron) chevron.textContent = "▼"; }
+        qaRunGroqSummary(agentId, year, monthIndex, idx, btn);
+      };
+    });
+
+    // 회차 카드 헤드를 누르면 펼치기/접기 (버튼 클릭은 위에서 stopPropagation으로 분리됨)
+    overlay.querySelectorAll("[data-qa-round-toggle]").forEach((head) => {
+      head.onclick = () => {
+        const idx = head.getAttribute("data-qa-round-toggle");
+        const body = document.getElementById(`qa-round-body-${idx}`);
+        const chevron = document.getElementById(`qa-round-chevron-${idx}`);
+        if (!body) return;
+        const opening = body.style.display === "none";
+        body.style.display = opening ? "" : "none";
+        if (chevron) chevron.textContent = opening ? "▼" : "▶";
+      };
     });
 
     setTimeout(() => document.addEventListener("keydown", qaDetailEscHandler, true), 0);
@@ -654,6 +705,7 @@
           <button class="ghost-btn sch-lock-toggle-btn ${locked ? "locked" : ""}" id="qa-lock-btn" style="margin-left:8px;">${locked ? `${ICON_UNLOCK} 잠금 해제` : `${ICON_LOCK} 이 달 잠그기`}</button>
           <button class="ghost-btn" id="qa-excel-upload-btn">${ICON_UPLOAD} 엑셀 업로드</button>
           <input type="file" id="qa-excel-input" accept=".xlsx" multiple style="display:none;">
+          <button class="ghost-btn qa-bulk-delete-btn" id="qa-bulk-delete-btn">${ICON_TRASH} 엑셀 일괄삭제</button>
           <button class="ghost-btn" id="qa-capture-btn">${ICON_CAMERA} 이미지로 저장 ▾</button>
         </div>
       </div>
@@ -689,6 +741,13 @@
     document.getElementById("qa-next-month").onclick = () => qaShiftMonth(1);
     document.getElementById("qa-lock-btn").onclick = () => qaToggleMonthLock(year, monthIndex);
     document.getElementById("qa-capture-btn").onclick = (e) => openQACaptureMenu(e.currentTarget);
+    document.getElementById("qa-bulk-delete-btn").onclick = () => {
+      if (qaIsMonthLocked(year, monthIndex)) { flashQAStatus("잠긴 달이에요. 잠금을 해제한 뒤 삭제해주세요."); return; }
+      if (!confirm(`${qaMonthLabel()}에 등록된 모든 상담사의 QA 엑셀 데이터를 일괄삭제할까요?\n원문과 AI 요약이 모두 함께 삭제되며, 되돌릴 수 없어요.`)) return;
+      const count = deleteAllQADetails(year, monthIndex);
+      flashQAStatus(count > 0 ? `${count}건 삭제됐어요.` : "삭제할 데이터가 없어요.");
+      renderApp();
+    };
     document.getElementById("qa-excel-upload-btn").onclick = () => document.getElementById("qa-excel-input").click();
     document.getElementById("qa-excel-input").onchange = (e) => {
       const files = e.target.files;

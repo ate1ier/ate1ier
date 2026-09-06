@@ -86,8 +86,14 @@
   .qa-detail-empty { color: var(--text-faint); font-size: 13.5px; padding: 20px 4px; line-height: 1.6; }
   .qa-detail-rounds { display: flex; flex-direction: column; gap: 14px; }
   .qa-round-card { border: 1px solid var(--hairline); border-radius: 14px; padding: 14px 16px; background: var(--elevated); }
-  .qa-round-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-  .qa-round-title { font-size: 13.5px; font-weight: 700; color: var(--text); }
+  .qa-round-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; cursor: pointer; user-select: none; }
+  .qa-round-title { font-size: 13.5px; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 8px; }
+  .qa-round-chevron { font-size: 10px; color: var(--text-faint); display: inline-block; width: 10px; }
+  .qa-round-body { }
+
+  .qa-detail-head-actions { display: flex; align-items: center; gap: 6px; }
+  .qa-detail-delete-btn, .qa-bulk-delete-btn { color: var(--red); border-color: var(--red); }
+  .qa-detail-delete-btn:hover, .qa-bulk-delete-btn:hover { background: color-mix(in srgb, var(--red) 12%, transparent); }
   .qa-round-empty { font-size: 12.5px; color: var(--text-faint); margin-top: 8px; }
   .qa-round-summary-box {
     margin-top: 10px; font-size: 13px; line-height: 1.7; color: var(--text-dim);
