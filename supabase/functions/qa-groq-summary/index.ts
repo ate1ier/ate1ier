@@ -21,7 +21,7 @@
 // 저장소 코드에는 이 키가 절대 등장하지 않으니, 안전하게 Public으로 유지해도 돼요.
 
 const ALLOWED_ORIGIN = Deno.env.get("ALLOWED_ORIGIN") || "";
-const GROQ_MODEL = Deno.env.get("GROQ_MODEL") || "llama-3.3-70b-versatile";
+const GROQ_MODEL = Deno.env.get("GROQ_MODEL") || "openai/gpt-oss-120b";
 // 키가 새어나가거나 예상 못한 대량 호출이 있어도 피해를 제한하기 위한 하루 총 호출 상한선.
 // 필요하면 supabase secrets set DAILY_LIMIT=숫자 로 바꿀 수 있어요.
 const DAILY_LIMIT = Number(Deno.env.get("DAILY_LIMIT") || "300");
