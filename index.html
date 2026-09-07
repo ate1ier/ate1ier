@@ -5333,6 +5333,7 @@
         </div>
       </div>
       <div class="qa-help-text">QA 평가 엑셀(.xlsx)을 올리면 "평균" 행 × "총점" 열 값을 자동으로 점수에 반영해요.<br>상담사 1명당 파일 1개(시트명 또는 파일명 = 상담사 이름)도, 여러 상담사가 시트로 나뉜 파일 하나도 모두 지원돼요.<br>이름을 누르면 회차별 상세 내용을 볼 수 있어요.</div>
+      <div class="qa-dropzone" id="qa-dropzone">${ICON_UPLOAD} 여기로 엑셀 파일을 끌어다 놓아도 업로드돼요 (여러 개 한꺼번에 가능)</div>
       <div class="status" id="qa-status"></div>
       <div class="qa-stat-grid">
         ${qaStatItemHtml("전체 평균", stats.total, prevStats.total, true)}
@@ -5382,6 +5383,49 @@
         alert(`엑셀 업로드 중 예상치 못한 오류가 발생했어요.\n\n${err && err.message ? err.message : err}\n\nF12 콘솔에 자세한 내용이 남았어요.`);
       });
     };
+
+    // ----- 드래그앤드롭 업로드 -----
+    // 파일 선택 대화상자(input.click())가 VDI 등 일부 환경에서 파일을 0개로
+    // 전달하는 문제가 있어서, 우회 경로로 드래그앤드롭도 지원한다.
+    const qaDropzone = document.getElementById("qa-dropzone");
+    const qaHandleDrop = (fileList) => {
+      console.log("[QA 업로드] 드래그앤드롭으로 전달된 파일 수:", fileList ? fileList.length : 0);
+      qaHandleExcelFiles(fileList).catch((err) => {
+        console.error("[QA 업로드] 드래그앤드롭 처리 중 예상치 못한 오류:", err);
+        alert(`엑셀 업로드 중 예상치 못한 오류가 발생했어요.\n\n${err && err.message ? err.message : err}\n\nF12 콘솔에 자세한 내용이 남았어요.`);
+      });
+    };
+    ["dragenter", "dragover"].forEach((evt) => {
+      qaDropzone.addEventListener(evt, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        qaDropzone.classList.add("qa-dropzone-active");
+      });
+    });
+    ["dragleave", "dragend"].forEach((evt) => {
+      qaDropzone.addEventListener(evt, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        qaDropzone.classList.remove("qa-dropzone-active");
+      });
+    });
+    qaDropzone.addEventListener("drop", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      qaDropzone.classList.remove("qa-dropzone-active");
+      const dt = e.dataTransfer;
+      const files = dt && dt.files;
+      if (!files || !files.length) {
+        console.warn("[QA 업로드] 드롭했지만 dataTransfer.files가 비어있어요.", dt);
+        flashQAStatus("파일을 인식하지 못했어요. 엑셀 파일 자체를 끌어다 놔주세요.");
+        return;
+      }
+      qaHandleDrop(files);
+    });
+    // 드롭존 밖(브라우저 창 전체)에 실수로 떨어뜨려서 파일이 통째로 열려버리는 것 방지.
+    ["dragover", "drop"].forEach((evt) => {
+      root.addEventListener(evt, (e) => { e.preventDefault(); });
+    });
 
     root.querySelectorAll("[data-qa-name-click]").forEach((el) => {
       el.onclick = () => openQADetailModal(el.getAttribute("data-qa-name-click"));
