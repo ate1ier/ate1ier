@@ -4806,7 +4806,10 @@
       let dateVal = summary && dateCell ? qaCellRawValue(ws, summary.row, dateCell.col) : null;
       if (dateVal instanceof Date) dateVal = `${dateVal.getFullYear()}-${pad2(dateVal.getMonth() + 1)}-${pad2(dateVal.getDate())}`;
       else dateVal = dateVal ? String(dateVal).trim() : "";
-      let idVal = summary && idCell ? qaCellRawValue(ws, summary.row, idCell.col) : null;
+      // "상담ID"는 요약표(구분/상담사/상담일)가 아니라, 각 회차 상세표의 시작 행에만
+      // 한 번 들어있다(예: "1차" 블록의 첫 행). summary.row(요약표) 기준으로 읽으면
+      // 그 자리엔 상담사 이름이 있어서 엉뚱한 값이 나온다.
+      let idVal = idCell ? qaCellRawValue(ws, block.startRow, idCell.col) : null;
       idVal = (idVal === null || idVal === undefined) ? "" : String(idVal).trim();
       const roundScoreRaw = summary ? qaCellRawValue(ws, summary.row, totalCell.col) : null;
       const roundScoreNum = Number(roundScoreRaw);
@@ -4836,22 +4839,43 @@
   // 여러 개의 xlsx 파일(상담사 1명당 1개, 또는 여러 상담사가 시트로 나뉜 파일 모두 지원)을
   // 한 번에 받아서, 시트 이름(없으면 파일명)을 상담사 이름과 맞춰 자동으로 반영한다.
   async function qaHandleExcelFiles(fileList) {
+    console.log("[QA 업로드] onchange 발생, 선택된 파일 수:", fileList ? fileList.length : 0);
     const files = Array.from(fileList || []);
-    if (!files.length) return;
+    if (!files.length) {
+      console.warn("[QA 업로드] 선택된 파일이 없어요 (파일 선택 대화상자에서 취소했거나, 브라우저가 파일을 전달하지 못했어요).");
+      return;
+    }
+    console.log("[QA 업로드] 파일 목록:", files.map((f) => f.name));
     const { year, monthIndex } = qaUi;
-    if (qaIsMonthLocked(year, monthIndex)) { flashQAStatus("잠긴 달이에요. 잠금을 해제한 뒤 업로드해주세요."); return; }
-    if (typeof ExcelJS === "undefined") { flashQAStatus("엑셀 처리 기능을 불러오지 못했어요 (인터넷 연결 확인)"); return; }
+    if (qaIsMonthLocked(year, monthIndex)) {
+      console.warn("[QA 업로드] 이 달은 잠겨 있어서 업로드를 막았어요:", qaMonthLabel());
+      flashQAStatus("잠긴 달이에요. 잠금을 해제한 뒤 업로드해주세요.");
+      alert(`${qaMonthLabel()}은(는) 잠겨 있어서 업로드할 수 없어요.\n상단의 "잠금 해제" 버튼을 먼저 눌러주세요.`);
+      return;
+    }
+    if (typeof ExcelJS === "undefined") {
+      console.error("[QA 업로드] ExcelJS 라이브러리가 로드되지 않았어요. CDN(cdn.jsdelivr.net)이 차단됐거나 인터넷 연결이 끊겼을 수 있어요. 개발자도구 Network 탭에서 exceljs.min.js 요청이 실패했는지 확인해주세요.");
+      flashQAStatus("엑셀 처리 기능을 불러오지 못했어요 (인터넷 연결 확인)");
+      alert("엑셀 처리 기능을 불러오지 못했어요.\n\n인터넷 연결을 확인하거나, 방화벽/보안 프로그램이 cdn.jsdelivr.net 접속을 막고 있지 않은지 확인해주세요.\n(F12 개발자도구 → Network 탭에서 exceljs.min.js 요청이 실패(빨간색)로 뜨는지 확인하시면 정확한 원인을 알 수 있어요.)");
+      return;
+    }
 
-    const allAgents = agentsData.filter((a) => !a.isAdmin);
-    const normName = (s) => String(s || "").trim().replace(/\s+/g, "");
-    const matchAgentByName = (name) => {
-      const target = normName(name);
-      if (!target) return null;
-      return allAgents.find((a) => normName(a.name) === target) || null;
-    };
-
-    let okCount = 0;
-    const failList = [];
+    let allAgents, normName, matchAgentByName, okCount, failList;
+    try {
+      allAgents = agentsData.filter((a) => !a.isAdmin);
+      normName = (s) => String(s || "").trim().replace(/\s+/g, "");
+      matchAgentByName = (name) => {
+        const target = normName(name);
+        if (!target) return null;
+        return allAgents.find((a) => normName(a.name) === target) || null;
+      };
+      okCount = 0;
+      failList = [];
+    } catch (setupErr) {
+      console.error("[QA 업로드] 초기화 단계에서 오류가 발생했어요:", setupErr);
+      alert(`엑셀 업로드 준비 중 오류가 발생했어요.\n\n${setupErr.message}\n\n(F12 콘솔에 자세한 내용이 남았어요. 개발자에게 이 메시지를 전달해주세요.)`);
+      return;
+    }
     flashQAStatus("엑셀을 분석하고 있어요...");
 
     for (const file of files) {
@@ -4871,7 +4895,10 @@
       for (const ws of sheets) {
         let agent = matchAgentByName(ws.name);
         if (!agent && sheets.length === 1) agent = matchAgentByName(file.name.replace(/\.xlsx$/i, ""));
-        if (!agent) continue;
+        if (!agent) {
+          console.warn(`[QA 업로드] 이름이 일치하는 상담사를 못 찾았어요. 시트명="${ws.name}", 파일명="${file.name}". 등록된 상담사 이름 목록:`, allAgents.map((a) => a.name));
+          continue;
+        }
         matchedAny = true;
         try {
           const parsed = qaParseWorksheet(ws);
@@ -5348,7 +5375,12 @@
     document.getElementById("qa-excel-input").onchange = (e) => {
       const files = e.target.files;
       e.target.value = "";
-      qaHandleExcelFiles(files);
+      qaHandleExcelFiles(files).catch((err) => {
+        // qaHandleExcelFiles 내부에서 못 잡은 예외가 있으면(원래는 콘솔에도 안 뜨고 조용히
+        // 사라졌던 경우) 여기서 반드시 콘솔+팝업으로 드러나게 한다.
+        console.error("[QA 업로드] 처리 중 예상치 못한 오류:", err);
+        alert(`엑셀 업로드 중 예상치 못한 오류가 발생했어요.\n\n${err && err.message ? err.message : err}\n\nF12 콘솔에 자세한 내용이 남았어요.`);
+      });
     };
 
     root.querySelectorAll("[data-qa-name-click]").forEach((el) => {
