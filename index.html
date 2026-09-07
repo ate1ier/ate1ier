@@ -5061,6 +5061,94 @@
     `;
   }
 
+  function closeQAUploadModal() {
+    const existing = document.getElementById("qa-upload-overlay");
+    if (existing) existing.remove();
+    document.removeEventListener("keydown", qaUploadEscHandler, true);
+  }
+  function qaUploadEscHandler(e) { if (e.key === "Escape") closeQAUploadModal(); }
+
+  function openQAUploadModal() {
+    closeQAUploadModal();
+    const { year, monthIndex } = qaUi;
+    if (qaIsMonthLocked(year, monthIndex)) { flashQAStatus("잠긴 달이에요. 잠금을 해제한 뒤 업로드해주세요."); return; }
+
+    const overlay = document.createElement("div");
+    overlay.id = "qa-upload-overlay";
+    overlay.className = "sch-preview-overlay";
+    overlay.innerHTML = `
+      <div class="sch-preview-box qa-upload-box">
+        <div class="sch-preview-head">
+          <span>QA 평가 엑셀 업로드 · ${esc(qaMonthLabel())}</span>
+          <button type="button" class="sch-preview-close" id="qa-upload-close-x" aria-label="닫기">✕</button>
+        </div>
+        <div class="sch-preview-body qa-upload-body">
+          <div class="qa-upload-dropzone" id="qa-upload-dropzone">
+            <div class="qa-upload-dropzone-icon">${ICON_UPLOAD}</div>
+            <div class="qa-upload-dropzone-text">여기로 엑셀 파일을 끌어다 놓아주세요</div>
+            <div class="qa-upload-dropzone-sub">여러 상담사 파일을 한꺼번에 놓아도 돼요</div>
+            <button type="button" class="ghost-btn" id="qa-upload-pick-btn">파일 선택</button>
+            <input type="file" id="qa-upload-input" accept=".xlsx" multiple style="display:none;">
+          </div>
+          <div class="qa-help-text" style="margin:12px 0 0;">상담사 1명당 파일 1개(시트명 또는 파일명 = 상담사 이름)도, 여러 상담사가 시트로 나뉜 파일 하나도 모두 지원돼요.</div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    overlay.onclick = (e) => { if (e.target === overlay) closeQAUploadModal(); };
+    document.getElementById("qa-upload-close-x").onclick = () => closeQAUploadModal();
+    document.addEventListener("keydown", qaUploadEscHandler, true);
+
+    const dropzone = document.getElementById("qa-upload-dropzone");
+    const fileInput = document.getElementById("qa-upload-input");
+
+    const runUpload = (fileList, source) => {
+      console.log(`[QA 업로드] ${source}로 전달된 파일 수:`, fileList ? fileList.length : 0);
+      if (!fileList || !fileList.length) {
+        flashQAStatus("파일을 인식하지 못했어요.");
+        return;
+      }
+      closeQAUploadModal();
+      qaHandleExcelFiles(fileList).catch((err) => {
+        console.error(`[QA 업로드] ${source} 처리 중 예상치 못한 오류:`, err);
+        alert(`엑셀 업로드 중 예상치 못한 오류가 발생했어요.\n\n${err && err.message ? err.message : err}\n\nF12 콘솔에 자세한 내용이 남았어요.`);
+      });
+    };
+
+    document.getElementById("qa-upload-pick-btn").onclick = () => fileInput.click();
+    fileInput.onchange = (e) => {
+      const files = e.target.files;
+      e.target.value = "";
+      runUpload(files, "파일 선택");
+    };
+
+    ["dragenter", "dragover"].forEach((evt) => {
+      dropzone.addEventListener(evt, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropzone.classList.add("qa-upload-dropzone-active");
+      });
+    });
+    ["dragleave", "dragend"].forEach((evt) => {
+      dropzone.addEventListener(evt, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropzone.classList.remove("qa-upload-dropzone-active");
+      });
+    });
+    dropzone.addEventListener("drop", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dropzone.classList.remove("qa-upload-dropzone-active");
+      runUpload(e.dataTransfer && e.dataTransfer.files, "드래그앤드롭");
+    });
+    // 모달 밖(브라우저 창 전체)에 실수로 파일을 떨어뜨려서 브라우저가 그 파일을
+    // 통째로 열어버리는 사고 방지.
+    ["dragover", "drop"].forEach((evt) => {
+      overlay.addEventListener(evt, (e) => { if (e.target === overlay) e.preventDefault(); });
+    });
+  }
+
   function closeQADetailModal() {
     const existing = document.getElementById("qa-detail-overlay");
     if (existing) existing.remove();
@@ -5327,13 +5415,11 @@
           <button class="schedule-month-btn" id="qa-next-month">›</button>
           <button class="ghost-btn sch-lock-toggle-btn ${locked ? "locked" : ""}" id="qa-lock-btn" style="margin-left:8px;">${locked ? `${ICON_UNLOCK} 잠금 해제` : `${ICON_LOCK} 이 달 잠그기`}</button>
           <button class="ghost-btn" id="qa-excel-upload-btn">${ICON_UPLOAD} 엑셀 업로드</button>
-          <input type="file" id="qa-excel-input" accept=".xlsx" multiple style="display:none;">
           <button class="ghost-btn qa-bulk-delete-btn" id="qa-bulk-delete-btn">${ICON_TRASH} 엑셀 일괄삭제</button>
           <button class="ghost-btn" id="qa-capture-btn">${ICON_CAMERA} 이미지로 저장 ▾</button>
         </div>
       </div>
       <div class="qa-help-text">QA 평가 엑셀(.xlsx)을 올리면 "평균" 행 × "총점" 열 값을 자동으로 점수에 반영해요.<br>상담사 1명당 파일 1개(시트명 또는 파일명 = 상담사 이름)도, 여러 상담사가 시트로 나뉜 파일 하나도 모두 지원돼요.<br>이름을 누르면 회차별 상세 내용을 볼 수 있어요.</div>
-      <div class="qa-dropzone" id="qa-dropzone">${ICON_UPLOAD} 여기로 엑셀 파일을 끌어다 놓아도 업로드돼요 (여러 개 한꺼번에 가능)</div>
       <div class="status" id="qa-status"></div>
       <div class="qa-stat-grid">
         ${qaStatItemHtml("전체 평균", stats.total, prevStats.total, true)}
@@ -5372,60 +5458,7 @@
       flashQAStatus(count > 0 ? `${count}건 삭제됐어요.` : "삭제할 데이터가 없어요.");
       renderApp();
     };
-    document.getElementById("qa-excel-upload-btn").onclick = () => document.getElementById("qa-excel-input").click();
-    document.getElementById("qa-excel-input").onchange = (e) => {
-      const files = e.target.files;
-      e.target.value = "";
-      qaHandleExcelFiles(files).catch((err) => {
-        // qaHandleExcelFiles 내부에서 못 잡은 예외가 있으면(원래는 콘솔에도 안 뜨고 조용히
-        // 사라졌던 경우) 여기서 반드시 콘솔+팝업으로 드러나게 한다.
-        console.error("[QA 업로드] 처리 중 예상치 못한 오류:", err);
-        alert(`엑셀 업로드 중 예상치 못한 오류가 발생했어요.\n\n${err && err.message ? err.message : err}\n\nF12 콘솔에 자세한 내용이 남았어요.`);
-      });
-    };
-
-    // ----- 드래그앤드롭 업로드 -----
-    // 파일 선택 대화상자(input.click())가 VDI 등 일부 환경에서 파일을 0개로
-    // 전달하는 문제가 있어서, 우회 경로로 드래그앤드롭도 지원한다.
-    const qaDropzone = document.getElementById("qa-dropzone");
-    const qaHandleDrop = (fileList) => {
-      console.log("[QA 업로드] 드래그앤드롭으로 전달된 파일 수:", fileList ? fileList.length : 0);
-      qaHandleExcelFiles(fileList).catch((err) => {
-        console.error("[QA 업로드] 드래그앤드롭 처리 중 예상치 못한 오류:", err);
-        alert(`엑셀 업로드 중 예상치 못한 오류가 발생했어요.\n\n${err && err.message ? err.message : err}\n\nF12 콘솔에 자세한 내용이 남았어요.`);
-      });
-    };
-    ["dragenter", "dragover"].forEach((evt) => {
-      qaDropzone.addEventListener(evt, (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        qaDropzone.classList.add("qa-dropzone-active");
-      });
-    });
-    ["dragleave", "dragend"].forEach((evt) => {
-      qaDropzone.addEventListener(evt, (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        qaDropzone.classList.remove("qa-dropzone-active");
-      });
-    });
-    qaDropzone.addEventListener("drop", (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      qaDropzone.classList.remove("qa-dropzone-active");
-      const dt = e.dataTransfer;
-      const files = dt && dt.files;
-      if (!files || !files.length) {
-        console.warn("[QA 업로드] 드롭했지만 dataTransfer.files가 비어있어요.", dt);
-        flashQAStatus("파일을 인식하지 못했어요. 엑셀 파일 자체를 끌어다 놔주세요.");
-        return;
-      }
-      qaHandleDrop(files);
-    });
-    // 드롭존 밖(브라우저 창 전체)에 실수로 떨어뜨려서 파일이 통째로 열려버리는 것 방지.
-    ["dragover", "drop"].forEach((evt) => {
-      root.addEventListener(evt, (e) => { e.preventDefault(); });
-    });
+    document.getElementById("qa-excel-upload-btn").onclick = () => openQAUploadModal();
 
     root.querySelectorAll("[data-qa-name-click]").forEach((el) => {
       el.onclick = () => openQADetailModal(el.getAttribute("data-qa-name-click"));
