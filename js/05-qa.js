@@ -337,8 +337,12 @@
     const totalCell = qaFindCell(ws, "총점", { maxRow: 12 });
     if (!avgCell || !totalCell) throw new Error("'평균' 행 또는 '총점' 열을 찾지 못했어요.");
     const rawScore = qaCellRawValue(ws, avgCell.row, totalCell.col);
-    const score = Number(rawScore);
-    if (rawScore === null || rawScore === undefined || isNaN(score)) throw new Error("평균×총점 칸의 값이 숫자가 아니에요.");
+    const scoreNum = Number(rawScore);
+    if (rawScore === null || rawScore === undefined || isNaN(scoreNum)) throw new Error("평균×총점 칸의 값이 숫자가 아니에요.");
+    // 엑셀 수식이 내부적으로 81.166666...처럼 소수점 아래 여러 자리를 들고 있어도,
+    // 엑셀 화면(및 우리 목록)에는 소수점 첫째 자리까지만 보이므로 그 표시값과
+    // 저장되는 값이 어긋나지 않도록 여기서 미리 소수 첫째 자리로 반올림해서 저장한다.
+    const score = Math.round(scoreNum * 10) / 10;
 
     const merges = (ws.model && ws.model.merges ? ws.model.merges : [])
       .map((rangeStr) => {
@@ -385,7 +389,7 @@
       idVal = (idVal === null || idVal === undefined) ? "" : String(idVal).trim();
       const roundScoreRaw = summary ? qaCellRawValue(ws, summary.row, totalCell.col) : null;
       const roundScoreNum = Number(roundScoreRaw);
-      const roundScore = (roundScoreRaw === null || roundScoreRaw === undefined || isNaN(roundScoreNum)) ? null : roundScoreNum;
+      const roundScore = (roundScoreRaw === null || roundScoreRaw === undefined || isNaN(roundScoreNum)) ? null : Math.round(roundScoreNum * 10) / 10;
 
       const items = [];
       for (let r = block.startRow; r <= block.endRow; r++) {
@@ -845,7 +849,7 @@
     const val = getQAScore(agent.id, year, monthIndex);
     const locked = qaIsMonthLocked(year, monthIndex);
     return `<td><input type="number" class="qa-score-input" min="0" max="100" step="0.1" inputmode="decimal"
-      data-qa-agent="${agent.id}" value="${val === null ? "" : val}" placeholder="-" title="점수"${locked ? " disabled" : ""}></td>`;
+      data-qa-agent="${agent.id}" value="${val === null ? "" : val.toFixed(1)}" placeholder="-" title="점수"${locked ? " disabled" : ""}></td>`;
   }
 
   function qaDiffHtml(agent, year, monthIndex) {
