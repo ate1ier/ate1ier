@@ -65,7 +65,7 @@
       interviewsData = interviewsData.filter((r) => r.agentId !== id);
       saveInterviewsData();
     }
-    // 상담사를 지울 때, 그 사람 앞으로 업로드해뒀던 QA 점수·평가 엑셀(원문/AI 요약 전부)도
+    // 상담사를 지울 때, 그 사람 앞으로 업로드해뒀던 QA 점수·평가 엑셀(원문/정리된 텍스트 전부)도
     // 모든 달에 걸쳐 함께 삭제한다. 이걸 안 지우면 "파일은 있는데 상담사 목록엔 없는"
     // 유령 데이터로 계속 남게 된다.
     if (typeof qaData !== "undefined" && qaData) {

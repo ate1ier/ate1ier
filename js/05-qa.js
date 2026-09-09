@@ -8,13 +8,13 @@
   let qaData = loadQAData();
   // 월별 스케줄과 동일한 방식의 "월별 잠금". 잠긴 달은 점수 입력이 막힌다.
   if (!qaData.monthLocks || typeof qaData.monthLocks !== "object") qaData.monthLocks = {};
-  // 엑셀 업로드로 뽑아낸 상세 QA 내역(회차별 감점/코멘트 원문 + AI 요약 캐시).
+  // 엑셀 업로드로 뽑아낸 상세 QA 내역(회차별 감점/코멘트 원문 + 정리된 텍스트 캐시).
   // qaData(=계정별 클라우드 동기화 대상) 안에 같이 저장한다.
   if (!qaData.details || typeof qaData.details !== "object") qaData.details = {};
 
   // ----- 업로드한 엑셀 원문의 자동 만료 -----
   // 업로드일로부터 2개월이 지나면 회차별 원문(감점 항목/코멘트)은 자동으로 지운다.
-  // 단, 그 전에 만들어둔 AI 요약(aiSummary)은 원문이 사라져도 그대로 남는다("박제").
+  // 단, 그 전에 만들어둔 정리된 텍스트(aiSummary)는 원문이 사라져도 그대로 남는다("박제").
   const QA_DETAIL_EXPIRY_MONTHS = 2;
   function qaDetailExpiryDate(detail) {
     if (!detail || !detail.uploadedAt) return null;
@@ -42,23 +42,18 @@
   }
   qaPurgeExpiredDetails();
 
-  // ----- AI 요약은 Supabase Edge Function(qa-groq-summary)이 대신 처리한다. -----
-  // Groq API 키는 그 서버 함수의 환경변수에만 있고, 이 저장소(공개 저장소 포함)나
-  // 브라우저 어디에도 등장하지 않는다. 이 파일은 그 함수를 호출하기만 한다.
-  const QA_AI_SUMMARY_FN = "qa-groq-summary";
-
   function qaDetailKey(agentId, year, monthIndex) { return `${agentId}|${qaMonthKey(year, monthIndex)}`; }
   function getQADetail(agentId, year, monthIndex) { return qaData.details[qaDetailKey(agentId, year, monthIndex)] || null; }
   function setQADetail(agentId, year, monthIndex, detailObj) {
     qaData.details[qaDetailKey(agentId, year, monthIndex)] = detailObj;
     saveQAData();
   }
-  // 상담사 1명의 등록된 엑셀(원문+AI 요약 전부)을 완전히 삭제한다.
+  // 상담사 1명의 등록된 엑셀(원문+정리된 텍스트 전부)을 완전히 삭제한다.
   function deleteQADetail(agentId, year, monthIndex) {
     delete qaData.details[qaDetailKey(agentId, year, monthIndex)];
     saveQAData();
   }
-  // 해당 달에 등록된 모든 상담사의 엑셀(원문+AI 요약 전부)을 한 번에 삭제한다.
+  // 해당 달에 등록된 모든 상담사의 엑셀(원문+정리된 텍스트 전부)을 한 번에 삭제한다.
   function deleteAllQADetails(year, monthIndex) {
     const suffix = `|${qaMonthKey(year, monthIndex)}`;
     let count = 0;
@@ -502,59 +497,44 @@
     }
   }
 
-  /* ===================== 상담사 이름 클릭 → QA 상세 카드 팝업 (Groq AI 요약) ===================== */
+  /* ===================== 상담사 이름 클릭 → QA 상세 카드 팝업 (엑셀 원문 정리) ===================== */
   function qaFormatSummaryHtml(text) {
     return esc(text || "")
       .split("\n")
       .map((line) => {
-        // 모델이 마크다운 강조 기호(**)를 붙여 보내도 화면엔 남지 않게 제거한다.
+        // 혹시 남아있는 마크다운 강조 기호(**)가 있어도 화면엔 남지 않게 제거한다.
         const clean = line.replace(/\*\*/g, "");
         const trimmed = clean.trim();
-        // "[차감된 요소]", "[피드백이 필요한 내용]" 같은 대괄호 제목 줄은 굵게 표시한다.
+        // "[가이드라인명]" 같은 대괄호 제목 줄은 굵게 표시한다.
         if (/^\[[^\[\]]+\]$/.test(trimmed)) return `<strong>${trimmed}</strong>`;
         return clean;
       })
       .join("<br>");
   }
 
-  async function qaRunGroqSummary(agentId, year, monthIndex, roundIdx, btnEl) {
+  // AI를 거치지 않고, 엑셀에서 뽑아온 감점/코멘트 원문(items)을 그대로 읽기 좋게
+  // 줄바꿈해서 정리만 해준다. 항목마다 "[가이드라인]" 제목 줄 + 코멘트 원문 줄로
+  // 나열하고, 가이드라인이 없는 항목은 번호만 붙여 구분한다.
+  function qaOrganizeItemsText(items) {
+    return items
+      .map((it, i) => {
+        const label = it.guideline ? `[${it.guideline}]` : `[${i + 1}번째 항목]`;
+        return `${label}\n${it.feedback}`;
+      })
+      .join("\n\n");
+  }
+
+  function qaOrganizeRoundItems(agentId, year, monthIndex, roundIdx, btnEl) {
     const detail = getQADetail(agentId, year, monthIndex);
     if (!detail || !detail.rounds || !detail.rounds[roundIdx]) return;
     const round = detail.rounds[roundIdx];
-    if (!round.items || !round.items.length) { flashQAStatus("원문이 만료되어 요약할 내용이 없어요."); return; }
-    if (!cloud) { flashQAStatus("AI 요약 서버에 연결할 수 없어요 (네트워크 확인)."); return; }
+    if (!round.items || !round.items.length) { flashQAStatus("원문이 만료되어 정리할 내용이 없어요."); return; }
     const box = document.getElementById(`qa-round-summary-${roundIdx}`);
-    const originalBtnText = btnEl.textContent;
-    btnEl.disabled = true;
-    btnEl.textContent = "요약 중...";
-    if (box) box.innerHTML = `<span class="qa-round-hint">AI에게 요약을 요청하고 있어요...</span>`;
-    try {
-      const itemsText = round.items.map((it, i) => `${i + 1}. ${it.guideline ? `[${it.guideline}] ` : ""}${it.feedback}`).join("\n\n");
-      const prompt = `다음은 콜센터 상담사 QA(품질 관리) 평가에서 감점되었거나 코멘트가 남은 항목들의 원문입니다.\n\n${itemsText}\n\n위 내용을 한국어로, 아래와 같이 정확히 두 개 섹션으로만 정리해주세요. 불필요한 서론·결론 문장은 쓰지 마세요. 마크다운 기호(**, *, # 등)는 절대 쓰지 말고, 아래처럼 대괄호로 된 제목만 그대로 써주세요.\n\n[차감된 요소]\n- (항목별로 무엇 때문에 감점되었는지 한 줄씩, 최대한 간결하게. 문장은 "~하세요/~마세요" 같은 권유형이 아니라 "~함", "~됨"처럼 개조식 명사형 종결로 쓰세요. 예: "필요 이상으로 신원을 확인함")\n\n[피드백이 필요한 내용]\n- (다음 상담에서 개선하면 좋을 점을 한 줄씩 간결하게. "~하세요", "~주세요", "~마세요" 같은 권유형은 쓰지 말고 "~필요", "~해야 함"처럼 개조식 명사형 종결로 쓰세요. 예: "재탐색 없이 즉시 활용 필요")`;
-      // 실제 Groq API 키는 이 브라우저가 아니라 Supabase Edge Function(qa-groq-summary)
-      // 서버 쪽 환경변수에만 있다. 여기서는 그 함수를 호출하기만 한다.
-      const { data, error } = await cloud.functions.invoke(QA_AI_SUMMARY_FN, { body: { prompt } });
-      if (error) {
-        let msg = error.message || "요청 실패";
-        try {
-          const ctx = error.context && typeof error.context.json === "function" ? await error.context.json() : null;
-          if (ctx && ctx.error) msg = ctx.error;
-        } catch (_e) {}
-        throw new Error(msg);
-      }
-      const text = (data && data.text) ? String(data.text).trim() : "";
-      if (!text) throw new Error("응답에서 요약 내용을 찾지 못했어요.");
-      round.aiSummary = { text, generatedAt: new Date().toISOString() };
-      setQADetail(agentId, year, monthIndex, detail);
-      if (box) box.innerHTML = qaFormatSummaryHtml(text);
-      btnEl.textContent = "다시 요약";
-    } catch (err) {
-      console.error(err);
-      if (box) box.innerHTML = `<span class="qa-round-hint" style="color:var(--red);">요약 실패: ${esc(err.message || String(err))}</span>`;
-      btnEl.textContent = originalBtnText;
-    } finally {
-      btnEl.disabled = false;
-    }
+    const text = qaOrganizeItemsText(round.items);
+    round.aiSummary = { text, generatedAt: new Date().toISOString() };
+    setQADetail(agentId, year, monthIndex, detail);
+    if (box) box.innerHTML = qaFormatSummaryHtml(text);
+    if (btnEl) btnEl.textContent = "다시 정리";
   }
 
 
@@ -743,7 +723,7 @@
     const metaText = detail && detail.purged
       ? `원본 엑셀은 업로드 후 ${QA_DETAIL_EXPIRY_MONTHS}개월이 지나 자동 삭제됐어요 · 차수 ${detail.rounds.length}개`
       : detail
-        ? `${esc(detail.fileName || "")} 업로드됨 · 차수 ${detail.rounds.length}개 (원문은 업로드 후 ${QA_DETAIL_EXPIRY_MONTHS}개월 뒤 자동 삭제되며, AI 요약은 그대로 남아요)`
+        ? `${esc(detail.fileName || "")} 업로드됨 · 차수 ${detail.rounds.length}개 (원문은 업로드 후 ${QA_DETAIL_EXPIRY_MONTHS}개월 뒤 자동 삭제되며, 정리된 내용은 그대로 남아요)`
         : "";
 
     const trendHtml = qaTrendSvgHtml(agentId, year, monthIndex);
@@ -761,22 +741,22 @@
               : (round.items ? round.items.length : 0);
             const isPerfect = effectiveItemCount === 0 && !round.aiSummary;
             const rawGone = !isPerfect && round.items.length === 0; // 원문 만료로 사라진 경우
-            const showButton = round.items.length > 0; // 원문이 남아있을 때만 (다시) 요약 가능
+            const showButton = round.items.length > 0; // 원문이 남아있을 때만 (다시) 정리 가능
             let bodyBlock;
             if (isPerfect) {
               bodyBlock = `<div class="qa-round-empty">감점/코멘트 항목이 없어요 (만점 처리된 차수예요).</div>`;
             } else if (rawGone) {
               bodyBlock = `<div class="qa-round-summary-box" id="qa-round-summary-${idx}">${round.aiSummary
                 ? qaFormatSummaryHtml(round.aiSummary.text)
-                : `<span class="qa-round-hint" style="color:var(--red);">원문이 만료되어 삭제됐어요.<br>만료 전에 요약해두지 않아 남은 내용이 없어요.</span>`}</div>`;
+                : `<span class="qa-round-hint" style="color:var(--red);">원문이 만료되어 삭제됐어요.<br>만료 전에 정리해두지 않아 남은 내용이 없어요.</span>`}</div>`;
             } else {
-              bodyBlock = `<div class="qa-round-summary-box" id="qa-round-summary-${idx}">${round.aiSummary ? qaFormatSummaryHtml(round.aiSummary.text) : `<span class="qa-round-hint">원문 ${round.items.length}건 · 요약 버튼을 눌러 정리해보세요.</span>`}</div>`;
+              bodyBlock = `<div class="qa-round-summary-box" id="qa-round-summary-${idx}">${round.aiSummary ? qaFormatSummaryHtml(round.aiSummary.text) : `<span class="qa-round-hint">원문 ${round.items.length}건 · 버튼을 눌러 정리해보세요.</span>`}</div>`;
             }
             return `
             <div class="qa-round-card">
               <div class="qa-round-head" data-qa-round-toggle="${idx}">
                 <div class="qa-round-title"><span class="qa-round-chevron" id="qa-round-chevron-${idx}">▶</span>${qaRoundSummaryLine(round)}</div>
-                ${showButton ? `<button type="button" class="ghost-btn" data-qa-summarize="${idx}">${round.aiSummary ? "다시 요약" : "AI로 요약하기"}</button>` : ""}
+                ${showButton ? `<button type="button" class="ghost-btn" data-qa-summarize="${idx}">${round.aiSummary ? "다시 정리" : "정리해서 보기"}</button>` : ""}
               </div>
               <div class="qa-round-body" id="qa-round-body-${idx}" style="display:none;">
                 ${bodyBlock}
@@ -811,7 +791,7 @@
     const deleteBtn = document.getElementById("qa-detail-delete-btn");
     if (deleteBtn) {
       deleteBtn.onclick = () => {
-        if (!confirm(`${agent.name}님의 ${qaMonthLabel()} QA 엑셀 데이터를 삭제할까요?\n원문과 AI 요약이 모두 함께 삭제되며, 되돌릴 수 없어요.`)) return;
+        if (!confirm(`${agent.name}님의 ${qaMonthLabel()} QA 엑셀 데이터를 삭제할까요?\n원문과 정리된 내용이 모두 함께 삭제되며, 되돌릴 수 없어요.`)) return;
         deleteQADetail(agentId, year, monthIndex);
         flashQAStatus("삭제됐어요.");
         openQADetailModal(agentId); // 모달을 "업로드된 엑셀 없음" 상태로 다시 그림
@@ -825,7 +805,7 @@
         const body = document.getElementById(`qa-round-body-${idx}`);
         const chevron = document.getElementById(`qa-round-chevron-${idx}`);
         if (body && body.style.display === "none") { body.style.display = ""; if (chevron) chevron.textContent = "▼"; }
-        qaRunGroqSummary(agentId, year, monthIndex, idx, btn);
+        qaOrganizeRoundItems(agentId, year, monthIndex, idx, btn);
       };
     });
 
@@ -1029,7 +1009,7 @@
     document.getElementById("qa-capture-btn").onclick = (e) => openQACaptureMenu(e.currentTarget);
     document.getElementById("qa-bulk-delete-btn").onclick = () => {
       if (qaIsMonthLocked(year, monthIndex)) { flashQAStatus("잠긴 달이에요. 잠금을 해제한 뒤 삭제해주세요."); return; }
-      if (!confirm(`${qaMonthLabel()}에 등록된 모든 상담사의 QA 엑셀 데이터를 일괄삭제할까요?\n원문과 AI 요약이 모두 함께 삭제되며, 되돌릴 수 없어요.`)) return;
+      if (!confirm(`${qaMonthLabel()}에 등록된 모든 상담사의 QA 엑셀 데이터를 일괄삭제할까요?\n원문과 정리된 내용이 모두 함께 삭제되며, 되돌릴 수 없어요.`)) return;
       const count = deleteAllQADetails(year, monthIndex);
       flashQAStatus(count > 0 ? `${count}건 삭제됐어요.` : "삭제할 데이터가 없어요.");
       renderApp();
