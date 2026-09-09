@@ -512,9 +512,9 @@
       .join("<br>");
   }
 
-  // AI를 거치지 않고, 엑셀에서 뽑아온 감점/코멘트 원문(items)을 그대로 읽기 좋게
-  // 줄바꿈해서 정리만 해준다. 항목마다 "[가이드라인]" 제목 줄 + 코멘트 원문 줄로
-  // 나열하고, 가이드라인이 없는 항목은 번호만 붙여 구분한다.
+  // 엑셀에서 뽑아온 감점/코멘트 원문(items)을 그대로 읽기 좋게 줄바꿈해서 나열한다.
+  // 항목마다 "[가이드라인]" 제목 줄 + 코멘트 원문 줄로 나열하고, 가이드라인이 없는
+  // 항목은 번호만 붙여 구분한다. AI 요약 프롬프트의 재료 + "원문 전체 보기"에 쓰인다.
   function qaOrganizeItemsText(items) {
     return items
       .map((it, i) => {
@@ -524,17 +524,70 @@
       .join("\n\n");
   }
 
-  function qaOrganizeRoundItems(agentId, year, monthIndex, roundIdx, btnEl) {
+  /* ===================== QA 회차 상세 AI 요약 (Groq) ===================== */
+  // 실제 Groq API 키는 브라우저에 없고, 면담일지 AI 정리와 동일한 Supabase Edge
+  // Function(qa-groq-summary)의 서버 환경변수에만 있다. 그 함수는 prompt 텍스트를
+  // 넘기면 Groq 응답 텍스트를 돌려주는 범용 함수라서 여기서도 그대로 재사용한다.
+  const QA_AI_SUMMARY_FN = "qa-groq-summary";
+
+  // 감점 항목 원문이 방대해도, 상담사에게 실제로 전달할 "피드백/개선이 필요한 부분"만
+  // 핵심 요점 위주로 추려달라고 요청하는 프롬프트.
+  function qaBuildSummaryPrompt(items) {
+    const itemsText = qaOrganizeItemsText(items);
+    return `다음은 콜센터 상담사 QA(품질관리) 평가에서 감점된 항목들의 가이드라인명과 코멘트(원문)입니다.\n\n${itemsText}\n\n위 내용을 바탕으로, 이 상담사에게 전달할 "피드백/개선이 필요한 부분"만 핵심 요점 위주로 정리해주세요. 한국어로, 항목별로 줄을 나눠 쓰고 모든 줄은 반드시 "- "로 시작하세요. 서로 겹치거나 비슷한 지적은 하나로 묶고, 단순 사실 나열이 아니라 실제로 개선이 필요한 지적·피드백만 남기세요(이미 잘하고 있다는 칭찬이나 사소한 사유는 제외). 문장은 "~함", "~필요", "~권장"처럼 짧고 담백한 개조식으로 쓰고, 불필요한 서론·결론이나 섹션 제목은 쓰지 마세요. 마크다운 기호(**, *, # 등)는 절대 쓰지 마세요.`;
+  }
+
+  // AI 응답에서 여백을 걷어내고, "- "로 시작하는 개조식 줄 목록으로 다듬는다
+  // (면담일지 AI 요약과 동일한 방식).
+  function qaParseAiSummaryText(text) {
+    const clean = String(text || "")
+      .replace(/\*\*/g, "")
+      .replace(/^\s*\[[^\[\]]+\]\s*/m, "")
+      .trim();
+    return clean
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0)
+      .map((line) => (line.startsWith("-") ? line : `- ${line}`))
+      .join("\n");
+  }
+
+  async function qaOrganizeRoundItems(agentId, year, monthIndex, roundIdx, btnEl) {
     const detail = getQADetail(agentId, year, monthIndex);
     if (!detail || !detail.rounds || !detail.rounds[roundIdx]) return;
     const round = detail.rounds[roundIdx];
     if (!round.items || !round.items.length) { flashQAStatus("원문이 만료되어 정리할 내용이 없어요."); return; }
+    if (!cloud) { flashQAStatus("AI 서버에 연결할 수 없어요 (네트워크 확인)."); return; }
     const box = document.getElementById(`qa-round-summary-${roundIdx}`);
-    const text = qaOrganizeItemsText(round.items);
-    round.aiSummary = { text, generatedAt: new Date().toISOString() };
-    setQADetail(agentId, year, monthIndex, detail);
-    if (box) box.innerHTML = qaFormatSummaryHtml(text);
-    if (btnEl) btnEl.textContent = "다시 정리";
+    const originalLabel = btnEl ? btnEl.textContent : "";
+    if (btnEl) { btnEl.disabled = true; btnEl.textContent = "정리 중..."; }
+    if (box) box.innerHTML = `<span class="qa-round-hint">AI가 요점만 정리하고 있어요...</span>`;
+    try {
+      const prompt = qaBuildSummaryPrompt(round.items);
+      const { data, error } = await cloud.functions.invoke(QA_AI_SUMMARY_FN, { body: { prompt } });
+      if (error) {
+        let msg = error.message || "요청 실패";
+        try {
+          const ctx = error.context && typeof error.context.json === "function" ? await error.context.json() : null;
+          if (ctx && ctx.error) msg = ctx.error;
+        } catch (_e) {}
+        throw new Error(msg);
+      }
+      const raw = (data && data.text) ? String(data.text).trim() : "";
+      if (!raw) throw new Error("응답에서 정리된 내용을 찾지 못했어요.");
+      const text = qaParseAiSummaryText(raw);
+      round.aiSummary = { text, generatedAt: new Date().toISOString() };
+      setQADetail(agentId, year, monthIndex, detail);
+      if (box) box.innerHTML = qaFormatSummaryHtml(text);
+      if (btnEl) btnEl.textContent = "다시 정리";
+    } catch (err) {
+      console.error(err);
+      if (box) box.innerHTML = `<span class="qa-round-hint" style="color:var(--red);">정리 실패: ${esc(err.message || String(err))}</span>`;
+      flashQAStatus("AI 요약에 실패했어요.");
+      if (btnEl) btnEl.textContent = originalLabel;
+    } finally {
+      if (btnEl) btnEl.disabled = false;
+    }
   }
 
 
@@ -750,13 +803,17 @@
                 ? qaFormatSummaryHtml(round.aiSummary.text)
                 : `<span class="qa-round-hint" style="color:var(--red);">원문이 만료되어 삭제됐어요.<br>만료 전에 정리해두지 않아 남은 내용이 없어요.</span>`}</div>`;
             } else {
-              bodyBlock = `<div class="qa-round-summary-box" id="qa-round-summary-${idx}">${round.aiSummary ? qaFormatSummaryHtml(round.aiSummary.text) : `<span class="qa-round-hint">원문 ${round.items.length}건 · 버튼을 눌러 정리해보세요.</span>`}</div>`;
+              bodyBlock = `<div class="qa-round-summary-box" id="qa-round-summary-${idx}">${round.aiSummary ? qaFormatSummaryHtml(round.aiSummary.text) : `<span class="qa-round-hint">원문 ${round.items.length}건 · 버튼을 눌러 AI 요점 정리를 받아보세요.</span>`}</div>
+              <div class="qa-round-raw">
+                <button type="button" class="qa-round-raw-toggle" data-qa-raw-toggle="${idx}">원문 전체 보기</button>
+                <div class="qa-round-raw-box" id="qa-round-raw-${idx}" style="display:none;"></div>
+              </div>`;
             }
             return `
             <div class="qa-round-card">
               <div class="qa-round-head" data-qa-round-toggle="${idx}">
                 <div class="qa-round-title"><span class="qa-round-chevron" id="qa-round-chevron-${idx}">▶</span>${qaRoundSummaryLine(round)}</div>
-                ${showButton ? `<button type="button" class="ghost-btn" data-qa-summarize="${idx}">${round.aiSummary ? "다시 정리" : "정리해서 보기"}</button>` : ""}
+                ${showButton ? `<button type="button" class="ghost-btn" data-qa-summarize="${idx}">${round.aiSummary ? "다시 정리" : "AI 요점 정리"}</button>` : ""}
               </div>
               <div class="qa-round-body" id="qa-round-body-${idx}" style="display:none;">
                 ${bodyBlock}
@@ -807,6 +864,25 @@
         if (body && body.style.display === "none") { body.style.display = ""; if (chevron) chevron.textContent = "▼"; }
         qaOrganizeRoundItems(agentId, year, monthIndex, idx, btn);
       };
+    });
+
+    // "원문 전체 보기" 토글: AI 요약이 다시 만들어져 내용이 바뀌어도 계속 동작하도록
+    // 개별 버튼이 아니라 오버레이 전체에 위임해서 클릭을 잡는다.
+    overlay.addEventListener("click", (e) => {
+      const toggleBtn = e.target.closest && e.target.closest("[data-qa-raw-toggle]");
+      if (!toggleBtn) return;
+      e.stopPropagation();
+      const idx = Number(toggleBtn.getAttribute("data-qa-raw-toggle"));
+      const round = detail.rounds[idx];
+      const rawBox = document.getElementById(`qa-round-raw-${idx}`);
+      if (!round || !rawBox) return;
+      const opening = rawBox.style.display === "none";
+      if (opening && !rawBox.dataset.filled) {
+        rawBox.innerHTML = qaFormatSummaryHtml(qaOrganizeItemsText(round.items));
+        rawBox.dataset.filled = "1";
+      }
+      rawBox.style.display = opening ? "" : "none";
+      toggleBtn.textContent = opening ? "원문 접기" : "원문 전체 보기";
     });
 
     // 회차 카드 헤드를 누르면 펼치기/접기 (버튼 클릭은 위에서 stopPropagation으로 분리됨)

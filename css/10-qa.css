@@ -131,6 +131,17 @@
     white-space: normal;
   }
   .qa-round-hint { color: var(--text-faint); font-size: 12.5px; }
+  /* AI가 정리한 요점 아래, 원할 때만 감점 원문 전체를 펼쳐볼 수 있는 토글 */
+  .qa-round-raw { margin-top: 8px; }
+  .qa-round-raw-toggle {
+    background: none; border: none; padding: 0; cursor: pointer;
+    font-size: 12px; color: var(--text-faint); text-decoration: underline;
+  }
+  .qa-round-raw-toggle:hover { color: var(--accent); }
+  .qa-round-raw-box {
+    margin-top: 8px; padding: 10px 12px; border-radius: 10px;
+    background: var(--surface); font-size: 12.5px; line-height: 1.7; color: var(--text-faint);
+  }
 
   /* ---------- 품질 관리 페이지 모바일 대응 ----------
      표(.qa-table-wrap)는 이미 항상 overflow-x:auto라 좁은 화면에서도 가로로
