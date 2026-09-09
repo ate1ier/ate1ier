@@ -170,3 +170,22 @@
     border-radius: 20px;
   }
 
+  /* ---------- 업무 정리 페이지 모바일 대응 ---------- */
+  @media (max-width: 720px) {
+    .notes-header { margin-bottom: 20px; }
+    .inline-form, .pinned-block { padding: 13px 14px; border-radius: 16px; }
+    .folder-block { border-radius: 16px; margin-bottom: 12px; }
+    .folder-header { padding: 12px 14px; }
+    .folder-name { font-size: 16px; }
+
+    /* 드래그 핸들·핀·삭제 버튼이 아이콘 하나만 있는데도 탭 영역이 20px 안쪽이라
+       손가락으로 누르기 빠듯하다. 아이콘 크기는 유지하되 터치 영역만 넉넉하게 키운다. */
+    .drag-handle, .pin-btn, .note-del, .folder-del {
+      width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;
+      padding: 0;
+    }
+    .note-title-btn { font-size: 15px; }
+    .note-body { padding: 0 10px 12px 12px; }
+    .note-content { padding: 11px 12px; }
+  }
+

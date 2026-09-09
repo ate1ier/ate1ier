@@ -60,3 +60,40 @@
   .nav-master-return-btn:hover { filter: brightness(1.1); }
   .master-account-row { justify-content: space-between; flex-wrap: wrap; }
 
+  /* ---------- 로그인 화면 모바일 대응 ---------- */
+  @media (max-width: 720px) {
+    /* 로그인 화면에는 하단 탭바(#nav-dock)가 항상 빈 채로 렌더되므로,
+       탭바 자리를 위해 비워둔 #page-area 하단 여백(192px)과 빈 탭바 자체를
+       이 화면에서만 걷어낸다. */
+    body.login-screen #page-area { padding: 14px 10px; }
+    body.login-screen #nav-dock { display: none; }
+
+    .login-shell {
+      /* #page-area가 좌우 패딩(10px)을 이미 갖고 있으므로 여기선 최소화.
+         100vh 대신 100dvh를 써서 모바일 브라우저 주소창 높이 변화로
+         카드가 세로 중앙에서 튀는 현상을 줄인다. */
+      min-height: 80vh;
+      min-height: 80dvh;
+      padding: 12px 4px 24px;
+    }
+    .login-card {
+      /* 화면 폭에 최대한 맞추되, 카드 자체 padding은 24px 18px(전역 규칙)을 유지 */
+      max-width: 440px;
+      border-radius: 22px;
+    }
+    .login-title { font-size: 21px; }
+    .login-sub { font-size: 12.5px; }
+
+    /* 손가락 탭 기준 최소 44px 목표로 탭/입력/버튼 높이를 확보 */
+    .login-tabs { padding: 3px; }
+    .login-tab { padding: 11px 0; font-size: 14px; }
+    .login-field .add-input { padding: 13px 12px; }
+    .login-submit { padding: 14px 0; font-size: 15px; }
+    .login-master-check { padding: 11px 12px; }
+  }
+
+  @media (max-width: 380px) {
+    .login-card { padding: 20px 14px; }
+    .login-title { font-size: 19px; }
+  }
+

@@ -36,10 +36,10 @@
   .interview-textarea-draft { min-height: 130px; }
   .interview-textarea-content { min-height: 260px; }
   .agent-form-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 13px; }
-  @media (max-width: 620px) { .agent-form-row-2 { grid-template-columns: 1fr; } }
+  @media (max-width: 720px) { .agent-form-row-2 { grid-template-columns: 1fr; } }
   .agent-form-row-2-date-type { align-items: center; }
   .agent-form-row-2-date-type .agent-radio-row { margin-top: 0; height: 40px; align-items: center; }
-  @media (max-width: 620px) { .agent-form-row-2-date-type { align-items: stretch; } }
+  @media (max-width: 720px) { .agent-form-row-2-date-type { align-items: stretch; } }
   .agent-picker { position: relative; }
   .agent-picker-list {
     position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 30;
@@ -104,5 +104,19 @@
   }
   .interview-draft-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
   .interview-draft-status { font-size: 12.5px; color: var(--text-faint); }
+
+  /* ---------- 면담일지 모바일 대응 ---------- */
+  @media (max-width: 720px) {
+    .interview-summary-row { flex-direction: column; align-items: stretch; gap: 10px; }
+    .interview-summary-row .agent-search-input { width: 100%; }
+    .agent-list-header-actions #btn-interview-add,
+    .agent-list-header-actions #interview-export-btn,
+    .agent-list-header-actions #btn-interview-ai-summary { flex: 1 1 auto; text-align: center; }
+    .interview-row { padding: 12px 4px; gap: 8px; }
+    .interview-row-top { gap: 6px; }
+    .interview-row-actions { width: 100%; margin-left: 0; justify-content: flex-end; }
+    .interview-row-body { padding-left: 4px; }
+    .interview-summary-row .agent-summary { white-space: normal; }
+  }
 
 

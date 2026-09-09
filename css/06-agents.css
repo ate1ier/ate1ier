@@ -177,3 +177,37 @@
   }
   .cancel-btn:hover { color: var(--text); background: var(--hairline); border-color: var(--hairline-strong); }
 
+  /* 상세 화면 맨 위 "‹ 목록으로" 버튼. 데스크톱(목록+상세 나란히)에선 필요 없어서 숨기고,
+     모바일 전체 화면 전환 모드에서만 보여준다(아래 900px 블록에서 display 켜짐). */
+  .agent-mobile-back-btn {
+    display: none;
+    background: none; border: none; color: var(--text-dim); cursor: pointer;
+    font-size: 14px; padding: 6px 2px; margin-bottom: 12px; gap: 4px; align-items: center;
+  }
+  .agent-mobile-back-btn:hover { color: var(--accent); }
+
+  /* ---------- 상담사 관리 페이지 모바일 대응 ---------- */
+  @media (max-width: 900px) {
+    /* 데스크톱은 목록/상세가 항상 나란히(또는 위아래로) 다 보이지만, 모바일 폭에서는
+       상담사를 고르기 전엔 목록만, 고른 뒤(또는 추가/수정 중)엔 상세만 화면 전체에
+       보여준다 — 탭 한 번에 화면이 전환되는 느낌을 준다. */
+    .agent-shell.show-list .agent-detail-card { display: none; }
+    .agent-shell.show-detail .agent-list-card { display: none; }
+    .agent-mobile-back-btn { display: flex; }
+
+    .agent-page-header { margin-bottom: 16px; }
+    .agent-add-btn { padding: 10px 16px; }
+    .agent-summary { font-size: 12px; }
+    .agent-controls-top { flex-direction: column; align-items: stretch; }
+    .agent-search-input { width: 100%; }
+    .agent-filter-row { gap: 5px; }
+    .agent-filter-btn { padding: 8px 13px; font-size: 12.5px; }
+    .agent-row { padding: 12px 8px; }
+    .agent-row-name { font-size: 15px; }
+    .agent-detail-name { font-size: 21px; }
+    .agent-field { padding: 13px 0; flex-wrap: wrap; gap: 6px; }
+    .agent-field-value { text-align: left; }
+    .agent-detail-actions { width: 100%; }
+    .agent-detail-actions .ghost-btn { flex: 1; }
+  }
+

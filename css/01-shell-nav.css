@@ -553,18 +553,31 @@
   }
 
   @media (max-width: 720px) {
-    #layout { flex-direction: column-reverse; }
+    /* 예전엔 #layout을 column-reverse로 뒤집어서 #nav-dock이 화면 아래쪽에
+       오도록 "흉내"만 냈는데, #page-area 콘텐츠가 100vh보다 길어지는 순간
+       flex 배치가 깨지면서 검색바+메뉴 줄이 화면 맨 위로 올라가 스크롤하면
+       사라져버리는 문제가 있었다. 이제는 #nav-dock을 position: fixed로 화면
+       하단에 실제로 고정해서, 스크롤 위치와 무관하게 항상 보이는 진짜
+       하단 탭바로 만든다. */
+    #layout { flex-direction: column; }
     #nav {
       width: 100%;
       flex-direction: row;
+      flex-wrap: nowrap;
       align-items: flex-start;
-      border-left: none;
-      border-top: 1px solid var(--hairline);
-      padding: 10px 14px;
-      gap: 4px;
+      justify-content: flex-start;
+      border: none;
+      background: none;
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+      box-shadow: none;
+      padding: 6px 6px 4px;
+      gap: 2px;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
     }
     .nav-label-top, .nav-divider { display: none; }
-    .nav-btn { width: auto; padding: 10px 16px; }
+    .nav-btn { width: auto; padding: 8px 14px; flex-shrink: 0; }
     .nav-btn.active::before { left: 8px; right: 8px; top: auto; bottom: 0; width: auto; height: 2px; }
     .nav-spacer { display: none; }
     .nav-master-banner { margin: 0; padding: 4px 8px; flex-direction: row; align-items: center; gap: 6px; }
@@ -572,6 +585,32 @@
     .nav-master-return-btn { width: auto; }
     .nav-master-mode { margin: 0; padding: 6px 10px; flex-direction: row; align-items: center; }
     .nav-master-mode-sub { display: none; }
+
+    /* ---- #nav-dock: 검색바 + 메뉴 아이콘 줄을 통째로 화면 하단에 고정 ---- */
+    #nav-dock {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 45;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      padding: 0 0 env(safe-area-inset-bottom, 0px);
+      background: var(--mac-vibrancy);
+      backdrop-filter: blur(30px) saturate(2);
+      -webkit-backdrop-filter: blur(30px) saturate(2);
+      border-top: 1px solid var(--mac-vibrancy-hairline);
+      box-shadow: var(--mac-shadow-float);
+    }
+    #nav-dock #global-search-root {
+      padding: 8px 14px 6px;
+      border-bottom: 1px solid var(--mac-vibrancy-hairline);
+    }
+    #nav-dock #global-search-root:empty {
+      display: none;
+      border-bottom: none;
+    }
   }
 
   /* ---------- 모바일 전역 최적화 ---------- */
@@ -581,14 +620,29 @@
     input, select, textarea { font-size: 16px !important; }
     .badge, .badge-btn, .agent-filter-btn, .agent-sort-select { font-size: 12.5px !important; }
 
-    #page-area { padding: 14px 10px 84px; }
-    .card { padding: 18px 16px; border-radius: 20px; }
+    #page-area { padding: 14px 10px 192px; }
+    /* .card 자체가 04-calendar.css에서도 무조건(미디어 쿼리 없이) 다시 정의되는데,
+       스타일시트 로드 순서상 그 규칙이 이 모바일 축소값보다 뒤에 와서 이겨버리는
+       바람에 캘린더/상담사/메모/면담/QA 등 대부분 페이지 카드가 모바일에서도
+       데스크톱 패딩(30px 32px)을 그대로 쓰고 있었다. 선택자 특이도를 한 단계
+       올려서(body .card) 로드 순서와 무관하게 항상 이기도록 한다. */
+    body .card { padding: 18px 16px; border-radius: 20px; }
     .login-card { padding: 24px 18px; }
 
     /* 손가락 터치 기준으로 버튼 최소 크기를 넉넉하게 확보 */
     .icon-btn { width: 40px; height: 40px; }
     .schedule-month-btn { width: 34px; height: 34px; }
     .ghost-btn, .primary-btn, .cancel-btn { padding: 10px 14px; }
+
+    /* 화면 하단이 이제 고정 탭바(#nav-dock, 약 176px)에 덮이므로,
+       우측 하단에 떠 있던 되돌리기/새로고침/설정 버튼 묶음과 되돌리기 토스트를
+       탭바 위쪽으로 전부 끌어올린다. */
+    .utility-dock-toggle-btn { bottom: 202px; }
+    #settings-toggle-root .manual-toggle-wrap { bottom: 248px; }
+    #undo-toggle-root .undo-toggle-wrap { bottom: 294px; }
+    #refresh-toggle-root .manual-toggle-wrap { bottom: 340px; }
+    .undo-toast { bottom: 330px; }
+    .theme-toggle-wrap { bottom: 202px; }
   }
   @media (max-width: 600px) {
     #nav {
