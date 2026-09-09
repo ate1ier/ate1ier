@@ -87,3 +87,43 @@
   .page-nav-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
   .page-nav-btn:disabled { opacity: 0.4; cursor: default; }
   .page-nav-info { font-size: 12.5px; color: var(--text-faint); min-width: 72px; text-align: center; }
+
+  /* ---- 알림 허용/제한 토글 스위치 (마스터 > 디스코드 알림 탭) ---- */
+  .notify-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .notify-toggle input { position: absolute; opacity: 0; width: 0; height: 0; }
+  .notify-toggle-track {
+    position: relative;
+    width: 40px;
+    height: 22px;
+    border-radius: 999px;
+    background: var(--elevated);
+    border: 1px solid var(--hairline);
+    transition: background 0.15s ease, border-color 0.15s ease;
+    flex-shrink: 0;
+  }
+  .notify-toggle-thumb {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--text-faint);
+    transition: transform 0.15s ease, background 0.15s ease;
+  }
+  .notify-toggle input:checked + .notify-toggle-track {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+  .notify-toggle input:checked + .notify-toggle-track .notify-toggle-thumb {
+    transform: translateX(18px);
+    background: #ffffff;
+  }
+  .notify-toggle input:focus-visible + .notify-toggle-track { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .notify-toggle-label { font-size: 13px; color: var(--text-dim); min-width: 28px; }

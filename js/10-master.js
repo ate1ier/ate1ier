@@ -15,6 +15,7 @@
           <button type="button" class="login-tab ${uiState.tab === "accounts" ? "active" : ""}" data-master-tab="accounts">계정 관리</button>
           <button type="button" class="login-tab ${uiState.tab === "activity" ? "active" : ""}" data-master-tab="activity">활동 로그</button>
           <button type="button" class="login-tab ${uiState.tab === "backups" ? "active" : ""}" data-master-tab="backups">자동 백업</button>
+          <button type="button" class="login-tab ${uiState.tab === "notify" ? "active" : ""}" data-master-tab="notify">디스코드 알림</button>
         </div>
         <div id="master-tab-body"></div>
       `;
@@ -24,7 +25,58 @@
       const body = document.getElementById("master-tab-body");
       if (uiState.tab === "activity") drawActivityLog(body);
       else if (uiState.tab === "backups") drawBackups(body);
+      else if (uiState.tab === "notify") drawNotifySettings(body);
       else drawAccounts(body);
+    }
+
+    // ----- 디스코드 알림 탭: 계정별로 디스코드 알림을 받을지 토글로 켜고 끈다 -----
+    // 기본은 전부 "제한"이고, 허용으로 켠 계정에만 알림이 간다(여러 계정 동시 허용 가능).
+    function drawNotifySettings(root) {
+      const accounts = loadAccounts().slice().sort((a, b) => (a.createdAt || "").localeCompare(b.createdAt || ""));
+      const settings = loadDiscordNotifySettings();
+      const rows = accounts.map((a) => {
+        const allowed = settings[a.id] === true;
+        return `
+          <div class="agent-row master-account-row">
+            <div class="agent-row-main" style="cursor:default;">
+              <span class="agent-row-name">${esc(a.username)}${a.isMaster ? ' <span class="badge sm master">마스터</span>' : ""}</span>
+              <span class="agent-row-ldap">${allowed ? "이 계정의 일정·할일 알림이 디스코드로 전송돼요." : "디스코드 알림이 제한되어 있어요."}</span>
+            </div>
+            <div class="agent-row-badges">
+              <label class="notify-toggle">
+                <input type="checkbox" data-notify-toggle="${a.id}" ${allowed ? "checked" : ""}>
+                <span class="notify-toggle-track"><span class="notify-toggle-thumb"></span></span>
+                <span class="notify-toggle-label">${allowed ? "허용" : "제한"}</span>
+              </label>
+            </div>
+          </div>
+        `;
+      }).join("");
+      const allowedCount = accounts.filter((a) => settings[a.id] === true).length;
+      root.innerHTML = `
+        <div class="agent-summary">
+          디스코드 알림 웹훅은 이제 계정별로 켜고 끌 수 있어요. 기본값은 전부 "제한"이고, 여기서 "허용"으로 켠 계정의
+          일정·할일만 디스코드로 알림이 가요(여러 계정을 동시에 허용해도 돼요). 지금 ${accounts.length}개 계정 중 ${allowedCount}개 허용 중.
+        </div>
+        <div class="status" id="notify-status"></div>
+        <div class="agent-list">${rows || `<div class="agent-list-empty">등록된 계정이 없어요.</div>`}</div>
+      `;
+      const statusEl = document.getElementById("notify-status");
+      function flash(msg) {
+        if (!statusEl) return;
+        statusEl.textContent = msg;
+        setTimeout(() => { if (statusEl.textContent === msg) statusEl.textContent = ""; }, 2200);
+      }
+      root.querySelectorAll("[data-notify-toggle]").forEach((input) => {
+        input.onchange = () => {
+          const id = input.getAttribute("data-notify-toggle");
+          const target = accounts.find((a) => a.id === id);
+          const nextAllowed = input.checked;
+          setDiscordNotifyAllowed(id, nextAllowed);
+          draw();
+          flash(`"${target ? target.username : ""}" 계정 알림을 ${nextAllowed ? "허용" : "제한"}으로 바꿨어요.`);
+        };
+      });
     }
 
     function drawAccounts(root) {
