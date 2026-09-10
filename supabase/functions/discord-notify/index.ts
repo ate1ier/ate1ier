@@ -187,8 +187,13 @@ Deno.serve(async (_req: Request) => {
     }
 
     // ── 이미 보낸 건 제외 ──
+    // 주의: 여기서 조회가 실패했는데도 모르고 넘어가면 "이미 보낸 것"을 하나도 걸러내지
+    // 못해서 매번(5분마다) 같은 알림을 계속 다시 보내게 돼요. 그래서 에러가 나면 절대
+    // 그냥 넘어가지 않고 바로 중단시켜요 (notify_log 테이블이 없거나 접근이 안 되는
+    // 경우가 대표적인 원인 → supabase/discord-notify-setup.sql을 먼저 실행했는지 확인).
     const ids = items.map((it) => it.id);
-    const { data: already } = await supabase.from("notify_log").select("id").in("id", ids);
+    const { data: already, error: alreadyErr } = await supabase.from("notify_log").select("id").in("id", ids);
+    if (alreadyErr) throw new Error(`notify_log 조회 실패(이 때문에 중복 발송될 수 있어 중단함): ${alreadyErr.message}`);
     const sentIds = new Set((already || []).map((r: { id: string }) => r.id));
     const toSend = items
       .filter((it) => !sentIds.has(it.id))
@@ -242,7 +247,13 @@ Deno.serve(async (_req: Request) => {
     }
 
     // ── 보낸 기록 남기기 (다음 실행부터 중복 방지) ──
-    await supabase.from("notify_log").upsert(toSend.map((it) => ({ id: it.id })), { onConflict: "id" });
+    // 이 저장이 조용히 실패하면 디스코드로는 이미 보냈는데 기록은 안 남아서, 다음
+    // 실행(5분 뒤)에 또 "안 보낸 것"으로 착각하고 재전송 → 알림이 여러 번 오는 원인이 돼요.
+    // 그래서 실패하면 에러로 드러나게 던져줘요 (Supabase 함수 로그에서 바로 확인 가능).
+    const { error: upsertErr } = await supabase
+      .from("notify_log")
+      .upsert(toSend.map((it) => ({ id: it.id })), { onConflict: "id" });
+    if (upsertErr) throw new Error(`notify_log 저장 실패(디스코드엔 이미 보냈지만 기록이 안 남아 다음 실행에 중복 발송될 수 있음): ${upsertErr.message}`);
 
     return new Response(JSON.stringify({ sent: toSend.length }), { headers: { "Content-Type": "application/json" } });
   } catch (e) {
