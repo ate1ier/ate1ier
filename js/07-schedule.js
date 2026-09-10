@@ -19,10 +19,31 @@
     // 사용자가 직접 켜고 끄는 "월별 잠금". 잠긴 달은 셀 클릭·일괄 붙여넣기·삭제·필요인력 입력 등
     // 데이터를 바꾸는 조작이 전부 막혀서 실수로 수정되는 걸 막아준다. 다시 버튼을 눌러 풀면 그대로 수정 가능.
     if (!d.monthLocks || typeof d.monthLocks !== "object") d.monthLocks = {};
+    // 사용자가 직접 접어둔 열/행 상태(행 그룹, 열 그룹, 개별로 숨긴 날짜·정보열·인원·집계행).
+    // 달(월)마다 날짜 개수·인원 구성이 달라지므로 달 단위("YYYY-MM")로 따로 저장해서,
+    // 그 달을 다시 열면(다른 사람이 열어도) 접어뒀던 그대로 보이게 한다.
+    if (!d.collapseByMonth || typeof d.collapseByMonth !== "object") d.collapseByMonth = {};
     return d;
   }
+  // 특정 달의 접기 상태 저장 칸을 가져온다(없으면 빈 상태로 만들어서 돌려준다).
+  function scheduleGetMonthCollapseState(year, monthIndex) {
+    const key = scheduleMonthKey(year, monthIndex);
+    if (!scheduleData.collapseByMonth) scheduleData.collapseByMonth = {};
+    if (!scheduleData.collapseByMonth[key]) {
+      scheduleData.collapseByMonth[key] = {
+        collapsedRowGroups: [], colGroups: [], manualHiddenDays: [],
+        manualHiddenStaffIds: [], manualHiddenInfoCols: [], manualHiddenSummaryRows: [],
+      };
+    }
+    return scheduleData.collapseByMonth[key];
+  }
   // 되돌리기(undo)로 스냅샷을 복원한 뒤 이 함수를 호출해 scheduleData를 다시 읽어들인다.
-  function reloadScheduleData() { scheduleData = normalizeScheduleData(loadScheduleData()); }
+  function reloadScheduleData() {
+    scheduleData = normalizeScheduleData(loadScheduleData());
+    // 되돌리기(undo)나 다른 사람의 원격 변경으로 데이터를 다시 읽어들인 뒤에도,
+    // 지금 보고 있는 달의 접기 상태를 최신 저장값으로 다시 맞춰준다.
+    scheduleSyncUiCollapseFromData();
+  }
   let scheduleData = normalizeScheduleData(loadScheduleData());
 
   // "YYYY-MM" 형태의 달 키. 과거 달을 고정(확정)하고 식별하는 데 쓴다.
@@ -147,7 +168,57 @@
     manualHiddenStaffIds: new Set(), // 인원 이름칸을 직접 선택해서 접은 staffId 모음
     manualHiddenInfoCols: new Set(), // 직접 선택해서 접은 인원 정보 열(닉네임~결근) 키 모음
     manualHiddenSummaryRows: new Set(), // 직접 선택해서 접은 집계행(관리자 인원/필요인력/대비 등) 키 모음
+    searchQuery: "", // 상담사 검색어. 쉼표(,)로 여러 명을 한 번에 검색할 수 있다.
   };
+
+  // 지금 보고 있는 달(scheduleUi.year/monthIndex)의 접기 상태를 scheduleData.collapseByMonth에
+  // 그대로 옮겨 담고 saveScheduleData()로 저장한다. saveScheduleData()가 localStorage에
+  // 쓰는 순간 클라우드(Supabase)에도 함께 올라가므로, 접어둔 열/행이 다른 사람 화면에도
+  // 그대로 보이고 새로고침해도 유지된다. 열/행을 접거나 펼치는 모든 동작 뒤에 호출한다.
+  function scheduleSaveCollapseState() {
+    const state = scheduleGetMonthCollapseState(scheduleUi.year, scheduleUi.monthIndex);
+    state.collapsedRowGroups = Array.from(scheduleUi.collapsedRowGroups);
+    state.colGroups = scheduleUi.colGroups.map((g) => ({ ...g }));
+    state.manualHiddenDays = Array.from(scheduleUi.manualHiddenDays);
+    state.manualHiddenStaffIds = Array.from(scheduleUi.manualHiddenStaffIds);
+    state.manualHiddenInfoCols = Array.from(scheduleUi.manualHiddenInfoCols);
+    state.manualHiddenSummaryRows = Array.from(scheduleUi.manualHiddenSummaryRows);
+    saveScheduleData();
+  }
+  // scheduleData.collapseByMonth에 저장돼 있던(=서버에서 불러온) 지금 달의 접기 상태를
+  // 화면이 실제로 쓰는 scheduleUi로 되살린다. 페이지를 처음 열었을 때, 달을 이동했을 때,
+  // 되돌리기(undo)나 다른 사람의 원격 변경으로 scheduleData를 다시 읽어들였을 때 호출한다.
+  function scheduleSyncUiCollapseFromData() {
+    const state = scheduleGetMonthCollapseState(scheduleUi.year, scheduleUi.monthIndex);
+    scheduleUi.collapsedRowGroups = new Set(state.collapsedRowGroups || []);
+    scheduleUi.colGroups = (state.colGroups || []).map((g) => ({ ...g }));
+    scheduleUi.manualHiddenDays = new Set(state.manualHiddenDays || []);
+    scheduleUi.manualHiddenStaffIds = new Set(state.manualHiddenStaffIds || []);
+    scheduleUi.manualHiddenInfoCols = new Set(state.manualHiddenInfoCols || []);
+    scheduleUi.manualHiddenSummaryRows = new Set(state.manualHiddenSummaryRows || []);
+  }
+  // 페이지가 처음 로드될 때, 지금 보고 있는 달(기본은 이번 달)에 저장돼 있던 접기 상태를
+  // 곧바로 불러와둔다.
+  scheduleSyncUiCollapseFromData();
+
+  // ----- 상담사 검색 -----
+  // "상담사 관리"·"면담 관리"와 같은 방식: 이름/닉네임(LDAP)/사번 일부만 입력해도 찾고,
+  // 초성만 입력해도 찾는다("ㅎㄱㅇ" → "홍길동"). 쉼표(,)로 여러 명을 구분해서 입력하면
+  // 그 중 하나라도 일치하는 인원을 모두 보여준다.
+  function scheduleStaffMatchesSearchTerm(s, needle) {
+    if (!needle) return true;
+    if ((s.name || "").toLowerCase().indexOf(needle) !== -1) return true;
+    if ((s.nickname || "").toLowerCase().indexOf(needle) !== -1) return true;
+    if ((s.empNo || "").toLowerCase().indexOf(needle) !== -1) return true;
+    if (getChosungString(s.name || "").indexOf(needle) !== -1) return true;
+    if (getChosungString(s.nickname || "").indexOf(needle) !== -1) return true;
+    return false;
+  }
+  function scheduleStaffMatchesSearch(s, query) {
+    const terms = (query || "").split(",").map((t) => t.trim().toLowerCase()).filter(Boolean);
+    if (terms.length === 0) return true;
+    return terms.some((t) => scheduleStaffMatchesSearchTerm(s, t));
+  }
 
   // ----- 월별 스케줄 표: 행(인원 그룹)·열(날짜) 접기/펼치기 -----
   // 행 그룹 키는 "필터모드::그룹이름" 형태로 만들어서, 전체보기/주간보기/야간보기 등
@@ -166,21 +237,25 @@
   function scheduleToggleRowGroup(key) {
     if (scheduleUi.collapsedRowGroups.has(key)) scheduleUi.collapsedRowGroups.delete(key);
     else scheduleUi.collapsedRowGroups.add(key);
+    scheduleSaveCollapseState();
     renderApp();
   }
 
   function scheduleAddColGroup(start, end) {
     const s = Math.min(start, end), e = Math.max(start, end);
     scheduleUi.colGroups.push({ id: `cg${Date.now()}${Math.random().toString(36).slice(2, 6)}`, start: s, end: e, collapsed: true });
+    scheduleSaveCollapseState();
     renderApp();
   }
   function scheduleRemoveColGroup(id) {
     scheduleUi.colGroups = scheduleUi.colGroups.filter((g) => g.id !== id);
+    scheduleSaveCollapseState();
     renderApp();
   }
   function scheduleToggleColGroup(id) {
     const g = scheduleUi.colGroups.find((g) => g.id === id);
     if (g) g.collapsed = !g.collapsed;
+    scheduleSaveCollapseState();
     renderApp();
   }
   // "숨긴 열/행" 버튼 옆에 표시할 개수: 열 그룹(접힌 것) + 개별로 숨긴 열·행을 모두 합친다.
@@ -272,6 +347,7 @@
     scheduleHeaderSelCols = new Set();
     scheduleHeaderSelRows = new Set();
     closeScheduleMenu();
+    scheduleSaveCollapseState();
     renderApp();
     flashScheduleStatus(`${n}개 접었어요.`);
   }
@@ -301,18 +377,22 @@
   // 개별로 접어둔 날짜/인원정보열/인원/집계행을 다시 펼친다.
   function scheduleUnhideDay(day) {
     scheduleUi.manualHiddenDays.delete(day);
+    scheduleSaveCollapseState();
     renderApp();
   }
   function scheduleUnhideInfoCol(key) {
     scheduleUi.manualHiddenInfoCols.delete(key);
+    scheduleSaveCollapseState();
     renderApp();
   }
   function scheduleUnhideSummaryRow(key) {
     scheduleUi.manualHiddenSummaryRows.delete(key);
+    scheduleSaveCollapseState();
     renderApp();
   }
   function scheduleUnhideStaff(staffId) {
     scheduleUi.manualHiddenStaffIds.delete(staffId);
+    scheduleSaveCollapseState();
     renderApp();
   }
   function scheduleUnhideAll() {
@@ -320,6 +400,9 @@
     scheduleUi.manualHiddenInfoCols = new Set();
     scheduleUi.manualHiddenStaffIds = new Set();
     scheduleUi.manualHiddenSummaryRows = new Set();
+    scheduleUi.collapsedRowGroups = new Set();
+    scheduleUi.colGroups = [];
+    scheduleSaveCollapseState();
     renderApp();
   }
 
@@ -552,11 +635,13 @@
     while (m > 11) { m -= 12; y += 1; }
     scheduleUi.monthIndex = m;
     scheduleUi.year = y;
-    // 달이 바뀌면 날짜 번호·인원 목록의 의미가 달라지므로 선택·개별 접기 상태를 모두 초기화한다.
+    // 달이 바뀌면 지금 선택 중이던 헤더는 의미가 없어지므로 선택 상태만 초기화하고,
+    // 접기 상태는 새로 보는 달에 맞춰 서버에 저장돼 있던 값(scheduleData.collapseByMonth)을
+    // 그대로 불러와서 유지한다 — 그래야 이전에 이 달을 접어뒀다면(나든 다른 사람이든)
+    // 다시 열었을 때도 그 모습 그대로 보인다.
     scheduleHeaderSelCols = new Set();
     scheduleHeaderSelRows = new Set();
-    scheduleUi.manualHiddenDays = new Set();
-    scheduleUi.manualHiddenStaffIds = new Set();
+    scheduleSyncUiCollapseFromData();
     renderApp();
   }
 
@@ -664,14 +749,15 @@
     let scheduleRowCounter = 0; // 드래그 선택의 사각형 범위 계산에 쓰는, 렌더링될 때마다 매겨지는 행 순번
     function staffRowHtml(s) {
       const rowIdx = scheduleRowCounter++;
-      const rowHiddenCls = scheduleUi.manualHiddenStaffIds.has(s.id) ? " sch-row-hidden" : "";
+      const searchHidden = !scheduleStaffMatchesSearch(s, scheduleUi.searchQuery);
+      const rowHiddenCls = (scheduleUi.manualHiddenStaffIds.has(s.id) || searchHidden) ? " sch-row-hidden" : "";
       const cells = days.map((d) => {
         const dateKey = scheduleDateKey(year, monthIndex, d);
         const record = getScheduleRecord(s.id, dateKey);
         const disp = scheduleCellDisplay(record);
         const memo = getScheduleMemo(s.id, dateKey);
         const memoDot = (memo && !hideMemoMarks) ? `<span class="sch-memo-dot" title="${esc(memo)}"></span>` : "";
-        return `<td class="sch-cell ${disp.cls}${colHiddenCls(d)}" data-staff-id="${s.id}" data-date="${dateKey}" data-row-idx="${rowIdx}" data-day="${d}" title="${esc(memo)}">${disp.label}${memoDot}</td>`;
+        return `<td class="sch-cell ${disp.cls}${colHiddenCls(d)}" data-staff-id="${s.id}" data-date="${dateKey}" data-row-idx="${rowIdx}" data-day="${d}" title="${esc(memo)}" tabindex="0"><span class="sch-cell-label">${disp.label}</span>${memoDot}</td>`;
       }).join("");
       const counts = scheduleStaffMonthCounts(s.id, year, monthIndex);
       const infoColValues = {
@@ -1795,10 +1881,167 @@
     }, 0);
   }
 
+  // ----- 스케줄 셀: 키보드로 상하좌우/Tab 이동 + 텍스트 직접 입력 -----
+  // 칸을 클릭하거나 방향키로 이동해서 포커스를 두면(파란 테두리), 그 상태에서
+  // 글자를 바로 치기 시작하면 입력창이 뜬다. Enter/Tab으로 확정하고, 확정한 값이
+  // scheduleTokenToRecord가 알아보는 값(근무/오프/연차 등)이 아니면 저장하지 않고
+  // 빨간 테두리로 오류를 표시한 채 그 칸에 그대로 머문다. Esc는 취소.
+  let scheduleActiveEdit = null; // { cell }
+
+  function scheduleFindCell(staffId, dateKey) {
+    const root = document.getElementById("schedule-table-area");
+    if (!root) return null;
+    const cells = root.querySelectorAll(".sch-cell");
+    for (let i = 0; i < cells.length; i++) {
+      if (cells[i].getAttribute("data-staff-id") === staffId && cells[i].getAttribute("data-date") === dateKey) return cells[i];
+    }
+    return null;
+  }
+  function scheduleVisibleCells() {
+    const root = document.getElementById("schedule-table-area");
+    if (!root) return [];
+    return Array.from(root.querySelectorAll(".sch-cell")).filter((c) => {
+      if (c.classList.contains("sch-col-hidden")) return false;
+      const tr = c.closest("tr");
+      if (tr && tr.classList.contains("sch-row-hidden")) return false;
+      return true;
+    });
+  }
+  function scheduleNeighborCell(cell, dir) {
+    const visible = scheduleVisibleCells();
+    const rowIdx = Number(cell.getAttribute("data-row-idx"));
+    const day = Number(cell.getAttribute("data-day"));
+    if (dir === "left" || dir === "right") {
+      const rowCells = visible.filter((c) => Number(c.getAttribute("data-row-idx")) === rowIdx)
+        .sort((a, b) => Number(a.getAttribute("data-day")) - Number(b.getAttribute("data-day")));
+      const idx = rowCells.indexOf(cell);
+      if (idx === -1) return null;
+      return (dir === "right") ? (rowCells[idx + 1] || null) : (rowCells[idx - 1] || null);
+    }
+    const colCells = visible.filter((c) => Number(c.getAttribute("data-day")) === day)
+      .sort((a, b) => Number(a.getAttribute("data-row-idx")) - Number(b.getAttribute("data-row-idx")));
+    const idx2 = colCells.indexOf(cell);
+    if (idx2 === -1) return null;
+    return (dir === "down") ? (colCells[idx2 + 1] || null) : (colCells[idx2 - 1] || null);
+  }
+  function scheduleMoveFocus(cell, dir) {
+    const target = scheduleNeighborCell(cell, dir);
+    if (target) target.focus();
+  }
+  // 편집 중 저장/취소가 끝나면 표를 다시 그리고, 가능하면 같은 칸(또는 이동한 칸)에 포커스를 되돌린다.
+  function scheduleExitCellEdit(staffId, dateKey, moveDir) {
+    scheduleActiveEdit = null;
+    updateScheduleTableArea();
+    const cell = (staffId != null && dateKey != null) ? scheduleFindCell(staffId, dateKey) : null;
+    if (!cell) return;
+    if (moveDir) scheduleMoveFocus(cell, moveDir);
+    else cell.focus();
+  }
+  // 입력값을 확정 시도한다. 빈 값이면 기본값(근무)으로, 알아보는 근태 표현이면 그 값으로 저장.
+  // 알아보지 못하는 텍스트면 mode에 따라: "block"=그 칸에 그대로 머물며 오류 표시,
+  // "revert"=저장하지 않고 원래 값으로 되돌리며 안내만 띄움.
+  function scheduleFinalizeCellEdit(cell, staffId, dateKey, rawValue, mode, moveDir) {
+    const trimmed = (rawValue || "").trim();
+    const mapped = trimmed === "" ? { status: "WORK", attendance: null } : scheduleTokenToRecord(trimmed);
+    if (!mapped) {
+      if (mode === "revert") {
+        scheduleExitCellEdit(staffId, dateKey, null);
+        flashScheduleStatus(`인식할 수 없는 값이라 되돌렸어요: "${trimmed}"`);
+        return;
+      }
+      const input = cell.querySelector(".sch-cell-input");
+      if (input) {
+        input.classList.add("sch-cell-input--error");
+        input.title = `"${trimmed}"은(는) 등록된 근태가 아니에요.`;
+        input.focus();
+        input.select();
+      }
+      flashScheduleStatus(`인식할 수 없는 값이에요: "${trimmed}"`);
+      return;
+    }
+    setScheduleRecord(staffId, dateKey, { status: mapped.status, attendance: mapped.attendance || null });
+    scheduleExitCellEdit(staffId, dateKey, moveDir);
+  }
+  function scheduleStartCellEdit(cell, typedChar) {
+    if (cell.classList.contains("sch-cell--editing")) return;
+    const staffId = cell.getAttribute("data-staff-id");
+    const dateKey = cell.getAttribute("data-date");
+    if (scheduleIsDateLocked(dateKey)) { flashScheduleStatus("잠긴 달이에요. 잠금을 해제한 뒤 수정해주세요."); return; }
+    closeScheduleMenu();
+    const labelEl = cell.querySelector(".sch-cell-label");
+    const originalLabel = labelEl ? labelEl.textContent : "";
+    const startValue = (typedChar === null) ? originalLabel : typedChar;
+    cell.classList.add("sch-cell--editing");
+    cell.innerHTML = `<input type="text" class="sch-cell-input" />`;
+    const input = cell.querySelector(".sch-cell-input");
+    input.value = startValue;
+    scheduleActiveEdit = { cell };
+    let finished = false;
+    function finish(mode, moveDir) {
+      if (finished) return;
+      finished = true;
+      if (mode === "cancel") { scheduleExitCellEdit(staffId, dateKey, null); return; }
+      scheduleFinalizeCellEdit(cell, staffId, dateKey, input.value, mode, moveDir);
+    }
+    input.onkeydown = (e) => {
+      e.stopPropagation();
+      if (e.key === "Enter") { e.preventDefault(); finish("block", null); }
+      else if (e.key === "Escape") { e.preventDefault(); finish("cancel", null); }
+      else if (e.key === "Tab") { e.preventDefault(); finish("block", e.shiftKey ? "left" : "right"); }
+    };
+    // 오류로 빨갛게 표시된 뒤 글자를 다시 고치기 시작하면, 확정하기 전이라도 오류 표시를 지운다.
+    input.oninput = () => {
+      if (input.classList.contains("sch-cell-input--error")) {
+        input.classList.remove("sch-cell-input--error");
+        input.title = "";
+      }
+    };
+    input.onblur = () => finish("revert", null);
+    requestAnimationFrame(() => {
+      input.focus();
+      if (typedChar === null) input.select();
+      else input.setSelectionRange(input.value.length, input.value.length);
+    });
+  }
+  function scheduleCommitActiveEditIfOutside(target) {
+    if (!scheduleActiveEdit) return;
+    if (scheduleActiveEdit.cell.contains(target)) return;
+    // 이 핸들러는 mousedown "캡처" 단계라, 사용자가 실제로 누른 요소(target)에
+    // 이벤트가 도달하기도 전에 먼저 실행된다. 여기서 곧바로 blur()를 호출해
+    // 표 전체를 innerHTML로 다시 그리면, 방금 클릭한 그 DOM 노드가 target에
+    // 닿기 전에 파괴되어 click 이벤트 자체가 발생하지 않는 문제가 있었다
+    // (다른 칸 클릭, 행 그룹 접기/펼치기 화살표 클릭 등 첫 클릭이 씹힘).
+    // 그래서 커밋(재렌더링)을 한 틱(setTimeout 0) 늦춰서, 원래 클릭이 target까지
+    // 정상적으로 전달되고 처리된 뒤에 편집을 정리하도록 한다.
+    const cellAtCapture = scheduleActiveEdit.cell;
+    setTimeout(() => {
+      if (!scheduleActiveEdit || scheduleActiveEdit.cell !== cellAtCapture) return; // 그 사이 이미 다른 방식으로 정리됨
+      if (!document.contains(cellAtCapture)) { scheduleActiveEdit = null; return; } // 그 사이 다른 재렌더링으로 이미 떨어져 나감
+      const input = cellAtCapture.querySelector(".sch-cell-input");
+      if (input) input.blur(); // blur 핸들러(finish("revert"))가 정리를 맡는다.
+    }, 0);
+  }
+  document.addEventListener("mousedown", (e) => scheduleCommitActiveEditIfOutside(e.target), true);
+
+  function scheduleCellKeydown(e, cell) {
+    if (cell.classList.contains("sch-cell--editing")) return;
+    const key = e.key;
+    if (key === "ArrowUp") { e.preventDefault(); scheduleMoveFocus(cell, "up"); return; }
+    if (key === "ArrowDown") { e.preventDefault(); scheduleMoveFocus(cell, "down"); return; }
+    if (key === "ArrowLeft") { e.preventDefault(); scheduleMoveFocus(cell, "left"); return; }
+    if (key === "ArrowRight") { e.preventDefault(); scheduleMoveFocus(cell, "right"); return; }
+    if (key === "Tab") { e.preventDefault(); scheduleMoveFocus(cell, e.shiftKey ? "left" : "right"); return; }
+    if (key === "Enter" || key === "F2") { e.preventDefault(); scheduleStartCellEdit(cell, null); return; }
+    if (key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      e.preventDefault();
+      scheduleStartCellEdit(cell, key);
+    }
+  }
+
   function attachScheduleTableHandlers(root) {
     root.querySelectorAll(".sch-cell").forEach((cell) => {
       // 클릭(드래그 없이 눌렀다 뗌)만 기존처럼 그 칸 하나의 메뉴를 연다.
-      // 드래그로 여러 칸을 선택한 경우의 처리는 mousedown/mouseenter + 문서 전체 mouseup에서 한다.
+      // 드래그로 여러 칸을 선택한 경우의 처리는 mousedown/mouseenter + 문서 전체 мouseup에서 한다.
       cell.onclick = () => {
         if (scheduleSelectMoved) return;
         openScheduleMenu(cell, cell.getAttribute("data-staff-id"), cell.getAttribute("data-date"));
@@ -1819,6 +2062,7 @@
         scheduleSelectCurrent = { rowIdx, day };
         scheduleApplySelectionHighlight();
       };
+      cell.onkeydown = (e) => scheduleCellKeydown(e, cell);
     });
     root.querySelectorAll(".sch-required-input").forEach((input) => {
       // 입력칸을 벗어날 때(blur) 또는 Enter 시 저장. 매 타이핑마다 전체를 다시 그리지 않아
@@ -2089,6 +2333,10 @@
         <span class="item"><span class="swatch" style="background:var(--text-faint);"></span>퇴사</span>
       </div>
       <div class="schedule-table-toolbar">
+        <div class="agent-search-input" style="margin-right:auto;">
+          <input type="text" class="agent-search-input-field" id="sch-search-input" placeholder="상담사 검색 (쉼표로 여러 명)" value="${esc(scheduleUi.searchQuery)}" autocomplete="off">
+          ${ICON_SEARCH_MINI}
+        </div>
         <button class="ghost-btn ${scheduleHiddenPanelOpen ? "active" : ""}" id="sch-hidden-btn">${ICON_CALENDAR} 숨긴 열/행${scheduleHiddenCount() > 0 ? ` (${scheduleHiddenCount()})` : ""} ▾</button>
         <button class="ghost-btn sch-delete-btn-small" id="sch-delete-btn">${ICON_TRASH} 일정 삭제</button>
       </div>
@@ -2179,6 +2427,14 @@
       scheduleHiddenPanelOpen = !scheduleHiddenPanelOpen;
       renderApp();
     };
+    const schSearchInput = document.getElementById("sch-search-input");
+    if (schSearchInput) {
+      // 표 영역만 다시 그려서(전체 renderApp() 대신) 검색창의 IME 조합·포커스가 끊기지 않게 한다.
+      schSearchInput.oninput = (e) => {
+        scheduleUi.searchQuery = e.target.value;
+        updateScheduleTableArea();
+      };
+    }
     root.querySelectorAll("[data-unhide-day]").forEach((btn) => {
       btn.onclick = () => scheduleUnhideDay(Number(btn.getAttribute("data-unhide-day")));
     });

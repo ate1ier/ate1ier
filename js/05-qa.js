@@ -80,7 +80,17 @@
   const qaUi = {
     year: today.getFullYear(),
     monthIndex: today.getMonth(), // 0-based. 실시간 기준 당월로 시작한다.
+    searchQuery: "", // 상담사 검색어. 쉼표(,)로 여러 명을 한 번에 검색할 수 있다.
   };
+
+  // ----- 상담사 검색 -----
+  // "상담사 관리"의 검색(이름/LDAP/초성)과 같은 방식을 쓰되, 쉼표(,)로 여러 명을 구분해서
+  // 입력하면 그 중 하나라도 일치하는 상담사를 모두 보여준다.
+  function qaAgentMatchesSearch(a, query) {
+    const terms = (query || "").split(",").map((t) => t.trim()).filter(Boolean);
+    if (terms.length === 0) return true;
+    return terms.some((t) => agentMatchesSearch(a, t));
+  }
   // 상담사 상세에서 "품질 관리로 이동"을 눌렀을 때, 이동한 화면에서 그 인원의 행을
   // 한 번 강조해서 보여주기 위한 값. 렌더링 후 바로 비워서 다음 화면 갱신부터는
   // 강조가 남지 않게 한다.
@@ -1030,9 +1040,55 @@
     `;
   }
 
+  // 검색창 자체는 다시 그리지 않고 표 영역만 갱신한다(agents/interviews 화면과 같은 방식).
+  // IME(한글) 조합 중에도 입력이 끊기지 않고, 타이핑 즉시 결과가 반영된다.
+  function updateQATableArea() {
+    const tableArea = document.getElementById("qa-table-area");
+    if (!tableArea) return;
+    const { year, monthIndex } = qaUi;
+    const filteredList = qaWorkingAgents().filter((a) => qaAgentMatchesSearch(a, qaUi.searchQuery));
+    tableArea.innerHTML = buildQATableHtml(filteredList, year, monthIndex, false);
+    attachQATableAreaHandlers(tableArea, filteredList, year, monthIndex);
+  }
+
+  function attachQATableAreaHandlers(root, agentsList, year, monthIndex) {
+    root.querySelectorAll("[data-qa-name-click]").forEach((el) => {
+      el.onclick = () => openQADetailModal(el.getAttribute("data-qa-name-click"));
+    });
+
+    root.querySelectorAll(".qa-score-input").forEach((input) => {
+      // 필요인력 입력칸과 같은 방식: blur(포커스 아웃) 또는 Enter일 때만 저장해서
+      // 타이핑 중에 표 전체가 다시 그려지며 깜빡이거나 포커스가 빠지지 않게 한다.
+      input.onchange = () => {
+        setQAScore(
+          input.getAttribute("data-qa-agent"),
+          year, monthIndex,
+          input.value
+        );
+        renderApp();
+      };
+      // 엑셀처럼 Enter/Tab으로 다음(아래) 칸, Shift+Enter/Shift+Tab으로 이전(위) 칸으로
+      // 바로 이동한다. blur()를 호출하면 값이 바뀐 경우 change 이벤트가 이 안에서
+      // 그대로(동기적으로) 발생해서 저장 + 표 다시 그리기까지 끝나므로, blur() 호출이
+      // 끝난 뒤에 다음 칸을 찾아 포커스를 옮기면 된다(다시 그려졌든 안 그려졌든 그
+      // 시점엔 이미 최종 DOM이 갖춰져 있다).
+      input.onkeydown = (e) => {
+        if (e.key !== "Enter" && e.key !== "Tab") return;
+        e.preventDefault();
+        const idx = agentsList.findIndex((a) => a.id === input.getAttribute("data-qa-agent"));
+        const delta = e.shiftKey ? -1 : 1;
+        const nextAgent = idx !== -1 ? agentsList[idx + delta] : null;
+        input.blur();
+        if (nextAgent) qaFocusScoreInput(nextAgent.id);
+      };
+    });
+  }
+
   function renderQAPage(root) {
     const agentsList = qaWorkingAgents();
+    const filteredList = agentsList.filter((a) => qaAgentMatchesSearch(a, qaUi.searchQuery));
     const { year, monthIndex } = qaUi;
+    // 통계(평균)는 검색어와 무관하게 항상 재직중인 전체 인원 기준으로 보여준다.
     const stats = qaComputeStats(agentsList, year, monthIndex);
     const prevYm = qaPrevMonth(year, monthIndex);
     const prevStats = qaComputeStats(agentsList, prevYm.year, prevYm.monthIndex);
@@ -1064,7 +1120,11 @@
         ${qaStatItemHtml("야간 채팅 평균", stats.nightChat, prevStats.nightChat)}
         ${qaStatItemHtml("야간 유선 평균", stats.nightVoice, prevStats.nightVoice)}
       </div>
-      ${buildQATableHtml(agentsList, year, monthIndex, false)}
+      <div class="agent-search-input" style="margin-bottom:10px;">
+        <input type="text" class="agent-search-input-field" id="qa-search-input" placeholder="상담사 검색 (쉼표로 여러 명)" value="${esc(qaUi.searchQuery)}" autocomplete="off">
+        ${ICON_SEARCH_MINI}
+      </div>
+      <div id="qa-table-area">${buildQATableHtml(filteredList, year, monthIndex, false)}</div>
     `;
 
     // 상담사 상세에서 "품질 관리로 이동"으로 넘어온 경우, 그 인원의 행으로
@@ -1092,36 +1152,15 @@
     };
     document.getElementById("qa-excel-upload-btn").onclick = () => openQAUploadModal();
 
-    root.querySelectorAll("[data-qa-name-click]").forEach((el) => {
-      el.onclick = () => openQADetailModal(el.getAttribute("data-qa-name-click"));
-    });
+    const qaSearchInput = document.getElementById("qa-search-input");
+    if (qaSearchInput) {
+      qaSearchInput.oninput = (e) => {
+        qaUi.searchQuery = e.target.value;
+        updateQATableArea();
+      };
+    }
 
-    root.querySelectorAll(".qa-score-input").forEach((input) => {
-      // 필요인력 입력칸과 같은 방식: blur(포커스 아웃) 또는 Enter일 때만 저장해서
-      // 타이핑 중에 표 전체가 다시 그려지며 깜빡이거나 포커스가 빠지지 않게 한다.
-      input.onchange = () => {
-        setQAScore(
-          input.getAttribute("data-qa-agent"),
-          year, monthIndex,
-          input.value
-        );
-        renderApp();
-      };
-      // 엑셀처럼 Enter/Tab으로 다음(아래) 칸, Shift+Enter/Shift+Tab으로 이전(위) 칸으로
-      // 바로 이동한다. blur()를 호출하면 값이 바뀐 경우 change 이벤트가 이 안에서
-      // 그대로(동기적으로) 발생해서 저장 + 표 다시 그리기까지 끝나므로, blur() 호출이
-      // 끝난 뒤에 다음 칸을 찾아 포커스를 옮기면 된다(다시 그려졌든 안 그려졌든 그
-      // 시점엔 이미 최종 DOM이 갖춰져 있다).
-      input.onkeydown = (e) => {
-        if (e.key !== "Enter" && e.key !== "Tab") return;
-        e.preventDefault();
-        const idx = agentsList.findIndex((a) => a.id === input.getAttribute("data-qa-agent"));
-        const delta = e.shiftKey ? -1 : 1;
-        const nextAgent = idx !== -1 ? agentsList[idx + delta] : null;
-        input.blur();
-        if (nextAgent) qaFocusScoreInput(nextAgent.id);
-      };
-    });
+    attachQATableAreaHandlers(root.querySelector("#qa-table-area"), filteredList, year, monthIndex);
   }
   // 특정 상담사의 점수 입력칸에 포커스를 주고 기존 값을 선택 상태로 만든다
   // (Enter/Tab으로 다음 칸으로 넘어갈 때, 바로 덮어쓸 수 있게).
