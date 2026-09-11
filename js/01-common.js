@@ -1302,7 +1302,7 @@
 
   /* ===================== 공용 페이지네이션 ===================== */
   // 목록이 길어질 때 10개 단위로 잘라서 보여주기 위한 공용 헬퍼.
-  const PAGE_SIZE = 10;
+  const PAGE_SIZE = 12; // 상담사 관리 / 면담일지 목록 페이지당 표시 개수
   // list 전체와 원하는 page(1부터 시작)를 넣으면, 범위를 벗어난 page는 알아서
   // 안쪽으로 보정해서 { items, page, totalPages }를 돌려준다.
   function paginateList(list, page) {

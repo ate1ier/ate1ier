@@ -16,7 +16,7 @@
     sortBy: "shift", // "shift" | "custom" | "name" | "type" | "chat" | "night" | "created"
     interviewMode: "list", // "list" | "add" | "edit" — 상담사 상세의 면담 이력 섹션용
     interviewEditingId: null,
-    page: 1, // 고정 인원을 제외한 목록의 현재 페이지(10개씩)
+    page: 1, // 고정 인원을 제외한 목록의 현재 페이지(PAGE_SIZE개씩)
   };
 
   let agentStatusTimer = null;
