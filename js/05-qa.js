@@ -601,6 +601,59 @@
   }
 
 
+  /* ===================== QA 이번 달 "핵심 피드백" 자동 요약 (AI 미사용) ===================== */
+  // AI 요약(qaOrganizeRoundItems)은 회차 하나씩, 버튼을 눌러야, 외부 서버(Groq)를 호출해서
+  // 정리해준다. 여기서는 그거랑 별개로 "이번 달 전체 회차"를 대상으로 브라우저 안에서
+  // 바로(버튼 없이, 네트워크 호출 없이) 규칙 기반으로 간추려서 보여준다.
+  // - 칭찬/문제없음류의 코멘트(실제로 고칠 게 없는 내용)는 제외한다.
+  // - 같은 가이드라인이 여러 회차에서 반복 지적됐으면 하나로 묶어서 "n회 지적됨"으로 표시한다.
+  // - 코멘트 원문이 길면 짧게 잘라서 보여준다(전체 원문은 각 회차의 "원문 전체 보기"에서 확인).
+  const QA_TRIVIAL_FEEDBACK_RE = /우수|양호|훌륭|칭찬|만족스럽|문제\s*없|이상\s*없|잘\s*하고\s*있|충실히|적절히\s*(수행|진행|응대)?함?$/;
+  function qaIsTrivialFeedback(text) {
+    const t = String(text || "").replace(/\s+/g, "");
+    if (!t) return true;
+    return QA_TRIVIAL_FEEDBACK_RE.test(t);
+  }
+  function qaShortenText(text, maxLen) {
+    const limit = maxLen || 70;
+    const t = String(text || "").trim().replace(/\s+/g, " ");
+    return t.length <= limit ? t : `${t.slice(0, limit).trim()}…`;
+  }
+  // 이번 달 등록된 회차들(원문이 아직 남아있는 회차만) 중, 실제로 개선이 필요한
+  // 감점 항목만 가이드라인 기준으로 묶어서 { guideline, count, sample } 배열로 반환한다.
+  function qaBuildLocalOverviewGroups(detail) {
+    const groups = new Map();
+    let consideredRounds = 0;
+    (detail.rounds || []).forEach((round) => {
+      if (!round.items || !round.items.length) return; // 원문이 만료된 회차는 대상에서 제외
+      consideredRounds += 1;
+      round.items.forEach((it) => {
+        if (qaIsTrivialFeedback(it.feedback)) return;
+        const key = it.guideline || qaShortenText(it.feedback, 20);
+        if (!groups.has(key)) groups.set(key, { guideline: it.guideline || "", count: 0, sample: it.feedback || "" });
+        const g = groups.get(key);
+        g.count += 1;
+        if ((it.feedback || "").length > g.sample.length) g.sample = it.feedback;
+      });
+    });
+    return { groups: Array.from(groups.values()).sort((a, b) => b.count - a.count), consideredRounds };
+  }
+  function qaFormatLocalOverviewHtml(detail) {
+    const { groups, consideredRounds } = qaBuildLocalOverviewGroups(detail);
+    if (consideredRounds === 0) {
+      return `<span class="qa-round-hint">원문이 남아있는 회차가 없어 자동 요약을 만들 수 없어요.</span>`;
+    }
+    if (groups.length === 0) {
+      return `<span class="qa-round-hint">이번 달 등록된 회차 중 실제로 개선이 필요한 지적 사항이 없어요.</span>`;
+    }
+    return groups.map((g) => {
+      const title = g.guideline ? esc(g.guideline) : "";
+      const countText = g.count > 1 ? ` <span class="qa-overview-count">${g.count}회 지적됨</span>` : "";
+      const sep = title ? ": " : "";
+      return `- ${title ? `<strong>${title}</strong>${countText}${sep}` : ""}${esc(qaShortenText(g.sample))}`;
+    }).join("<br>");
+  }
+
   function qaRoundSummaryLine(round) {
     const scoreText = (round.score === null || round.score === undefined) ? "-" : round.score;
     const dateText = round.date ? ` · ${esc(round.date)}` : "";
@@ -795,6 +848,10 @@
       ? `<div class="qa-detail-empty">이번 달(${esc(qaMonthLabel())})에 업로드된 QA 평가 엑셀이 없어요.<br>상단 "${esc("엑셀 업로드")}" 버튼으로 이 상담사의 평가표를 올려주세요.</div>`
       : `
         <div class="qa-detail-meta">${metaText}</div>
+        <div class="qa-detail-overview">
+          <div class="qa-detail-overview-title">이번 달 핵심 피드백 <span class="qa-overview-badge">자동 요약 · AI 미사용</span></div>
+          <div class="qa-detail-overview-body">${qaFormatLocalOverviewHtml(detail)}</div>
+        </div>
         <div class="qa-detail-rounds">
           ${detail.rounds.map((round, idx) => {
             // itemCount가 없는 예전 데이터(이 필드가 생기기 전에 저장된 회차)는

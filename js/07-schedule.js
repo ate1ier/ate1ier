@@ -694,6 +694,9 @@
     const numDays = scheduleDaysInMonth(year, monthIndex);
     const days = [];
     for (let d = 1; d <= numDays; d++) days.push(d);
+    // 상담사 검색 중(캡처용 표는 제외)이면 그룹 제목 행·소제목 행·집계행(관리자 인원/필요인력/대비/
+    // 인력 대비 편성/총 인원 등)을 전부 숨기고, 검색어와 일치하는 인원 행만 보이게 한다.
+    const searchActive = !hideSummaryCols && !!(scheduleUi.searchQuery && scheduleUi.searchQuery.trim());
     const collapsedDays = scheduleCollapsedDaySet();
     const colHiddenCls = (d) => (collapsedDays.has(d) ? " sch-col-hidden" : "");
     // 이미지로 저장할 때는 근무~결근 집계 열 5개를 표에서 아예 빼고 그린다.
@@ -784,7 +787,9 @@
       return `<td class="sch-info sch-row-th" colspan="${infoColCount}" data-row-key="r:${esc(rowKey)}" title="클릭해서 선택, 선택 후 오른쪽 클릭으로 접기">${label}</td>`;
     }
     function summaryRowHiddenCls(rowKey) {
-      return (!hideSummaryCols && rowKey && scheduleUi.manualHiddenSummaryRows.has(rowKey)) ? " sch-row-hidden" : "";
+      if (hideSummaryCols) return "";
+      if (searchActive) return " sch-row-hidden";
+      return (rowKey && scheduleUi.manualHiddenSummaryRows.has(rowKey)) ? " sch-row-hidden" : "";
     }
     // type이 null/undefined면 업무 구분(채팅/유선)과 무관하게 목록 전체를 집계한다.
     // (관리자 인원 집계처럼 채팅/유선 구분 없이 셀 때 사용)
@@ -2053,6 +2058,12 @@
         scheduleSelectAnchor = { rowIdx: Number(cell.getAttribute("data-row-idx")), day: Number(cell.getAttribute("data-day")) };
         scheduleSelectCurrent = scheduleSelectAnchor;
         e.preventDefault(); // 드래그 중 글자 선택(파랗게 칠해지는 것) 방지
+        // mousedown에서 preventDefault()를 하면 브라우저가 클릭에 따른 기본 포커스 이동까지
+        // 취소해버려서, 셀을 클릭해도 이 tabindex="0" 셀에 실제 포커스가 잡히지 않는 문제가
+        // 있었다. 그러면 클릭 직후 방향키·Tab 이동이나 글자 바로 입력(scheduleCellKeydown)이
+        // 전혀 동작하지 않으므로, 여기서 명시적으로 포커스를 줘서 이어서 키보드 조작이
+        // 가능하게 한다.
+        cell.focus();
       };
       cell.onmouseenter = () => {
         if (!scheduleSelectDragging) return;
