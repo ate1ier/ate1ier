@@ -6,8 +6,9 @@
   .schedule-title { font-size: var(--page-title-size); font-weight: var(--page-title-weight); letter-spacing: -0.01em; }
   .schedule-month-nav { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
   .schedule-table-toolbar { display: flex; justify-content: flex-end; gap: 10px; margin-bottom: 6px; }
-  /* 문구("상담사 검색 (이름/주간/야간/채팅/유선, 쉼표로 여러 개)")가 잘리지 않도록 충분히 넓게. */
-  .schedule-table-toolbar .agent-search-input { width: 420px; max-width: 100%; }
+  /* 플레이스홀더가 "이름 검색"으로 짧아져서 굳이 넓을 필요가 없다. 자세한 검색 방법은
+     title(마우스 올렸을 때 뜨는 툴팁)로 안내한다. */
+  .schedule-table-toolbar .agent-search-input { width: 200px; max-width: 100%; }
   .sch-delete-btn-small { font-size: 12px; padding: 4px 10px; }
   .schedule-month-btn {
     background: var(--elevated); border: 1px solid var(--hairline); color: var(--text-dim);

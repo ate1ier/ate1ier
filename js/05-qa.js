@@ -1036,7 +1036,7 @@
       <div class="status" id="qa-status"></div>
       <div class="qa-stat-row">
         <div class="agent-search-input">
-          <input type="text" class="agent-search-input-field" id="qa-search-input" placeholder="상담사 검색 (이름/주간/야간/채팅/유선, 쉼표로 여러 개)" value="${esc(qaUi.searchQuery)}" autocomplete="off">
+          <input type="text" class="agent-search-input-field" id="qa-search-input" placeholder="이름 검색" title="상담사 검색 (이름/주간/야간/채팅/유선, 쉼표로 여러 개)" value="${esc(qaUi.searchQuery)}" autocomplete="off">
           ${ICON_SEARCH_MINI}
         </div>
         <div class="qa-stat-grid">
