@@ -13,10 +13,9 @@
   if (!qaData.details || typeof qaData.details !== "object") qaData.details = {};
 
   // ----- 업로드한 엑셀 원문의 자동 만료 -----
-  // 업로드일로부터 2개월이 지나면 회차별 원문(감점 항목/코멘트)은 자동으로 지운다.
-  // 단, 원문이 사라지기 전에 규칙 기반으로 미리 만들어둔 간단 요약(localSummary)은
-  // 원문이 사라져도 그대로 남는다("박제").
-  const QA_DETAIL_EXPIRY_MONTHS = 2;
+  // 업로드일로부터 3개월이 지나면 회차별 원문(감점 항목/코멘트)을 서버(클라우드)와
+  // 이 기기 양쪽 모두에서 완전히 지운다. 예전 요약본을 남겨두지 않고, 흔적 없이 삭제한다.
+  const QA_DETAIL_EXPIRY_MONTHS = 3;
   function qaDetailExpiryDate(detail) {
     if (!detail || !detail.uploadedAt) return null;
     const d = new Date(detail.uploadedAt);
@@ -35,16 +34,16 @@
       if (!detail || detail.purged) return;
       if (!qaIsDetailExpired(detail)) return;
       (detail.rounds || []).forEach((round) => {
-        // 원문을 지우기 전에, 규칙 기반 간단 요약을 미리 계산해서 남겨둔다.
-        if (round.items && round.items.length && !round.localSummary) {
-          round.localSummary = qaBuildLocalRoundSummaryText(round.items);
-        }
+        // 원문(감점/코멘트)을 흔적 없이 완전히 지운다. 별도 요약본도 남기지 않는다.
         round.items = [];
+        delete round.localSummary;
       });
       detail.fileName = "";
       detail.purged = true;
       changed = true;
     });
+    // saveQAData()가 localStorage에 쓰는 즉시 클라우드(Supabase)에도 같은 내용으로
+    // 덮어써지므로, 지워진 원문은 이 기기뿐 아니라 서버에도 남지 않는다.
     if (changed) saveQAData();
   }
   qaPurgeExpiredDetails();
@@ -542,81 +541,6 @@
       .join("\n\n");
   }
 
-  /* ===================== QA 회차별 "간단 정리" (규칙 기반, 외부 서버 호출 없음) ===================== */
-  // 어떤 경우에도 외부 서버를 호출하지 않고 브라우저 안의 정해진 규칙만으로 즉시 정리한다.
-  // 원문을 무작정 다 가져오는 게 아니라:
-  // - 칭찬/문제없음류의 코멘트(실제로 고칠 게 없는 내용)는 제외한다.
-  // - "OOO의 경우"처럼 특정 상담 내용이 아니라 가이드라인 자체를 조건문으로 다시 설명한
-  //   문장(=실제 피드백이 아닌 일반 규정 설명)도 제외한다.
-  // - 남는 코멘트도 핵심 문장(또는 핵심 절)만 남기고 나머지 부연 설명은 잘라낸다. 말줄임표
-  //   ("…")는 쓰지 않고, 문장·절 경계에서 자연스럽게 끊어서 그 자체로 완결된 짧은 문구가
-  //   되게 한다.
-  const QA_TRIVIAL_FEEDBACK_RE = /우수|양호|훌륭|칭찬|만족스럽|문제\s*없|이상\s*없|잘\s*하고\s*있|충실히|적절히\s*(수행|진행|응대)?함?$/;
-  function qaIsTrivialFeedback(text) {
-    const t = String(text || "").replace(/\s+/g, "");
-    if (!t) return true;
-    return QA_TRIVIAL_FEEDBACK_RE.test(t);
-  }
-  // 문장 맨 앞부분이 "~의 경우"로 시작하면, 특정 상담 건에 대한 지적이 아니라 가이드라인
-  // 자체를 조건문 형태로 다시 풀어쓴 일반 설명일 가능성이 높아서 실제 피드백에서 제외한다.
-  const QA_GENERIC_CLAUSE_RE = /^[^,.\n]{0,30}의\s*경우[,)]?\s*/;
-  function qaIsGenericClauseFeedback(text) {
-    return QA_GENERIC_CLAUSE_RE.test(String(text || "").trim());
-  }
-  // 원문 앞에 붙어있는 "-", "1.", "•" 같은 기호를 떼어내고 공백을 정리한다.
-  function qaCleanFeedbackForDisplay(text) {
-    return String(text || "")
-      .replace(/^[\-\*•\d.\)\s]+/, "")
-      .replace(/\s+/g, " ")
-      .trim();
-  }
-  // 말줄임표 없이, 문장 → 절(쉼표) → 어절 순서로 점점 더 짧은 단위를 시도해서 제한 길이
-  // 안에 들어가는 "그 자체로 완결된" 가장 긴 조각을 고른다. 문장을 억지로 다시 쓰지 않고
-  // 원문 그대로의 표현만 잘라내므로 어색한 문법이 만들어지지 않는다.
-  function qaSummarizeFeedback(text, maxLen) {
-    const limit = maxLen || 40;
-    const cleaned = String(text || "").trim();
-    if (!cleaned) return "";
-    // 1) 여러 문장이면 핵심이 되는 첫 문장만 남기고 뒤따르는 부연 설명은 버린다.
-    const firstSentence = (cleaned.split(/(?<=[.!?])\s+/)[0] || cleaned).replace(/[.]+$/, "").trim();
-    if (firstSentence.length <= limit) return firstSentence;
-    // 2) 그래도 길면 쉼표 등 절 경계에서 앞부분만 남긴다.
-    const firstClause = firstSentence.split(/[,、]/)[0].trim();
-    if (firstClause && firstClause.length <= limit) return firstClause;
-    // 3) 그래도 길면 어절(공백) 단위로, 제한을 넘지 않는 데까지만 이어붙인다.
-    const words = firstClause.split(" ");
-    let result = "";
-    for (const w of words) {
-      const candidate = result ? `${result} ${w}` : w;
-      if (candidate.length > limit) break;
-      result = candidate;
-    }
-    return result || firstClause.slice(0, limit).trim();
-  }
-  // 한 회차의 items 중 실제로 개선이 필요한 코멘트만 걸러 "[가이드라인]\n- 코멘트" 형태의
-  // 텍스트로 짧게 정리한다.
-  function qaBuildLocalRoundSummaryText(items) {
-    const kept = (items || []).filter((it) => {
-      const fb = it.feedback || "";
-      if (qaIsTrivialFeedback(fb)) return false;
-      if (qaIsGenericClauseFeedback(fb)) return false;
-      return true;
-    });
-    if (kept.length === 0) return "";
-    return kept
-      .map((it) => {
-        const label = it.guideline ? `[${it.guideline}]` : "";
-        const cleaned = qaSummarizeFeedback(qaCleanFeedbackForDisplay(it.feedback), 40);
-        return `${label}\n- ${cleaned}`.trim();
-      })
-      .join("\n");
-  }
-  function qaFormatLocalRoundSummaryHtml(round) {
-    const text = qaBuildLocalRoundSummaryText(round.items);
-    if (!text) return `<span class="qa-round-hint">실제 개선이 필요한 지적 내용이 없어요 (조건 설명·칭찬성 코멘트만 있었어요).</span>`;
-    return qaFormatSummaryHtml(text);
-  }
-
   function qaRoundSummaryLine(round) {
     const scoreText = (round.score === null || round.score === undefined) ? "-" : round.score;
     const dateText = round.date ? ` · ${esc(round.date)}` : "";
@@ -802,7 +726,7 @@
     const metaText = detail && detail.purged
       ? `원본 엑셀은 업로드 후 ${QA_DETAIL_EXPIRY_MONTHS}개월이 지나 자동 삭제됐어요 · 차수 ${detail.rounds.length}개`
       : detail
-        ? `${esc(detail.fileName || "")} 업로드됨 · 차수 ${detail.rounds.length}개 (원문은 업로드 후 ${QA_DETAIL_EXPIRY_MONTHS}개월 뒤 자동 삭제되며, 정리된 내용은 그대로 남아요)`
+        ? `${esc(detail.fileName || "")} 업로드됨 · 차수 ${detail.rounds.length}개 (원문은 업로드 후 ${QA_DETAIL_EXPIRY_MONTHS}개월 뒤 자동 삭제돼요)`
         : "";
 
     const trendHtml = qaTrendSvgHtml(agentId, year, monthIndex);
@@ -824,17 +748,11 @@
             if (isPerfect) {
               bodyBlock = `<div class="qa-round-empty">감점/코멘트 항목이 없어요 (만점 처리된 차수예요).</div>`;
             } else if (rawGone) {
-              bodyBlock = `<div class="qa-round-summary-box" id="qa-round-summary-${idx}">${round.localSummary
-                ? qaFormatSummaryHtml(round.localSummary)
-                : `<span class="qa-round-hint" style="color:var(--red);">원문이 만료되어 삭제됐어요.<br>만료 전에 정리해두지 않아 남은 내용이 없어요.</span>`}</div>`;
+              bodyBlock = `<div class="qa-round-summary-box" id="qa-round-summary-${idx}"><span class="qa-round-hint" style="color:var(--red);">원문이 ${QA_DETAIL_EXPIRY_MONTHS}개월 만료되어 삭제됐어요.</span></div>`;
             } else {
               bodyBlock = `
-              <div class="qa-round-local">
-                <button type="button" class="qa-round-raw-toggle" data-qa-local-toggle="${idx}">간단 요약 보기</button>
-                <div class="qa-round-local-box" id="qa-round-local-${idx}" style="display:none;"></div>
-              </div>
               <div class="qa-round-raw">
-                <button type="button" class="qa-round-raw-toggle" data-qa-raw-toggle="${idx}">원문 전체 보기</button>
+                <button type="button" class="qa-round-raw-toggle" data-qa-raw-toggle="${idx}">원문 보기</button>
                 <div class="qa-round-raw-box" id="qa-round-raw-${idx}" style="display:none;"></div>
               </div>`;
             }
@@ -883,26 +801,8 @@
       };
     }
 
-    // "간단 요약 보기" 토글: 버튼을 누르면(첫 클릭 때만) 그 자리에서 즉시 규칙 기반으로
-    // 정리해서 보여주고, 다시 누르면 접힌다. 외부 서버를 호출하지 않는다.
-    overlay.addEventListener("click", (e) => {
-      const localBtn = e.target.closest && e.target.closest("[data-qa-local-toggle]");
-      if (!localBtn) return;
-      e.stopPropagation();
-      const idx = Number(localBtn.getAttribute("data-qa-local-toggle"));
-      const round = detail.rounds[idx];
-      const localBox = document.getElementById(`qa-round-local-${idx}`);
-      if (!round || !localBox) return;
-      const opening = localBox.style.display === "none";
-      if (opening && !localBox.dataset.filled) {
-        localBox.innerHTML = qaFormatLocalRoundSummaryHtml(round);
-        localBox.dataset.filled = "1";
-      }
-      localBox.style.display = opening ? "" : "none";
-      localBtn.textContent = opening ? "간단 요약 접기" : "간단 요약 보기";
-    });
-
-    // "원문 전체 보기" 토글: 개별 버튼이 아니라 오버레이 전체에 위임해서 클릭을 잡는다.
+    // "원문 보기" 토글: 개별 버튼이 아니라 오버레이 전체에 위임해서 클릭을 잡는다.
+    // 기본은 접힌 상태(style="display:none")이고, 누를 때마다 펼치고/접는다.
     overlay.addEventListener("click", (e) => {
       const toggleBtn = e.target.closest && e.target.closest("[data-qa-raw-toggle]");
       if (!toggleBtn) return;
@@ -917,7 +817,7 @@
         rawBox.dataset.filled = "1";
       }
       rawBox.style.display = opening ? "" : "none";
-      toggleBtn.textContent = opening ? "원문 접기" : "원문 전체 보기";
+      toggleBtn.textContent = opening ? "원문 접기" : "원문 보기";
     });
 
     // 회차 카드 헤드를 누르면 펼치기/접기 (버튼 클릭은 위에서 stopPropagation으로 분리됨)
@@ -1135,6 +1035,10 @@
       <div class="qa-help-text">QA 평가 엑셀(.xlsx)을 올리면 "평균" 행 × "총점" 열 값을 자동으로 점수에 반영해요.<br>상담사 1명당 파일 1개(시트명 또는 파일명 = 상담사 이름)도, 여러 상담사가 시트로 나뉜 파일 하나도 모두 지원돼요.<br>이름을 누르면 회차별 상세 내용을 볼 수 있어요.</div>
       <div class="status" id="qa-status"></div>
       <div class="qa-stat-row">
+        <div class="agent-search-input">
+          <input type="text" class="agent-search-input-field" id="qa-search-input" placeholder="상담사 검색 (이름/주간/야간/채팅/유선, 쉼표로 여러 개)" value="${esc(qaUi.searchQuery)}" autocomplete="off">
+          ${ICON_SEARCH_MINI}
+        </div>
         <div class="qa-stat-grid">
           ${qaStatItemHtml("전체 평균", stats.total, prevStats.total, true)}
           ${qaStatItemHtml("유선 점수 평균", stats.voice, prevStats.voice)}
@@ -1145,10 +1049,6 @@
           ${qaStatItemHtml("주간 유선 평균", stats.dayVoice, prevStats.dayVoice)}
           ${qaStatItemHtml("야간 채팅 평균", stats.nightChat, prevStats.nightChat)}
           ${qaStatItemHtml("야간 유선 평균", stats.nightVoice, prevStats.nightVoice)}
-        </div>
-        <div class="agent-search-input">
-          <input type="text" class="agent-search-input-field" id="qa-search-input" placeholder="상담사 검색 (이름/주간/야간/채팅/유선, 쉼표로 여러 개)" value="${esc(qaUi.searchQuery)}" autocomplete="off">
-          ${ICON_SEARCH_MINI}
         </div>
       </div>
       <div id="qa-table-area">${buildQATableHtml(filteredList, year, monthIndex, false)}</div>
