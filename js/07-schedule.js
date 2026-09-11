@@ -33,6 +33,7 @@
       scheduleData.collapseByMonth[key] = {
         collapsedRowGroups: [], colGroups: [], manualHiddenDays: [],
         manualHiddenStaffIds: [], manualHiddenInfoCols: [], manualHiddenSummaryRows: [],
+        manualHiddenBatches: [],
       };
     }
     return scheduleData.collapseByMonth[key];
@@ -168,6 +169,11 @@
     manualHiddenStaffIds: new Set(), // 인원 이름칸을 직접 선택해서 접은 staffId 모음
     manualHiddenInfoCols: new Set(), // 직접 선택해서 접은 인원 정보 열(닉네임~결근) 키 모음
     manualHiddenSummaryRows: new Set(), // 직접 선택해서 접은 집계행(관리자 인원/필요인력/대비 등) 키 모음
+    // 인원 정보 칸·인원·집계행을 "한 번에 여러 개 선택해서 접었을 때" 그 묶음을 기억해두는 목록.
+    // { id, infoCols: [key,...], staffIds: [id,...], summaryRows: [key,...] } 형태.
+    // "숨긴 열/행" 패널에서 같이 접은 항목들을 한 덩어리로 보여주고, 버튼 하나로 한 번에
+    // 펼칠 수 있게 하려는 용도다(날짜는 연속 여부로 자동 판단하므로 여기 포함 안 함).
+    manualHiddenBatches: [],
     searchQuery: "", // 상담사 검색어. 쉼표(,)로 여러 명을 한 번에 검색할 수 있다.
   };
 
@@ -183,6 +189,7 @@
     state.manualHiddenStaffIds = Array.from(scheduleUi.manualHiddenStaffIds);
     state.manualHiddenInfoCols = Array.from(scheduleUi.manualHiddenInfoCols);
     state.manualHiddenSummaryRows = Array.from(scheduleUi.manualHiddenSummaryRows);
+    state.manualHiddenBatches = scheduleUi.manualHiddenBatches.map((b) => ({ ...b }));
     saveScheduleData();
   }
   // scheduleData.collapseByMonth에 저장돼 있던(=서버에서 불러온) 지금 달의 접기 상태를
@@ -196,6 +203,7 @@
     scheduleUi.manualHiddenStaffIds = new Set(state.manualHiddenStaffIds || []);
     scheduleUi.manualHiddenInfoCols = new Set(state.manualHiddenInfoCols || []);
     scheduleUi.manualHiddenSummaryRows = new Set(state.manualHiddenSummaryRows || []);
+    scheduleUi.manualHiddenBatches = (state.manualHiddenBatches || []).map((b) => ({ ...b }));
   }
   // 페이지가 처음 로드될 때, 지금 보고 있는 달(기본은 이번 달)에 저장돼 있던 접기 상태를
   // 곧바로 불러와둔다.
@@ -203,8 +211,16 @@
 
   // ----- 상담사 검색 -----
   // "상담사 관리"·"면담 관리"와 같은 방식: 이름/닉네임(LDAP)/사번 일부만 입력해도 찾고,
-  // 초성만 입력해도 찾는다("ㅎㄱㅇ" → "홍길동"). 쉼표(,)로 여러 명을 구분해서 입력하면
-  // 그 중 하나라도 일치하는 인원을 모두 보여준다.
+  // 초성만 입력해도 찾는다("ㅎㄱㅇ" → "홍길동"). "주간"/"야간"/"채팅"/"유선" 키워드를 입력하면
+  // 그 조건에 해당하는 인원이 모두 걸린다. 쉼표(,)로 여러 조건을 구분해서 입력하면
+  // 그 중 하나라도 일치하는 인원을 모두 보여준다(이름+키워드를 섞어도 됨. 예: "홍길동,야간").
+  // 이름/닉네임/사번/초성 외에, "주간"/"야간"/"채팅"/"유선" 근무 형태 키워드로도 검색할 수 있게 한다.
+  const SCHEDULE_SEARCH_KEYWORD_MATCHERS = {
+    "주간": (s) => s.group !== "night",
+    "야간": (s) => s.group === "night",
+    "채팅": (s) => (s.types || []).indexOf("채팅") !== -1,
+    "유선": (s) => (s.types || []).indexOf("유선") !== -1,
+  };
   function scheduleStaffMatchesSearchTerm(s, needle) {
     if (!needle) return true;
     if ((s.name || "").toLowerCase().indexOf(needle) !== -1) return true;
@@ -212,6 +228,8 @@
     if ((s.empNo || "").toLowerCase().indexOf(needle) !== -1) return true;
     if (getChosungString(s.name || "").indexOf(needle) !== -1) return true;
     if (getChosungString(s.nickname || "").indexOf(needle) !== -1) return true;
+    const keywordFn = SCHEDULE_SEARCH_KEYWORD_MATCHERS[needle];
+    if (keywordFn && keywordFn(s)) return true;
     return false;
   }
   function scheduleStaffMatchesSearch(s, query) {
@@ -336,20 +354,54 @@
   // 행 key는 인원이면 "s:staffId", 집계행(관리자 인원/필요인력/대비 등)이면 "r:행고유키" 형태.
   function scheduleCollapseHeaderSelection() {
     const n = scheduleHeaderSelCols.size + scheduleHeaderSelRows.size;
+    const batchInfoCols = [];
+    const batchStaffIds = [];
+    const batchSummaryRows = [];
     scheduleHeaderSelCols.forEach((k) => {
       if (k.startsWith("d:")) scheduleUi.manualHiddenDays.add(Number(k.slice(2)));
-      else if (k.startsWith("i:")) scheduleUi.manualHiddenInfoCols.add(k.slice(2));
+      else if (k.startsWith("i:")) { const key = k.slice(2); scheduleUi.manualHiddenInfoCols.add(key); batchInfoCols.push(key); }
     });
     scheduleHeaderSelRows.forEach((k) => {
-      if (k.startsWith("s:")) scheduleUi.manualHiddenStaffIds.add(k.slice(2));
-      else if (k.startsWith("r:")) scheduleUi.manualHiddenSummaryRows.add(k.slice(2));
+      if (k.startsWith("s:")) { const id = k.slice(2); scheduleUi.manualHiddenStaffIds.add(id); batchStaffIds.push(id); }
+      else if (k.startsWith("r:")) { const key = k.slice(2); scheduleUi.manualHiddenSummaryRows.add(key); batchSummaryRows.push(key); }
     });
+    // 날짜 외에(정보 칸·인원·집계행 중 하나라도) 같이 접은 게 있으면, "숨긴 열/행" 패널에서
+    // 한 덩어리로 묶어서 보여주고 한 번에 펼칠 수 있도록 이번에 접은 조합을 기록해둔다.
+    if (batchInfoCols.length || batchStaffIds.length || batchSummaryRows.length) {
+      scheduleUi.manualHiddenBatches.push({
+        id: `hb${Date.now()}${Math.random().toString(36).slice(2, 6)}`,
+        infoCols: batchInfoCols, staffIds: batchStaffIds, summaryRows: batchSummaryRows,
+      });
+    }
     scheduleHeaderSelCols = new Set();
     scheduleHeaderSelRows = new Set();
     closeScheduleMenu();
     scheduleSaveCollapseState();
     renderApp();
     flashScheduleStatus(`${n}개 접었어요.`);
+  }
+  // 배치(한 번에 같이 접은 정보 칸·인원·집계행 묶음)를 한 번에 펼친다.
+  function scheduleUnhideBatch(batchId) {
+    const batch = scheduleUi.manualHiddenBatches.find((b) => b.id === batchId);
+    if (!batch) return;
+    (batch.infoCols || []).forEach((key) => scheduleUi.manualHiddenInfoCols.delete(key));
+    (batch.staffIds || []).forEach((id) => scheduleUi.manualHiddenStaffIds.delete(id));
+    (batch.summaryRows || []).forEach((key) => scheduleUi.manualHiddenSummaryRows.delete(key));
+    scheduleUi.manualHiddenBatches = scheduleUi.manualHiddenBatches.filter((b) => b.id !== batchId);
+    scheduleSaveCollapseState();
+    renderApp();
+  }
+  // 배치 목록에서, 이미 다른 경로로 펼쳐졌거나(개별 펼치기) 지워진 항목은 걸러내고
+  // 실제로 아직 숨겨져 있는 항목만 남긴 배치를 돌려준다. 빈 배치는 통째로 제외한다.
+  function scheduleEffectiveHiddenBatches() {
+    return scheduleUi.manualHiddenBatches
+      .map((b) => ({
+        id: b.id,
+        infoCols: (b.infoCols || []).filter((key) => scheduleUi.manualHiddenInfoCols.has(key)),
+        staffIds: (b.staffIds || []).filter((id) => scheduleUi.manualHiddenStaffIds.has(id)),
+        summaryRows: (b.summaryRows || []).filter((key) => scheduleUi.manualHiddenSummaryRows.has(key)),
+      }))
+      .filter((b) => b.infoCols.length + b.staffIds.length + b.summaryRows.length > 1); // 1개짜리는 기존 개별 칩으로 표시
   }
   function openScheduleHideMenu(e) {
     closeScheduleMenu();
@@ -375,10 +427,26 @@
     setTimeout(() => document.addEventListener("mousedown", scheduleMenuOutsideHandler, true), 0);
   }
   // 개별로 접어둔 날짜/인원정보열/인원/집계행을 다시 펼친다.
-  function scheduleUnhideDay(day) {
-    scheduleUi.manualHiddenDays.delete(day);
+  // 연속된 날짜 구간(start~end)을 한 번에 펼친다. "숨긴 열/행" 패널에서 여러 날짜를
+  // 한 번에 접었을 때 하나로 묶여 보이는 범위 칩의 "펼치기" 버튼에서 쓰인다.
+  function scheduleUnhideDayRange(start, end) {
+    for (let d = start; d <= end; d++) scheduleUi.manualHiddenDays.delete(d);
     scheduleSaveCollapseState();
     renderApp();
+  }
+  // 접혀 있는 날짜들을 정렬한 뒤, 연속된(바로 다음날) 구간끼리 묶어서
+  // [{start, end}, ...] 형태로 돌려준다. 예: [11,12,13,15] → [{11,13},{15,15}]
+  // 여러 날짜를 한 번에 선택해서 접으면 "09/11~09/13" 처럼 범위 하나로 보여주고,
+  // 그 범위를 한 번에 펼칠 수 있게 하기 위함이다.
+  function scheduleGroupConsecutiveDays(days) {
+    const sorted = Array.from(days).sort((a, b) => a - b);
+    const ranges = [];
+    for (const d of sorted) {
+      const last = ranges[ranges.length - 1];
+      if (last && d === last.end + 1) last.end = d;
+      else ranges.push({ start: d, end: d });
+    }
+    return ranges;
   }
   function scheduleUnhideInfoCol(key) {
     scheduleUi.manualHiddenInfoCols.delete(key);
@@ -400,6 +468,7 @@
     scheduleUi.manualHiddenInfoCols = new Set();
     scheduleUi.manualHiddenStaffIds = new Set();
     scheduleUi.manualHiddenSummaryRows = new Set();
+    scheduleUi.manualHiddenBatches = [];
     scheduleUi.collapsedRowGroups = new Set();
     scheduleUi.colGroups = [];
     scheduleSaveCollapseState();
@@ -2299,6 +2368,71 @@
     });
   }
 
+  // "숨긴 열/행" 패널에 나열할 칩들의 HTML을 만든다. 연속 날짜는 범위로, 한 번에 같이
+  // 접은 정보 칸/인원/집계행 묶음(2개 이상)은 한 칩으로 묶어서 보여준다.
+  function scheduleHiddenItemsListHtml() {
+    const effectiveBatches = scheduleEffectiveHiddenBatches();
+    const coveredInfoCols = new Set();
+    const coveredStaffIds = new Set();
+    const coveredSummaryRows = new Set();
+    effectiveBatches.forEach((b) => {
+      b.infoCols.forEach((k) => coveredInfoCols.add(k));
+      b.staffIds.forEach((k) => coveredStaffIds.add(k));
+      b.summaryRows.forEach((k) => coveredSummaryRows.add(k));
+    });
+    const batchLabel = (b) => {
+      const parts = [];
+      b.infoCols.forEach((key) => {
+        const col = SCHEDULE_INFO_COLS.find((c) => c.key === key);
+        parts.push(esc(col ? col.label : key));
+      });
+      b.staffIds.forEach((id) => {
+        const staff = getStaffListForMonth(scheduleUi.year, scheduleUi.monthIndex).find((s) => s.id === id);
+        parts.push(esc(staff ? staff.nickname : "(알 수 없음)"));
+      });
+      b.summaryRows.forEach((key) => parts.push(esc(schedulePrettyRowKey(key))));
+      return parts.join(", ");
+    };
+    return `
+      ${scheduleGroupConsecutiveDays(scheduleUi.manualHiddenDays).map((r) => `
+        <span class="schedule-colgroup-chip">
+          ${pad2(scheduleUi.monthIndex + 1)}/${pad2(r.start)}${r.end > r.start ? `~${pad2(scheduleUi.monthIndex + 1)}/${pad2(r.end)}` : ""}
+          <button class="sch-colgroup-toggle-btn" data-unhide-day-range="${r.start}-${r.end}">펼치기</button>
+        </span>
+      `).join("")}
+      ${effectiveBatches.map((b) => `
+        <span class="schedule-colgroup-chip">
+          ${batchLabel(b)}
+          <button class="sch-colgroup-toggle-btn" data-unhide-batch="${b.id}">펼치기</button>
+        </span>
+      `).join("")}
+      ${Array.from(scheduleUi.manualHiddenInfoCols).filter((key) => !coveredInfoCols.has(key)).map((key) => {
+        const col = SCHEDULE_INFO_COLS.find((c) => c.key === key);
+        return `
+        <span class="schedule-colgroup-chip">
+          ${esc(col ? col.label : key)}
+          <button class="sch-colgroup-toggle-btn" data-unhide-infocol="${esc(key)}">펼치기</button>
+        </span>
+      `;
+      }).join("")}
+      ${Array.from(scheduleUi.manualHiddenStaffIds).filter((id) => !coveredStaffIds.has(id)).map((id) => {
+        const staff = getStaffListForMonth(scheduleUi.year, scheduleUi.monthIndex).find((s) => s.id === id);
+        return `
+        <span class="schedule-colgroup-chip">
+          ${esc(staff ? staff.nickname : "(알 수 없음)")}
+          <button class="sch-colgroup-toggle-btn" data-unhide-staff="${id}">펼치기</button>
+        </span>
+      `;
+      }).join("")}
+      ${Array.from(scheduleUi.manualHiddenSummaryRows).filter((key) => !coveredSummaryRows.has(key)).map((key) => `
+        <span class="schedule-colgroup-chip">
+          ${esc(schedulePrettyRowKey(key))}
+          <button class="sch-colgroup-toggle-btn" data-unhide-summaryrow="${esc(key)}">펼치기</button>
+        </span>
+      `).join("")}
+    `;
+  }
+
   function renderSchedulePage(root) {
     root.innerHTML = `
       <div class="schedule-top">
@@ -2344,8 +2478,8 @@
         <span class="item"><span class="swatch" style="background:var(--text-faint);"></span>퇴사</span>
       </div>
       <div class="schedule-table-toolbar">
-        <div class="agent-search-input" style="margin-right:auto;">
-          <input type="text" class="agent-search-input-field" id="sch-search-input" placeholder="상담사 검색 (쉼표로 여러 명)" value="${esc(scheduleUi.searchQuery)}" autocomplete="off">
+        <div class="agent-search-input">
+          <input type="text" class="agent-search-input-field" id="sch-search-input" placeholder="상담사 검색 (이름/주간/야간/채팅/유선, 쉼표로 여러 개)" value="${esc(scheduleUi.searchQuery)}" autocomplete="off">
           ${ICON_SEARCH_MINI}
         </div>
         <button class="ghost-btn ${scheduleHiddenPanelOpen ? "active" : ""}" id="sch-hidden-btn">${ICON_CALENDAR} 숨긴 열/행${scheduleHiddenCount() > 0 ? ` (${scheduleHiddenCount()})` : ""} ▾</button>
@@ -2385,36 +2519,7 @@
             <div class="schedule-colgroup-empty">접어둔 열·행이 없어요.</div>
           ` : `
             <div class="schedule-colgroup-list">
-              ${Array.from(scheduleUi.manualHiddenDays).sort((a, b) => a - b).map((d) => `
-                <span class="schedule-colgroup-chip">
-                  ${pad2(scheduleUi.monthIndex + 1)}/${pad2(d)}
-                  <button class="sch-colgroup-toggle-btn" data-unhide-day="${d}">펼치기</button>
-                </span>
-              `).join("")}
-              ${Array.from(scheduleUi.manualHiddenInfoCols).map((key) => {
-                const col = SCHEDULE_INFO_COLS.find((c) => c.key === key);
-                return `
-                <span class="schedule-colgroup-chip">
-                  ${esc(col ? col.label : key)}
-                  <button class="sch-colgroup-toggle-btn" data-unhide-infocol="${esc(key)}">펼치기</button>
-                </span>
-              `;
-              }).join("")}
-              ${Array.from(scheduleUi.manualHiddenStaffIds).map((id) => {
-                const staff = getStaffListForMonth(scheduleUi.year, scheduleUi.monthIndex).find((s) => s.id === id);
-                return `
-                <span class="schedule-colgroup-chip">
-                  ${esc(staff ? staff.nickname : "(알 수 없음)")}
-                  <button class="sch-colgroup-toggle-btn" data-unhide-staff="${id}">펼치기</button>
-                </span>
-              `;
-              }).join("")}
-              ${Array.from(scheduleUi.manualHiddenSummaryRows).map((key) => `
-                <span class="schedule-colgroup-chip">
-                  ${esc(schedulePrettyRowKey(key))}
-                  <button class="sch-colgroup-toggle-btn" data-unhide-summaryrow="${esc(key)}">펼치기</button>
-                </span>
-              `).join("")}
+              ${scheduleHiddenItemsListHtml()}
             </div>
             <div><button class="ghost-btn" id="sch-unhide-all-btn">모두 펼치기</button></div>
           `}
@@ -2446,8 +2551,12 @@
         updateScheduleTableArea();
       };
     }
-    root.querySelectorAll("[data-unhide-day]").forEach((btn) => {
-      btn.onclick = () => scheduleUnhideDay(Number(btn.getAttribute("data-unhide-day")));
+    root.querySelectorAll("[data-unhide-day-range]").forEach((btn) => {
+      const [s, e] = btn.getAttribute("data-unhide-day-range").split("-").map(Number);
+      btn.onclick = () => scheduleUnhideDayRange(s, e);
+    });
+    root.querySelectorAll("[data-unhide-batch]").forEach((btn) => {
+      btn.onclick = () => scheduleUnhideBatch(btn.getAttribute("data-unhide-batch"));
     });
     root.querySelectorAll("[data-unhide-infocol]").forEach((btn) => {
       btn.onclick = () => scheduleUnhideInfoCol(btn.getAttribute("data-unhide-infocol"));

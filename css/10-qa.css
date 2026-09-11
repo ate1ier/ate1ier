@@ -4,6 +4,18 @@
     flex-wrap: wrap; gap: 10px; margin-bottom: 24px;
   }
   .qa-title { font-size: var(--page-title-size); font-weight: var(--page-title-weight); letter-spacing: -0.01em; }
+  /* 통계(평균) 그리드 + 검색창을 한 줄로 묶어서, 검색창이 평균 테이블 오른쪽 위에 오게 한다. */
+  .qa-stat-row {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 16px 24px; flex-wrap: wrap; margin-bottom: 26px; padding-bottom: 22px;
+    border-bottom: 1px solid var(--hairline);
+  }
+  .qa-stat-row .qa-stat-grid { margin-bottom: 0; padding-bottom: 0; border-bottom: none; flex: 1 1 320px; }
+  .qa-stat-row .agent-search-input { width: 240px; flex-shrink: 0; }
+  @media (max-width: 720px) {
+    .qa-stat-row { flex-direction: column; align-items: stretch; gap: 14px; }
+    .qa-stat-row .agent-search-input { width: 100%; }
+  }
   /* 카드형 박스 대신, 캡처 이미지처럼 테두리 없이 숫자를 크게 나열하는 방식.
      justify-content:space-between으로 아래 표와 같은 너비에 맞춰 양 끝까지 고르게 펼친다. */
   .qa-stat-grid {
@@ -132,7 +144,7 @@
     white-space: normal;
   }
   .qa-round-hint { color: var(--text-faint); font-size: 12.5px; }
-  /* AI가 정리한 요점 아래, 원할 때만 규칙 기반 자동 정리·감점 원문 전체를 펼쳐볼 수 있는 토글 */
+  /* 원할 때만 규칙 기반 간단 요약·감점 원문 전체를 펼쳐볼 수 있는 토글 */
   .qa-round-local, .qa-round-raw { margin-top: 8px; }
   .qa-round-raw-toggle {
     background: none; border: none; padding: 0; cursor: pointer;

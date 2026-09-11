@@ -14,7 +14,8 @@
 
   // ----- 업로드한 엑셀 원문의 자동 만료 -----
   // 업로드일로부터 2개월이 지나면 회차별 원문(감점 항목/코멘트)은 자동으로 지운다.
-  // 단, 그 전에 만들어둔 정리된 텍스트(aiSummary)는 원문이 사라져도 그대로 남는다("박제").
+  // 단, 원문이 사라지기 전에 규칙 기반으로 미리 만들어둔 간단 요약(localSummary)은
+  // 원문이 사라져도 그대로 남는다("박제").
   const QA_DETAIL_EXPIRY_MONTHS = 2;
   function qaDetailExpiryDate(detail) {
     if (!detail || !detail.uploadedAt) return null;
@@ -33,7 +34,13 @@
       const detail = qaData.details[key];
       if (!detail || detail.purged) return;
       if (!qaIsDetailExpired(detail)) return;
-      (detail.rounds || []).forEach((round) => { round.items = []; });
+      (detail.rounds || []).forEach((round) => {
+        // 원문을 지우기 전에, 규칙 기반 간단 요약을 미리 계산해서 남겨둔다.
+        if (round.items && round.items.length && !round.localSummary) {
+          round.localSummary = qaBuildLocalRoundSummaryText(round.items);
+        }
+        round.items = [];
+      });
       detail.fileName = "";
       detail.purged = true;
       changed = true;
@@ -84,8 +91,9 @@
   };
 
   // ----- 상담사 검색 -----
-  // "상담사 관리"의 검색(이름/LDAP/초성)과 같은 방식을 쓰되, 쉼표(,)로 여러 명을 구분해서
-  // 입력하면 그 중 하나라도 일치하는 상담사를 모두 보여준다.
+  // "상담사 관리"의 검색(이름/LDAP/초성)과 같은 방식을 쓰되, "주간"/"야간"/"채팅"/"유선"
+  // 키워드를 입력하면 그 조건에 해당하는 인원이 모두 걸린다. 쉼표(,)로 여러 조건을 구분해서
+  // 입력하면(이름+키워드를 섞어도 됨) 그 중 하나라도 일치하는 상담사를 모두 보여준다.
   function qaAgentMatchesSearch(a, query) {
     const terms = (query || "").split(",").map((t) => t.trim()).filter(Boolean);
     if (terms.length === 0) return true;
@@ -524,7 +532,7 @@
 
   // 엑셀에서 뽑아온 감점/코멘트 원문(items)을 그대로 읽기 좋게 줄바꿈해서 나열한다.
   // 항목마다 "[가이드라인]" 제목 줄 + 코멘트 원문 줄로 나열하고, 가이드라인이 없는
-  // 항목은 번호만 붙여 구분한다. AI 요약 프롬프트의 재료 + "원문 전체 보기"에 쓰인다.
+  // 항목은 번호만 붙여 구분한다. "원문 전체 보기"에 쓰인다.
   function qaOrganizeItemsText(items) {
     return items
       .map((it, i) => {
@@ -534,78 +542,9 @@
       .join("\n\n");
   }
 
-  /* ===================== QA 회차 상세 AI 요약 (Groq) ===================== */
-  // 실제 Groq API 키는 브라우저에 없고, 면담일지 AI 정리와 동일한 Supabase Edge
-  // Function(qa-groq-summary)의 서버 환경변수에만 있다. 그 함수는 prompt 텍스트를
-  // 넘기면 Groq 응답 텍스트를 돌려주는 범용 함수라서 여기서도 그대로 재사용한다.
-  const QA_AI_SUMMARY_FN = "qa-groq-summary";
-
-  // 감점 항목 원문이 방대해도, 상담사에게 실제로 전달할 "피드백/개선이 필요한 부분"만
-  // 핵심 요점 위주로 추려달라고 요청하는 프롬프트.
-  function qaBuildSummaryPrompt(items) {
-    const itemsText = qaOrganizeItemsText(items);
-    return `다음은 콜센터 상담사 QA(품질관리) 평가에서 감점된 항목들의 가이드라인명과 코멘트(원문)입니다.\n\n${itemsText}\n\n위 내용을 바탕으로, 이 상담사에게 전달할 "피드백/개선이 필요한 부분"만 핵심 요점 위주로 정리해주세요. 한국어로, 항목별로 줄을 나눠 쓰고 모든 줄은 반드시 "- "로 시작하세요. 서로 겹치거나 비슷한 지적은 하나로 묶고, 단순 사실 나열이 아니라 실제로 개선이 필요한 지적·피드백만 남기세요(이미 잘하고 있다는 칭찬이나 사소한 사유는 제외). 문장은 "~함", "~필요", "~권장"처럼 짧고 담백한 개조식으로 쓰고, 불필요한 서론·결론이나 섹션 제목은 쓰지 마세요. 마크다운 기호(**, *, # 등)는 절대 쓰지 마세요.`;
-  }
-
-  // AI 응답에서 여백을 걷어내고, "- "로 시작하는 개조식 줄 목록으로 다듬는다
-  // (면담일지 AI 요약과 동일한 방식).
-  function qaParseAiSummaryText(text) {
-    const clean = String(text || "")
-      .replace(/\*\*/g, "")
-      .replace(/^\s*\[[^\[\]]+\]\s*/m, "")
-      .trim();
-    return clean
-      .split("\n")
-      .map((line) => line.trim())
-      .filter((line) => line.length > 0)
-      .map((line) => (line.startsWith("-") ? line : `- ${line}`))
-      .join("\n");
-  }
-
-  async function qaOrganizeRoundItems(agentId, year, monthIndex, roundIdx, btnEl) {
-    const detail = getQADetail(agentId, year, monthIndex);
-    if (!detail || !detail.rounds || !detail.rounds[roundIdx]) return;
-    const round = detail.rounds[roundIdx];
-    if (!round.items || !round.items.length) { flashQAStatus("원문이 만료되어 정리할 내용이 없어요."); return; }
-    if (!cloud) { flashQAStatus("AI 서버에 연결할 수 없어요 (네트워크 확인)."); return; }
-    const box = document.getElementById(`qa-round-summary-${roundIdx}`);
-    const originalLabel = btnEl ? btnEl.textContent : "";
-    if (btnEl) { btnEl.disabled = true; btnEl.textContent = "정리 중..."; }
-    if (box) box.innerHTML = `<span class="qa-round-hint">AI가 요점만 정리하고 있어요...</span>`;
-    try {
-      const prompt = qaBuildSummaryPrompt(round.items);
-      const { data, error } = await cloud.functions.invoke(QA_AI_SUMMARY_FN, { body: { prompt } });
-      if (error) {
-        let msg = error.message || "요청 실패";
-        try {
-          const ctx = error.context && typeof error.context.json === "function" ? await error.context.json() : null;
-          if (ctx && ctx.error) msg = ctx.error;
-        } catch (_e) {}
-        throw new Error(msg);
-      }
-      const raw = (data && data.text) ? String(data.text).trim() : "";
-      if (!raw) throw new Error("응답에서 정리된 내용을 찾지 못했어요.");
-      const text = qaParseAiSummaryText(raw);
-      round.aiSummary = { text, generatedAt: new Date().toISOString() };
-      setQADetail(agentId, year, monthIndex, detail);
-      if (box) box.innerHTML = qaFormatSummaryHtml(text);
-      if (btnEl) btnEl.textContent = "다시 정리";
-    } catch (err) {
-      console.error(err);
-      if (box) box.innerHTML = `<span class="qa-round-hint" style="color:var(--red);">정리 실패: ${esc(err.message || String(err))}</span>`;
-      flashQAStatus("AI 요약에 실패했어요.");
-      if (btnEl) btnEl.textContent = originalLabel;
-    } finally {
-      if (btnEl) btnEl.disabled = false;
-    }
-  }
-
-
-  /* ===================== QA 회차별 "간단 정리" (AI 절대 사용 안 함, 규칙 기반) ===================== */
-  // "AI 요점 정리" 버튼(qaOrganizeRoundItems)은 외부 서버(Groq)를 호출해서 실제 AI가 정리해주는
-  // 기능이다. 여기 이 기능은 그거랑 완전히 별개이며, 어떤 경우에도 외부 서버나 AI를 호출하지
-  // 않고 브라우저 안의 정해진 규칙만으로 즉시 정리한다("간단 정리" = AI 미사용). 원문을
-  // 무작정 다 가져오는 게 아니라:
+  /* ===================== QA 회차별 "간단 정리" (규칙 기반, 외부 서버 호출 없음) ===================== */
+  // 어떤 경우에도 외부 서버를 호출하지 않고 브라우저 안의 정해진 규칙만으로 즉시 정리한다.
+  // 원문을 무작정 다 가져오는 게 아니라:
   // - 칭찬/문제없음류의 코멘트(실제로 고칠 게 없는 내용)는 제외한다.
   // - "OOO의 경우"처럼 특정 상담 내용이 아니라 가이드라인 자체를 조건문으로 다시 설명한
   //   문장(=실제 피드백이 아닌 일반 규정 설명)도 제외한다.
@@ -879,18 +818,17 @@
             const effectiveItemCount = (round.itemCount !== undefined && round.itemCount !== null)
               ? round.itemCount
               : (round.items ? round.items.length : 0);
-            const isPerfect = effectiveItemCount === 0 && !round.aiSummary;
+            const isPerfect = effectiveItemCount === 0;
             const rawGone = !isPerfect && round.items.length === 0; // 원문 만료로 사라진 경우
-            const showButton = round.items.length > 0; // 원문이 남아있을 때만 (다시) 정리 가능
             let bodyBlock;
             if (isPerfect) {
               bodyBlock = `<div class="qa-round-empty">감점/코멘트 항목이 없어요 (만점 처리된 차수예요).</div>`;
             } else if (rawGone) {
-              bodyBlock = `<div class="qa-round-summary-box" id="qa-round-summary-${idx}">${round.aiSummary
-                ? qaFormatSummaryHtml(round.aiSummary.text)
+              bodyBlock = `<div class="qa-round-summary-box" id="qa-round-summary-${idx}">${round.localSummary
+                ? qaFormatSummaryHtml(round.localSummary)
                 : `<span class="qa-round-hint" style="color:var(--red);">원문이 만료되어 삭제됐어요.<br>만료 전에 정리해두지 않아 남은 내용이 없어요.</span>`}</div>`;
             } else {
-              bodyBlock = `<div class="qa-round-summary-box" id="qa-round-summary-${idx}">${round.aiSummary ? qaFormatSummaryHtml(round.aiSummary.text) : `<span class="qa-round-hint">원문 ${round.items.length}건 · 버튼을 눌러 AI 요점 정리를 받아보세요.</span>`}</div>
+              bodyBlock = `
               <div class="qa-round-local">
                 <button type="button" class="qa-round-raw-toggle" data-qa-local-toggle="${idx}">간단 요약 보기</button>
                 <div class="qa-round-local-box" id="qa-round-local-${idx}" style="display:none;"></div>
@@ -904,7 +842,6 @@
             <div class="qa-round-card">
               <div class="qa-round-head" data-qa-round-toggle="${idx}">
                 <div class="qa-round-title"><span class="qa-round-chevron" id="qa-round-chevron-${idx}">▶</span>${qaRoundSummaryLine(round)}</div>
-                ${showButton ? `<button type="button" class="ghost-btn" data-qa-summarize="${idx}">${round.aiSummary ? "다시 정리" : "AI 요점 정리"}</button>` : ""}
               </div>
               <div class="qa-round-body" id="qa-round-body-${idx}" style="display:none;">
                 ${bodyBlock}
@@ -946,19 +883,8 @@
       };
     }
 
-    overlay.querySelectorAll("[data-qa-summarize]").forEach((btn) => {
-      btn.onclick = (e) => {
-        e.stopPropagation();
-        const idx = Number(btn.getAttribute("data-qa-summarize"));
-        const body = document.getElementById(`qa-round-body-${idx}`);
-        const chevron = document.getElementById(`qa-round-chevron-${idx}`);
-        if (body && body.style.display === "none") { body.style.display = ""; if (chevron) chevron.textContent = "▼"; }
-        qaOrganizeRoundItems(agentId, year, monthIndex, idx, btn);
-      };
-    });
-
-    // "간단 정리"(AI 미사용) 토글: 버튼을 누르면(첫 클릭 때만) 그 자리에서 즉시 규칙 기반으로
-    // 정리해서 보여주고, 다시 누르면 접힌다. 절대 외부 서버·AI를 호출하지 않는다.
+    // "간단 요약 보기" 토글: 버튼을 누르면(첫 클릭 때만) 그 자리에서 즉시 규칙 기반으로
+    // 정리해서 보여주고, 다시 누르면 접힌다. 외부 서버를 호출하지 않는다.
     overlay.addEventListener("click", (e) => {
       const localBtn = e.target.closest && e.target.closest("[data-qa-local-toggle]");
       if (!localBtn) return;
@@ -976,8 +902,7 @@
       localBtn.textContent = opening ? "간단 요약 접기" : "간단 요약 보기";
     });
 
-    // "원문 전체 보기" 토글: AI 요약이 다시 만들어져 내용이 바뀌어도 계속 동작하도록
-    // 개별 버튼이 아니라 오버레이 전체에 위임해서 클릭을 잡는다.
+    // "원문 전체 보기" 토글: 개별 버튼이 아니라 오버레이 전체에 위임해서 클릭을 잡는다.
     overlay.addEventListener("click", (e) => {
       const toggleBtn = e.target.closest && e.target.closest("[data-qa-raw-toggle]");
       if (!toggleBtn) return;
@@ -1209,20 +1134,22 @@
       </div>
       <div class="qa-help-text">QA 평가 엑셀(.xlsx)을 올리면 "평균" 행 × "총점" 열 값을 자동으로 점수에 반영해요.<br>상담사 1명당 파일 1개(시트명 또는 파일명 = 상담사 이름)도, 여러 상담사가 시트로 나뉜 파일 하나도 모두 지원돼요.<br>이름을 누르면 회차별 상세 내용을 볼 수 있어요.</div>
       <div class="status" id="qa-status"></div>
-      <div class="qa-stat-grid">
-        ${qaStatItemHtml("전체 평균", stats.total, prevStats.total, true)}
-        ${qaStatItemHtml("유선 점수 평균", stats.voice, prevStats.voice)}
-        ${qaStatItemHtml("채팅 점수 평균", stats.chat, prevStats.chat)}
-        ${qaStatItemHtml("주간 점수 평균", stats.day, prevStats.day)}
-        ${qaStatItemHtml("야간 점수 평균", stats.night, prevStats.night)}
-        ${qaStatItemHtml("주간 채팅 평균", stats.dayChat, prevStats.dayChat)}
-        ${qaStatItemHtml("주간 유선 평균", stats.dayVoice, prevStats.dayVoice)}
-        ${qaStatItemHtml("야간 채팅 평균", stats.nightChat, prevStats.nightChat)}
-        ${qaStatItemHtml("야간 유선 평균", stats.nightVoice, prevStats.nightVoice)}
-      </div>
-      <div class="agent-search-input" style="margin-bottom:10px;">
-        <input type="text" class="agent-search-input-field" id="qa-search-input" placeholder="상담사 검색 (쉼표로 여러 명)" value="${esc(qaUi.searchQuery)}" autocomplete="off">
-        ${ICON_SEARCH_MINI}
+      <div class="qa-stat-row">
+        <div class="qa-stat-grid">
+          ${qaStatItemHtml("전체 평균", stats.total, prevStats.total, true)}
+          ${qaStatItemHtml("유선 점수 평균", stats.voice, prevStats.voice)}
+          ${qaStatItemHtml("채팅 점수 평균", stats.chat, prevStats.chat)}
+          ${qaStatItemHtml("주간 점수 평균", stats.day, prevStats.day)}
+          ${qaStatItemHtml("야간 점수 평균", stats.night, prevStats.night)}
+          ${qaStatItemHtml("주간 채팅 평균", stats.dayChat, prevStats.dayChat)}
+          ${qaStatItemHtml("주간 유선 평균", stats.dayVoice, prevStats.dayVoice)}
+          ${qaStatItemHtml("야간 채팅 평균", stats.nightChat, prevStats.nightChat)}
+          ${qaStatItemHtml("야간 유선 평균", stats.nightVoice, prevStats.nightVoice)}
+        </div>
+        <div class="agent-search-input">
+          <input type="text" class="agent-search-input-field" id="qa-search-input" placeholder="상담사 검색 (이름/주간/야간/채팅/유선, 쉼표로 여러 개)" value="${esc(qaUi.searchQuery)}" autocomplete="off">
+          ${ICON_SEARCH_MINI}
+        </div>
       </div>
       <div id="qa-table-area">${buildQATableHtml(filteredList, year, monthIndex, false)}</div>
     `;

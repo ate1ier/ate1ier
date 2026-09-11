@@ -131,12 +131,25 @@
     }
     return out;
   }
+  // 이름/LDAP/초성 외에, "주간"/"야간"/"채팅"/"유선" 같은 근무 형태 키워드로도 검색할 수 있게 한다.
+  // 이름에 이 단어들이 실제로 들어갈 일은 거의 없으므로, 이름 검색과 그냥 OR로 묶어도 안전하다.
+  const AGENT_SEARCH_KEYWORD_MATCHERS = {
+    "주간": (a) => a.group !== "night",
+    "야간": (a) => a.group === "night",
+    "채팅": (a) => (a.workTypes || []).indexOf("채팅") !== -1,
+    "유선": (a) => (a.workTypes || []).indexOf("유선") !== -1,
+  };
+  function agentMatchesSearchKeyword(a, needle) {
+    const fn = AGENT_SEARCH_KEYWORD_MATCHERS[needle];
+    return !!fn && fn(a);
+  }
   function agentMatchesSearch(a, query) {
     const needle = (query || "").trim().toLowerCase();
     if (!needle) return true;
     if ((a.name || "").toLowerCase().indexOf(needle) !== -1) return true;
     if ((a.ldap || "").toLowerCase().indexOf(needle) !== -1) return true;
     if (getChosungString(a.name || "").indexOf(needle) !== -1) return true;
+    if (agentMatchesSearchKeyword(a, needle)) return true;
     return false;
   }
   function agentMatchesFilterType(a, filterType) {
