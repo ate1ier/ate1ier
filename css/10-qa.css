@@ -4,14 +4,16 @@
     flex-wrap: wrap; gap: 10px; margin-bottom: 24px;
   }
   .qa-title { font-size: var(--page-title-size); font-weight: var(--page-title-weight); letter-spacing: -0.01em; }
-  /* 검색창을 평균 테이블 위쪽에 두고, 그 아래에 통계(평균) 그리드가 오게 한다. */
+  /* 검색창을 평균 테이블 위쪽 오른쪽에 두고, 그 아래에 통계(평균) 그리드가 오게 한다. */
   .qa-stat-row {
     display: flex; flex-direction: column; align-items: stretch;
     gap: 16px; margin-bottom: 26px; padding-bottom: 22px;
     border-bottom: 1px solid var(--hairline);
   }
   .qa-stat-row .qa-stat-grid { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
-  .qa-stat-row .agent-search-input { width: 240px; flex-shrink: 0; }
+  /* 문구("상담사 검색 (이름/주간/야간/채팅/유선, 쉼표로 여러 개)")가 잘리지 않도록 충분히 넓게,
+     오른쪽 끝에 붙도록 align-self로 정렬한다. */
+  .qa-stat-row .agent-search-input { width: 420px; max-width: 100%; flex-shrink: 0; align-self: flex-end; }
   @media (max-width: 720px) {
     .qa-stat-row .agent-search-input { width: 100%; }
   }
