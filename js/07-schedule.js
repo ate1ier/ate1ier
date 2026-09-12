@@ -2197,6 +2197,7 @@
   // 입력값을 확정 시도한다. 빈 값이면 기본값(근무)으로, 알아보는 근태 표현이면 그 값으로 저장.
   // 알아보지 못하는 텍스트면 mode에 따라: "block"=그 칸에 그대로 머물며 오류 표시,
   // "revert"=저장하지 않고 원래 값으로 되돌리며 안내만 띄움.
+  // 반환값: 실제로 편집 모드를 빠져나갔으면(저장/되돌림) true, 오류로 그 칸에 계속 머물면 false.
   function scheduleFinalizeCellEdit(cell, staffId, dateKey, rawValue, mode, moveDir) {
     const trimmed = (rawValue || "").trim();
     const mapped = trimmed === "" ? { status: "WORK", attendance: null } : scheduleTokenToRecord(trimmed);
@@ -2204,7 +2205,7 @@
       if (mode === "revert") {
         scheduleExitCellEdit(staffId, dateKey, null);
         flashScheduleStatus(`인식할 수 없는 값이라 되돌렸어요: "${trimmed}"`);
-        return;
+        return true;
       }
       const input = cell.querySelector(".sch-cell-input");
       if (input) {
@@ -2214,10 +2215,11 @@
         input.select();
       }
       flashScheduleStatus(`인식할 수 없는 값이에요: "${trimmed}"`);
-      return;
+      return false;
     }
     setScheduleRecord(staffId, dateKey, { status: mapped.status, attendance: mapped.attendance || null });
     scheduleExitCellEdit(staffId, dateKey, moveDir);
+    return true;
   }
   function scheduleStartCellEdit(cell, typedChar) {
     if (cell.classList.contains("sch-cell--editing")) return;
@@ -2234,11 +2236,14 @@
     input.value = startValue;
     scheduleActiveEdit = { cell };
     let finished = false;
+    // 값이 틀려서 그 칸에 그대로 머무는 경우(mode="block"이고 인식 실패)엔 finished를
+    // true로 고정하면 안 된다. 그러면 사용자가 값을 바로잡아도 이후의 Enter/Tab이
+    // "이미 끝난 편집"으로 취급되어 아무 반응이 없는 문제가 생긴다.
     function finish(mode, moveDir) {
       if (finished) return;
-      finished = true;
-      if (mode === "cancel") { scheduleExitCellEdit(staffId, dateKey, null); return; }
-      scheduleFinalizeCellEdit(cell, staffId, dateKey, input.value, mode, moveDir);
+      if (mode === "cancel") { finished = true; scheduleExitCellEdit(staffId, dateKey, null); return; }
+      const done = scheduleFinalizeCellEdit(cell, staffId, dateKey, input.value, mode, moveDir);
+      if (done) finished = true;
     }
     input.onkeydown = (e) => {
       e.stopPropagation();
