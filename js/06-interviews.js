@@ -396,6 +396,7 @@
 
   // renderInterviewFormFields로 그려진 폼이 실제 DOM에 붙은 뒤 호출해서 검색-선택 위젯을 동작시킨다.
   function attachInterviewFormPickers(idPrefix, lockAgentId) {
+    enhanceDateInput(document.getElementById(`${idPrefix}-date`));
     if (!lockAgentId) {
       const activeAgents = agentsData.slice().sort((a, b) => a.name.localeCompare(b.name, "ko"));
       attachAgentPickerField(idPrefix, "agent", activeAgents);

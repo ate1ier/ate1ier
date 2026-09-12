@@ -127,3 +127,142 @@
   }
   .notify-toggle input:focus-visible + .notify-toggle-track { outline: 2px solid var(--accent); outline-offset: 2px; }
   .notify-toggle-label { font-size: 13px; color: var(--text-dim); min-width: 28px; }
+
+  /* ---------- 공통 커스텀 드롭다운(모든 select에 적용) ----------
+     브라우저 기본 select 목록은 그대로 두면 OS/브라우저마다 스타일이 달라서
+     앱 디자인과 어울리지 않는다. 그래서 실제 <select>는 화면에서 숨기고
+     (enhanceSelect 참고) 아래처럼 평평한(그라데이션·블러 없는) 단색 팝업으로
+     대신 그려준다. */
+  .app-select { position: relative; display: inline-block; max-width: 100%; vertical-align: middle; }
+  .app-select-native { display: none !important; }
+  .app-select-trigger {
+    width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    text-align: left; cursor: pointer; font: inherit;
+  }
+  .app-select-trigger-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .app-select-caret { display: flex; flex-shrink: 0; color: var(--text-faint); transition: transform 0.15s ease; }
+  .app-select-trigger.open .app-select-caret { transform: rotate(180deg); color: var(--accent); }
+  .app-select-trigger:disabled { cursor: default; opacity: 0.6; }
+
+  .app-select-menu {
+    position: fixed; z-index: 60; background: var(--elevated); border: 1px solid var(--hairline-strong);
+    border-radius: 14px; padding: 6px; display: flex; flex-direction: column; gap: 2px;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
+    min-width: 108px; max-height: 260px; overflow-y: auto;
+  }
+  .app-select-menu button {
+    background: none; border: none; color: var(--text); text-align: left; font-size: 13.5px;
+    padding: 8px 10px; border-radius: 9px; cursor: pointer; white-space: nowrap;
+  }
+  .app-select-menu button:hover { background: var(--accent-dim); color: var(--accent); }
+  .app-select-menu button.selected { background: var(--accent-dim); color: var(--accent); font-weight: 600; }
+  .app-select-menu button:disabled { opacity: 0.5; cursor: default; }
+  .app-select-menu button:disabled:hover { background: none; color: var(--text); }
+
+  /* select가 flex 줄(repeat-row 등) 안에서 쓰일 때, 숨겨진 원본 select 대신
+     이 wrapper가 flex 아이템 역할을 해야 하므로 폭 관련 규칙을 넘겨받는다. */
+  .repeat-row .app-select { flex: 1; min-width: 0; }
+  .repeat-row .app-select .app-select-trigger { background: none; border: none; padding: 0; color: var(--text); font-size: 14px; }
+
+  /* ---------- 공통 커스텀 날짜선택(모든 input[type=date]에 적용) ----------
+     드롭다운과 같은 원리: 실제 date input은 화면에서 숨기고(enhanceDateInput 참고)
+     버튼(트리거) + 미니 달력 팝업으로 대신 그려서, 브라우저마다 다르게 생기는
+     기본 달력 UI 대신 앱과 통일된 느낌을 준다. */
+  .app-date { position: relative; display: inline-block; max-width: 100%; vertical-align: middle; }
+  .app-date-native { display: none !important; }
+  .app-date-trigger {
+    width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    text-align: left; cursor: pointer; font: inherit;
+  }
+  .app-date-trigger-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .app-date-trigger-text.app-date-placeholder { color: var(--text-faint); }
+  .app-date-icon { display: flex; flex-shrink: 0; color: var(--text-faint); }
+  .app-date-trigger.open .app-date-icon { color: var(--accent); }
+  .app-date-trigger:disabled { cursor: default; opacity: 0.6; }
+
+  /* .app-date-trigger의 font: inherit가 .add-input 등 원래 클래스의 글자
+     크기(15px)를 지워버려서 옆 칸(제목 입력 등)과 글씨 크기가 달라 보이는
+     문제가 있었다. 두 클래스를 함께 가진 트리거는 원래 크기를 되살린다. */
+  .app-date-trigger.add-input,
+  .app-time-trigger.add-input,
+  .app-select-trigger.add-input { font-size: 15px; }
+
+  /* date input이 flex 줄(range-row, repeat-row) 안에서 쓰일 때, 숨겨진 원본
+     대신 이 wrapper가 flex 아이템 역할을 해야 하므로 폭 관련 규칙을 넘겨받는다. */
+  .range-row .app-date { flex: 1; min-width: 0; }
+  .range-row .app-date .app-date-trigger { background: none; border: none; padding: 0; color: var(--text); font-size: 14px; }
+  .repeat-row .app-date { flex: 1; min-width: 0; }
+  .repeat-row .app-date .app-date-trigger { background: none; border: none; padding: 0; color: var(--text); font-size: 14px; }
+
+  .app-date-menu {
+    position: fixed; z-index: 60; background: var(--elevated); border: 1px solid var(--hairline-strong);
+    border-radius: 14px; padding: 10px; box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
+    width: 252px;
+  }
+  .app-date-panel-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .app-date-panel-month { font-size: 13.5px; font-weight: 600; color: var(--text); }
+  .app-date-nav-btn {
+    background: none; border: none; color: var(--text-dim); cursor: pointer;
+    width: 26px; height: 26px; border-radius: 8px; font-size: 15px; line-height: 1;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .app-date-nav-btn:hover { background: var(--panel); color: var(--accent); }
+  .app-date-weekdays {
+    display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px;
+    margin-bottom: 4px; text-align: center;
+  }
+  .app-date-weekdays span { font-size: 11px; color: var(--text-faint); }
+  .app-date-days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+  .app-date-day {
+    background: none; border: none; color: var(--text); font-size: 12.5px;
+    aspect-ratio: 1 / 1; border-radius: 8px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  span.app-date-day.other-month { color: var(--text-faint); opacity: 0.4; cursor: default; }
+  .app-date-day:not(.other-month):not(:disabled):hover { background: var(--panel); }
+  .app-date-day.today { color: var(--accent); font-weight: 600; }
+  .app-date-day.selected { background: var(--accent); color: #ffffff; font-weight: 600; }
+  .app-date-day.disabled { color: var(--text-faint); opacity: 0.35; cursor: default; }
+  .app-date-day.disabled:hover { background: none; }
+  .app-date-panel-footer {
+    display: flex; gap: 6px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--hairline);
+  }
+  .app-date-footer-btn {
+    flex: 1; background: none; border: 1px solid var(--hairline); color: var(--text-dim);
+    font-size: 12px; padding: 6px 0; border-radius: 8px; cursor: pointer;
+  }
+  .app-date-footer-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ---------- 공통 커스텀 시간선택(모든 input[type=time]에 적용) ---------- */
+  .app-time { position: relative; display: inline-block; max-width: 100%; vertical-align: middle; }
+  .app-time-native { display: none !important; }
+  .app-time-trigger {
+    width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 6px;
+    text-align: left; cursor: pointer; font: inherit;
+  }
+  .app-time-trigger-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .app-time-trigger-text.app-time-placeholder { color: var(--text-faint); }
+  .app-time-icon { display: flex; flex-shrink: 0; color: var(--text-faint); }
+  .app-time-trigger.open .app-time-icon { color: var(--accent); }
+  .app-time-trigger:disabled { cursor: default; opacity: 0.6; }
+
+  .app-time-menu {
+    position: fixed; z-index: 60; background: var(--elevated); border: 1px solid var(--hairline-strong);
+    border-radius: 14px; padding: 10px; box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
+    width: 200px;
+  }
+  .app-time-columns { display: flex; gap: 8px; }
+  .app-time-col { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .app-time-col-label { font-size: 11px; color: var(--text-faint); text-align: center; margin-bottom: 4px; }
+  .app-time-col-list {
+    display: flex; flex-direction: column; gap: 2px; max-height: 176px; overflow-y: auto;
+    border: 1px solid var(--hairline); border-radius: 10px; padding: 4px;
+  }
+  .app-time-item {
+    background: none; border: none; color: var(--text); font-size: 13px;
+    padding: 6px 0; border-radius: 8px; cursor: pointer; text-align: center;
+    font-variant-numeric: tabular-nums;
+  }
+  .app-time-item:hover { background: var(--panel); }
+  .app-time-item.selected { background: var(--accent); color: #ffffff; font-weight: 600; }
+  .app-time-done { border-color: var(--accent); color: var(--accent); }

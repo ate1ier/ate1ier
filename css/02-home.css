@@ -392,3 +392,14 @@
     .today-brief-date { font-size: 21px; }
   }
 
+  /* ---- 월마감 확인 팝업: 카드/오버레이는 "오늘의 브리핑"(today-brief-*) 스타일을 그대로
+     재사용하고, 항목의 완료 표시와 "앞으로 뜨지 않음" 체크박스 줄만 추가한다. */
+  .month-close-row.done { border-color: var(--hairline); background: transparent; opacity: 0.7; }
+  .month-close-row.done:hover { transform: none; background: transparent; border-color: var(--hairline); }
+  .month-close-row.done .today-brief-row-icon { background: var(--accent-dim); color: var(--accent); }
+  .month-close-dismiss-row {
+    display: flex; align-items: center; gap: 8px; margin-top: 16px;
+    font-size: 13px; color: var(--text-dim); cursor: pointer; user-select: none;
+  }
+  .month-close-dismiss-row input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; accent-color: var(--accent); }
+

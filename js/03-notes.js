@@ -311,6 +311,8 @@
   }
 
   function attachNotesEvents(root) {
+    const noteFolderSelect = document.getElementById("new-note-folder");
+    if (noteFolderSelect) enhanceSelect(noteFolderSelect);
     const newFolderBtn = document.getElementById("btn-new-folder");
     const newNoteBtn = document.getElementById("btn-new-note");
     if (newFolderBtn) newFolderBtn.onclick = () => { notesUi.showNewFolder = true; notesUi.showNewNote = false; renderApp(); setTimeout(() => { const el = document.getElementById("new-folder-name"); if (el) el.focus(); }, 0); };

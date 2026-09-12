@@ -315,6 +315,7 @@
     ["personal-agents:data", "상담사 관리"],
     ["personal-notes:data", "업무 정리(메모)"],
     ["personal-calendar:todos", "캘린더/할일"],
+    ["personal-monthclose:data", "월마감 확인"],
     ["personal-app:accounts", "계정 목록"],
     ["personal-app:discord-notify-settings", "디스코드 알림 설정"],
   ];
@@ -366,6 +367,10 @@
     if (key.indexOf("personal-schedule:data") !== -1) {
       reloadScheduleData();
       return ["schedule", "home"];
+    }
+    if (key.indexOf("personal-monthclose:data") !== -1) {
+      monthCloseData = loadMonthCloseData();
+      return ["home"];
     }
     return [];
   }
@@ -1460,6 +1465,7 @@
     const origin = getMasterOrigin() || getSession();
     if (origin) setMasterOrigin(origin);
     setSession(targetAccountId);
+    clearTeamLoginMember();
     await flushCloudWrites();
     location.reload();
   }
@@ -1469,6 +1475,7 @@
     if (!origin) return;
     clearMasterOrigin();
     setSession(origin);
+    clearTeamLoginMember();
     await flushCloudWrites();
     location.reload();
   }
@@ -1554,49 +1561,539 @@
   function findAccountById(id) {
     return loadAccounts().find((a) => a.id === id) || null;
   }
+  /* ---- 팀용 계정의 "로그인 인원" ----
+     팀용 계정은 비밀번호 하나를 여러 명이 함께 쓰되, 로그인할 때 누가 접속했는지
+     이름표만 골라서 들어간다. 이 목록(teamMembers)은 마스터 계정에서만 추가/삭제할
+     수 있고, 실제 인증(비밀번호 검증)에는 관여하지 않는다 — 활동 로그 등에서
+     "누가"를 조금 더 구체적으로 보여주기 위한 용도. */
+  function addTeamMember(accountId, name) {
+    const trimmed = (name || "").trim();
+    if (!trimmed) return { ok: false, reason: "이름을 입력해주세요." };
+    const list = loadAccounts();
+    const idx = list.findIndex((a) => a.id === accountId);
+    if (idx === -1) return { ok: false, reason: "계정을 찾을 수 없어요." };
+    if (list[idx].accountType !== "team") return { ok: false, reason: "팀용 계정이 아니에요." };
+    const members = Array.isArray(list[idx].teamMembers) ? list[idx].teamMembers.slice() : [];
+    if (members.some((m) => m.name === trimmed)) return { ok: false, reason: "이미 있는 이름이에요." };
+    members.push({ id: genId(), name: trimmed });
+    list[idx] = { ...list[idx], teamMembers: members };
+    saveAccounts(list);
+    appendActivityLog({
+      accountId,
+      accountName: list[idx].username,
+      viaMasterName: CURRENT_ACCOUNT_NAME,
+      categoryKey: "account",
+      categoryLabel: "계정 관리",
+      subLabel: "로그인 인원",
+      diff: [`로그인 인원 추가: ${trimmed}`],
+    });
+    return { ok: true };
+  }
+  function removeTeamMember(accountId, memberId) {
+    const list = loadAccounts();
+    const idx = list.findIndex((a) => a.id === accountId);
+    if (idx === -1) return { ok: false, reason: "계정을 찾을 수 없어요." };
+    const members = Array.isArray(list[idx].teamMembers) ? list[idx].teamMembers : [];
+    const target = members.find((m) => m.id === memberId);
+    if (!target) return { ok: false, reason: "인원을 찾을 수 없어요." };
+    list[idx] = { ...list[idx], teamMembers: members.filter((m) => m.id !== memberId) };
+    saveAccounts(list);
+    appendActivityLog({
+      accountId,
+      accountName: list[idx].username,
+      viaMasterName: CURRENT_ACCOUNT_NAME,
+      categoryKey: "account",
+      categoryLabel: "계정 관리",
+      subLabel: "로그인 인원",
+      diff: [`로그인 인원 삭제: ${target.name}`],
+    });
+    return { ok: true };
+  }
+  // 마스터가 이미 만들어진 계정의 유형(개인용/팀용)을 바꾼다. 팀용으로 바꿀 때 로그인
+  // 인원 목록이 없으면 빈 목록으로 시작하고, 개인용으로 바꿔도 이미 등록해둔 인원
+  // 목록 자체는 지우지 않는다(나중에 다시 팀용으로 바꾸면 그대로 남아있게).
+  function setAccountType(accountId, newType) {
+    const type = newType === "team" ? "team" : "personal";
+    const list = loadAccounts();
+    const idx = list.findIndex((a) => a.id === accountId);
+    if (idx === -1) return { ok: false, reason: "계정을 찾을 수 없어요." };
+    const prevType = list[idx].accountType === "team" ? "team" : "personal";
+    if (prevType === type) return { ok: true };
+    const updated = { ...list[idx], accountType: type };
+    if (type === "team" && !Array.isArray(updated.teamMembers)) updated.teamMembers = [];
+    list[idx] = updated;
+    saveAccounts(list);
+    appendActivityLog({
+      accountId,
+      accountName: list[idx].username,
+      viaMasterName: CURRENT_ACCOUNT_NAME,
+      categoryKey: "account",
+      categoryLabel: "계정 관리",
+      subLabel: "",
+      diff: [`계정 유형: ${prevType === "team" ? "팀용" : "개인용"} → ${type === "team" ? "팀용" : "개인용"}`],
+    });
+    // 지금 로그인해 있는 계정 자신의 유형이 팀용이 아니게 바뀌면, 남아있던 "로그인 인원"
+    // 선택도 더는 의미가 없으니 같이 지운다.
+    if (accountId === CURRENT_ACCOUNT_ID && type !== "team") clearTeamLoginMember();
+    return { ok: true };
+  }
+  // 지금 선택된 "로그인 인원"(팀용 계정에서만 의미 있음)을 브라우저에 잠깐 저장해서,
+  // 새로고침 후에도(같은 세션이 유지되는 동안) 계속 같은 인원으로 표시되게 한다.
+  const TEAM_MEMBER_KEY = "personal-app:team-login-member";
+  function getTeamLoginMember() {
+    try {
+      const raw = localStorage.getItem(TEAM_MEMBER_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) { return null; }
+  }
+  function setTeamLoginMember(member) {
+    try {
+      if (member) localStorage.setItem(TEAM_MEMBER_KEY, JSON.stringify(member));
+      else localStorage.removeItem(TEAM_MEMBER_KEY);
+    } catch (e) {}
+  }
+  function clearTeamLoginMember() {
+    try { localStorage.removeItem(TEAM_MEMBER_KEY); } catch (e) {}
+  }
   async function logout() {
     clearSession();
     clearMasterOrigin();
     clearLastActive();
+    clearTeamLoginMember();
     await flushCloudWrites();
     location.reload();
+  }
+
+  /* ---- 커스텀 드롭다운/날짜선택(모든 <select>·<input type="date">에 공통 적용) ----
+     기본 <select>와 <input type="date">는 목록/달력 부분이 브라우저 기본 스타일로
+     떠서 앱 디자인과 어울리지 않아서, 월별 스케줄 화면의 떠있는 메뉴(.sch-menu)와
+     같은 느낌으로 직접 그리는 드롭다운/달력으로 감싸준다. 원본 엘리먼트는 화면에서만
+     숨기고 DOM에 그대로 둬서, 각 화면에서 쓰던 select.value / input.value /
+     .onchange / addEventListener("change", ...) 같은 기존 코드는 손댈 필요가 없다.
+     렌더링마다 매번 새로 그려지는 이 앱 구조상 각 화면은 자기 select/date input을
+     그린 뒤 enhanceSelect(...) / enhanceDateInput(...)만 호출해주면 된다. */
+  function closeAllAppFloatingMenus() {
+    document.querySelectorAll(".app-select-menu").forEach((m) => m.remove());
+    document.querySelectorAll(".app-select-trigger.open").forEach((t) => t.classList.remove("open"));
+    document.querySelectorAll(".app-date-menu").forEach((m) => m.remove());
+    document.querySelectorAll(".app-date-trigger.open").forEach((t) => t.classList.remove("open"));
+    document.querySelectorAll(".app-time-menu").forEach((m) => m.remove());
+    document.querySelectorAll(".app-time-trigger.open").forEach((t) => t.classList.remove("open"));
+    document.removeEventListener("mousedown", appFloatingOutsideHandler, true);
+  }
+  // 이전 이름으로 부르는 코드가 있어도 그대로 동작하도록 별칭을 남겨둔다.
+  const closeAllAppSelectMenus = closeAllAppFloatingMenus;
+  function appFloatingOutsideHandler(e) {
+    // 드롭다운/날짜/시간 팝업(.app-select-menu, .app-date-menu, .app-time-menu)은 위치 계산 때문에
+    // document.body에 바로 붙기 때문에 .app-select / .app-date / .app-time의 자손이 아니다.
+    // 이 셋도 함께 확인하지 않으면, 팝업 안의 항목을 누르는 순간(mousedown)
+    // "바깥을 눌렀다"고 오판해서 클릭이 완료되기 전에 팝업을 지워버려
+    // 선택이 반영되지 않는 문제가 생긴다.
+    if (
+      !e.target.closest(".app-select") && !e.target.closest(".app-date") && !e.target.closest(".app-time") &&
+      !e.target.closest(".app-select-menu") && !e.target.closest(".app-date-menu") && !e.target.closest(".app-time-menu")
+    ) {
+      closeAllAppFloatingMenus();
+    }
+  }
+  function enhanceSelect(selectEl) {
+    if (!selectEl || selectEl.tagName !== "SELECT") return;
+    if (selectEl.classList.contains("app-select-native")) return; // 이미 적용됨 (중복 방지)
+    const wrap = document.createElement("div");
+    wrap.className = "app-select";
+    selectEl.parentNode.insertBefore(wrap, selectEl);
+    wrap.appendChild(selectEl);
+    selectEl.classList.add("app-select-native");
+
+    const trigger = document.createElement("button");
+    trigger.type = "button";
+    trigger.className = `${selectEl.getAttribute("data-trigger-class") || "add-input"} app-select-trigger`;
+    if (selectEl.id) trigger.id = `${selectEl.id}-trigger`;
+    trigger.disabled = selectEl.disabled;
+    const textSpan = document.createElement("span");
+    textSpan.className = "app-select-trigger-text";
+    const caretSpan = document.createElement("span");
+    caretSpan.className = "app-select-caret";
+    caretSpan.innerHTML = `<svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.6 6 8 10.4 12.4 6"/></svg>`;
+    trigger.appendChild(textSpan);
+    trigger.appendChild(caretSpan);
+    wrap.appendChild(trigger);
+
+    const syncLabel = () => {
+      const opt = selectEl.options[selectEl.selectedIndex];
+      textSpan.textContent = opt ? opt.textContent : "";
+    };
+    syncLabel();
+
+    trigger.onclick = () => {
+      if (trigger.disabled) return;
+      const wasOpen = trigger.classList.contains("open");
+      closeAllAppFloatingMenus();
+      if (wasOpen) return; // 토글: 열려 있었으면 닫기만 하고 끝
+      trigger.classList.add("open");
+      const menu = document.createElement("div");
+      menu.className = "app-select-menu";
+      Array.from(selectEl.options).forEach((opt) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.textContent = opt.textContent;
+        if (opt.disabled) btn.disabled = true;
+        if (opt.value === selectEl.value) btn.classList.add("selected");
+        btn.onclick = () => {
+          selectEl.value = opt.value;
+          syncLabel();
+          closeAllAppFloatingMenus();
+          selectEl.dispatchEvent(new Event("change", { bubbles: true }));
+        };
+        menu.appendChild(btn);
+      });
+      document.body.appendChild(menu);
+      const rect = trigger.getBoundingClientRect();
+      menu.style.minWidth = `${rect.width}px`;
+      const top = Math.min(rect.bottom + 4, window.innerHeight - menu.offsetHeight - 8);
+      const left = Math.min(rect.left, window.innerWidth - menu.offsetWidth - 8);
+      menu.style.top = `${Math.max(8, top)}px`;
+      menu.style.left = `${Math.max(8, left)}px`;
+      setTimeout(() => document.addEventListener("mousedown", appFloatingOutsideHandler, true), 0);
+    };
+  }
+
+  /* ---- 커스텀 날짜선택(모든 <input type="date">에 공통 적용) ----
+     드롭다운과 같은 방식: 실제 <input type="date">는 화면에서만 숨기고
+     DOM/값은 그대로 유지한 채, 버튼(트리거) + 미니 달력 팝업으로 대신 그려준다.
+     기존 코드의 input.value 읽기, .min 속성, onchange 핸들러는 그대로 동작한다. */
+  function enhanceDateInput(inputEl) {
+    if (!inputEl || inputEl.tagName !== "INPUT" || inputEl.type !== "date") return;
+    if (inputEl.classList.contains("app-date-native")) return; // 이미 적용됨 (중복 방지)
+    const wrap = document.createElement("div");
+    wrap.className = "app-date";
+    inputEl.parentNode.insertBefore(wrap, inputEl);
+    wrap.appendChild(inputEl);
+    const triggerClass = inputEl.className;
+    inputEl.classList.add("app-date-native");
+    // 값을 지울 수 있는 선택 항목인지(할 일 마감일/입사일/면접일처럼 비워둘 수 있는 칸인지)는
+    // "date-input" 클래스(캘린더 일정의 기간·반복 종료일처럼 반드시 값이 있어야 하는 칸)
+    // 유무로 구분한다.
+    const clearable = !inputEl.classList.contains("date-input");
+
+    const trigger = document.createElement("button");
+    trigger.type = "button";
+    trigger.className = `${triggerClass} app-date-trigger`;
+    if (inputEl.id) trigger.id = `${inputEl.id}-trigger`;
+    trigger.disabled = inputEl.disabled;
+    const textSpan = document.createElement("span");
+    textSpan.className = "app-date-trigger-text";
+    const iconSpan = document.createElement("span");
+    iconSpan.className = "app-date-icon";
+    iconSpan.innerHTML = `<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3.2" width="12" height="10.8" rx="2"/><path d="M2 6.4h12M5.2 1.6v2.4M10.8 1.6v2.4"/></svg>`;
+    trigger.appendChild(textSpan);
+    trigger.appendChild(iconSpan);
+    wrap.appendChild(trigger);
+
+    const fmt = (iso) => {
+      const [y, m, d] = iso.split("-").map(Number);
+      return `${y}. ${m}. ${d}.`;
+    };
+    const syncLabel = () => {
+      const hasVal = !!inputEl.value;
+      textSpan.textContent = hasVal ? fmt(inputEl.value) : (inputEl.placeholder || "날짜 선택");
+      textSpan.classList.toggle("app-date-placeholder", !hasVal);
+    };
+    syncLabel();
+
+    trigger.onclick = () => {
+      if (trigger.disabled) return;
+      const wasOpen = trigger.classList.contains("open");
+      closeAllAppFloatingMenus();
+      if (wasOpen) return; // 토글: 열려 있었으면 닫기만 하고 끝
+      trigger.classList.add("open");
+
+      const parseLocalISO = (iso) => {
+        const [y, m, d] = iso.split("-").map(Number);
+        return new Date(y, m - 1, d);
+      };
+      const base = inputEl.value ? parseLocalISO(inputEl.value) : new Date();
+      let viewY = base.getFullYear();
+      let viewM = base.getMonth();
+
+      const menu = document.createElement("div");
+      menu.className = "app-date-menu";
+
+      const renderPanel = () => {
+        const minISO = inputEl.min || "";
+        const maxISO = inputEl.max || "";
+        const firstOfMonth = new Date(viewY, viewM, 1);
+        const startOffset = firstOfMonth.getDay(); // 0=일요일
+        const daysInMonth = new Date(viewY, viewM + 1, 0).getDate();
+        const daysInPrevMonth = new Date(viewY, viewM, 0).getDate();
+        const now = new Date();
+        const todayISOStr = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}`;
+
+        let cellsHtml = "";
+        for (let i = 0; i < startOffset; i++) {
+          const d = daysInPrevMonth - startOffset + 1 + i;
+          cellsHtml += `<span class="app-date-day other-month">${d}</span>`;
+        }
+        for (let d = 1; d <= daysInMonth; d++) {
+          const iso = `${viewY}-${pad2(viewM + 1)}-${pad2(d)}`;
+          const disabled = (minISO && iso < minISO) || (maxISO && iso > maxISO);
+          const isSelected = inputEl.value === iso;
+          const isToday = iso === todayISOStr;
+          const cls = ["app-date-day"];
+          if (isSelected) cls.push("selected");
+          else if (isToday) cls.push("today");
+          if (disabled) cls.push("disabled");
+          cellsHtml += `<button type="button" class="${cls.join(" ")}" ${disabled ? "disabled" : ""} data-iso="${iso}">${d}</button>`;
+        }
+        const totalCells = startOffset + daysInMonth;
+        const trailing = (7 - (totalCells % 7)) % 7;
+        for (let d = 1; d <= trailing; d++) {
+          cellsHtml += `<span class="app-date-day other-month">${d}</span>`;
+        }
+
+        menu.innerHTML = `
+          <div class="app-date-panel-header">
+            <button type="button" class="app-date-nav-btn" data-nav="-1" aria-label="이전 달">‹</button>
+            <span class="app-date-panel-month">${viewY}년 ${MONTH_NAMES[viewM]}</span>
+            <button type="button" class="app-date-nav-btn" data-nav="1" aria-label="다음 달">›</button>
+          </div>
+          <div class="app-date-weekdays">${WEEKDAYS.map((w) => `<span>${w}</span>`).join("")}</div>
+          <div class="app-date-days">${cellsHtml}</div>
+          <div class="app-date-panel-footer">
+            <button type="button" class="app-date-footer-btn" data-action="today">오늘</button>
+            ${clearable ? `<button type="button" class="app-date-footer-btn" data-action="clear">지우기</button>` : ""}
+          </div>
+        `;
+
+        menu.querySelector('[data-nav="-1"]').onclick = () => { viewM -= 1; if (viewM < 0) { viewM = 11; viewY -= 1; } renderPanel(); };
+        menu.querySelector('[data-nav="1"]').onclick = () => { viewM += 1; if (viewM > 11) { viewM = 0; viewY += 1; } renderPanel(); };
+        menu.querySelectorAll(".app-date-day[data-iso]").forEach((btn) => {
+          btn.onclick = () => {
+            inputEl.value = btn.getAttribute("data-iso");
+            syncLabel();
+            closeAllAppFloatingMenus();
+            inputEl.dispatchEvent(new Event("change", { bubbles: true }));
+          };
+        });
+        const todayBtn = menu.querySelector('[data-action="today"]');
+        if (todayBtn) todayBtn.onclick = () => {
+          inputEl.value = todayISOStr;
+          syncLabel();
+          closeAllAppFloatingMenus();
+          inputEl.dispatchEvent(new Event("change", { bubbles: true }));
+        };
+        const clearBtn = menu.querySelector('[data-action="clear"]');
+        if (clearBtn) clearBtn.onclick = () => {
+          inputEl.value = "";
+          syncLabel();
+          closeAllAppFloatingMenus();
+          inputEl.dispatchEvent(new Event("change", { bubbles: true }));
+        };
+      };
+      renderPanel();
+
+      document.body.appendChild(menu);
+      const rect = trigger.getBoundingClientRect();
+      const top = Math.min(rect.bottom + 4, window.innerHeight - menu.offsetHeight - 8);
+      const left = Math.min(rect.left, window.innerWidth - menu.offsetWidth - 8);
+      menu.style.top = `${Math.max(8, top)}px`;
+      menu.style.left = `${Math.max(8, left)}px`;
+      setTimeout(() => document.addEventListener("mousedown", appFloatingOutsideHandler, true), 0);
+    };
+  }
+
+  /* ---- 커스텀 시간선택(모든 <input type="time">에 공통 적용) ----
+     날짜선택과 같은 방식: 실제 <input type="time">는 화면에서만 숨기고
+     DOM/값은 그대로 유지한 채, 버튼(트리거) + 시/분 목록 팝업으로 대신 그려준다. */
+  function enhanceTimeInput(inputEl) {
+    if (!inputEl || inputEl.tagName !== "INPUT" || inputEl.type !== "time") return;
+    if (inputEl.classList.contains("app-time-native")) return; // 이미 적용됨 (중복 방지)
+    const wrap = document.createElement("div");
+    wrap.className = "app-time";
+    inputEl.parentNode.insertBefore(wrap, inputEl);
+    wrap.appendChild(inputEl);
+    const triggerClass = inputEl.className;
+    inputEl.classList.add("app-time-native");
+
+    const trigger = document.createElement("button");
+    trigger.type = "button";
+    trigger.className = `${triggerClass} app-time-trigger`;
+    if (inputEl.id) trigger.id = `${inputEl.id}-trigger`;
+    trigger.disabled = inputEl.disabled;
+    const textSpan = document.createElement("span");
+    textSpan.className = "app-time-trigger-text";
+    const iconSpan = document.createElement("span");
+    iconSpan.className = "app-time-icon";
+    iconSpan.innerHTML = `<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6.4"/><path d="M8 4.8V8l2.4 1.4"/></svg>`;
+    trigger.appendChild(textSpan);
+    trigger.appendChild(iconSpan);
+    wrap.appendChild(trigger);
+
+    const syncLabel = () => {
+      const hasVal = !!inputEl.value;
+      textSpan.textContent = hasVal ? inputEl.value : (inputEl.placeholder || "시간 선택");
+      textSpan.classList.toggle("app-time-placeholder", !hasVal);
+    };
+    syncLabel();
+
+    trigger.onclick = () => {
+      if (trigger.disabled) return;
+      const wasOpen = trigger.classList.contains("open");
+      closeAllAppFloatingMenus();
+      if (wasOpen) return; // 토글: 열려 있었으면 닫기만 하고 끝
+      trigger.classList.add("open");
+
+      const parts = (inputEl.value || "").split(":");
+      let curHour = parts[0] !== undefined && parts[0] !== "" ? parseInt(parts[0], 10) : null;
+      let curMinute = parts[1] !== undefined && parts[1] !== "" ? parseInt(parts[1], 10) : null;
+
+      const menu = document.createElement("div");
+      menu.className = "app-time-menu";
+
+      const commit = () => {
+        const h = curHour === null ? 0 : curHour;
+        const m = curMinute === null ? 0 : curMinute;
+        inputEl.value = `${pad2(h)}:${pad2(m)}`;
+        syncLabel();
+        inputEl.dispatchEvent(new Event("change", { bubbles: true }));
+      };
+
+      const renderPanel = () => {
+        const hourItems = Array.from({ length: 24 }, (_, h) => h)
+          .map((h) => `<button type="button" class="app-time-item ${h === curHour ? "selected" : ""}" data-hour="${h}">${pad2(h)}</button>`)
+          .join("");
+        const minuteItems = Array.from({ length: 12 }, (_, i) => i * 5)
+          .map((m) => `<button type="button" class="app-time-item ${m === curMinute ? "selected" : ""}" data-minute="${m}">${pad2(m)}</button>`)
+          .join("");
+
+        menu.innerHTML = `
+          <div class="app-time-columns">
+            <div class="app-time-col">
+              <div class="app-time-col-label">시</div>
+              <div class="app-time-col-list" data-col="hour">${hourItems}</div>
+            </div>
+            <div class="app-time-col">
+              <div class="app-time-col-label">분</div>
+              <div class="app-time-col-list" data-col="minute">${minuteItems}</div>
+            </div>
+          </div>
+          <div class="app-date-panel-footer">
+            <button type="button" class="app-date-footer-btn" data-action="now">지금</button>
+            <button type="button" class="app-date-footer-btn" data-action="clear">지우기</button>
+            <button type="button" class="app-date-footer-btn app-time-done" data-action="done">확인</button>
+          </div>
+        `;
+
+        menu.querySelectorAll(".app-time-item[data-hour]").forEach((btn) => {
+          btn.onclick = () => { curHour = parseInt(btn.getAttribute("data-hour"), 10); commit(); renderPanel(); };
+        });
+        menu.querySelectorAll(".app-time-item[data-minute]").forEach((btn) => {
+          btn.onclick = () => { curMinute = parseInt(btn.getAttribute("data-minute"), 10); commit(); renderPanel(); };
+        });
+        menu.querySelector('[data-action="now"]').onclick = () => {
+          const now = new Date();
+          curHour = now.getHours();
+          curMinute = now.getMinutes();
+          commit();
+          closeAllAppFloatingMenus();
+        };
+        menu.querySelector('[data-action="clear"]').onclick = () => {
+          curHour = null; curMinute = null;
+          inputEl.value = "";
+          syncLabel();
+          inputEl.dispatchEvent(new Event("change", { bubbles: true }));
+          closeAllAppFloatingMenus();
+        };
+        menu.querySelector('[data-action="done"]').onclick = () => { closeAllAppFloatingMenus(); };
+
+        // 스크롤 목록에서 지금 고른 항목이 보이도록 가운데쯤에 위치시킨다.
+        menu.querySelectorAll(".app-time-col-list").forEach((list) => {
+          const sel = list.querySelector(".selected");
+          if (sel) list.scrollTop = sel.offsetTop - list.clientHeight / 2 + sel.clientHeight / 2;
+        });
+      };
+      renderPanel();
+
+      document.body.appendChild(menu);
+      const rect = trigger.getBoundingClientRect();
+      const top = Math.min(rect.bottom + 4, window.innerHeight - menu.offsetHeight - 8);
+      const left = Math.min(rect.left, window.innerWidth - menu.offsetWidth - 8);
+      menu.style.top = `${Math.max(8, top)}px`;
+      menu.style.left = `${Math.max(8, left)}px`;
+      setTimeout(() => document.addEventListener("mousedown", appFloatingOutsideHandler, true), 0);
+    };
   }
 
   function renderLoginScreen() {
     const nav = document.getElementById("nav");
     if (nav) nav.innerHTML = "";
+    document.body.classList.add("login-screen");
     const root = document.getElementById("page-inner");
     root.classList.remove("wide");
-    const uiState = { tab: loadAccounts().length ? "login" : "signup", error: "" };
+    // uiState.loginStep: "id"(아이디만 입력) → "auth"(팀용이면 인원 선택+비밀번호, 개인용이면 비밀번호만)
+    const uiState = {
+      tab: loadAccounts().length ? "login" : "signup", error: "",
+      loginStep: "id", loginAccount: null, signupType: "personal",
+    };
+
+    function resetLoginStep() { uiState.loginStep = "id"; uiState.loginAccount = null; }
 
     function draw() {
       const accounts = loadAccounts();
       const hasMaster = accounts.some((a) => a.isMaster);
+      const loginAcc = uiState.loginAccount;
+      const isTeamLogin = !!loginAcc && loginAcc.accountType === "team";
+      const teamMembers = isTeamLogin && Array.isArray(loginAcc.teamMembers) ? loginAcc.teamMembers : [];
       root.innerHTML = `
         <div class="login-shell">
           <div class="login-card">
+            <div class="login-badge">${ICON_LOCK}</div>
             <div class="login-title">업무 종합 관리</div>
-            <div class="login-sub">계정마다 캘린더·메모·상담사·스케줄 데이터가 따로 저장돼요.<br>(현재는 이 브라우저 안에만 로컬로 저장되는 시험 버전이에요)</div>
             <div class="login-tabs">
               <button class="login-tab ${uiState.tab === "login" ? "active" : ""}" data-tab="login">로그인</button>
               <button class="login-tab ${uiState.tab === "signup" ? "active" : ""}" data-tab="signup">계정 만들기</button>
             </div>
             ${uiState.error ? `<div class="login-error">${esc(uiState.error)}</div>` : ""}
-            ${uiState.tab === "login" ? `
-              <form class="login-form" id="login-form">
-                <label class="login-field"><span>아이디</span>
-                  <input class="add-input" id="login-username" autocomplete="username" placeholder="아이디">
-                </label>
-                <label class="login-field"><span>비밀번호</span>
-                  <input class="add-input" id="login-password" type="password" autocomplete="current-password" placeholder="비밀번호">
-                </label>
-                <button type="submit" class="primary-btn login-submit">로그인</button>
-              </form>
-              <div class="login-accounts-hint">${accounts.length ? `등록된 계정: ${accounts.map((a) => esc(a.username)).join(", ")}` : `아직 등록된 계정이 없어요.<br>"계정 만들기" 탭에서 먼저 계정을 만들어주세요.`}</div>
-            ` : `
+            ${uiState.tab === "login" ? (
+              uiState.loginStep === "id" ? `
+                <form class="login-form" id="login-id-form">
+                  <label class="login-field"><span>아이디</span>
+                    <input class="add-input" id="login-username" autocomplete="username" placeholder="아이디">
+                  </label>
+                  <button type="submit" class="primary-btn login-submit">로그인</button>
+                </form>
+              ` : `
+                <button type="button" class="login-back-link" id="login-back-btn">← 다른 계정으로</button>
+                <div class="login-selected-account">
+                  <b>${esc(loginAcc.username)}</b>${isTeamLogin ? ' <span class="badge sm type">팀용</span>' : ""}
+                </div>
+                <form class="login-form" id="login-auth-form">
+                  ${isTeamLogin ? `
+                    <label class="login-field"><span>로그인 인원</span>
+                      <select class="add-input" id="login-member" ${!teamMembers.length ? "disabled" : ""}>
+                        <option value="">${teamMembers.length ? "선택해주세요" : "등록된 인원이 없어요"}</option>
+                        ${teamMembers.map((m) => `<option value="${esc(m.id)}">${esc(m.name)}</option>`).join("")}
+                      </select>
+                    </label>
+                    ${!teamMembers.length ? `<div class="login-accounts-hint">아직 등록된 로그인 인원이 없어요. 마스터 계정에서 먼저 추가해달라고 해주세요.</div>` : ""}
+                  ` : ""}
+                  <label class="login-field"><span>비밀번호</span>
+                    <input class="add-input" id="login-password" type="password" autocomplete="current-password" placeholder="비밀번호">
+                  </label>
+                  <button type="submit" class="primary-btn login-submit" ${isTeamLogin && !teamMembers.length ? "disabled" : ""}>로그인</button>
+                </form>
+              `
+            ) : `
               <form class="login-form" id="signup-form">
                 <label class="login-field"><span>아이디</span>
                   <input class="add-input" id="signup-username" autocomplete="username" placeholder="아이디">
+                </label>
+                <label class="login-field"><span>계정 유형</span>
+                  <div class="login-type-radios">
+                    <label class="login-type-radio"><input type="radio" name="signup-type" value="personal" ${uiState.signupType === "team" ? "" : "checked"}> 개인용</label>
+                    <label class="login-type-radio"><input type="radio" name="signup-type" value="team" ${uiState.signupType === "team" ? "checked" : ""}> 팀용</label>
+                  </div>
+                  ${uiState.signupType === "team" ? `<span class="login-master-hint">팀용은 여러 명이 비밀번호 하나를 같이 쓰고, 로그인할 때 인원만 골라요. 로그인 인원은 나중에 마스터 계정에서 추가할 수 있어요.</span>` : ""}
                 </label>
                 <label class="login-field"><span>비밀번호</span>
                   <input class="add-input" id="signup-password" type="password" autocomplete="new-password" placeholder="비밀번호 (4자 이상)">
@@ -1618,22 +2115,71 @@
       `;
 
       root.querySelectorAll("[data-tab]").forEach((btn) => {
-        btn.onclick = () => { uiState.tab = btn.getAttribute("data-tab"); uiState.error = ""; draw(); };
+        btn.onclick = () => { uiState.tab = btn.getAttribute("data-tab"); uiState.error = ""; resetLoginStep(); draw(); };
       });
 
-      const loginForm = document.getElementById("login-form");
-      if (loginForm) {
-        loginForm.onsubmit = async (e) => {
+      const backBtn = document.getElementById("login-back-btn");
+      if (backBtn) {
+        backBtn.onclick = () => { uiState.error = ""; resetLoginStep(); draw(); };
+      }
+
+      // 단계가 바뀔 때마다(아이디 입력→인증 단계) 커서를 직접 옮길 필요 없이 바로
+      // 입력할 수 있게, 지금 단계에 맞는 입력칸에 자동으로 포커스를 준다.
+      if (uiState.tab === "login") {
+        if (uiState.loginStep === "id") {
+          const usernameField = document.getElementById("login-username");
+          if (usernameField) usernameField.focus();
+        } else {
+          const memberSelect = document.getElementById("login-member");
+          if (memberSelect) enhanceSelect(memberSelect);
+          const memberTrigger = document.getElementById("login-member-trigger");
+          const passwordField = document.getElementById("login-password");
+          if (isTeamLogin && memberSelect && !memberSelect.value) {
+            // 팀용 계정: 인원을 먼저 골라야 하니 인원 선택 버튼에 포커스해두고,
+            // 인원을 고르는 순간 바로 비밀번호 칸으로 넘어가게 한다.
+            if (memberTrigger) memberTrigger.focus();
+          } else if (passwordField) {
+            passwordField.focus();
+          }
+          if (memberSelect) {
+            memberSelect.addEventListener("change", () => {
+              if (memberSelect.value && passwordField) passwordField.focus();
+            });
+          }
+        }
+      }
+
+      const loginIdForm = document.getElementById("login-id-form");
+      if (loginIdForm) {
+        loginIdForm.onsubmit = (e) => {
           e.preventDefault();
           const username = document.getElementById("login-username").value.trim();
-          const password = document.getElementById("login-password").value;
-          if (!username || !password) { uiState.error = "아이디와 비밀번호를 입력해주세요."; draw(); return; }
+          if (!username) { uiState.error = "아이디를 입력해주세요."; draw(); return; }
           const account = findAccountByUsername(username);
-          if (!account) {
-            uiState.error = "아이디 또는 비밀번호가 올바르지 않아요.";
-            draw();
-            return;
+          if (!account) { uiState.error = "등록된 계정이 없어요."; draw(); return; }
+          uiState.loginAccount = account;
+          uiState.loginStep = "auth";
+          uiState.error = "";
+          draw();
+        };
+      }
+
+      const loginAuthForm = document.getElementById("login-auth-form");
+      if (loginAuthForm) {
+        loginAuthForm.onsubmit = async (e) => {
+          e.preventDefault();
+          const account = uiState.loginAccount;
+          if (!account) { resetLoginStep(); draw(); return; }
+          let member = null;
+          if (account.accountType === "team") {
+            const memberSelect = document.getElementById("login-member");
+            const memberId = memberSelect ? memberSelect.value : "";
+            if (!memberId) { uiState.error = "로그인 인원을 선택해주세요."; draw(); return; }
+            member = (Array.isArray(account.teamMembers) ? account.teamMembers : []).find((m) => m.id === memberId) || null;
+            if (!member) { uiState.error = "로그인 인원을 다시 선택해주세요."; draw(); return; }
           }
+          const password = document.getElementById("login-password").value;
+          if (!password) { uiState.error = "비밀번호를 입력해주세요."; draw(); return; }
           let ok;
           if (account.salt) {
             ok = account.passwordHash === (await hashPassword(password, account.salt));
@@ -1654,6 +2200,7 @@
             return;
           }
           setSession(account.id);
+          setTeamLoginMember(member ? { id: member.id, name: member.name } : null);
           touchLastActive();
           try { sessionStorage.setItem("app:just-logged-in", "1"); } catch (e) {}
           await flushCloudWrites();
@@ -1662,6 +2209,9 @@
       }
       const signupForm = document.getElementById("signup-form");
       if (signupForm) {
+        root.querySelectorAll('input[name="signup-type"]').forEach((radio) => {
+          radio.onchange = () => { uiState.signupType = radio.value; draw(); };
+        });
         signupForm.onsubmit = async (e) => {
           e.preventDefault();
           const username = document.getElementById("signup-username").value.trim();
@@ -1673,12 +2223,18 @@
           if (findAccountByUsername(username)) { uiState.error = "이미 사용 중인 아이디예요."; draw(); return; }
           const accountsList = loadAccounts();
           const wantsMaster = !accountsList.some((a) => a.isMaster) && !!document.getElementById("signup-master") && document.getElementById("signup-master").checked;
+          const typeInput = document.querySelector('input[name="signup-type"]:checked');
+          const accountType = typeInput && typeInput.value === "team" ? "team" : "personal";
           const salt = genSalt();
           const passwordHash = await hashPassword(password, salt);
-          const newAccount = { id: genId(), username, salt, passwordHash, createdAt: new Date().toISOString(), isMaster: wantsMaster };
+          const newAccount = {
+            id: genId(), username, salt, passwordHash, createdAt: new Date().toISOString(), isMaster: wantsMaster,
+            accountType, teamMembers: accountType === "team" ? [] : undefined,
+          };
           accountsList.push(newAccount);
           saveAccounts(accountsList);
           setSession(newAccount.id);
+          clearTeamLoginMember();
           touchLastActive();
           try { sessionStorage.setItem("app:just-logged-in", "1"); } catch (e) {}
           await flushCloudWrites();
@@ -1702,6 +2258,7 @@
       clearSession();
       clearMasterOrigin();
       clearLastActive();
+      clearTeamLoginMember();
       _account = null;
     }
   }
@@ -1709,9 +2266,16 @@
     renderLoginScreen();
     return;
   }
+  document.body.classList.remove("login-screen");
   const CURRENT_ACCOUNT_ID = _account.id;
   const CURRENT_ACCOUNT_NAME = _account.username;
   const CURRENT_ACCOUNT_IS_MASTER = !!_account.isMaster;
+  // 팀용 계정은 여러 명이 하나의 계정(비밀번호)을 같이 쓰되, 로그인할 때 고른 "인원"
+  // 이름표를 함께 들고 있는다. 개인용 계정이거나, 옛날에 만들어져 accountType이 아예
+  // 없는 계정은 전부 "personal"로 취급한다.
+  const CURRENT_ACCOUNT_TYPE = _account.accountType === "team" ? "team" : "personal";
+  const CURRENT_TEAM_MEMBER = CURRENT_ACCOUNT_TYPE === "team" ? getTeamLoginMember() : null;
+  const CURRENT_ACCOUNT_DISPLAY_NAME = CURRENT_TEAM_MEMBER ? `${CURRENT_ACCOUNT_NAME} (${CURRENT_TEAM_MEMBER.name})` : CURRENT_ACCOUNT_NAME;
   // 마스터 계정이 다른 계정으로 들어와서 보고 있는 중인지 확인 (원래 마스터 계정 정보가 남아있는지로 판단)
   const _masterOriginId = getMasterOrigin();
   const MASTER_ORIGIN_ACCOUNT = _masterOriginId && _masterOriginId !== CURRENT_ACCOUNT_ID ? findAccountById(_masterOriginId) : null;
@@ -1876,106 +2440,34 @@
     return lines.length ? lines : ["내용이 바뀌었어요."];
   }
 
-  /* ---- 3분 단위로 묶어서 기록하기 ----
-     한 계정에서 짧은 시간 안에 여러 번 수정하면(스케줄 셀 여러 칸 수정 등) 로그가
-     한 줄씩 계속 쌓여서 목록이 너무 많아진다. 그래서 계정별로 "첫 변경이 생긴 시점"
-     부터 3분짜리 타이머를 하나 돌리고, 그 3분 동안 생긴 변경들은 전부 한 줄(리스트
-     항목 하나)로 모아서 기록한다. 3분이 지나면 그 줄은 마감되고, 그다음 변경부터는
-     새로운 3분 타이머(=새로운 줄)로 다시 쌓인다. 진행 중인 묶음은 클라우드에도 같이
-     저장해두므로, 브라우저를 껐다 켜거나 다른 탭/다른 사람이 열어도 이어서 처리된다. */
-  const ACTIVITY_BATCH_WINDOW_MS = 3 * 60 * 1000;
-  const ACTIVITY_PENDING_KEY = "activity-log:pending";
-  const _activityFlushTimers = {}; // accountId -> setTimeout id (이 탭이 열려 있는 동안만 유효)
-  function loadPendingActivityBatches() {
-    try {
-      const raw = localStorage.getItem(ACTIVITY_PENDING_KEY);
-      const parsed = raw ? JSON.parse(raw) : {};
-      return parsed && typeof parsed === "object" ? parsed : {};
-    } catch (e) { return {}; }
-  }
-  function savePendingActivityBatches(map) {
-    try { localStorage.setItem(ACTIVITY_PENDING_KEY, JSON.stringify(map)); } catch (e) {}
-  }
-  function scheduleActivityFlush(accountId, delayMs) {
-    if (_activityFlushTimers[accountId]) return; // 이미 이 탭에서 예약돼 있음
-    _activityFlushTimers[accountId] = setTimeout(() => {
-      delete _activityFlushTimers[accountId];
-      finalizeActivityBatch(accountId);
-    }, Math.max(0, delayMs));
-  }
-  // 진행 중이던 묶음을 하나의 로그 항목으로 마감해서 실제 목록(activity-log:entries)에 올린다.
-  function finalizeActivityBatch(accountId) {
-    if (_activityFlushTimers[accountId]) { clearTimeout(_activityFlushTimers[accountId]); delete _activityFlushTimers[accountId]; }
-    const pending = loadPendingActivityBatches();
-    const batch = pending[accountId];
-    if (!batch || !batch.changes || !batch.changes.length) { delete pending[accountId]; savePendingActivityBatches(pending); return; }
-    delete pending[accountId];
-    savePendingActivityBatches(pending);
-    const whereLabels = [];
-    batch.changes.forEach((c) => {
-      const w = c.subLabel ? `${c.categoryLabel} · ${c.subLabel}` : c.categoryLabel;
-      if (whereLabels.indexOf(w) === -1) whereLabels.push(w);
-    });
-    const categoryLabel = whereLabels.length <= 2 ? whereLabels.join(", ") : `${whereLabels.slice(0, 2).join(", ")} 외 ${whereLabels.length - 2}곳`;
-    const diffLines = [];
-    batch.changes.forEach((c) => {
-      const timeLabel = c.at ? formatKSTTime(c.at) : "";
-      const where = c.subLabel ? `${c.categoryLabel} · ${c.subLabel}` : c.categoryLabel;
-      (c.diff && c.diff.length ? c.diff : ["내용이 바뀌었어요."]).forEach((line) => diffLines.push(`[${timeLabel}] ${where} — ${line}`));
-    });
+  /* ---- 활동 로그는 즉시 기록한다 ----
+     예전에는 한 계정에서 짧은 시간(3분) 안에 생긴 변경들을 클라우드의 임시 저장소
+     (activity-log:pending)에 모아뒀다가, 3분이 지나야 실제 목록(activity-log:entries)
+     으로 확정하는 방식이었다. 이 "3분 묶음"은 마스터 계정의 활동 로그 화면을 깔끔하게
+     보여주기 위한 것이었는데, 문제는 이 지연이 스케줄 셀 "수정 이력 보기"에도 그대로
+     적용돼서 — 방금 고친 셀이 최대 3분 동안 이력에 전혀 안 보이는 부작용이 있었다.
+     그래서 저장(기록) 자체는 항상 즉시 하나의 로그 항목으로 남기고, "여러 변경을 하나로
+     묶어 보여주는 것"은 마스터 계정의 활동 로그 화면(10-master.js)에서 화면에 그릴 때만
+     (표시 전용으로) 묶어서 보여주도록 바꿨다. 그래야 실제 데이터(activity-log:entries)는
+     항상 최신 상태이고, 셀 수정 이력도 곧바로 반영된다. */
+  // 마스터 활동 로그 화면에서 "짧은 시간 안의 여러 변경"을 한 줄로 묶어 보여줄 때
+  // 쓰는 창(표시 전용). 실제 저장 시점과는 무관하다.
+  const ACTIVITY_DISPLAY_GROUP_MS = 3 * 60 * 1000;
+  function recordActivityChange(change) {
+    const timeLabel = formatKSTTime(new Date().toISOString());
+    const where = change.subLabel ? `${change.categoryLabel} · ${change.subLabel}` : change.categoryLabel;
+    const diffLines = (change.diff && change.diff.length ? change.diff : ["내용이 바뀌었어요."])
+      .map((line) => `[${timeLabel}] ${where} — ${line}`);
     appendActivityLog({
-      at: batch.startedAt,
-      endedAt: new Date().toISOString(),
-      accountId,
-      accountName: batch.accountName,
-      viaMasterName: batch.viaMasterName,
-      categoryKey: "batch",
-      categoryLabel,
-      subLabel: `${batch.changes.length}건`,
-      diff: diffLines,
-    });
-  }
-  // 개별 변경 하나를 계정별 진행 중인 3분 묶음에 쌓는다(묶음이 없거나 이미 3분이
-  // 지났으면 새 묶음을 새로 시작한다).
-  function queueActivityChange(change) {
-    let pending = loadPendingActivityBatches();
-    const existing = pending[change.accountId];
-    if (existing && existing.startedAt && (Date.now() - Date.parse(existing.startedAt)) >= ACTIVITY_BATCH_WINDOW_MS) {
-      finalizeActivityBatch(change.accountId); // 창이 이미 끝난 묶음이면 먼저 마감하고 새로 시작
-      pending = loadPendingActivityBatches();
-    }
-    let batch = pending[change.accountId];
-    if (!batch) {
-      batch = { startedAt: new Date().toISOString(), accountId: change.accountId, accountName: change.accountName, viaMasterName: change.viaMasterName, changes: [] };
-      pending[change.accountId] = batch;
-      scheduleActivityFlush(change.accountId, ACTIVITY_BATCH_WINDOW_MS);
-    } else {
-      batch.accountName = change.accountName;
-      batch.viaMasterName = change.viaMasterName;
-    }
-    batch.changes.push({
-      at: new Date().toISOString(),
+      accountId: change.accountId,
+      accountName: change.accountName,
+      viaMasterName: change.viaMasterName,
       categoryKey: change.categoryKey,
       categoryLabel: change.categoryLabel,
       subLabel: change.subLabel,
-      diff: change.diff,
-    });
-    savePendingActivityBatches(pending);
-  }
-  // 앱을 새로 열 때, 다른 탭/다른 사람이 만들어두고 아직 안 끝난 묶음들을 이어받는다.
-  // 이미 3분이 지나버린 묶음은 바로 마감하고, 아직 남았으면 남은 시간만큼만 다시 예약한다.
-  function resumePendingActivityBatches() {
-    const pending = loadPendingActivityBatches();
-    const now = Date.now();
-    Object.keys(pending).forEach((accountId) => {
-      const batch = pending[accountId];
-      if (!batch || !batch.startedAt) return;
-      const elapsed = now - Date.parse(batch.startedAt);
-      if (elapsed >= ACTIVITY_BATCH_WINDOW_MS) finalizeActivityBatch(accountId);
-      else scheduleActivityFlush(accountId, ACTIVITY_BATCH_WINDOW_MS - elapsed);
+      diff: diffLines,
     });
   }
-  resumePendingActivityBatches();
   pruneActivityLogIfStale();
 
   // acct:{계정id}:{나머지 키} 형태의 저장에만 반응해서 활동 로그를 남긴다. 계정 목록
@@ -1991,9 +2483,9 @@
     try {
       const accountId = m[1];
       const relKey = m[2];
-      const acc = accountId === CURRENT_ACCOUNT_ID ? { username: CURRENT_ACCOUNT_NAME } : (findAccountById(accountId) || {});
+      const acc = accountId === CURRENT_ACCOUNT_ID ? { username: CURRENT_ACCOUNT_DISPLAY_NAME } : (findAccountById(accountId) || {});
       const cat = activityCategoryForRelKey(relKey);
-      queueActivityChange({
+      recordActivityChange({
         accountId,
         accountName: acc.username || "(삭제된 계정)",
         viaMasterName: MASTER_ORIGIN_ACCOUNT ? MASTER_ORIGIN_ACCOUNT.username : null,
@@ -2066,19 +2558,23 @@
     }
   }
 
-  function setPage(p) {
+  // opts.year / opts.monthIndex를 넘기면 "월별 스케줄"·"품질 관리" 페이지를 그 달로 열어준다
+  // (예: 월마감 확인 팝업에서 지난달 항목을 눌렀을 때). 넘기지 않으면 기존과 동일하게
+  // 항상 실시간 기준 당월을 보여준다.
+  function setPage(p, opts) {
     // 마스터 계정은 계정 관리 페이지 외에는 이동하지 않는다.
     if (CURRENT_ACCOUNT_IS_MASTER) { state.page = "master"; renderApp(); return; }
     if (p !== state.page) _resetExpandedStateForPage(state.page); // 떠나는 화면의 펼침 상태 초기화
-    // "월별 스케줄" 카테고리를 누르면 항상 실시간 기준 당월 스케줄을 보여준다.
+    const hasTargetMonth = !!(opts && typeof opts.year === "number" && typeof opts.monthIndex === "number");
+    // "월별 스케줄" 카테고리를 누르면 기본적으로 실시간 기준 당월 스케줄을 보여준다.
     if (p === "schedule" && typeof scheduleUi !== "undefined") {
-      scheduleUi.year = today.getFullYear();
-      scheduleUi.monthIndex = today.getMonth();
+      scheduleUi.year = hasTargetMonth ? opts.year : today.getFullYear();
+      scheduleUi.monthIndex = hasTargetMonth ? opts.monthIndex : today.getMonth();
     }
-    // "품질 관리" 카테고리를 누르면 항상 실시간 기준 당월 QA 점수를 보여준다.
+    // "품질 관리" 카테고리를 누르면 기본적으로 실시간 기준 당월 QA 점수를 보여준다.
     if (p === "qa" && typeof qaUi !== "undefined") {
-      qaUi.year = today.getFullYear();
-      qaUi.monthIndex = today.getMonth();
+      qaUi.year = hasTargetMonth ? opts.year : today.getFullYear();
+      qaUi.monthIndex = hasTargetMonth ? opts.monthIndex : today.getMonth();
     }
     // 이제 마지막으로 보던 페이지를 저장/복원하지 않으므로(항상 홈에서 시작),
     // localStorage에 따로 기록하지 않는다.

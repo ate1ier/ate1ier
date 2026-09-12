@@ -1902,7 +1902,8 @@
     setTimeout(() => document.addEventListener("mousedown", scheduleMenuOutsideHandler, true), 0);
   }
   // 마우스를 뗄 때(문서 전체 기준): 드래그해서 여러 칸을 옮겨다녔으면 일괄 적용 메뉴를 띄우고,
-  // 그냥 제자리에서 뗐으면(=클릭) 아무 것도 하지 않고 이어서 그 칸의 onclick이 기존 방식대로 처리한다.
+  // 그냥 제자리에서 뗐으면(=클릭) 선택만 풀고 끝낸다. 그 칸 하나의 메뉴(상태 변경 등)는
+  // 더 이상 왼쪽 클릭으로 열리지 않고, 셀의 오른쪽 클릭(우클릭, oncontextmenu)으로 연다.
   function scheduleSelectionMouseUpHandler(e) {
     if (!scheduleSelectDragging) return;
     const root = document.getElementById("schedule-table-area");
@@ -1922,26 +1923,30 @@
   document.addEventListener("mouseup", scheduleSelectionMouseUpHandler);
 
   function openScheduleMenu(anchorEl, staffId, dateKey) {
-    if (scheduleIsDateLocked(dateKey)) {
-      flashScheduleStatus("잠긴 달이에요. 잠금을 해제한 뒤 수정해주세요.");
-      return;
-    }
     closeScheduleMenu();
+    const locked = scheduleIsDateLocked(dateKey);
     const rect = anchorEl.getBoundingClientRect();
     const menu = document.createElement("div");
     menu.id = "sch-menu";
     menu.className = "sch-menu";
-    const options = SCHEDULE_STATUS_OPTIONS;
-    const hasMemo = !!getScheduleMemo(staffId, dateKey);
-    const memoLabel = hasMemo ? `${ICON_NOTE || ""} 메모 수정` : `${ICON_NOTE || ""} 메모 추가`;
-    const memoDeleteBtnHtml = hasMemo ? `<button type="button" class="sch-menu-danger" data-memo-delete="1">${ICON_TRASH || ""} 메모 삭제</button>` : "";
-    menu.innerHTML = options.map((o) =>
-      `<button type="button" data-status="${o[0]}" data-attendance="${o[1] || ""}">${o[2]}</button>`
-    ).join("")
-      + `<div class="sch-menu-divider"></div>`
-      + `<button type="button" data-memo="1">${memoLabel}</button>`
-      + memoDeleteBtnHtml
-      + `<button type="button" class="sch-menu-reset" data-reset="1">기본값(근무)으로</button>`;
+    if (locked) {
+      // 잠긴 달은 수정은 막되, 수정 이력만큼은 그대로 볼 수 있게 한다.
+      menu.innerHTML = `<div class="sch-menu-title">잠긴 달이에요</div>`
+        + `<button type="button" data-history="1">${ICON_CLOCK || ""} 수정 이력 보기</button>`;
+    } else {
+      const options = SCHEDULE_STATUS_OPTIONS;
+      const hasMemo = !!getScheduleMemo(staffId, dateKey);
+      const memoLabel = hasMemo ? `${ICON_NOTE || ""} 메모 수정` : `${ICON_NOTE || ""} 메모 추가`;
+      const memoDeleteBtnHtml = hasMemo ? `<button type="button" class="sch-menu-danger" data-memo-delete="1">${ICON_TRASH || ""} 메모 삭제</button>` : "";
+      menu.innerHTML = options.map((o) =>
+        `<button type="button" data-status="${o[0]}" data-attendance="${o[1] || ""}">${o[2]}</button>`
+      ).join("")
+        + `<div class="sch-menu-divider"></div>`
+        + `<button type="button" data-memo="1">${memoLabel}</button>`
+        + memoDeleteBtnHtml
+        + `<button type="button" data-history="1">${ICON_CLOCK || ""} 수정 이력 보기</button>`
+        + `<button type="button" class="sch-menu-reset" data-reset="1">기본값(근무)으로</button>`;
+    }
     document.body.appendChild(menu);
     const top = Math.min(rect.bottom + 4, window.innerHeight - menu.offsetHeight - 8);
     const left = Math.min(rect.left, window.innerWidth - menu.offsetWidth - 8);
@@ -1977,7 +1982,160 @@
         updateScheduleTableArea();
       };
     }
+    const historyBtn = menu.querySelector("[data-history]");
+    if (historyBtn) {
+      historyBtn.onclick = () => {
+        closeScheduleMenu();
+        openScheduleCellHistoryModal(staffId, dateKey);
+      };
+    }
     setTimeout(() => document.addEventListener("mousedown", scheduleMenuOutsideHandler, true), 0);
+  }
+
+  // ----- 스케줄 셀 "수정 이력" -----
+  // 스케줄 저장은 전체 스케줄 데이터를 한 번에 저장하는 구조라, 실제 변경 이력은
+  // 계정 활동 로그(appendActivityLog)에 "records.{staffId}|{dateKey}...", "memos.{staffId}|{dateKey}..."
+  // 형태의 일반 diff 텍스트로 이미 쌓이고 있다. 이 함수들은 그 로그에서 특정 셀(사람×날짜)에
+  // 해당하는 줄만 골라내 사람이 읽기 쉬운 문장으로 바꿔준다.
+  function scheduleHistoryStatusLabel(status, attendance) {
+    if (status === "WORK" && attendance === "LATE") return "지각";
+    if (status === "WORK" && attendance === "ABSENT") return "결근";
+    if (status === "WORK") return "근무";
+    const meta = SCHEDULE_STATUS_META[status];
+    return meta ? meta.label : (status || "근무");
+  }
+  function scheduleHistoryTranslateFieldValue(fieldName, raw) {
+    if (raw === "(없음)" || raw === "(비어있음)" || raw === "(빈 값)") return "없음";
+    if (fieldName === "status") {
+      if (raw === "WORK") return "근무";
+      const meta = SCHEDULE_STATUS_META[raw];
+      return meta ? meta.label : raw;
+    }
+    if (fieldName === "attendance") {
+      if (raw === "LATE") return "지각";
+      if (raw === "ABSENT") return "결근";
+      return raw;
+    }
+    return raw;
+  }
+  function scheduleHistoryDescribeBlob(raw) {
+    if (raw === "(없음)" || raw === "(비어있음)" || raw === "(빈 값)") return "없음";
+    try {
+      const obj = JSON.parse(raw);
+      if (obj && typeof obj === "object" && "status" in obj) return scheduleHistoryStatusLabel(obj.status, obj.attendance);
+    } catch (e) { /* 잘렸거나 JSON이 아니면 원문 그대로 보여준다 */ }
+    return raw;
+  }
+  // 활동 로그 한 줄(예: "[14:32] 월별 스케줄 — records.abc123|2026-08-12.status: WORK → OFF")에서
+  // 이 셀(cellKey)에 해당하는 부분만 사람이 읽기 쉬운 { time, text } 형태로 뽑아낸다.
+  // 이 셀과 무관한 줄이면 null을 돌려준다.
+  function scheduleDescribeCellHistoryLine(cellKey, rawLine) {
+    const sepIdx = rawLine.indexOf(" — ");
+    if (sepIdx === -1) return null;
+    const prefix = rawLine.slice(0, sepIdx);
+    const content = rawLine.slice(sepIdx + 3);
+    const timeMatch = /^\[(\d{2}:\d{2})\]/.exec(prefix);
+    const time = timeMatch ? timeMatch[1] : "";
+    const recPrefix = `records.${cellKey}`;
+    const memoPrefix = `memos.${cellKey}`;
+    let isMemo = false, rest = null;
+    if (content.indexOf(recPrefix) === 0) rest = content.slice(recPrefix.length);
+    else if (content.indexOf(memoPrefix) === 0) { isMemo = true; rest = content.slice(memoPrefix.length); }
+    if (rest === null) return null;
+    let m = /^\.(\w+): (.*) → (.*)$/.exec(rest);
+    if (m) {
+      const fieldName = m[1];
+      if (isMemo) return { time, text: `메모: "${m[2]}" → "${m[3]}"` };
+      const fieldLabel = fieldName === "status" ? "근태" : (fieldName === "attendance" ? "출결" : fieldName);
+      const oldLabel = scheduleHistoryTranslateFieldValue(fieldName, m[2]);
+      const newLabel = scheduleHistoryTranslateFieldValue(fieldName, m[3]);
+      return { time, text: `${fieldLabel}: ${oldLabel} → ${newLabel}` };
+    }
+    m = /^: (.*) → (.*)$/.exec(rest);
+    if (m) {
+      if (isMemo) {
+        const oldLabel = (m[1] === "(없음)" || m[1] === "(비어있음)" || m[1] === "(빈 값)") ? "없음" : m[1];
+        const newLabel = (m[2] === "(없음)" || m[2] === "(비어있음)" || m[2] === "(빈 값)") ? "없음" : m[2];
+        return { time, text: `메모: "${oldLabel}" → "${newLabel}"` };
+      }
+      return { time, text: `근태: ${scheduleHistoryDescribeBlob(m[1])} → ${scheduleHistoryDescribeBlob(m[2])}` };
+    }
+    // 정규식으로 못 잡은 형태는 원문이라도 그대로 보여준다(정보 유실 방지).
+    return { time, text: rest.replace(/^[.:]\s*/, "") || content };
+  }
+  // 이 계정(CURRENT_ACCOUNT_ID)의 활동 로그 전체를 훑어서, 특정 사람×날짜 셀에 대한
+  // 변경 내역만 최신순으로 모아 돌려준다. { when, who, text }[] 형태.
+  // (활동 로그는 이제 변경이 생기자마자 곧바로 activity-log:entries에 기록되므로,
+  // 방금 고친 셀도 바로 이 목록에 나타난다. "여러 변경을 묶어서 보여주기"는 마스터
+  // 계정의 활동 로그 화면에서만 화면 표시용으로 따로 처리한다.)
+  function scheduleCellHistoryEntries(staffId, dateKey) {
+    const cellKey = scheduleRecordKey(staffId, dateKey);
+    const log = loadActivityLog();
+    const out = [];
+    log.forEach((entry) => {
+      if (entry.accountId !== CURRENT_ACCOUNT_ID) return;
+      const lines = Array.isArray(entry.diff) ? entry.diff : [];
+      lines.forEach((line) => {
+        if (line.indexOf(`records.${cellKey}`) === -1 && line.indexOf(`memos.${cellKey}`) === -1) return;
+        const parsed = scheduleDescribeCellHistoryLine(cellKey, line);
+        if (!parsed) return;
+        const ts = entry.endedAt || entry.at || "";
+        const dateStr = formatKSTDateTime(ts).slice(0, 10);
+        out.push({
+          sortKey: `${ts}|${parsed.time}`,
+          when: parsed.time ? `${dateStr} ${parsed.time}` : dateStr,
+          who: entry.viaMasterName ? `${entry.accountName || "-"} (마스터 진입: ${entry.viaMasterName})` : (entry.accountName || "-"),
+          text: parsed.text,
+        });
+      });
+    });
+    out.sort((a, b) => b.sortKey.localeCompare(a.sortKey));
+    return out;
+  }
+  function closeScheduleCellHistoryModal() {
+    const existing = document.getElementById("sch-history-overlay");
+    if (existing) existing.remove();
+    document.removeEventListener("keydown", scheduleCellHistoryEscHandler, true);
+  }
+  function scheduleCellHistoryEscHandler(e) {
+    if (e.key === "Escape") closeScheduleCellHistoryModal();
+  }
+  function openScheduleCellHistoryModal(staffId, dateKey) {
+    closeScheduleCellHistoryModal();
+    const staff = getStaffListForMonth(scheduleUi.year, scheduleUi.monthIndex).find((s) => s.id === staffId) || scheduleData.staff.find((s) => s.id === staffId);
+    const d = new Date(`${dateKey}T00:00:00`);
+    const wd = isNaN(d.getTime()) ? "" : WEEKDAYS[d.getDay()];
+    const dateLabel = wd ? `${dateKey} (${wd})` : dateKey;
+    const entries = scheduleCellHistoryEntries(staffId, dateKey);
+    const rows = entries.map((e) => `
+      <div class="sch-history-row">
+        <div class="sch-history-meta"><span class="sch-history-when">${esc(e.when)}</span><span class="sch-history-who">${esc(e.who)}</span></div>
+        <div class="sch-history-text">${esc(e.text)}</div>
+      </div>
+    `).join("");
+    const overlay = document.createElement("div");
+    overlay.id = "sch-history-overlay";
+    overlay.className = "sch-preview-overlay";
+    overlay.innerHTML = `
+      <div class="sch-preview-box sch-history-box">
+        <div class="sch-preview-head">
+          <span>${esc(staff ? staff.name : "")} · ${esc(dateLabel)} 수정 이력</span>
+          <button type="button" class="sch-preview-close" id="sch-history-close-x" aria-label="닫기">✕</button>
+        </div>
+        <div class="sch-preview-body sch-history-body">
+          <div class="sch-adjust-desc">최근 ${ACTIVITY_LOG_RETENTION_DAYS}일 이내에 이 칸에서 있었던 변경 내역이에요.</div>
+          ${rows ? `<div class="sch-history-list">${rows}</div>` : `<div class="sch-adjust-empty">이 칸에는 아직 기록된 변경 이력이 없어요.</div>`}
+        </div>
+        <div class="sch-preview-actions">
+          <button type="button" class="ghost-btn" id="sch-history-close-btn">닫기</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    overlay.onclick = (e) => { if (e.target === overlay) closeScheduleCellHistoryModal(); };
+    document.getElementById("sch-history-close-x").onclick = () => closeScheduleCellHistoryModal();
+    document.getElementById("sch-history-close-btn").onclick = () => closeScheduleCellHistoryModal();
+    setTimeout(() => document.addEventListener("keydown", scheduleCellHistoryEscHandler, true), 0);
   }
 
   // ----- 셀 메모 입력 모달 -----
@@ -2302,10 +2460,11 @@
 
   function attachScheduleTableHandlers(root) {
     root.querySelectorAll(".sch-cell").forEach((cell) => {
-      // 클릭(드래그 없이 눌렀다 뗌)만 기존처럼 그 칸 하나의 메뉴를 연다.
-      // 드래그로 여러 칸을 선택한 경우의 처리는 mousedown/mouseenter + 문서 전체 мouseup에서 한다.
-      cell.onclick = () => {
-        if (scheduleSelectMoved) return;
+      // 왼쪽 클릭(드래그 없이 눌렀다 뗌)은 이제 메뉴를 열지 않는다 — 셀 선택/드래그 선택
+      // 용도로만 쓰고, 그 칸 하나의 메뉴(상태 변경/메모/이력 등)는 오른쪽 클릭(우클릭)
+      // 으로 연다.
+      cell.oncontextmenu = (e) => {
+        e.preventDefault();
         openScheduleMenu(cell, cell.getAttribute("data-staff-id"), cell.getAttribute("data-date"));
       };
       cell.onmousedown = (e) => {

@@ -497,7 +497,7 @@
           </div>
         </div>
         <div class="agent-sort-row">
-          <select class="agent-sort-select" id="agent-sort-select">
+          <select class="agent-sort-select" id="agent-sort-select" data-trigger-class="agent-sort-select">
             <option value="shift" ${agentsUi.sortBy === "shift" ? "selected" : ""}>기본순(주간→야간·업무·시간순)</option>
             <option value="custom" ${agentsUi.sortBy === "custom" ? "selected" : ""}>사용자 지정(드래그)</option>
             <option value="name" ${agentsUi.sortBy === "name" ? "selected" : ""}>이름순</option>
@@ -638,6 +638,7 @@
     });
     const sortSelect = document.getElementById("agent-sort-select");
     if (sortSelect) {
+      enhanceSelect(sortSelect);
       sortSelect.onchange = (e) => {
         agentsUi.sortBy = e.target.value;
         agentsUi.page = 1;
@@ -663,6 +664,7 @@
 
     const form = document.getElementById("agent-form");
     if (form) {
+      enhanceDateInput(document.getElementById("agent-input-hiredate"));
       form.onsubmit = (e) => {
         e.preventDefault();
         const name = document.getElementById("agent-input-name").value.trim();

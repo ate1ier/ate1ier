@@ -471,3 +471,137 @@
     document.addEventListener("keydown", todayBriefKeyHandler);
   }
 
+  /* ===================== 월마감 확인 팝업 =====================
+     달이 바뀌면(예: 9월이 지나 10월이 되면), 방금 지나간 달(9월)의 "최종 스케줄 확정 /
+     품질 관리 확정"을 마쳤는지 로그인할 때마다 확인시켜주는 팝업.
+     - 최종 스케줄 확정 = 월별 스케줄에서 그 달을 잠금(scheduleIsMonthLocked)
+     - 품질 관리 확정  = 품질 관리(QA)에서 그 달을 잠금(qaIsMonthLocked)
+     두 항목 모두 매번 그 자리에서 실시간으로(잠금 여부를 직접) 확인하기 때문에,
+     확정했다가 수정하려고 다시 풀고 나중에 또 잠그면 자연스럽게 다시 "완료" 상태가
+     되어 팝업이 뜨지 않는다 — 별도로 "한 번 확정한 적 있음" 같은 상태를 저장해두지
+     않는다. "앞으로 뜨지 않음"만 그 달 단위로 저장해서, 체크해두면 다시 풀었다
+     잠가도(또는 아예 안 잠가도) 그 달에 대해서는 로그인해도 더 이상 뜨지 않는다. */
+  const MONTH_CLOSE_KEY = acctKey("personal-monthclose:data");
+  function loadMonthCloseData() {
+    try {
+      const raw = localStorage.getItem(MONTH_CLOSE_KEY);
+      const parsed = raw ? JSON.parse(raw) : null;
+      if (parsed && typeof parsed === "object") {
+        if (!parsed.dismissed || typeof parsed.dismissed !== "object") parsed.dismissed = {};
+        return parsed;
+      }
+    } catch (e) {}
+    return { dismissed: {} };
+  }
+  let monthCloseData = loadMonthCloseData();
+  function saveMonthCloseData() {
+    try { localStorage.setItem(MONTH_CLOSE_KEY, JSON.stringify(monthCloseData)); } catch (e) {}
+  }
+  // "마감 확인"의 대상이 되는 달 = 오늘이 속한 달의 바로 전 달(=방금 지나간 달).
+  function monthCloseTargetMonth() {
+    const d = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    return { year: d.getFullYear(), monthIndex: d.getMonth() };
+  }
+  function monthCloseKeyStr(year, monthIndex) { return `${year}-${pad2(monthIndex + 1)}`; }
+  function monthCloseStatus() {
+    const { year, monthIndex } = monthCloseTargetMonth();
+    const key = monthCloseKeyStr(year, monthIndex);
+    const scheduleDone = scheduleIsMonthLocked(year, monthIndex);
+    const qaDone = qaIsMonthLocked(year, monthIndex);
+    return {
+      year, monthIndex, key, scheduleDone, qaDone,
+      allDone: scheduleDone && qaDone,
+      dismissed: !!monthCloseData.dismissed[key],
+    };
+  }
+  function shouldShowMonthClosePopup() {
+    const s = monthCloseStatus();
+    return !s.allDone && !s.dismissed;
+  }
+  function setMonthCloseDismissed(flag) {
+    const s = monthCloseStatus();
+    if (flag) monthCloseData.dismissed[s.key] = true;
+    else delete monthCloseData.dismissed[s.key];
+    saveMonthCloseData();
+  }
+
+  let monthCloseKeyHandler = null;
+  function closeMonthClosePopup() {
+    const overlay = document.getElementById("month-close-overlay");
+    if (!overlay) return;
+    if (monthCloseKeyHandler) { document.removeEventListener("keydown", monthCloseKeyHandler); monthCloseKeyHandler = null; }
+    overlay.classList.add("closing");
+    setTimeout(() => overlay.remove(), 200);
+  }
+  function monthCloseRowsHtml(s) {
+    const rows = [
+      {
+        done: s.scheduleDone, icon: ICON_CLIPBOARD, nav: "schedule",
+        title: "최종 스케줄 확정",
+        sub: s.scheduleDone ? "확정(잠금) 완료" : "이 달 스케줄을 확정(잠금)해주세요",
+      },
+      {
+        done: s.qaDone, icon: ICON_QA, nav: "qa",
+        title: "품질 관리 확정",
+        sub: s.qaDone ? "확정(잠금) 완료" : "이 달 QA 점수를 확정(잠금)해주세요",
+      },
+    ];
+    return rows.map((r, i) => `
+      <button type="button" class="today-brief-row month-close-row ${r.done ? "done" : ""}" data-monthclose-nav="${r.nav}" style="animation-delay:${80 + i * 55}ms">
+        <span class="today-brief-row-icon">${r.done ? ICON_CHECK : r.icon}</span>
+        <span class="today-brief-row-text">
+          <b>${esc(r.title)}</b>
+          <span>${esc(r.sub)}</span>
+        </span>
+        ${ICON_CHEVRON_RIGHT}
+      </button>
+    `).join("");
+  }
+  function monthCloseCardHtml(s) {
+    return `
+      <div class="today-brief-card month-close-card" role="dialog" aria-modal="true" aria-label="월마감 확인">
+        <button type="button" class="today-brief-close" id="month-close-close" aria-label="닫기">${ICON_CLOSE_SM}</button>
+        <div class="today-brief-head">
+          <div class="today-brief-badge">${ICON_CLIPBOARD} 월마감 확인</div>
+          <div class="today-brief-date">${s.year}년 ${s.monthIndex + 1}월 마감</div>
+        </div>
+        <div class="today-brief-rows month-close-rows">
+          ${monthCloseRowsHtml(s)}
+        </div>
+        <label class="month-close-dismiss-row" for="month-close-dismiss-checkbox">
+          <input type="checkbox" id="month-close-dismiss-checkbox" ${s.dismissed ? "checked" : ""}>
+          <span>앞으로 뜨지 않음</span>
+        </label>
+        <button type="button" class="today-brief-cta" id="month-close-cta">확인했어요</button>
+      </div>
+    `;
+  }
+  function bindMonthCloseEvents(overlay) {
+    document.getElementById("month-close-close").onclick = () => closeMonthClosePopup();
+    document.getElementById("month-close-cta").onclick = () => closeMonthClosePopup();
+    document.getElementById("month-close-dismiss-checkbox").onchange = (e) => {
+      setMonthCloseDismissed(e.target.checked);
+    };
+    overlay.querySelectorAll("[data-monthclose-nav]").forEach((btn) => {
+      btn.onclick = () => {
+        const nav = btn.getAttribute("data-monthclose-nav");
+        const s = monthCloseStatus();
+        closeMonthClosePopup();
+        if (nav === "schedule" || nav === "qa") setPage(nav, { year: s.year, monthIndex: s.monthIndex });
+        else setPage(nav);
+      };
+    });
+  }
+  function showMonthClosePopup() {
+    if (document.getElementById("month-close-overlay")) return;
+    const overlay = document.createElement("div");
+    overlay.id = "month-close-overlay";
+    overlay.className = "today-brief-overlay month-close-overlay";
+    document.body.appendChild(overlay);
+    overlay.innerHTML = monthCloseCardHtml(monthCloseStatus());
+    bindMonthCloseEvents(overlay);
+    overlay.onclick = (e) => { if (e.target === overlay) closeMonthClosePopup(); };
+    monthCloseKeyHandler = (e) => { if (e.key === "Escape") closeMonthClosePopup(); };
+    document.addEventListener("keydown", monthCloseKeyHandler);
+  }
+

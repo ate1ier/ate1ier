@@ -4,6 +4,7 @@
       tab: "accounts", resettingId: null, renamingId: null, error: "", renameError: "",
       logAccountFilter: "all", expandedLogIds: new Set(),
       backupList: null, backupLoading: false, expandedBackupDates: new Set(),
+      manageMembersId: null, memberError: "",
     };
 
     function draw() {
@@ -86,13 +87,18 @@
         const created = a.createdAt ? esc(a.createdAt.slice(0, 10)) : "-";
         const isResetting = uiState.resettingId === a.id;
         const isRenaming = uiState.renamingId === a.id;
+        const isTeam = a.accountType === "team";
+        const isManagingMembers = uiState.manageMembersId === a.id;
+        const members = isTeam && Array.isArray(a.teamMembers) ? a.teamMembers : [];
         return `
           <div class="agent-row master-account-row">
             <div class="agent-row-main" style="cursor:default;">
-              <span class="agent-row-name">${esc(a.username)}${a.isMaster ? ' <span class="badge sm master">마스터</span>' : ""}${isSelf ? ' <span class="badge sm working">현재 로그인 중</span>' : ""}</span>
-              <span class="agent-row-ldap">가입일 ${created}</span>
+              <span class="agent-row-name">${esc(a.username)}${a.isMaster ? ' <span class="badge sm master">마스터</span>' : ""} <span class="badge sm type">${isTeam ? "팀용" : "개인용"}</span>${isSelf ? ' <span class="badge sm working">현재 로그인 중</span>' : ""}</span>
+              <span class="agent-row-ldap">가입일 ${created}${isTeam ? ` · 로그인 인원 ${members.length}명` : ""}</span>
             </div>
             <div class="agent-row-badges">
+              <button class="ghost-btn" data-action="master-type" data-id="${a.id}">${isTeam ? "개인용으로 전환" : "팀용으로 전환"}</button>
+              ${isTeam ? `<button class="ghost-btn ${isManagingMembers ? "active" : ""}" data-action="master-members" data-id="${a.id}">${isManagingMembers ? "닫기" : "로그인 인원 관리"}</button>` : ""}
               <button class="ghost-btn ${isRenaming ? "active" : ""}" data-action="master-rename" data-id="${a.id}">${isRenaming ? "취소" : "이름 수정"}</button>
               <button class="ghost-btn ${isResetting ? "active" : ""}" data-action="master-reset" data-id="${a.id}">${isResetting ? "취소" : "비밀번호 초기화"}</button>
               <button class="ghost-btn" data-action="master-enter" data-id="${a.id}" ${isSelf ? "disabled" : ""}>이 계정으로 들어가기</button>
@@ -118,6 +124,21 @@
                 ${uiState.error ? `<div class="login-error">${esc(uiState.error)}</div>` : ""}
                 <button type="submit" class="primary-btn login-submit">비밀번호 저장</button>
               </form>
+            ` : ""}
+            ${isTeam && isManagingMembers ? `
+              <div class="master-members-panel">
+                <div class="agent-row-ldap" style="margin-bottom:8px;">"${esc(a.username)}" 계정으로 로그인할 때 고를 수 있는 인원 목록이에요. 비밀번호는 계정 하나로 공통이고, 여기 인원은 이름표 용도예요.</div>
+                <div class="master-members-list">
+                  ${members.length ? members.map((m) => `
+                    <span class="master-member-chip">${esc(m.name)}<button type="button" class="chip-remove" data-remove-member="${a.id}:${m.id}" title="삭제">×</button></span>
+                  `).join("") : `<div class="agent-list-empty" style="padding:6px 0;">아직 등록된 인원이 없어요.</div>`}
+                </div>
+                <form class="master-member-form" data-member-form="${a.id}">
+                  <input class="add-input" id="member-name-${a.id}" type="text" autocomplete="off" placeholder="추가할 인원 이름">
+                  <button type="submit" class="primary-btn login-submit">추가</button>
+                </form>
+                ${uiState.memberError ? `<div class="login-error">${esc(uiState.memberError)}</div>` : ""}
+              </div>
             ` : ""}
           </div>
         `;
@@ -163,6 +184,57 @@
           draw();
         };
       });
+      root.querySelectorAll("[data-action='master-type']").forEach((btn) => {
+        btn.onclick = () => {
+          const id = btn.getAttribute("data-id");
+          const target = accounts.find((a) => a.id === id);
+          if (!target) return;
+          const isTeamNow = target.accountType === "team";
+          const nextType = isTeamNow ? "personal" : "team";
+          const nextLabel = isTeamNow ? "개인용" : "팀용";
+          const confirmMsg = isTeamNow
+            ? `"${target.username}" 계정을 개인용으로 바꿀까요? (등록해둔 로그인 인원 목록은 지워지지 않고 남아있어요)`
+            : `"${target.username}" 계정을 팀용으로 바꿀까요? 팀용으로 바꾸면 "로그인 인원 관리"에서 로그인할 인원을 추가할 수 있어요.`;
+          if (!window.confirm(confirmMsg)) return;
+          const result = setAccountType(id, nextType);
+          if (!result.ok) { flash(result.reason || "유형을 바꾸지 못했어요."); return; }
+          if (uiState.manageMembersId === id && nextType !== "team") uiState.manageMembersId = null;
+          draw();
+          flash(`"${target.username}" 계정을 ${nextLabel}으로 바꿨어요.`);
+        };
+      });
+      root.querySelectorAll("[data-action='master-members']").forEach((btn) => {
+        btn.onclick = () => {
+          const id = btn.getAttribute("data-id");
+          uiState.memberError = "";
+          uiState.manageMembersId = uiState.manageMembersId === id ? null : id;
+          draw();
+        };
+      });
+      root.querySelectorAll("[data-member-form]").forEach((form) => {
+        form.onsubmit = (e) => {
+          e.preventDefault();
+          const id = form.getAttribute("data-member-form");
+          const input = document.getElementById(`member-name-${id}`);
+          const result = addTeamMember(id, input ? input.value : "");
+          if (!result.ok) { uiState.memberError = result.reason || "추가하지 못했어요."; draw(); return; }
+          uiState.memberError = "";
+          draw();
+          flash(`로그인 인원 "${(input.value || "").trim()}"을(를) 추가했어요.`);
+        };
+      });
+      root.querySelectorAll("[data-remove-member]").forEach((btn) => {
+        btn.onclick = () => {
+          const [accId, memberId] = btn.getAttribute("data-remove-member").split(":");
+          const acc = accounts.find((x) => x.id === accId);
+          const member = acc && Array.isArray(acc.teamMembers) ? acc.teamMembers.find((m) => m.id === memberId) : null;
+          if (!window.confirm(`"${member ? member.name : "이 인원"}"을(를) 로그인 인원에서 삭제할까요?`)) return;
+          const result = removeTeamMember(accId, memberId);
+          if (!result.ok) { flash(result.reason || "삭제하지 못했어요."); return; }
+          draw();
+          flash("로그인 인원을 삭제했어요.");
+        };
+      });
       root.querySelectorAll("[data-rename-form]").forEach((form) => {
         form.onsubmit = (e) => {
           e.preventDefault();
@@ -195,9 +267,63 @@
       });
     }
 
+    // 실제 저장(activity-log:entries)은 변경이 생기자마자 한 건씩 즉시 기록된다.
+    // 다만 마스터 계정에서 이 목록을 볼 때, 같은 계정이 짧은 시간(3분) 안에 여러
+    // 번 고친 건 한 줄로 묶어서 보여주는 게 더 읽기 편하므로, 화면에 그릴 때만
+    // (표시 전용) 묶는다. 실제 데이터를 건드리지 않으므로 스케줄 셀 "수정 이력
+    // 보기" 등 다른 화면에는 영향이 없다.
+    function groupActivityEntriesForDisplay(entries) {
+      const byAccount = {};
+      entries.forEach((e) => {
+        if (!byAccount[e.accountId]) byAccount[e.accountId] = [];
+        byAccount[e.accountId].push(e);
+      });
+      const groups = [];
+      Object.keys(byAccount).forEach((accountId) => {
+        const list = byAccount[accountId].slice().sort((a, b) => Date.parse(a.at || 0) - Date.parse(b.at || 0));
+        let current = null;
+        list.forEach((e) => {
+          const ts = Date.parse(e.at || "");
+          const lastTs = current ? Date.parse(current.lastAt || "") : NaN;
+          const sameBurst = current
+            && (current.viaMasterName || null) === (e.viaMasterName || null)
+            && !isNaN(ts) && !isNaN(lastTs)
+            && (ts - lastTs) <= ACTIVITY_DISPLAY_GROUP_MS;
+          if (sameBurst) {
+            current.items.push(e);
+            current.lastAt = e.at || current.lastAt;
+          } else {
+            current = { accountId, accountName: e.accountName, viaMasterName: e.viaMasterName, startAt: e.at, lastAt: e.at, items: [e] };
+            groups.push(current);
+          }
+        });
+      });
+      groups.sort((a, b) => Date.parse(b.lastAt || 0) - Date.parse(a.lastAt || 0));
+      return groups.map((g) => {
+        const whereLabels = [];
+        g.items.forEach((e) => {
+          const w = e.subLabel ? `${e.categoryLabel} · ${e.subLabel}` : e.categoryLabel;
+          if (whereLabels.indexOf(w) === -1) whereLabels.push(w);
+        });
+        const categoryLabel = whereLabels.length <= 2 ? whereLabels.join(", ") : `${whereLabels.slice(0, 2).join(", ")} 외 ${whereLabels.length - 2}곳`;
+        const diffLines = [];
+        g.items.forEach((e) => { (e.diff || []).forEach((line) => diffLines.push(line)); });
+        return {
+          id: g.items[0].id,
+          at: g.startAt,
+          endedAt: g.items.length > 1 ? g.lastAt : null,
+          accountId: g.accountId,
+          accountName: g.accountName,
+          viaMasterName: g.viaMasterName,
+          categoryLabel,
+          subLabel: g.items.length > 1 ? `${g.items.length}건` : g.items[0].subLabel,
+          diff: diffLines,
+        };
+      });
+    }
     // ----- 활동 로그 탭: 계정별 데이터 변경 이력을 간단한 목록으로 보여준다 -----
     function drawActivityLog(root) {
-      const entries = loadActivityLog();
+      const entries = groupActivityEntriesForDisplay(loadActivityLog());
       const accounts = loadAccounts();
       const accountNameOf = (id) => { const a = accounts.find((x) => x.id === id); return a ? a.username : null; };
 
@@ -244,7 +370,7 @@
           ${ACTIVITY_LOG_RETENTION_DAYS}일 지난 로그는 자동으로 정리돼요. 총 ${filtered.length}건${filtered.length > shown.length ? ` (최근 ${shown.length}건만 표시)` : ""}.
         </div>
         <div style="display:flex; gap:8px; align-items:center; margin-bottom:14px; flex-wrap:wrap;">
-          <select class="agent-sort-select" id="log-account-filter">
+          <select class="agent-sort-select" id="log-account-filter" data-trigger-class="agent-sort-select">
             <option value="all" ${uiState.logAccountFilter === "all" ? "selected" : ""}>전체 계정</option>
             ${accountOptions.map((a) => `<option value="${esc(a.id)}" ${uiState.logAccountFilter === a.id ? "selected" : ""}>${esc(a.name)}</option>`).join("")}
           </select>
@@ -254,7 +380,10 @@
       `;
 
       const filterEl = document.getElementById("log-account-filter");
-      if (filterEl) filterEl.onchange = () => { uiState.logAccountFilter = filterEl.value; draw(); };
+      if (filterEl) {
+        enhanceSelect(filterEl);
+        filterEl.onchange = () => { uiState.logAccountFilter = filterEl.value; draw(); };
+      }
 
       const clearBtn = document.getElementById("log-clear-btn");
       if (clearBtn) {

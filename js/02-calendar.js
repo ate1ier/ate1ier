@@ -6,7 +6,7 @@
     selectedDay: today.getDate(),
     monthData: {},
     hideDone: false,
-    formType: "memo",
+    formType: "event",
     formPriority: false,
     rangeMode: false,
     repeatMode: false, // 추가 폼에서 "반복" 설정이 켜져 있는지
@@ -189,8 +189,6 @@
       <div class="entry entry-editing" data-id="${entry.id}">
         <div class="entry-edit-form">
           <div class="type-row">
-            <button type="button" class="type-btn memo ${cal.editType === "memo" ? "active" : ""}" data-edit-type="memo">메모</button>
-            <button type="button" class="type-btn event ${cal.editType === "event" ? "active" : ""}" data-edit-type="event">일정</button>
             <button type="button" class="type-btn priority ${cal.editPriority ? "active" : ""}" id="btn-edit-priority">★ 중요</button>
           </div>
           ${isRange ? `
@@ -369,8 +367,6 @@
             ${upcomingHtml}
             <form class="add-form" id="add-form">
               <div class="type-row">
-                <button type="button" class="type-btn memo ${cal.formType === "memo" ? "active" : ""}" data-form-type="memo">메모</button>
-                <button type="button" class="type-btn event ${cal.formType === "event" ? "active" : ""}" data-form-type="event">일정</button>
                 <button type="button" class="type-btn priority ${cal.formPriority ? "active" : ""}" id="btn-priority">★ 중요</button>
                 <button type="button" class="type-btn rangetoggle ${cal.rangeMode ? "active" : ""}" id="btn-range">기간 설정</button>
                 <button type="button" class="type-btn repeattoggle ${cal.repeatMode ? "active" : ""}" id="btn-repeat">${ICON_REFRESH} 반복</button>
@@ -420,6 +416,9 @@
   }
 
   function attachCalEvents() {
+    document.querySelectorAll(".repeat-select").forEach((sel) => enhanceSelect(sel));
+    document.querySelectorAll('input[type="date"]').forEach((inp) => enhanceDateInput(inp));
+    document.querySelectorAll('input[type="time"]').forEach((inp) => enhanceTimeInput(inp));
     document.getElementById("btn-today").onclick = () => {
       cal.year = today.getFullYear();
       cal.monthIndex = today.getMonth();
@@ -469,13 +468,6 @@
     document.querySelectorAll("[data-action='save-edit']").forEach((btn) => {
       btn.onclick = () => saveEditEntry(btn.getAttribute("data-id"));
     });
-    document.querySelectorAll("[data-edit-type]").forEach((btn) => {
-      btn.onclick = () => {
-        cal.editType = btn.getAttribute("data-edit-type");
-        document.querySelectorAll("[data-edit-type]").forEach((b) => b.classList.remove("active"));
-        btn.classList.add("active");
-      };
-    });
     const editPriorityBtn = document.getElementById("btn-edit-priority");
     if (editPriorityBtn) {
       editPriorityBtn.onclick = (e) => {
@@ -517,13 +509,6 @@
       btn.onclick = () => { cal.selectedDay = parseInt(btn.getAttribute("data-goto-day"), 10); renderApp(); };
     });
 
-    document.querySelectorAll("[data-form-type]").forEach((btn) => {
-      btn.onclick = () => {
-        cal.formType = btn.getAttribute("data-form-type");
-        document.querySelectorAll("[data-form-type]").forEach((b) => b.classList.remove("active"));
-        btn.classList.add("active");
-      };
-    });
     document.getElementById("btn-priority").onclick = (e) => {
       cal.formPriority = !cal.formPriority;
       e.currentTarget.classList.toggle("active", cal.formPriority);
@@ -1019,6 +1004,7 @@
   }
 
   function attachTodoEvents() {
+    document.querySelectorAll(".todo-due-input").forEach((inp) => enhanceDateInput(inp));
     document.querySelectorAll("[data-action='todo-toggle']").forEach((btn) => {
       btn.onclick = () => { toggleTodoDone(btn.getAttribute("data-id")); renderApp(); };
     });

@@ -30,6 +30,7 @@
     .type-btn { padding: 8px 0; }
     .add-row { flex-wrap: wrap; }
     .time-input { width: 100%; }
+    .add-row .app-time { width: 100%; flex: 1 1 100%; }
     .text-input { width: 100%; }
     .submit-btn { width: 100%; height: 40px; }
     .range-row { flex-wrap: wrap; }
@@ -416,7 +417,7 @@
   .upcoming-toggle:hover { background: var(--elevated); color: var(--text-dim); }
 
   .add-form { border-top: 1px solid var(--hairline); padding-top: 14px; }
-  .type-row { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
+  .type-row { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; justify-content: flex-end; }
   .type-btn {
     background: var(--elevated); border: 1px solid var(--hairline); color: var(--text-dim);
     border-radius: 999px; padding: 6px 0; font-size: 13px; cursor: pointer;
@@ -471,6 +472,7 @@
   }
   .add-input::placeholder { color: var(--text-faint); }
   .time-input { width: 96px; }
+  .add-row .app-time { flex: 0 0 96px; }
   .text-input { flex: 1; min-width: 0; }
   .submit-btn {
     background: var(--accent); border: none; color: var(--accent-text); width: 36px;
@@ -543,13 +545,12 @@
   .todo-add-form { border-top: 1px solid var(--hairline); padding-top: 12px; display: flex; flex-direction: column; gap: 6px; }
   .todo-add-row { display: flex; gap: 6px; }
   .todo-due-input {
-    background: var(--elevated); border: 1px solid var(--hairline); color: var(--text);
-    border-radius: 12px; padding: 0 10px; font-size: 13px; color-scheme: var(--native-color-scheme, dark); flex: 0 0 132px;
+    color-scheme: var(--native-color-scheme, dark);
   }
+  .todo-add-row .app-date { flex: 0 0 auto; }
   @media (max-width: 600px) {
     .todo-add-row { flex-wrap: wrap; }
     .todo-add-row .add-input { flex: 1 1 100%; min-width: 0; }
-    .todo-due-input { flex: 1 1 auto; height: 38px; }
     .note-body { padding: 0 10px 12px 14px; }
     .interview-textarea, .note-content { font-size: 16px; }
   }

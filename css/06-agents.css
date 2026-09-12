@@ -87,7 +87,7 @@
   .agent-filter-btn.active { border-color: var(--yellow); color: var(--yellow); background: var(--yellow-dim); }
   .agent-sort-select {
     background: var(--elevated); border: 1px solid var(--hairline); color: var(--text);
-    border-radius: 12px; padding: 6px 10px; font-size: 13px; cursor: pointer;
+    border-radius: 12px; padding: 6px 10px; font-size: 14px; cursor: pointer;
   }
   .master-reset-form {
     flex-basis: 100%; display: flex; flex-direction: row; flex-wrap: wrap; gap: 8px; align-items: flex-end;
@@ -160,7 +160,7 @@
   .agent-checkbox-row { display: flex; gap: 16px; margin-top: 2px; }
   .agent-checkbox { display: flex; align-items: center; gap: 6px; font-size: 14.5px; color: var(--text); cursor: pointer; }
   .agent-checkbox input { accent-color: var(--accent); width: 15px; height: 15px; cursor: pointer; }
-  .agent-form-actions { display: flex; gap: 8px; margin-top: 4px; }
+  .agent-form-actions { display: flex; gap: 8px; margin-top: 4px; justify-content: flex-end; }
 
   .primary-btn {
     background: var(--accent); border: none; color: var(--accent-text);
