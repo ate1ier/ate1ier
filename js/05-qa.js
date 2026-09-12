@@ -1286,5 +1286,5 @@
 
   /* ===================== 면담일지 모듈 ===================== */
   const INTERVIEWS_KEY = acctKey("personal-interviews:data");
-  const INTERVIEW_TYPES = ["정기", "수시", "경고"];
+  const INTERVIEW_TYPES = ["정기", "비정기", "경고", "퇴사"];
 

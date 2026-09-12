@@ -160,7 +160,7 @@
         return `
         <button type="button" class="gs-card" data-gs-action="interview" data-id="${rec.id}">
           <div class="gs-card-main">
-            <span class="gs-card-title">${esc(agent ? agent.name : "(삭제된 상담사)")} <span class="badge sm ${interviewTypeBadgeClass(rec.type)}">${esc(rec.type || "수시")}</span></span>
+            <span class="gs-card-title">${esc(agent ? agent.name : "(삭제된 상담사)")} <span class="badge sm ${interviewTypeBadgeClass(rec.type)}">${esc(rec.type || "비정기")}</span></span>
             <span class="gs-card-sub">${snippet ? esc(snippet) : '<span class="agent-field-empty">내용 없음</span>'}</span>
           </div>
           <div class="gs-card-badges"><span class="gs-card-date">${esc(rec.date || "-")}</span></div>

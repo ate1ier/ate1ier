@@ -57,7 +57,7 @@
     const tenureMonths = agent ? calcTenureMonths(agent.hireDate) : null;
     return {
       date: rec.date || "",
-      type: rec.type || "수시",
+      type: rec.type || "비정기",
       agentName: agent ? agent.name : "(삭제된 상담사)",
       agentLdap: agent ? (agent.ldap || "") : "",
       group: agent ? (agent.group === "night" ? "야간" : "주간") : "",
@@ -237,7 +237,8 @@
   function interviewTypeBadgeClass(type) {
     if (type === "정기") return "type-regular";
     if (type === "경고") return "type-warning";
-    return "type-adhoc";
+    if (type === "퇴사") return "type-resign";
+    return "type-adhoc"; // 비정기(과거 데이터의 "수시" 포함)
   }
   // 면담 기록을 최신 날짜순(같은 날짜면 최근 작성순)으로 정렬한다.
   function sortInterviews(list) {
@@ -264,7 +265,7 @@
     mode: "list", // "list" | "add" | "edit"
     editingId: null,
     searchQuery: "",
-    typeFilter: "all", // "all" | "정기" | "수시" | "경고"
+    typeFilter: "all", // "all" | "정기" | "비정기" | "경고" | "퇴사"
     expandedIds: new Set(), // 목록에서 펼쳐본 면담 기록 id들 (상담사 상세 화면과 공유)
     page: 1, // 면담일지 목록의 현재 페이지(10건씩)
   };
@@ -438,7 +439,7 @@
         <div class="interview-row-top" data-action="toggle-interview-row" data-id="${rec.id}">
           <span class="interview-row-chevron">${ICON_CHEVRON_RIGHT}</span>
           <span class="interview-date">${esc(rec.date || "-")}</span>
-          <span class="badge sm ${interviewTypeBadgeClass(rec.type)}">${esc(rec.type || "수시")}</span>
+          <span class="badge sm ${interviewTypeBadgeClass(rec.type)}">${esc(rec.type || "비정기")}</span>
           ${agentNameHtml}
           ${agentMetaHtml}
           ${managerHtml}
@@ -920,7 +921,7 @@
               ${records.map((r) => `
                 <div class="interview-ai-source-item">
                   <span class="interview-date">${esc(r.date || "-")}</span>
-                  <span class="badge sm ${interviewTypeBadgeClass(r.type)}">${esc(r.type || "수시")}</span>
+                  <span class="badge sm ${interviewTypeBadgeClass(r.type)}">${esc(r.type || "비정기")}</span>
                 </div>
               `).join("")}
             </div>
@@ -941,7 +942,7 @@
     try {
       // 오래된 순으로 정리해서, AI가 시간 흐름을 따라 이해할 수 있게 한다.
       const recordsText = records.slice().reverse().map((r, i) => (
-        `${i + 1}. [${r.date || "날짜 미상"} · ${r.type || "수시"}]\n내용: ${r.content || "(내용 없음)"}\n후속조치: ${r.followUp || "없음"}`
+        `${i + 1}. [${r.date || "날짜 미상"} · ${r.type || "비정기"}]\n내용: ${r.content || "(내용 없음)"}\n후속조치: ${r.followUp || "없음"}`
       )).join("\n\n");
       const prompt = `다음은 콜센터 상담사 "${agent.name}"님과 나눈 최근 면담 ${records.length}건의 기록입니다(오래된 순).\n\n${recordsText}\n\n위 내용을 한국어로, 아래와 같이 정확히 세 개 섹션으로만 정리해주세요. 불필요한 서론·결론 문장은 쓰지 마세요. 마크다운 기호(**, *, # 등)는 절대 쓰지 말고, 아래처럼 대괄호로 된 제목만 그대로 써주세요.\n\n[면담 흐름 요약]\n- (여러 회차에 걸친 면담 내용을 시간 순으로 간결하게 정리하세요. 문장은 "~하세요/~마세요" 같은 권유형이 아니라 "~함", "~됨"처럼 개조식 명사형 종결로 쓰세요.)\n\n[반복되는 이슈]\n- (여러 면담에서 공통적으로 나온 문제나 패턴이 있다면 한 줄씩. 없다면 "특별히 반복되는 이슈는 없음" 한 줄만 쓰세요.)\n\n[후속 조치 필요 사항]\n- (아직 해결되지 않았거나 다음 면담에서 계속 챙겨야 할 점을 한 줄씩. "~하세요", "~주세요" 같은 권유형은 쓰지 말고 "~필요", "~해야 함"처럼 개조식 명사형 종결로 쓰세요.)`;
       // 실제 Groq API 키는 이 브라우저가 아니라 Supabase Edge Function(qa-groq-summary)

@@ -9,6 +9,7 @@
   .badge.type-regular { color: var(--blue); background: var(--blue-dim); }
   .badge.type-adhoc { color: var(--green); background: var(--green-dim); }
   .badge.type-warning { color: var(--red); background: var(--red-dim); }
+  .badge.type-resign { color: var(--purple); background: var(--purple-dim); }
   .interview-list { display: flex; flex-direction: column; }
   .interview-row {
     background: transparent; border-bottom: 1px solid var(--hairline);
