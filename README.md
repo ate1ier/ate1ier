@@ -68,6 +68,32 @@ counseling-app/
      ```
      (Node.js가 없다면 저에게 다시 파일을 올려주시면 같은 방식으로 다시 조합해드릴게요.)
 
+## 보안 업데이트 (2026-09): Supabase Auth 기반 인증으로 전환
+
+예전에는 Supabase RLS를 anon(누구나 쓰는 공개 키)에게 전면 개방해뒀어서, anon key만
+있으면(= 이 사이트의 JS 코드만 볼 수 있으면) 누구나 kv_store 테이블 전체를 읽고
+쓸 수 있었습니다. 지금은 실제로 로그인(Supabase Auth 인증)한 사람만 데이터를
+읽고 쓸 수 있도록 바꿨습니다. 로그인 화면 자체의 아이디/비밀번호 입력 방식은
+그대로지만, 로그인/계정 만들기에 성공하면 그 즉시 뒤에서 Supabase Auth 세션도
+함께 만들어집니다.
+
+**아직 적용 전이라면 반드시 해야 할 일 (1회성):**
+
+1. `supabase/auth-rls-migration.sql`을 Supabase 대시보드 → SQL Editor에서 실행합니다.
+2. Supabase 대시보드 → Authentication → Sign In / Providers → Email에서
+   **"Confirm email"을 꺼주세요.** (이 앱은 실제 이메일이 아니라 "아이디@ate1ier.local"
+   형태의 가짜 이메일로 Supabase Auth 계정을 만들기 때문에, 인증 메일을 받을 방법이
+   없습니다. 꺼두지 않으면 가입/로그인이 막힙니다.)
+3. `node build.js`로 다시 빌드해서 배포합니다.
+
+이 업데이트 이전부터 로그인해 있던 브라우저는 다음에 열 때 자동으로 로그인 화면으로
+돌아가고, 한 번 더 로그인하면 정상적으로 계속 쓸 수 있습니다(비밀번호가 바뀌는 건
+아닙니다).
+
+**알려진 제한 사항:** 마스터가 계정을 삭제해도 그 계정에 연결된 Supabase Auth
+사용자 레코드까지 자동으로 지워지지는 않습니다(눈에 보이는 문제는 없고, 아주
+드물게 같은 아이디로 계정을 다시 만들 때만 영향이 있을 수 있습니다).
+
 ## 주의
 
 `css/06-agents.css`, `css/07-interviews.css`, `css/08-agent-qa-preview.css`처럼
