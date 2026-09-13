@@ -20,6 +20,7 @@
     renderLoginScreen();
     return;
   }
+  _appBooted = true; // 이 시점부터는 renderApp()이 쓰는 값들이 전부 준비됨 — 실시간/탭전환 리스너가 다시 정상 동작해도 안전하다.
   document.body.classList.remove("login-screen");
   const CURRENT_ACCOUNT_ID = _account.id;
   const CURRENT_ACCOUNT_NAME = _account.username;

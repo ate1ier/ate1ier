@@ -332,6 +332,7 @@
         "postgres_changes",
         { event: "*", schema: "public", table: "kv_store" },
         (payload) => {
+          if (!_appBooted) return; // 로그인 화면 등 앱이 아직 초기화되기 전에는 안전하게 무시
           const row = payload.new && payload.new.key ? payload.new : payload.old;
           if (!row || !row.key || !isCloudSynced(row.key)) return;
           if (payload.eventType === "DELETE") {
@@ -368,6 +369,7 @@
   // 상태인지 확인해서 최신 내용으로 갱신한다 — 그래야 "다른 탭 보고 오니 화면이
   // 예전 내용"인 채로 남아있는 일이 없다. 배너 없이 조용히 갱신만 한다.
   function _catchUpRenderIfSafe() {
+    if (!_appBooted) return; // 로그인 화면에서는 아직 renderApp()이 참조하는 값들이 없으므로 건너뜀
     if (!_isTabVisible() || _hasActiveEditableFocus()) return;
     try { renderApp(); } catch (e) {}
   }

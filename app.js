@@ -87,6 +87,17 @@
   const cloud = (window.supabase && SUPABASE_URL && SUPABASE_ANON_KEY)
     ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
     : null;
+
+  // 로그인 화면(아직 _account가 없는 상태)에서는 renderApp()이 참조하는 state·
+  // CURRENT_ACCOUNT_* 같은 값들이 아직 만들어지지 않은 상태다. 그런데 실시간
+  // 구독(postgres_changes)이나 탭 전환 감지(visibilitychange/focus) 리스너는
+  // 로그인 여부와 상관없이 파일 로딩 시점에 바로 등록되기 때문에, 로그인 화면을
+  // 보고 있는 동안에도(예: 다른 관리자가 그 사이에 뭔가 저장했을 때, 또는 탭을
+  // 잠깐 다른 곳에 갔다 왔을 때) 이 리스너들이 그대로 실행되면서 아직 없는
+  // 값을 참조해 예외를 던지는 문제가 있었다. 이 플래그가 true로 바뀌기 전까지는
+  // (=로그인 검사를 통과해서 실제 앱 코드가 초기화되기 전까지는) 그런 리스너들이
+  // 안전하게 아무 일도 하지 않고 지나가도록 한다.
+  let _appBooted = false;
   // 로그인 아이디를 Supabase Auth용 이메일로 바꿀 때 쓰는 가짜 도메인.
   // 실제로 존재하는 도메인일 필요는 없지만(메일이 발송되지 않으니까), 한 번
   // 정하면 이후 바꾸지 말 것 — 바꾸면 기존 계정들이 전부 새 이메일로 다시
@@ -818,6 +829,7 @@
         "postgres_changes",
         { event: "*", schema: "public", table: "kv_store" },
         (payload) => {
+          if (!_appBooted) return; // 로그인 화면 등 앱이 아직 초기화되기 전에는 안전하게 무시
           const row = payload.new && payload.new.key ? payload.new : payload.old;
           if (!row || !row.key || !isCloudSynced(row.key)) return;
           if (payload.eventType === "DELETE") {
@@ -854,6 +866,7 @@
   // 상태인지 확인해서 최신 내용으로 갱신한다 — 그래야 "다른 탭 보고 오니 화면이
   // 예전 내용"인 채로 남아있는 일이 없다. 배너 없이 조용히 갱신만 한다.
   function _catchUpRenderIfSafe() {
+    if (!_appBooted) return; // 로그인 화면에서는 아직 renderApp()이 참조하는 값들이 없으므로 건너뜀
     if (!_isTabVisible() || _hasActiveEditableFocus()) return;
     try { renderApp(); } catch (e) {}
   }
@@ -2298,6 +2311,17 @@
   // ==================== 로그인 화면 렌더링 ====================
   // (예전 01-common.js에서 분리됨 — 실행 순서·내용은 그대로입니다)
   function renderLoginScreen() {
+    // 안전장치: 혹시라도(예: 브라우저의 뒤로가기/앞으로가기 캐시 복원처럼 스크립트가
+    // 다시 실행되지 않는 특수한 경우) 이전 화면에서 뜨던 팝업류(드롭다운/날짜·시간
+    // 선택 팝업, 설정 메뉴, 동기화 배너)가 화면 위에 그대로 남아있으면, 그 투명한
+    // 영역이 로그인 폼 위를 덮어서 클릭·입력이 먹히지 않는 것처럼 보일 수 있다.
+    // 로그인 화면을 그리기 전에 이런 잔재를 먼저 확실히 치운다.
+    if (typeof closeAllAppFloatingMenus === "function") { try { closeAllAppFloatingMenus(); } catch (e) {} }
+    const staleOverlayIds = ["settings-menu", "cloud-live-banner-wrap"];
+    staleOverlayIds.forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el.remove();
+    });
     const nav = document.getElementById("nav");
     if (nav) nav.innerHTML = "";
     document.body.classList.add("login-screen");
@@ -2553,6 +2577,7 @@
     renderLoginScreen();
     return;
   }
+  _appBooted = true; // 이 시점부터는 renderApp()이 쓰는 값들이 전부 준비됨 — 실시간/탭전환 리스너가 다시 정상 동작해도 안전하다.
   document.body.classList.remove("login-screen");
   const CURRENT_ACCOUNT_ID = _account.id;
   const CURRENT_ACCOUNT_NAME = _account.username;

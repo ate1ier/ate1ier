@@ -38,6 +38,17 @@
   const cloud = (window.supabase && SUPABASE_URL && SUPABASE_ANON_KEY)
     ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
     : null;
+
+  // 로그인 화면(아직 _account가 없는 상태)에서는 renderApp()이 참조하는 state·
+  // CURRENT_ACCOUNT_* 같은 값들이 아직 만들어지지 않은 상태다. 그런데 실시간
+  // 구독(postgres_changes)이나 탭 전환 감지(visibilitychange/focus) 리스너는
+  // 로그인 여부와 상관없이 파일 로딩 시점에 바로 등록되기 때문에, 로그인 화면을
+  // 보고 있는 동안에도(예: 다른 관리자가 그 사이에 뭔가 저장했을 때, 또는 탭을
+  // 잠깐 다른 곳에 갔다 왔을 때) 이 리스너들이 그대로 실행되면서 아직 없는
+  // 값을 참조해 예외를 던지는 문제가 있었다. 이 플래그가 true로 바뀌기 전까지는
+  // (=로그인 검사를 통과해서 실제 앱 코드가 초기화되기 전까지는) 그런 리스너들이
+  // 안전하게 아무 일도 하지 않고 지나가도록 한다.
+  let _appBooted = false;
   // 로그인 아이디를 Supabase Auth용 이메일로 바꿀 때 쓰는 가짜 도메인.
   // 실제로 존재하는 도메인일 필요는 없지만(메일이 발송되지 않으니까), 한 번
   // 정하면 이후 바꾸지 말 것 — 바꾸면 기존 계정들이 전부 새 이메일로 다시

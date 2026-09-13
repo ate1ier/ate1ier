@@ -1,6 +1,17 @@
   // ==================== 로그인 화면 렌더링 ====================
   // (예전 01-common.js에서 분리됨 — 실행 순서·내용은 그대로입니다)
   function renderLoginScreen() {
+    // 안전장치: 혹시라도(예: 브라우저의 뒤로가기/앞으로가기 캐시 복원처럼 스크립트가
+    // 다시 실행되지 않는 특수한 경우) 이전 화면에서 뜨던 팝업류(드롭다운/날짜·시간
+    // 선택 팝업, 설정 메뉴, 동기화 배너)가 화면 위에 그대로 남아있으면, 그 투명한
+    // 영역이 로그인 폼 위를 덮어서 클릭·입력이 먹히지 않는 것처럼 보일 수 있다.
+    // 로그인 화면을 그리기 전에 이런 잔재를 먼저 확실히 치운다.
+    if (typeof closeAllAppFloatingMenus === "function") { try { closeAllAppFloatingMenus(); } catch (e) {} }
+    const staleOverlayIds = ["settings-menu", "cloud-live-banner-wrap"];
+    staleOverlayIds.forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el.remove();
+    });
     const nav = document.getElementById("nav");
     if (nav) nav.innerHTML = "";
     document.body.classList.add("login-screen");
