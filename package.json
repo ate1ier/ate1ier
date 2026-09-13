@@ -1,0 +1,11 @@
+{
+  "name": "ate1ier",
+  "private": true,
+  "description": "업무 종합 관리 앱 — css/js 소스를 index.html/app.js/styles.min.css로 조합하는 빌드 스크립트 포함",
+  "scripts": {
+    "build": "node build.js"
+  },
+  "devDependencies": {
+    "terser": "^5.36.0"
+  }
+}
