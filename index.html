@@ -133,13 +133,20 @@
   const cloud = (window.supabase && SUPABASE_URL && SUPABASE_ANON_KEY)
     ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
     : null;
-  // 로그인 아이디를 Supabase Auth용 이메일로 바꿀 때 붙이는 가짜 도메인.
+  // 로그인 아이디를 Supabase Auth용 이메일로 바꿀 때 쓰는 가짜 도메인.
   // 실제로 존재하는 도메인일 필요는 없지만(메일이 발송되지 않으니까), 한 번
   // 정하면 이후 바꾸지 말 것 — 바꾸면 기존 계정들이 전부 새 이메일로 다시
   // 가입해야 하는 것처럼 보이게 된다.
   const AUTH_EMAIL_DOMAIN = "ate1ier.local";
-  function toAuthEmail(username) {
-    return `${String(username || "").trim().toLowerCase()}@${AUTH_EMAIL_DOMAIN}`;
+  // 아이디를 이메일 앞부분에 그대로 넣으면 한글・공백・특수문자가 섞인 아이디일 때
+  // "invalid format" 오류가 난다(이메일 로컬파트는 그런 문자를 허용하지 않음).
+  // 그래서 아이디를 그대로 쓰지 않고, 아이디를 해시(SHA-256)한 값 — 항상 영문
+  // 소문자・숫자로만 이뤄진 고정 길이 문자열 — 을 이메일 앞부분으로 쓴다. 같은
+  // 아이디는 항상 같은 값으로 바뀌므로 매핑은 그대로 유지된다.
+  async function toAuthEmail(username) {
+    const normalized = String(username || "").trim().toLowerCase();
+    const hashHex = HAS_SUBTLE_CRYPTO ? await sha256Hex(normalized) : legacyHash(normalized).replace(/^-/, "n");
+    return `u${hashHex}@${AUTH_EMAIL_DOMAIN}`;
   }
   // Supabase Auth의 "비밀번호"로는 사람이 로그인창에 입력하는 비밀번호를 그대로
   // 쓰지 않는다. 대신 계정마다 한 번 정해지면 바뀌지 않는 무작위 값
@@ -161,7 +168,8 @@
   // 계정을 새로 만들 때: 방금 정한 cloudAuthSecret으로 Supabase Auth에 가입한다.
   async function cloudAuthSignUp(username, secret) {
     if (!cloud) return { ok: true }; // 클라우드 연결이 아예 없는 환경(오프라인 전용)이면 그냥 통과
-    const result = await cloud.auth.signUp({ email: toAuthEmail(username), password: secret });
+    const email = await toAuthEmail(username);
+    const result = await cloud.auth.signUp({ email, password: secret });
     if (result.error) return { ok: false, reason: result.error.message || "클라우드 인증에 실패했어요." };
     if (!_hasSession(result)) {
       return { ok: false, reason: "가입은 됐지만 세션이 생성되지 않았어요. Supabase 프로젝트의 Authentication 설정에서 \"Confirm email\"이 꺼져 있는지 확인해주세요." };
@@ -173,7 +181,7 @@
   // 계정이라 처음 로그인하는 경우) 지금 새로 만들어서 계정에 저장해둔다.
   async function cloudAuthSignInForAccount(account) {
     if (!cloud) return { ok: true };
-    const email = toAuthEmail(account.username);
+    const email = await toAuthEmail(account.username);
     if (account.cloudAuthSecret) {
       const signIn = await cloud.auth.signInWithPassword({ email, password: account.cloudAuthSecret });
       if (!signIn.error && _hasSession(signIn)) return { ok: true };

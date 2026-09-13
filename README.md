@@ -81,9 +81,13 @@ counseling-app/
 
 1. `supabase/auth-rls-migration.sql`을 Supabase 대시보드 → SQL Editor에서 실행합니다.
 2. Supabase 대시보드 → Authentication → Sign In / Providers → Email에서
-   **"Confirm email"을 꺼주세요.** (이 앱은 실제 이메일이 아니라 "아이디@ate1ier.local"
-   형태의 가짜 이메일로 Supabase Auth 계정을 만들기 때문에, 인증 메일을 받을 방법이
-   없습니다. 꺼두지 않으면 가입/로그인이 막힙니다.)
+   **"Confirm email"을 꺼주세요.** (이 앱은 실제 이메일이 아니라 아이디를 해시한
+   값으로 만든 가짜 이메일(예: "u3f2a...@ate1ier.local")로 Supabase Auth 계정을
+   만들기 때문에, 인증 메일을 받을 방법이 없습니다. 꺼두지 않으면 가입/로그인이
+   막힙니다. 만약 이 화면에 "Confirm email" 토글 자체가 안 보이면, 최근 Supabase
+   UI 변경으로 이름이 바뀌었거나 다른 위치(Authentication → Sign In / Up의 상위
+   설정)로 옮겨졌을 수 있으니, 그냥 실전 가입/로그인 테스트를 먼저 해보고 안 되면
+   그때 찾아서 꺼주세요.)
 3. `node build.js`로 다시 빌드해서 배포합니다.
 
 이 업데이트 이전부터 로그인해 있던 브라우저는 다음에 열 때 자동으로 로그인 화면으로
