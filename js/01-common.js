@@ -392,6 +392,91 @@
     _renderFieldConflictBanner();
   }
 
+  /* ---- 부분 업데이트(patch) 최적화 ----
+     지금까지는 카테고리 하나(예: QA 전체, 면담일지 전체, 월별 스케줄 전체)를 조금만
+     고쳐도 그 카테고리의 JSON 전체를 매번 다시 서버로 보냈다. 항목이 수백 개인
+     데이터에서 체크박스 하나만 바꿔도 전체를 다시 보내는 건 낭비이므로, "이전에
+     서버와 같았던 값"(_knownServerValue)과 "지금 저장하려는 값"을 비교해서 바뀐
+     자리만 뽑아 서버의 kv_apply_patch 함수(supabase/kv-patch-function.sql)로 그
+     자리만 patch한다.
+     구조상 못 쪼개거나(예: id 없는 배열의 순서 변경, 최상위 값 자체가 문자열・숫자),
+     바뀐 자리가 너무 많거나(사실상 전체 교체나 다름없음), 값 자체가 작아서 나눌
+     실익이 없거나, 서버에 kv_apply_patch 함수가 아직 없으면(SQL을 안 올린 경우)
+     조용히 예전처럼 "전체를 통째로 저장하는 방식"으로 넘어간다 — 이 최적화는
+     실패해도 항상 안전하게 폴백하므로, SQL을 안 올려도 앱은 그대로 정상 동작한다. */
+  const KV_PATCH_MIN_SIZE = 3000; // 이보다 작은 값은 그냥 통째로 보내는 게 더 간단하고 충분히 빠르다
+  const KV_PATCH_MAX_OPS = 30; // 바뀐 자리가 너무 많으면 사실상 전체 교체이므로 그냥 전체로 보낸다
+  // id를 가진 배열은 항목 순서가 유지될 때만 "항목 하나 = 배열 인덱스 하나"로
+  // patch할 수 있다(항목 추가·삭제·순서 변경까지 patch로 표현하려면 훨씬 복잡해지므로
+  // 지금은 다루지 않고 전체 교체로 넘긴다). oldVal/newVal이 완전히 같은 자리는
+  // 그냥 건너뛰고, 다른 자리만 ops에 쌓는다. 분해할 수 없는 지점을 만나면 false를
+  // 돌려줘서 호출부가 "이번 저장은 patch로 못 한다"는 걸 알게 한다.
+  function _diffToOps(oldVal, newVal, path, ops) {
+    if (_deepEqual(oldVal, newVal)) return true;
+    if (_isIdArray(oldVal) && _isIdArray(newVal)) {
+      const oldIds = oldVal.map((it) => it.id);
+      const newIds = newVal.map((it) => it.id);
+      const idsUnchanged = oldIds.length === newIds.length && oldIds.every((id, i) => id === newIds[i]);
+      if (!idsUnchanged) return false;
+      const oldById = {};
+      oldVal.forEach((it) => { oldById[it.id] = it; });
+      for (let i = 0; i < newVal.length; i++) {
+        if (!_diffToOps(oldById[newVal[i].id], newVal[i], path.concat([i]), ops)) return false;
+        if (ops.length > KV_PATCH_MAX_OPS) return false;
+      }
+      return true;
+    }
+    if (oldVal && newVal && typeof oldVal === "object" && typeof newVal === "object" && !Array.isArray(oldVal) && !Array.isArray(newVal)) {
+      const keys = new Set([...Object.keys(oldVal), ...Object.keys(newVal)]);
+      for (const k of keys) {
+        const inOld = Object.prototype.hasOwnProperty.call(oldVal, k);
+        const inNew = Object.prototype.hasOwnProperty.call(newVal, k);
+        if (inOld && inNew) {
+          if (!_diffToOps(oldVal[k], newVal[k], path.concat([k]), ops)) return false;
+        } else if (!inOld && inNew) {
+          ops.push({ path: path.concat([k]), value: newVal[k] });
+        } else {
+          ops.push({ path: path.concat([k]), remove: true });
+        }
+        if (ops.length > KV_PATCH_MAX_OPS) return false;
+      }
+      return true;
+    }
+    // 여기 왔다는 건 순서만 있는 배열이거나 문자열/숫자 같은 원시값이 서로 다르다는
+    // 뜻 — 더는 쪼갤 수 없다. 이 지점 전체를 하나의 patch로 기록한다. 단, 이 지점이
+    // 애초에 최상위(path가 빈 배열)라면 patch할 "안쪽"이 없으므로 분해 자체가 불가능.
+    if (!path.length) return false;
+    ops.push({ path, value: newVal });
+    return true;
+  }
+  // 서버에 kv_apply_patch 함수가 없으면(아직 SQL을 안 올린 프로젝트) 매번 헛되이
+  // 시도하지 않도록, 한 번 "없다"고 확인되면 그 이후로는 시도 자체를 건너뛴다.
+  let _kvPatchRpcAvailable = true;
+  async function _tryPatchPush(key, value, expected, newTs) {
+    if (!cloud || !_kvPatchRpcAvailable || !expected) return null;
+    if (value.length < KV_PATCH_MIN_SIZE) return null;
+    if (typeof _knownServerValue[key] !== "string") return null;
+    let oldParsed, newParsed;
+    try {
+      oldParsed = JSON.parse(_knownServerValue[key]);
+      newParsed = JSON.parse(value);
+    } catch (e) { return null; } // JSON이 아니면 patch를 시도하지 않고 통째로 저장
+    const ops = [];
+    if (!_diffToOps(oldParsed, newParsed, [], ops) || !ops.length) return null;
+    try {
+      const { data, error } = await cloud.rpc("kv_apply_patch", {
+        p_key: key, p_ops: ops, p_new_updated_at: newTs, p_expected_updated_at: expected,
+      });
+      if (error) {
+        // 42883 = "함수가 없음"(undefined_function) — 아직 SQL을 안 올린 경우이므로
+        // 이후엔 더 시도하지 않고 곧장 기존 방식으로만 동작한다.
+        if (error.code === "42883" || /function .* does not exist/i.test(error.message || "")) _kvPatchRpcAvailable = false;
+        return null;
+      }
+      const row = Array.isArray(data) ? data[0] : data;
+      return row ? { applied: !!row.applied } : null;
+    } catch (e) { return null; }
+  }
 
   const CLOUD_KEY_LABELS = [
     ["personal-schedule:data", "월별 스케줄"],
@@ -584,20 +669,27 @@
       const newTs = new Date().toISOString();
       const expected = _knownServerUpdatedAt[key];
       let wroteOk = true;
+      let handledByPatch = false;
       if (expected && !force) {
-        // 낙관적 동시성 제어: 마지막으로 확인한 서버 버전이 그대로일 때만 저장한다.
-        // 그 사이 다른 사람이 먼저 저장해서 updated_at이 바뀌었으면 이 update는
-        // 아무 행도 바꾸지 못하고 0건으로 끝난다 → 그걸로 충돌을 감지한다.
-        const { data, error } = await cloud
-          .from("kv_store")
-          .update({ value, updated_at: newTs })
-          .eq("key", key)
-          .eq("updated_at", expected)
-          .select("key");
-        if (error) throw error;
-        wroteOk = !!(data && data.length);
-      } else {
-        await cloud.from("kv_store").upsert({ key, value, updated_at: newTs });
+        const patched = await _tryPatchPush(key, value, expected, newTs);
+        if (patched) { wroteOk = patched.applied; handledByPatch = true; }
+      }
+      if (!handledByPatch) {
+        if (expected && !force) {
+          // 낙관적 동시성 제어: 마지막으로 확인한 서버 버전이 그대로일 때만 저장한다.
+          // 그 사이 다른 사람이 먼저 저장해서 updated_at이 바뀌었으면 이 update는
+          // 아무 행도 바꾸지 못하고 0건으로 끝난다 → 그걸로 충돌을 감지한다.
+          const { data, error } = await cloud
+            .from("kv_store")
+            .update({ value, updated_at: newTs })
+            .eq("key", key)
+            .eq("updated_at", expected)
+            .select("key");
+          if (error) throw error;
+          wroteOk = !!(data && data.length);
+        } else {
+          await cloud.from("kv_store").upsert({ key, value, updated_at: newTs });
+        }
       }
       if (!wroteOk) {
         // 곧바로 팝업을 띄우지 않고, 먼저 자동으로 합쳐볼 수 있는지 시도한다. 서로 다른
@@ -1447,11 +1539,12 @@
      "로컬 프로토타입" 로그인입니다. 서버가 없는 한 브라우저 안의 어떤 값도
      완전히 안전할 수는 없으므로, 진짜 보안이 필요해지면 반드시 서버 기반
      인증(암호화된 비밀번호 저장, 세션/토큰 검증 등)으로 교체해야 합니다.
-     그래도 비밀번호는 브라우저 내장 SubtleCrypto로 계정마다 다른 salt를
-     붙여 SHA-256으로 해시해 저장해서, 평문은 물론 예전의 단순 해시보다
-     레인보우테이블·충돌 공격에 훨씬 강하게 만들어둡니다. 계정별 데이터는
-     저장 키 앞에 "acct:{계정ID}:" 접두어를 붙여 브라우저 안에서만 서로
-     분리해둡니다. */
+     비밀번호는 브라우저 내장 SubtleCrypto의 PBKDF2(HMAC-SHA256, 30만 회 반복)로
+     계정마다 다른 salt를 붙여 해시해 저장한다(2026-09 강화, 아래 makeNewPasswordRecord
+     참고). 예전에 만든 계정(2세대: SHA-256 1회, 1세대: salt 없음)도 다음 로그인
+     때 자동으로 이 방식으로 업그레이드된다(verifyAndMaybeUpgradePassword 참고).
+     계정별 데이터는 저장 키 앞에 "acct:{계정ID}:" 접두어를 붙여 브라우저 안에서만
+     서로 분리해둡니다. */
   const ACCOUNTS_KEY = "personal-app:accounts";
   // 로그인 세션(누가 로그인해 있는지)은 localStorage에 저장해서, 탭을 닫았다 새로
   // 열어도(같은 브라우저인 한) 로그인이 그대로 유지되게 한다. 대신 아래 LAST_ACTIVE_KEY
@@ -1485,16 +1578,70 @@
     const bytes = crypto.getRandomValues(new Uint8Array(16));
     return Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
   }
+  function hexToBytes(hex) {
+    const bytes = new Uint8Array(Math.floor(hex.length / 2));
+    for (let i = 0; i < bytes.length; i++) bytes[i] = parseInt(hex.substr(i * 2, 2), 16);
+    return bytes;
+  }
   async function sha256Hex(str) {
     const bytes = new TextEncoder().encode(str);
     const digest = await crypto.subtle.digest("SHA-256", bytes);
     return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
   }
-  // salt를 붙여 비밀번호를 해시한다. SubtleCrypto를 쓸 수 없는 예외적인 환경에서는
-  // (로그인 자체가 막히지 않도록) 예전 단순 해시로 대신한다.
-  async function hashPassword(password, salt) {
+  // 예전(2세대) 방식 — salt를 붙여 SHA-256으로 "딱 1번" 해시한다. 그래프카드(GPU)로
+  // 초당 수십억 번씩 계산할 수 있어서, 유출되면 흔한 비밀번호는 금방 뚫린다.
+  // 새 계정에는 쓰지 않고, 예전에 만든 계정을 아래 PBKDF2 방식으로 자동
+  // 업그레이드하기 위한 "확인용"으로만 남겨둔다.
+  async function hashPasswordSha256(password, salt) {
     if (!HAS_SUBTLE_CRYPTO) return legacyHash(`${salt}:${password}`);
     return sha256Hex(`${salt}:${password}`);
+  }
+  // 지금(3세대) 비밀번호 저장 방식: PBKDF2(HMAC-SHA256, 30만 회 반복). 같은 계산을
+  // 30만 번 반복시켜서, 유출된 해시로 비밀번호를 무차별 대입하려는 시도를 앞의
+  // SHA-256 1회 방식보다 훨씬 느리고 비싸게 만든다(GPU로 돌려도 초당 계산 가능
+  // 횟수가 수천~수만 배 줄어듦). 브라우저 내장 SubtleCrypto의 PBKDF2 구현만
+  // 쓰고, 외부 라이브러리는 쓰지 않는다.
+  const PBKDF2_ITERATIONS = 300000;
+  async function hashPasswordPBKDF2(password, saltHex, iterations) {
+    const enc = new TextEncoder();
+    const keyMaterial = await crypto.subtle.importKey("raw", enc.encode(password), { name: "PBKDF2" }, false, ["deriveBits"]);
+    const derivedBits = await crypto.subtle.deriveBits(
+      { name: "PBKDF2", salt: hexToBytes(saltHex), iterations: iterations || PBKDF2_ITERATIONS, hash: "SHA-256" },
+      keyMaterial,
+      256
+    );
+    return Array.from(new Uint8Array(derivedBits)).map((b) => b.toString(16).padStart(2, "0")).join("");
+  }
+  // 새 비밀번호를 정할 때(가입, 마스터의 비밀번호 초기화) 쓰는 함수. SubtleCrypto를
+  // 못 쓰는 예외적인 환경에서는(PBKDF2 자체를 돌릴 수 없으므로) 어쩔 수 없이 예전
+  // SHA-256 salted 방식으로 대신하고, 나중에 SubtleCrypto를 쓸 수 있는 환경에서
+  // 로그인하면 그때 자동으로 PBKDF2로 업그레이드된다.
+  async function makeNewPasswordRecord(password) {
+    const salt = genSalt();
+    if (!HAS_SUBTLE_CRYPTO) {
+      return { salt, passwordHash: await hashPasswordSha256(password, salt), hashAlgo: "sha256" };
+    }
+    return { salt, passwordHash: await hashPasswordPBKDF2(password, salt, PBKDF2_ITERATIONS), hashAlgo: "pbkdf2", iterations: PBKDF2_ITERATIONS };
+  }
+  // 계정에 저장된 방식이 무엇이든(1세대: salt 없음 / 2세대: salt+SHA-256 1회 /
+  // 3세대: salt+PBKDF2) 알맞게 확인하고, 맞으면 { ok: true, upgrade: <새 레코드 또는 null> }
+  // 를 돌려준다. upgrade가 있으면(구버전 확인 통과) 로그인 쪽에서 그 즉시 계정에
+  // 저장해 다음 로그인부터는 최신 방식으로 확인하게 한다.
+  async function verifyAndMaybeUpgradePassword(account, password) {
+    if (account.hashAlgo === "pbkdf2") {
+      const ok = account.passwordHash === (await hashPasswordPBKDF2(password, account.salt, account.iterations || PBKDF2_ITERATIONS));
+      return { ok, upgrade: null }; // 이미 최신 방식이라 업그레이드할 게 없음
+    }
+    if (account.salt) {
+      // 2세대(salt+SHA-256 1회) 계정: 이 방식으로 확인하고, 맞으면 PBKDF2로 업그레이드
+      const ok = account.passwordHash === (await hashPasswordSha256(password, account.salt));
+      if (!ok) return { ok: false, upgrade: null };
+      return { ok: true, upgrade: HAS_SUBTLE_CRYPTO ? await makeNewPasswordRecord(password) : null };
+    }
+    // 1세대(salt 없음) 계정: 예전 단순 해시로 확인하고, 맞으면 곧장 PBKDF2로 업그레이드
+    const ok = account.passwordHash === legacyHash(password);
+    if (!ok) return { ok: false, upgrade: null };
+    return { ok: true, upgrade: HAS_SUBTLE_CRYPTO ? await makeNewPasswordRecord(password) : null };
   }
   function loadAccounts() {
     try {
@@ -1617,9 +1764,8 @@
     const list = loadAccounts();
     const idx = list.findIndex((a) => a.id === accountId);
     if (idx === -1) return { ok: false, reason: "계정을 찾을 수 없어요." };
-    const salt = genSalt();
-    const passwordHash = await hashPassword(newPassword, salt);
-    list[idx] = { ...list[idx], salt, passwordHash };
+    const record = await makeNewPasswordRecord(newPassword);
+    list[idx] = { ...list[idx], ...record };
     saveAccounts(list);
     appendActivityLog({
       accountId,
@@ -2283,16 +2429,8 @@
           }
           const password = document.getElementById("login-password").value;
           if (!password) { uiState.error = "비밀번호를 입력해주세요."; draw(); return; }
-          let ok;
-          let needsHashUpgrade = false;
-          if (account.salt) {
-            ok = account.passwordHash === (await hashPassword(password, account.salt));
-          } else {
-            // salt가 없는 예전 계정: 예전 방식으로 한 번 확인하고, 맞으면 새 방식(salt+SHA-256)으로 조용히 업그레이드한다.
-            ok = account.passwordHash === legacyHash(password);
-            needsHashUpgrade = ok;
-          }
-          if (!ok) {
+          const check = await verifyAndMaybeUpgradePassword(account, password);
+          if (!check.ok) {
             uiState.error = "아이디 또는 비밀번호가 올바르지 않아요.";
             draw();
             return;
@@ -2308,12 +2446,10 @@
             draw();
             return;
           }
-          if (needsHashUpgrade) {
-            const salt = genSalt();
-            const passwordHash = await hashPassword(password, salt);
+          if (check.upgrade) {
             const list = loadAccounts();
             const idx = list.findIndex((a) => a.id === account.id);
-            if (idx !== -1) { list[idx] = { ...list[idx], salt, passwordHash }; saveAccounts(list); }
+            if (idx !== -1) { list[idx] = { ...list[idx], ...check.upgrade }; saveAccounts(list); }
           }
           setSession(account.id);
           setTeamLoginMember(member ? { id: member.id, name: member.name } : null);
@@ -2351,10 +2487,9 @@
           const wantsMaster = !accountsList.some((a) => a.isMaster) && !!document.getElementById("signup-master") && document.getElementById("signup-master").checked;
           const typeInput = document.querySelector('input[name="signup-type"]:checked');
           const accountType = typeInput && typeInput.value === "team" ? "team" : "personal";
-          const salt = genSalt();
-          const passwordHash = await hashPassword(password, salt);
+          const passwordRecord = await makeNewPasswordRecord(password);
           const newAccount = {
-            id: genId(), username, salt, passwordHash, cloudAuthSecret, createdAt: new Date().toISOString(), isMaster: wantsMaster,
+            id: genId(), username, ...passwordRecord, cloudAuthSecret, createdAt: new Date().toISOString(), isMaster: wantsMaster,
             accountType, teamMembers: accountType === "team" ? [] : undefined,
           };
           accountsList.push(newAccount);
