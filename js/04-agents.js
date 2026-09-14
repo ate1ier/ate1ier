@@ -111,11 +111,36 @@
 
   // 리스트에서 바로 "근무중" ↔ "퇴사"를 전환한다. 수정 화면을 열지 않아도 되도록
   // 리스트 안의 배지를 클릭하면 즉시 상태가 바뀌고, 저장과 동시에 월별 스케줄
-  // 반영 여부(근무중만 반영)도 자동으로 다시 계산된다.
+  // 반영 여부도 자동으로 다시 계산된다. "퇴사"로 바꿀 때는 퇴사일자를 물어보고,
+  // 그 날짜부터 해당 월 말일까지 월별 스케줄이 자동으로 "퇴사"로 채워진다.
   function toggleAgentStatus(id) {
     const agent = agentsData.find((a) => a.id === id);
     if (!agent) return;
-    agent.status = agent.status === "RESIGNED" ? "WORKING" : "RESIGNED";
+    if (agent.status === "RESIGNED") {
+      if (typeof clearResignedScheduleFrom === "function" && agent.resignDate) {
+        clearResignedScheduleFrom(agent.id, agent.resignDate);
+      }
+      agent.status = "WORKING";
+      agent.resignDate = null;
+    } else {
+      const defaultDate = `${today.getFullYear()}-${pad2(today.getMonth() + 1)}-${pad2(today.getDate())}`;
+      const input = window.prompt(
+        `${agent.name}님의 퇴사일자를 입력해주세요 (예: ${defaultDate}).\n이 날짜부터 이번 달 말일까지 월별 스케줄에 자동으로 "퇴사"로 표시돼요.`,
+        defaultDate
+      );
+      if (input === null) return; // 취소하면 상태를 바꾸지 않는다
+      const trimmed = input.trim();
+      const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(trimmed);
+      const parsed = m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : null;
+      const isValid = m && parsed.getFullYear() === Number(m[1]) && parsed.getMonth() === Number(m[2]) - 1 && parsed.getDate() === Number(m[3]);
+      if (!isValid) {
+        flashAgentStatus("퇴사일자 형식이 올바르지 않아요 (예: 2026-09-14)");
+        return;
+      }
+      agent.status = "RESIGNED";
+      agent.resignDate = trimmed;
+      if (typeof applyResignedScheduleFrom === "function") applyResignedScheduleFrom(agent.id, trimmed);
+    }
     saveAgentsData();
     renderApp();
   }
@@ -327,7 +352,7 @@
 
   function renderAgentForm(agent) {
     const isEdit = !!agent;
-    const v = agent || { name: "", ldap: "", empNo: "", hireDate: "", contact: "", workTypes: [], timezone: "", group: "day", isAdmin: false, status: "WORKING" };
+    const v = agent || { name: "", ldap: "", empNo: "", hireDate: "", contact: "", workTypes: [], timezone: "", group: "day", isAdmin: false, status: "WORKING", resignDate: "" };
     const workTypes = v.workTypes || [];
     const group = v.group === "night" ? "night" : "day";
     const status = v.status === "RESIGNED" ? "RESIGNED" : "WORKING";
@@ -370,6 +395,10 @@
             <label class="agent-radio"><input type="radio" name="agent-input-status" id="agent-input-status-resigned" value="RESIGNED" ${status === "RESIGNED" ? "checked" : ""}> 퇴사</label>
           </div>
         </div>
+        <label class="agent-form-label" id="agent-resigndate-wrap" style="${status === "RESIGNED" ? "" : "display:none;"}">퇴사일자
+          <input type="date" class="add-input" id="agent-input-resigndate" value="${esc(v.resignDate || "")}" autocomplete="off">
+          <span class="agent-form-hint">이 날짜부터 그 달 말일까지 월별 스케줄이 자동으로 "퇴사"로 표시돼요.</span>
+        </label>
         <div class="agent-form-label">권한
           <div class="agent-checkbox-row">
             <label class="agent-checkbox"><input type="checkbox" id="agent-input-admin" ${v.isAdmin ? "checked" : ""}> 관리자</label>
@@ -665,6 +694,24 @@
     const form = document.getElementById("agent-form");
     if (form) {
       enhanceDateInput(document.getElementById("agent-input-hiredate"));
+      const resignDateInput = document.getElementById("agent-input-resigndate");
+      if (resignDateInput) enhanceDateInput(resignDateInput);
+      // 재직 상태 라디오에 따라 퇴사일자 입력칸을 보이거나 숨긴다. "퇴사"로 바꿨는데
+      // 아직 날짜가 비어있으면 오늘 날짜를 기본값으로 채워준다.
+      const resignWrap = document.getElementById("agent-resigndate-wrap");
+      const statusWorkingRadio = document.getElementById("agent-input-status-working");
+      const statusResignedRadio = document.getElementById("agent-input-status-resigned");
+      const syncResignWrapVisibility = () => {
+        if (!resignWrap) return;
+        const isResigned = !!(statusResignedRadio && statusResignedRadio.checked);
+        resignWrap.style.display = isResigned ? "" : "none";
+        if (isResigned && resignDateInput && !resignDateInput.value) {
+          resignDateInput.value = `${today.getFullYear()}-${pad2(today.getMonth() + 1)}-${pad2(today.getDate())}`;
+        }
+      };
+      if (statusWorkingRadio) statusWorkingRadio.onchange = syncResignWrapVisibility;
+      if (statusResignedRadio) statusResignedRadio.onchange = syncResignWrapVisibility;
+
       form.onsubmit = (e) => {
         e.preventDefault();
         const name = document.getElementById("agent-input-name").value.trim();
@@ -680,15 +727,41 @@
         const group = document.getElementById("agent-input-group-night").checked ? "night" : "day";
         const isAdmin = document.getElementById("agent-input-admin").checked;
         const status = document.getElementById("agent-input-status-resigned").checked ? "RESIGNED" : "WORKING";
-        const values = { name, ldap, empNo, hireDate, contact, workTypes, timezone, group, isAdmin, status };
+        let resignDate = null;
+        if (status === "RESIGNED") {
+          const rawResignDate = resignDateInput ? resignDateInput.value.trim() : "";
+          resignDate = rawResignDate || `${today.getFullYear()}-${pad2(today.getMonth() + 1)}-${pad2(today.getDate())}`;
+        }
+        const values = { name, ldap, empNo, hireDate, contact, workTypes, timezone, group, isAdmin, status, resignDate };
 
+        const prevAgent = (agentsUi.mode === "edit" && agentsUi.editingId)
+          ? agentsData.find((a) => a.id === agentsUi.editingId)
+          : null;
+        const prevStatus = prevAgent ? prevAgent.status : "WORKING";
+        const prevResignDate = prevAgent ? prevAgent.resignDate : null;
+
+        let targetId;
         if (agentsUi.mode === "edit" && agentsUi.editingId) {
           updateAgent(agentsUi.editingId, values);
           agentsUi.selectedId = agentsUi.editingId;
+          targetId = agentsUi.editingId;
         } else {
-          const newId = addAgent(values);
-          agentsUi.selectedId = newId;
+          targetId = addAgent(values);
+          agentsUi.selectedId = targetId;
         }
+
+        // 재직 상태/퇴사일자가 실제로 바뀐 경우에만 월별 스케줄의 자동 "퇴사" 반영을
+        // 다시 계산한다. 퇴사일자를 고쳤을 때는 예전 날짜로 채워둔 칸을 먼저 지우고
+        // 새 날짜로 다시 채운다.
+        if (status === "RESIGNED" && (prevStatus !== "RESIGNED" || prevResignDate !== resignDate)) {
+          if (prevStatus === "RESIGNED" && prevResignDate && typeof clearResignedScheduleFrom === "function") {
+            clearResignedScheduleFrom(targetId, prevResignDate);
+          }
+          if (typeof applyResignedScheduleFrom === "function") applyResignedScheduleFrom(targetId, resignDate);
+        } else if (status !== "RESIGNED" && prevStatus === "RESIGNED" && prevResignDate) {
+          if (typeof clearResignedScheduleFrom === "function") clearResignedScheduleFrom(targetId, prevResignDate);
+        }
+
         agentsUi.mode = "view";
         agentsUi.editingId = null;
         renderApp();

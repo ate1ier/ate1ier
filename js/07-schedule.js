@@ -114,10 +114,16 @@
     }
     scheduleData.lastSyncMonthKey = currentMonthKey;
 
-    // 월별 스케줄에는 "근무중" 상태인 인원만 반영한다. "퇴사"로 표시된 인원은
-    // 상담사 관리 목록에는 남아있어도 이번 달/앞으로의 스케줄에는 나타나지 않는다.
+    // 월별 스케줄에는 "근무중" 상태인 인원과, "퇴사" 처리됐어도 아직 퇴사일이
+    // 속한 달까지는(그 달이 지나기 전까지는) 계속 반영한다. 실제 오늘 날짜가
+    // 퇴사일이 속한 달을 완전히 지나야(다음 달이 되어야) 명단에서 빠진다.
     // (단, 이미 지나간 달에 대한 기록·스냅샷은 그대로 보존된다)
-    scheduleData.staff = agentsData.filter((a) => a.status !== "RESIGNED").map((a) => ({
+    scheduleData.staff = agentsData.filter((a) => {
+      if (a.status !== "RESIGNED") return true;
+      if (!a.resignDate) return false;
+      const resignMonthKey = a.resignDate.slice(0, 7); // "YYYY-MM"
+      return resignMonthKey >= currentMonthKey;
+    }).map((a) => ({
       id: a.id,
       nickname: a.ldap || a.name,
       name: a.name,
@@ -149,6 +155,57 @@
   function saveScheduleData() {
     try { localStorage.setItem(SCHEDULE_KEY, JSON.stringify(scheduleData)); flashScheduleStatus("저장됨"); }
     catch (e) { flashScheduleStatus("저장 실패"); }
+  }
+
+  // ----- 퇴사 처리 시 월별 스케줄 자동 반영 -----
+  // "상담사 관리"에서 어떤 인원을 "퇴사"로 바꾸면, 입력한 퇴사일자부터 그 달
+  // 말일까지 월별 스케줄의 해당 인원 칸을 전부 "퇴사"로 자동 채운다. 이미
+  // 손으로 다른 값을 넣어둔 칸이라도 퇴사 처리 시점에는 더는 의미가 없으므로
+  // 덮어쓴다. 자동으로 채워진 칸도 잠금 처리는 하지 않으므로, 필요하면
+  // 관리자가 다른 셀과 똑같이 클릭해서 다시 고칠 수 있다.
+  function applyResignedScheduleFrom(staffId, resignDateStr) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(resignDateStr || "");
+    if (!m) return;
+    const year = Number(m[1]), monthIndex = Number(m[2]) - 1, startDay = Number(m[3]);
+    // 다른 일괄 변경 기능들(붙여넣기/일괄삭제 등)과 마찬가지로, 퇴사일이 속한 달이
+    // 잠겨 있으면(이미 확정된 지난 달 등) 자동 반영하지 않고 알려준다.
+    if (scheduleIsMonthLocked(year, monthIndex)) {
+      flashScheduleStatus("퇴사일이 속한 달이 잠겨 있어 스케줄에 자동 반영되지 않았어요.");
+      return;
+    }
+    // 다른 일괄 변경 기능들처럼 되돌리기(undo) 스택에도 남겨서, 실수로 반영됐을 때
+    // 관리자가 "되돌리기"로 바로 취소할 수 있게 한다.
+    recordUndo("퇴사 처리 자동 반영", SCHEDULE_KEY, reloadScheduleData);
+    const daysInMonth = scheduleDaysInMonth(year, monthIndex);
+    for (let day = startDay; day <= daysInMonth; day++) {
+      const key = scheduleRecordKey(staffId, scheduleDateKey(year, monthIndex, day));
+      scheduleData.records[key] = { status: "RESIGNED", attendance: null };
+    }
+    saveScheduleData();
+  }
+  // 퇴사 처리를 취소(다시 "근무중"으로)하거나 퇴사일자를 다른 날짜로 고칠 때,
+  // 예전 퇴사일자부터 채워뒀던 "퇴사" 칸을 지운다. 그사이 관리자가 개별 셀에서
+  // 손으로 다른 값으로 바꿔둔 칸까지 지우지 않도록, 지금 값이 여전히 "퇴사"인
+  // 칸만 지운다(지우면 기본값인 "근무"로 되돌아간다).
+  function clearResignedScheduleFrom(staffId, resignDateStr) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(resignDateStr || "");
+    if (!m) return;
+    const year = Number(m[1]), monthIndex = Number(m[2]) - 1, startDay = Number(m[3]);
+    const daysInMonth = scheduleDaysInMonth(year, monthIndex);
+    let changed = false;
+    for (let day = startDay; day <= daysInMonth; day++) {
+      const key = scheduleRecordKey(staffId, scheduleDateKey(year, monthIndex, day));
+      if (scheduleData.records[key] && scheduleData.records[key].status === "RESIGNED") changed = true;
+    }
+    if (!changed) return; // 지울 게 없으면 undo 스택도 더럽히지 않는다
+    recordUndo("퇴사 취소로 스케줄 되돌리기", SCHEDULE_KEY, reloadScheduleData);
+    for (let day = startDay; day <= daysInMonth; day++) {
+      const key = scheduleRecordKey(staffId, scheduleDateKey(year, monthIndex, day));
+      if (scheduleData.records[key] && scheduleData.records[key].status === "RESIGNED") {
+        delete scheduleData.records[key];
+      }
+    }
+    saveScheduleData();
   }
 
   let scheduleStatusTimer = null;

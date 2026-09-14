@@ -157,6 +157,7 @@
   .agent-form { display: flex; flex-direction: column; gap: 13px; }
   .agent-form-label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--text-dim); }
   .agent-form-label .add-input { width: 100%; }
+  .agent-form-hint { font-size: 12px; font-weight: 400; color: var(--text-faint); line-height: 1.4; }
   .agent-checkbox-row { display: flex; gap: 16px; margin-top: 2px; }
   .agent-checkbox { display: flex; align-items: center; gap: 6px; font-size: 14.5px; color: var(--text); cursor: pointer; }
   .agent-checkbox input { accent-color: var(--accent); width: 15px; height: 15px; cursor: pointer; }
