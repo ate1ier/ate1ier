@@ -7,10 +7,10 @@
     --text: #f1efe9;
     --text-dim: #c7c5c0;
     --text-faint: #8b8a8f;
-    --accent: #c9973f;
-    --accent-dim: #c9973f2e;
-    --accent-dim-soft: #c9973f0c;
-    --accent-text: #2a2205;
+    --accent: #5b8fc7;
+    --accent-dim: #5b8fc72e;
+    --accent-dim-soft: #5b8fc70c;
+    --accent-text: #ffffff;
     --green: #6faa78;
     --green-dim: #6faa7829;
     --red: #c9695f;
@@ -21,8 +21,8 @@
     --orange-dim: #c68a4a29;
     --salmon: #c2766a;
     --salmon-dim: #c2766a29;
-    --yellow: #c9973f;
-    --yellow-dim: #c9973f29;
+    --yellow: #5b8fc7;
+    --yellow-dim: #5b8fc729;
     --teal: #4a9791;
     --teal-dim: #4a979129;
     --purple: #9b7bc4;
@@ -62,10 +62,10 @@
     --text: #1d1d1f;
     --text-dim: #55555b;
     --text-faint: #86868b;
-    --accent: #a3791f;
-    --accent-dim: #a3791f22;
-    --accent-dim-soft: #a3791f0c;
-    --accent-text: #2a2205;
+    --accent: #5b8fc7;
+    --accent-dim: #5b8fc722;
+    --accent-dim-soft: #5b8fc70c;
+    --accent-text: #ffffff;
     --weekend-tint: #eef4fc;
     --native-color-scheme: light;
   }
@@ -87,8 +87,8 @@
     --orange-dim: #b9791e26;
     --salmon: #c2603f;
     --salmon-dim: #c2603f26;
-    --yellow: #8a6a1f;
-    --yellow-dim: #8a6a1f26;
+    --yellow: #5b8fc7;
+    --yellow-dim: #5b8fc726;
     --teal: #227d75;
     --teal-dim: #227d7526;
     --purple: #7454b5;

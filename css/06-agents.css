@@ -19,7 +19,7 @@
   .agent-list-heading { display: flex; flex-direction: column; gap: 11px; }
   .agent-list-title { font-size: var(--page-title-size); font-weight: var(--page-title-weight); letter-spacing: -0.01em; }
   .agent-add-btn {
-    background: var(--yellow); border: none; color: #2a2205;
+    background: var(--yellow); border: none; color: #ffffff;
     border-radius: 999px; padding: 10px 18px; font-size: 13.5px; font-weight: 600; cursor: pointer;
     white-space: nowrap; transition: filter 0.12s ease, transform 0.08s ease;
     box-shadow: 0 4px 14px var(--yellow-dim);
