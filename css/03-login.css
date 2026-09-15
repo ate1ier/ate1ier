@@ -103,6 +103,14 @@
   .login-type-radio:has(input:checked) { border-color: var(--accent); color: var(--text); background: var(--accent-dim); }
 
   /* ---------- 로그인 화면: 아이디 → 비밀번호(+인원선택) 2단계 흐름 ---------- */
+  /* 단계가 바뀔 때 JS(animateLoginStepTransition)가 이 요소의 height·opacity·
+     transform을 이전 값 → 새 값으로 바꾸는 동안만 .step-animating을 붙여서
+     transition이 걸리게 한다. 평소(애니메이션 중이 아닐 때)엔 아무 제약 없이
+     내용 높이에 맞춰 자연스럽게(auto) 늘었다 줄었다 하게 둔다. */
+  .login-step-area.step-animating {
+    overflow: hidden;
+    transition: height 0.28s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease, transform 0.22s ease;
+  }
   .login-back-link {
     background: none; border: none; color: var(--text-faint); font-size: 12.5px; cursor: pointer;
     padding: 0; margin-bottom: 12px; text-align: left;

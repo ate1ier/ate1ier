@@ -2396,6 +2396,46 @@
 
     function resetLoginStep() { uiState.loginStep = "id"; uiState.loginAccount = null; }
 
+    // 아이디 단계 ↔ 인원선택·비밀번호 단계 전환을 "정적으로 툭 바뀌는" 대신
+    // 자연스럽게 펼쳐지는/접히는 애니메이션으로 보여준다.
+    // 방식: 바뀌기 전 #login-step-area의 실제 높이를 재둔 뒤 상태를 바꾸고
+    // draw()로 다시 그린다. 새로 그려진 영역은 이미 최종 크기로 렌더돼 있으므로,
+    // 그 높이를 목표값으로 잡고 잠깐 이전 높이로 되돌린 뒤(+살짝 투명하게) 다음
+    // 프레임에서 목표 높이·불투명도로 되돌리면, 브라우저가 그 변화를 transition으로
+    // 인식해서 부드럽게 이어준다(흔히 쓰는 FLIP 기법의 축약형).
+    function animateLoginStepTransition(mutate) {
+      const prevWrap = document.getElementById("login-step-area");
+      const prevHeight = prevWrap ? prevWrap.getBoundingClientRect().height : null;
+      mutate();
+      draw();
+      if (prevHeight == null) return; // 로그인 탭에 처음 들어온 경우 등: 애니메이션 없이 그대로 표시
+      const nextWrap = document.getElementById("login-step-area");
+      if (!nextWrap) return;
+      const targetHeight = nextWrap.getBoundingClientRect().height;
+      if (Math.abs(targetHeight - prevHeight) < 1) return; // 높이 차이가 거의 없으면 굳이 애니메이션하지 않음
+      nextWrap.style.height = `${prevHeight}px`;
+      nextWrap.style.opacity = "0";
+      nextWrap.style.transform = "translateY(4px)";
+      nextWrap.classList.add("step-animating");
+      // 위에서 넣은 "시작 값"을 브라우저가 실제로 한 번 반영하게(리플로우) 강제로
+      // 읽어들인 뒤에 "끝 값"을 넣어야, 두 값의 차이를 transition으로 인식해서
+      // 부드럽게 이어준다. 그냥 연달아 대입하면 중간 과정 없이 바로 끝 값으로 점프한다.
+      void nextWrap.offsetHeight;
+      nextWrap.style.height = `${targetHeight}px`;
+      nextWrap.style.opacity = "1";
+      nextWrap.style.transform = "translateY(0)";
+      const cleanup = () => {
+        // 애니메이션이 끝나면 인라인 스타일을 지워서, 이후 이 단계 안에서 에러
+        // 메시지가 뜨는 등 내용이 다시 바뀔 때 높이가 auto로 자연스럽게 따라가게 한다.
+        nextWrap.classList.remove("step-animating");
+        nextWrap.style.height = "";
+        nextWrap.style.opacity = "";
+        nextWrap.style.transform = "";
+        nextWrap.removeEventListener("transitionend", cleanup);
+      };
+      nextWrap.addEventListener("transitionend", cleanup);
+    }
+
     function draw() {
       const hasMaster = uiState.hasMaster;
       const loginAcc = uiState.loginAccount;
@@ -2411,36 +2451,38 @@
               <button class="login-tab ${uiState.tab === "signup" ? "active" : ""}" data-tab="signup">계정 만들기</button>
             </div>
             ${uiState.error ? `<div class="login-error">${esc(uiState.error)}</div>` : ""}
-            ${uiState.tab === "login" ? (
-              uiState.loginStep === "id" ? `
-                <form class="login-form" id="login-id-form">
-                  <label class="login-field"><span>아이디</span>
-                    <input class="add-input" id="login-username" autocomplete="username" placeholder="아이디">
-                  </label>
-                  <button type="submit" class="primary-btn login-submit" ${uiState.checkingId ? "disabled" : ""}>${uiState.checkingId ? "확인 중…" : "로그인"}</button>
-                </form>
-              ` : `
-                <button type="button" class="login-back-link" id="login-back-btn">← 다른 계정으로</button>
-                <div class="login-selected-account">
-                  <b>${esc(loginAcc.username)}</b>${isTeamLogin ? ' <span class="badge sm type">팀용</span>' : ""}
-                </div>
-                <form class="login-form" id="login-auth-form">
-                  ${isTeamLogin ? `
-                    <label class="login-field"><span>로그인 인원</span>
-                      <select class="add-input" id="login-member" ${!teamMembers.length ? "disabled" : ""}>
-                        <option value="">${teamMembers.length ? "선택해주세요" : "등록된 인원이 없어요"}</option>
-                        ${teamMembers.map((m) => `<option value="${esc(m.id)}">${esc(m.name)}</option>`).join("")}
-                      </select>
+            ${uiState.tab === "login" ? `
+              <div class="login-step-area" id="login-step-area">
+                ${uiState.loginStep === "id" ? `
+                  <form class="login-form" id="login-id-form">
+                    <label class="login-field"><span>아이디</span>
+                      <input class="add-input" id="login-username" autocomplete="username" placeholder="아이디">
                     </label>
-                    ${!teamMembers.length ? `<div class="login-accounts-hint">아직 등록된 로그인 인원이 없어요. 마스터 계정에서 먼저 추가해달라고 해주세요.</div>` : ""}
-                  ` : ""}
-                  <label class="login-field"><span>비밀번호</span>
-                    <input class="add-input" id="login-password" type="password" autocomplete="current-password" placeholder="비밀번호">
-                  </label>
-                  <button type="submit" class="primary-btn login-submit" ${isTeamLogin && !teamMembers.length ? "disabled" : ""}>로그인</button>
-                </form>
-              `
-            ) : `
+                    <button type="submit" class="primary-btn login-submit" ${uiState.checkingId ? "disabled" : ""}>${uiState.checkingId ? "확인 중…" : "로그인"}</button>
+                  </form>
+                ` : `
+                  <button type="button" class="login-back-link" id="login-back-btn">← 다른 계정으로</button>
+                  <div class="login-selected-account">
+                    <b>${esc(loginAcc.username)}</b>${isTeamLogin ? ' <span class="badge sm type">팀용</span>' : ""}
+                  </div>
+                  <form class="login-form" id="login-auth-form">
+                    ${isTeamLogin ? `
+                      <label class="login-field"><span>로그인 인원</span>
+                        <select class="add-input" id="login-member" ${!teamMembers.length ? "disabled" : ""}>
+                          <option value="">${teamMembers.length ? "선택해주세요" : "등록된 인원이 없어요"}</option>
+                          ${teamMembers.map((m) => `<option value="${esc(m.id)}">${esc(m.name)}</option>`).join("")}
+                        </select>
+                      </label>
+                      ${!teamMembers.length ? `<div class="login-accounts-hint">아직 등록된 로그인 인원이 없어요. 마스터 계정에서 먼저 추가해달라고 해주세요.</div>` : ""}
+                    ` : ""}
+                    <label class="login-field"><span>비밀번호</span>
+                      <input class="add-input" id="login-password" type="password" autocomplete="current-password" placeholder="비밀번호">
+                    </label>
+                    <button type="submit" class="primary-btn login-submit" ${isTeamLogin && !teamMembers.length ? "disabled" : ""}>로그인</button>
+                  </form>
+                `}
+              </div>
+            ` : `
               <form class="login-form" id="signup-form">
                 <label class="login-field"><span>아이디</span>
                   <input class="add-input" id="signup-username" autocomplete="username" placeholder="아이디">
@@ -2477,7 +2519,7 @@
 
       const backBtn = document.getElementById("login-back-btn");
       if (backBtn) {
-        backBtn.onclick = () => { uiState.error = ""; resetLoginStep(); draw(); };
+        backBtn.onclick = () => { animateLoginStepTransition(() => { uiState.error = ""; resetLoginStep(); }); };
       }
 
       // 단계가 바뀔 때마다(아이디 입력→인증 단계) 커서를 직접 옮길 필요 없이 바로
@@ -2523,10 +2565,11 @@
           } catch (err) { /* 아래에서 "계정 없음"으로 처리 */ }
           uiState.checkingId = false;
           if (!info) { uiState.error = "등록된 계정이 없어요."; draw(); return; }
-          uiState.loginAccount = info;
-          uiState.loginStep = "auth";
-          uiState.error = "";
-          draw();
+          animateLoginStepTransition(() => {
+            uiState.loginAccount = info;
+            uiState.loginStep = "auth";
+            uiState.error = "";
+          });
         };
       }
 
