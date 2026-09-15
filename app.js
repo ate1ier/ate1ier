@@ -1550,10 +1550,22 @@
 
   /* ===================== 공통 유틸 ===================== */
   function pad2(n) { return String(n).padStart(2, "0"); }
+  // HTML에 끼워 넣을 문자열을 안전하게 만든다.
+  // 예전에는 document.createElement("div")에 textContent를 넣고 innerHTML을
+  // 읽는 방식이었는데, 그 방식은 브라우저 규칙상 &, <, > 세 글자만 바꾸고
+  // 따옴표는 그대로 둔다. 그런데 이 앱은 esc()를 태그 사이뿐 아니라
+  // value="${esc(...)}" · title="${esc(...)}" 처럼 "속성값 안"에서도 많이 쓰기
+  // 때문에, 일정 제목이나 셀 메모에 큰따옴표가 하나만 들어가도 속성이 거기서
+  // 끊겨 마크업이 깨졌다. 그래서 따옴표까지 포함해 직접 치환한다
+  // (DOM을 안 쓰므로 더 빠르고, 로그인 전처럼 document가 준비되지 않은
+  //  시점에 호출돼도 안전하다).
   function esc(str) {
-    const d = document.createElement("div");
-    d.textContent = str == null ? "" : String(str);
-    return d.innerHTML;
+    return String(str == null ? "" : str)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
   }
   function genId() { return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`; }
 
@@ -3974,7 +3986,11 @@
     });
   }
   function formatTodoDue(due) {
+    // 마감일이 없거나 형식이 깨진 값이 들어오면 "NaN/NaN"이 화면에 그대로
+    // 찍히므로, 그런 경우엔 빈 문자열을 돌려준다.
+    if (!due) return "";
     const d = parseISODate(due);
+    if (isNaN(d.getTime())) return "";
     return `${d.getMonth() + 1}/${d.getDate()}`;
   }
 
@@ -5546,6 +5562,8 @@
   /* ===================== 품질 관리(QA) 모듈 ===================== */
   const QA_KEY = acctKey("personal-qa:data");
 
+  // 05a-qa-data.js — 데이터 로드/저장, 상세 만료 처리, 월 잠금
+  // (05-qa.js를 기능 단위로 분할한 파일 중 하나. 실행 순서는 파일명 정렬로 유지됨)
   function loadQAData() {
     try {
       const raw = localStorage.getItem(QA_KEY);
@@ -5651,6 +5669,8 @@
   // 강조가 남지 않게 한다.
   let qaHighlightAgentId = null;
 
+  // 05b-qa-stats.js — 월 키/점수 getter·setter, 통계, 홈 화면 트렌드 계산
+  // (05-qa.js를 기능 단위로 분할한 파일 중 하나. 실행 순서는 파일명 정렬로 유지됨)
   function qaMonthKey(year, monthIndex) { return `${year}-${pad2(monthIndex + 1)}`; }
   function qaMonthLabel() { return `${qaUi.year}년 ${qaUi.monthIndex + 1}월`; }
   function qaScoreEntryKey(agentId, year, monthIndex) { return `${agentId}|${qaMonthKey(year, monthIndex)}`; }
@@ -5868,6 +5888,8 @@
   // 파일마다 "평균" 행, "총점" 열, "구분" 열의 실제 위치(행/열)가 달라질 수 있어서
   // 매번 셀 값을 직접 탐색해서 찾는다(고정된 셀 주소를 쓰지 않음).
 
+  // 05c-qa-excel-import.js — 엑셀 셀/워크시트 파싱, 업로드 처리
+  // (05-qa.js를 기능 단위로 분할한 파일 중 하나. 실행 순서는 파일명 정렬로 유지됨)
   function qaColLetterToNum(letters) {
     let n = 0;
     for (let i = 0; i < letters.length; i++) n = n * 26 + (letters.charCodeAt(i) - 64);
@@ -6105,6 +6127,9 @@
   }
 
   /* ===================== 상담사 이름 클릭 → QA 상세 카드 팝업 (엑셀 원문 정리) ===================== */
+
+  // 05d-qa-summary-trend.js — 요약 텍스트 포맷, 상담사별 트렌드 SVG
+  // (05-qa.js를 기능 단위로 분할한 파일 중 하나. 실행 순서는 파일명 정렬로 유지됨)
   function qaFormatSummaryHtml(text) {
     return esc(text || "")
       .split("\n")
@@ -6210,6 +6235,8 @@
     `;
   }
 
+  // 05e-qa-modals.js — 업로드/상세 모달, 점수 셀·차이 HTML, 상담사 QA 미리보기
+  // (05-qa.js를 기능 단위로 분할한 파일 중 하나. 실행 순서는 파일명 정렬로 유지됨)
   function closeQAUploadModal() {
     const existing = document.getElementById("qa-upload-overlay");
     if (existing) existing.remove();
@@ -6500,6 +6527,9 @@
   }
 
   // 이미지 저장 시 유형별로 인원을 걸러낼 때 쓴다. (월별 스케줄과 동일한 구분 기준)
+
+  // 05f-qa-render.js — 표 빌드, 영역 핸들러, renderQAPage 진입점
+  // (05-qa.js를 기능 단위로 분할한 파일 중 하나. 실행 순서는 파일명 정렬로 유지됨)
   function qaFilterAgentsByMode(agentsList, mode) {
     if (!mode || mode === "ALL") return agentsList;
     const hasVoice = (a) => (a.workTypes || []).indexOf("유선") !== -1;
@@ -6686,6 +6716,9 @@
   }
   // 특정 상담사의 점수 입력칸에 포커스를 주고 기존 값을 선택 상태로 만든다
   // (Enter/Tab으로 다음 칸으로 넘어갈 때, 바로 덮어쓸 수 있게).
+
+  // 05g-qa-capture-menu.js — 포커스 이동, 미리보기, 캡처 메뉴
+  // (05-qa.js를 기능 단위로 분할한 파일 중 하나. 실행 순서는 파일명 정렬로 유지됨)
   function qaFocusScoreInput(agentId) {
     const el = document.querySelector(`.qa-score-input[data-qa-agent="${CSS.escape(agentId)}"]`);
     if (!el || el.disabled) return;
@@ -7855,6 +7888,8 @@
   /* ===================== 월별 스케줄 모듈 ===================== */
   const SCHEDULE_KEY = acctKey("personal-schedule:data");
 
+  // 07a1-schedule-data.js — 데이터 로드/저장/정규화, 월 잠금, 상담사 목록 동기화
+  // (07-schedule.js를 기능 단위로 분할한 파일 중 하나. 실행 순서는 파일명 정렬로 유지됨)
   function loadScheduleData() {
     try {
       const raw = localStorage.getItem(SCHEDULE_KEY);
@@ -8095,6 +8130,9 @@
   // 그대로 옮겨 담고 saveScheduleData()로 저장한다. saveScheduleData()가 localStorage에
   // 쓰는 순간 클라우드(Supabase)에도 함께 올라가므로, 접어둔 열/행이 다른 사람 화면에도
   // 그대로 보이고 새로고침해도 유지된다. 열/행을 접거나 펼치는 모든 동작 뒤에 호출한다.
+
+  // 07a2-schedule-ui-state.js — 접기 상태, 검색, 행/열 그룹, 헤더 선택, 숨김 메뉴, 일괄 붙여넣기
+  // (07-schedule.js를 기능 단위로 분할한 파일 중 하나. 실행 순서는 파일명 정렬로 유지됨)
   function scheduleSaveCollapseState() {
     const state = scheduleGetMonthCollapseState(scheduleUi.year, scheduleUi.monthIndex);
     state.collapsedRowGroups = Array.from(scheduleUi.collapsedRowGroups);
@@ -8502,6 +8540,9 @@
   ];
   // 지금 화면(hideSummaryCols=false 기준)에서, 접히지 않은 고정 열들이 각각 왼쪽에서
   // 몇 px 위치에 붙어야 하는지 계산한다. 접힌 열은 폭이 0이 되므로 뒤 열들이 그만큼 당겨진다.
+
+  // 07a3-schedule-records.js — 필요인원, 셀 기록/메모, 조정요약, 정렬 헬퍼
+  // (07-schedule.js를 기능 단위로 분할한 파일 중 하나. 실행 순서는 파일명 정렬로 유지됨)
   function scheduleInfoColLeftOffsets() {
     let offset = 0;
     const lefts = {};
@@ -8758,6 +8799,9 @@
   // hideRequiredRows: true면 "필요인력"/"대비"/"인력 대비 편성" 3행 묶음(입력칸 포함)을 아예 빼고 그린다.
   // (이미지로 저장할 때 켜서 씀. 이 행에는 <input>이 들어있어 캡처 대상에서 빼는 게 더 안전하고,
   //  캡처 이미지 안에 사용자가 직접 편집하는 입력용 요소가 노출되지 않게 한다.)
+
+  // 07a4-schedule-table-render.js — 월별 스케줄 표 렌더링 (buildScheduleTableHtml)
+  // (07-schedule.js를 기능 단위로 분할한 파일 중 하나. 실행 순서는 파일명 정렬로 유지됨)
   function buildScheduleTableHtml(filterMode, hideSummaryCols, hideRequiredRows, hideMemoMarks) {
     const { year, monthIndex } = scheduleUi;
     const numDays = scheduleDaysInMonth(year, monthIndex);
@@ -9476,6 +9520,9 @@
 
   // buildScheduleTableHtml의 filterMode와 같은 기준으로, 캡처 대상 인원만 골라
   // "이번 달 지각·결근 기록"도 캡처된 표 안의 인원과 항상 일치하도록 한다.
+
+  // 07a5-schedule-log-capture.js — 변경 로그, 표 크기 맞춤, 이미지 캡처
+  // (07-schedule.js를 기능 단위로 분할한 파일 중 하나. 실행 순서는 파일명 정렬로 유지됨)
   function scheduleLogStaffForFilter(monthStaff, filterMode) {
     if (!filterMode) return monthStaff;
     if (filterMode === "ADMIN") return monthStaff.filter((s) => s.isAdmin);
@@ -9720,6 +9767,8 @@
   let scheduleSelectAnchor = null; // { rowIdx, day }
   let scheduleSelectCurrent = null; // { rowIdx, day }
 
+  // 07a6-schedule-cell-edit.js — 셀 선택/편집/키보드 핸들링
+  // (07-schedule.js를 기능 단위로 분할한 파일 중 하나. 실행 순서는 파일명 정렬로 유지됨)
   function scheduleSelectionRectCells(root, anchor, current) {
     if (!root || !anchor || !current) return [];
     const minRow = Math.min(anchor.rowIdx, current.rowIdx);
@@ -10459,6 +10508,9 @@
   // scope에 해당하는 인원 목록과 화면 표시용 라벨을 반환한다.
   // (표를 그릴 때 쓰는 것과 같은 분류 기준 — 관리자/주간/야간, 채팅/유선 — 을 그대로 사용해서
   // "표에서 보이는 그룹"과 "삭제 대상"이 항상 일치하도록 한다)
+
+  // 07a7-schedule-menus.js — 삭제/미리보기/캡처 메뉴
+  // (07-schedule.js를 기능 단위로 분할한 파일 중 하나. 실행 순서는 파일명 정렬로 유지됨)
   function scheduleDeleteTargets(scope, year, monthIndex) {
     const monthStaff = getStaffListForMonth(year, monthIndex);
     if (scope === "ALL") return monthStaff;
@@ -10694,6 +10746,8 @@
     `;
   }
 
+  // 07a8-schedule-render-page.js — renderSchedulePage 진입점
+  // (07-schedule.js를 기능 단위로 분할한 파일 중 하나. 실행 순서는 파일명 정렬로 유지됨)
   function renderSchedulePage(root) {
     root.innerHTML = `
       <div class="schedule-top">

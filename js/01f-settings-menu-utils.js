@@ -69,10 +69,22 @@
 
   /* ===================== 공통 유틸 ===================== */
   function pad2(n) { return String(n).padStart(2, "0"); }
+  // HTML에 끼워 넣을 문자열을 안전하게 만든다.
+  // 예전에는 document.createElement("div")에 textContent를 넣고 innerHTML을
+  // 읽는 방식이었는데, 그 방식은 브라우저 규칙상 &, <, > 세 글자만 바꾸고
+  // 따옴표는 그대로 둔다. 그런데 이 앱은 esc()를 태그 사이뿐 아니라
+  // value="${esc(...)}" · title="${esc(...)}" 처럼 "속성값 안"에서도 많이 쓰기
+  // 때문에, 일정 제목이나 셀 메모에 큰따옴표가 하나만 들어가도 속성이 거기서
+  // 끊겨 마크업이 깨졌다. 그래서 따옴표까지 포함해 직접 치환한다
+  // (DOM을 안 쓰므로 더 빠르고, 로그인 전처럼 document가 준비되지 않은
+  //  시점에 호출돼도 안전하다).
   function esc(str) {
-    const d = document.createElement("div");
-    d.textContent = str == null ? "" : String(str);
-    return d.innerHTML;
+    return String(str == null ? "" : str)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
   }
   function genId() { return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`; }
 

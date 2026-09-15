@@ -1,0 +1,34 @@
+#!/bin/sh
+# hooks/pre-commit
+#
+# 커밋 직전에 자동으로 테스트(npm test)와 `node build.js`를 실행하고, 빌드 결과물
+# (index.html, app.js, styles.min.css)을 커밋에 함께 포함시켜 줍니다.
+# 이렇게 하면 "css/js는 고쳤는데 build.js를 깜빡해서 옛날 빌드 결과물이
+# 커밋되는" 사고를 막을 수 있습니다.
+#
+# 설치: node tools/install-hooks.js  (또는 npm install 시 자동 설치됨)
+
+echo "[pre-commit] 테스트 실행 중 (node --test)..."
+npm test --silent
+TEST_EXIT=$?
+
+if [ $TEST_EXIT -ne 0 ]; then
+  echo "[pre-commit] 테스트 실패! 커밋을 중단합니다. 위 실패 항목을 먼저 고쳐주세요."
+  echo "[pre-commit] (정말 급하면 git commit --no-verify 로 건너뛸 수 있지만, 되도록 고치고 커밋해주세요.)"
+  exit 1
+fi
+
+echo "[pre-commit] node build.js 실행 중..."
+node build.js
+BUILD_EXIT=$?
+
+if [ $BUILD_EXIT -ne 0 ]; then
+  echo "[pre-commit] 빌드 실패! 커밋을 중단합니다. 위 에러를 먼저 고쳐주세요."
+  exit 1
+fi
+
+# 빌드 결과물이 새로 생성/수정됐다면 스테이징에 추가해서 커밋에 포함시킴
+git add index.html app.js styles.min.css
+
+echo "[pre-commit] 빌드 완료, 결과물을 커밋에 포함했습니다."
+exit 0

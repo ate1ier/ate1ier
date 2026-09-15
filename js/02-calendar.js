@@ -897,7 +897,11 @@
     });
   }
   function formatTodoDue(due) {
+    // 마감일이 없거나 형식이 깨진 값이 들어오면 "NaN/NaN"이 화면에 그대로
+    // 찍히므로, 그런 경우엔 빈 문자열을 돌려준다.
+    if (!due) return "";
     const d = parseISODate(due);
+    if (isNaN(d.getTime())) return "";
     return `${d.getMonth() + 1}/${d.getDate()}`;
   }
 
