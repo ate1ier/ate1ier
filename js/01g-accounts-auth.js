@@ -225,14 +225,21 @@
     });
     return { ok: true };
   }
-  // 마스터가 다른 계정의 비밀번호를 새 비밀번호로 초기화한다.
+  // 마스터가 다른 계정의 비밀번호를 새 비밀번호로 초기화한다. 실제 검증·변경은
+  // Edge Function(auth-admin)이 서버에서 처리한다 — 클라이언트는 결과만 받는다.
   async function resetAccountPassword(accountId, newPassword) {
     if (!newPassword || newPassword.length < 4) return { ok: false, reason: "비밀번호는 4자 이상으로 만들어주세요." };
     const list = loadAccounts();
     const idx = list.findIndex((a) => a.id === accountId);
     if (idx === -1) return { ok: false, reason: "계정을 찾을 수 없어요." };
-    const record = await makeNewPasswordRecord(newPassword);
-    list[idx] = { ...list[idx], ...record };
+    const result = await cloudAdminResetPassword(accountId, newPassword);
+    if (!result.ok) return result;
+    // 서버가 kv_store의 비밀번호 관련 필드를 이미 지워서 authMigrated:true로
+    // 저장해뒀으니, 이 브라우저의 로컬 캐시도 같은 모양으로 맞춰준다(다음
+    // cloudHydrate 때 서버 값으로 다시 덮어써지긴 하지만, 그 전에 화면이
+    // 예전 필드를 참조하다 혼동되는 걸 막기 위함).
+    const { passwordHash, salt, hashAlgo, iterations, cloudAuthSecret, ...rest } = list[idx];
+    list[idx] = { ...rest, authMigrated: true };
     saveAccounts(list);
     appendActivityLog({
       accountId,

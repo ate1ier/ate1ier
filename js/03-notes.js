@@ -11,10 +11,114 @@
       if (!parsed.pinnedOrder) parsed.pinnedOrder = [];
       if (!parsed.folders) parsed.folders = [];
       if (!parsed.notes) parsed.notes = {};
+      Object.values(parsed.notes).forEach((n) => { if (!n.attachments) n.attachments = []; });
       return parsed;
     } catch (e) { return defaultNotesData(); }
   }
   const notesData = loadNotesData();
+
+  /* ---- 메모 첨부파일 (Supabase Storage) ----
+     메모 내용(text)은 지금까지처럼 localStorage → kv_store로 동기화되지만,
+     첨부파일 원본은 크기가 클 수 있어 같은 방식(JSON 문자열)으로 넣기 적합하지
+     않다. 그래서 파일 원본은 Supabase Storage의 "note-attachments" 버킷에 직접
+     올리고, notesData(=메모 JSON)에는 파일 메타데이터(이름/크기/저장 경로)만
+     남겨서 지금처럼 kv_store로 함께 동기화되게 한다.
+     버킷/권한 설정은 supabase/notes-attachments-storage-setup.sql 1회 실행 필요. */
+  const NOTES_ATTACHMENTS_BUCKET = "note-attachments";
+  const NOTES_ATTACHMENT_MAX_MB = 20;
+  // 팀 전체가 같은 저장 공간을 쓰는 구조라, 누군가(계정이 도용됐거나 실수로)
+  // 실행 파일류를 올리면 다른 사람이 무심코 내려받아 실행할 위험이 있다.
+  // 그런 확장자는 아예 업로드 단계에서 막는다(내용 검사가 아니라 확장자 기준의
+  // 최소한의 방어선이며, 완전한 백신 검사를 대신하지는 않는다).
+  const NOTES_ATTACHMENT_BLOCKED_EXT = [
+    "exe", "msi", "bat", "cmd", "com", "scr", "pif", "js", "jse", "vbs", "vbe",
+    "wsf", "wsh", "ps1", "psm1", "jar", "apk", "app", "dmg", "pkg", "sh",
+    "command", "hta", "html", "htm", "svg",
+  ];
+  function getFileExtension(name) {
+    const m = /\.([a-z0-9]+)$/i.exec(String(name || "").trim());
+    return m ? m[1].toLowerCase() : "";
+  }
+
+  function formatAttachmentSize(bytes) {
+    const n = Number(bytes) || 0;
+    if (n >= 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(1)}MB`;
+    if (n >= 1024) return `${Math.round(n / 1024)}KB`;
+    return `${n}B`;
+  }
+  function sanitizeAttachmentFileName(name) {
+    return String(name || "file").replace(/[\/\\?%*:|"<>]/g, "_").slice(0, 150);
+  }
+  function attachmentStoragePath(noteId, att) {
+    return `${CURRENT_ACCOUNT_ID}/${noteId}/${att.id}_${sanitizeAttachmentFileName(att.name)}`;
+  }
+  async function uploadNoteAttachments(noteId, fileList) {
+    const note = notesData.notes[noteId];
+    if (!note) return;
+    if (!cloud) { alert("클라우드 연결이 안 되어 있어 파일을 업로드할 수 없어요."); return; }
+    if (!note.attachments) note.attachments = [];
+    const files = Array.from(fileList || []);
+    if (!files.length) return;
+    notesUi.uploadingNoteId = noteId;
+    renderApp();
+    for (const file of files) {
+      if (file.size > NOTES_ATTACHMENT_MAX_MB * 1024 * 1024) {
+        alert(`"${file.name}"은(는) ${NOTES_ATTACHMENT_MAX_MB}MB를 초과해서 업로드할 수 없어요.`);
+        continue;
+      }
+      const ext = getFileExtension(file.name);
+      if (ext && NOTES_ATTACHMENT_BLOCKED_EXT.includes(ext)) {
+        alert(`"${file.name}"(.${ext}) 형식은 보안상 첨부할 수 없어요. 실행 파일류나 웹페이지로 열리는 형식은 막아뒀어요. 필요하면 zip으로 압축해서 올려주세요.`);
+        continue;
+      }
+      const att = { id: genId(), name: file.name, size: file.size, type: file.type || "", uploadedAt: new Date().toISOString() };
+      const path = attachmentStoragePath(noteId, att);
+      try {
+        const { error } = await cloud.storage.from(NOTES_ATTACHMENTS_BUCKET).upload(path, file, { upsert: false, contentType: "application/octet-stream" });
+        if (error) throw error;
+        att.path = path;
+        note.attachments.push(att);
+        saveNotesData();
+      } catch (e) {
+        alert(`"${file.name}" 업로드에 실패했어요: ${(e && e.message) || e}\n\n버킷 설정이 아직 안 되어 있다면 supabase/notes-attachments-storage-setup.sql을 Supabase에서 먼저 실행해주세요.`);
+      }
+    }
+    notesUi.uploadingNoteId = null;
+    renderApp();
+  }
+  async function downloadNoteAttachment(noteId, attId) {
+    const note = notesData.notes[noteId];
+    const att = note && note.attachments && note.attachments.find((a) => a.id === attId);
+    if (!att) return;
+    if (!cloud) { alert("클라우드 연결이 안 되어 있어 파일을 내려받을 수 없어요."); return; }
+    try {
+      const { data, error } = await cloud.storage.from(NOTES_ATTACHMENTS_BUCKET).download(att.path);
+      if (error) throw error;
+      const url = URL.createObjectURL(data);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = att.name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 3000);
+    } catch (e) {
+      alert(`파일을 내려받지 못했어요: ${(e && e.message) || e}`);
+    }
+  }
+  async function deleteNoteAttachment(noteId, attId) {
+    const note = notesData.notes[noteId];
+    if (!note || !note.attachments) return;
+    const att = note.attachments.find((a) => a.id === attId);
+    if (!att) return;
+    if (!window.confirm(`"${att.name}" 파일을 삭제할까요?`)) return;
+    if (cloud && att.path) {
+      try { await cloud.storage.from(NOTES_ATTACHMENTS_BUCKET).remove([att.path]); } catch (e) {}
+    }
+    note.attachments = note.attachments.filter((a) => a.id !== attId);
+    saveNotesData();
+    renderApp();
+  }
 
   let notesStatusTimer = null;
   function flashNotesStatus(msg) {
@@ -36,6 +140,7 @@
     collapsedFolders: {},
     showNewNote: false,
     showNewFolder: false,
+    uploadingNoteId: null,
   };
 
   function createFolder(name) {
@@ -60,7 +165,7 @@
     if (!trimmed) return;
     const folderId = folderIdRaw && folderIdRaw !== UNFILED ? folderIdRaw : null;
     const id = genId();
-    notesData.notes[id] = { id, title: trimmed, content: "", folderId, pinned: false };
+    notesData.notes[id] = { id, title: trimmed, content: "", folderId, pinned: false, attachments: [] };
     const key = folderId || UNFILED;
     if (!notesData.folderOrder[key]) notesData.folderOrder[key] = [];
     notesData.folderOrder[key].push(id);
@@ -73,6 +178,10 @@
     const key = note.folderId || UNFILED;
     if (notesData.folderOrder[key]) notesData.folderOrder[key] = notesData.folderOrder[key].filter((x) => x !== id);
     notesData.pinnedOrder = notesData.pinnedOrder.filter((x) => x !== id);
+    if (cloud && note.attachments && note.attachments.length) {
+      const paths = note.attachments.map((a) => a.path).filter(Boolean);
+      if (paths.length) cloud.storage.from(NOTES_ATTACHMENTS_BUCKET).remove(paths).catch(() => {});
+    }
     delete notesData.notes[id];
     delete notesUi.expanded[id];
     saveNotesData();
@@ -226,7 +335,36 @@
         ${isExpanded ? `
         <div class="note-body">
           <textarea class="note-content" data-content-id="${note.id}" placeholder="메모 내용을 입력하세요">${esc(note.content)}</textarea>
+          ${renderNoteAttachments(note)}
         </div>` : ""}
+      </div>
+    `;
+  }
+
+  function renderNoteAttachments(note) {
+    const attachments = note.attachments || [];
+    const uploading = notesUi.uploadingNoteId === note.id;
+    return `
+      <div class="note-attachments">
+        <div class="note-attachments-head">
+          <span class="note-attachments-label">${ICON_PAPERCLIP} 첨부파일${attachments.length ? ` (${attachments.length})` : ""}</span>
+          <button type="button" class="ghost-btn note-attach-btn" data-action="attach-file" data-id="${note.id}" ${uploading ? "disabled" : ""}>
+            ${uploading ? "업로드 중…" : `${ICON_UPLOAD} 파일 첨부`}
+          </button>
+          <input type="file" multiple style="display:none;" data-file-input="${note.id}">
+        </div>
+        ${attachments.length === 0
+          ? `<div class="note-attachment-empty">첨부된 파일이 없어요.</div>`
+          : `<div class="note-attachment-list">
+              ${attachments.map((a) => `
+                <div class="note-attachment-row">
+                  <span class="note-attachment-name" title="${esc(a.name)}">${esc(a.name)}</span>
+                  <span class="note-attachment-size">${formatAttachmentSize(a.size)}</span>
+                  <button type="button" class="note-attachment-icon-btn" data-action="download-attachment" data-id="${note.id}" data-att-id="${a.id}" title="다운로드">${ICON_DOWNLOAD}</button>
+                  <button type="button" class="note-attachment-icon-btn note-attachment-icon-btn-danger" data-action="delete-attachment" data-id="${note.id}" data-att-id="${a.id}" title="삭제">${ICON_TRASH}</button>
+                </div>
+              `).join("")}
+            </div>`}
       </div>
     `;
   }
@@ -383,6 +521,35 @@
     });
     root.querySelectorAll("[data-content-id]").forEach((ta) => {
       ta.addEventListener("input", (e) => { updateNoteContent(ta.getAttribute("data-content-id"), e.target.value); });
+    });
+
+    root.querySelectorAll("[data-action='attach-file']").forEach((btn) => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        const id = btn.getAttribute("data-id");
+        const input = root.querySelector(`[data-file-input="${id}"]`);
+        if (input) input.click();
+      };
+    });
+    root.querySelectorAll("[data-file-input]").forEach((input) => {
+      input.addEventListener("click", (e) => e.stopPropagation());
+      input.addEventListener("change", (e) => {
+        const id = input.getAttribute("data-file-input");
+        if (e.target.files && e.target.files.length) uploadNoteAttachments(id, e.target.files);
+        input.value = "";
+      });
+    });
+    root.querySelectorAll("[data-action='download-attachment']").forEach((btn) => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        downloadNoteAttachment(btn.getAttribute("data-id"), btn.getAttribute("data-att-id"));
+      };
+    });
+    root.querySelectorAll("[data-action='delete-attachment']").forEach((btn) => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        deleteNoteAttachment(btn.getAttribute("data-id"), btn.getAttribute("data-att-id"));
+      };
     });
 
     attachDragHandlers(root);

@@ -64,54 +64,78 @@
     const hashHex = HAS_SUBTLE_CRYPTO ? await sha256Hex(normalized) : legacyHash(normalized).replace(/^-/, "n");
     return `u${hashHex}@${AUTH_EMAIL_DOMAIN}`;
   }
-  // Supabase Auth의 "비밀번호"로는 사람이 로그인창에 입력하는 비밀번호를 그대로
-  // 쓰지 않는다. 대신 계정마다 한 번 정해지면 바뀌지 않는 무작위 값
-  // (cloudAuthSecret, 계정 레코드에 함께 저장됨)을 쓴다. 이렇게 분리해두면
-  // 마스터가 나중에 "사람용 로그인 비밀번호"를 초기화해도 Supabase Auth 쪽
-  // 인증은 그대로 유지되어, 초기화 직후 로그인이 막히는 일이 없다. 사람용
-  // 비밀번호 확인(해시 대조)은 지금 로직 그대로 두고, 그 확인을 통과한
-  // "다음 단계"로만 이 함수를 쓴다.
-  function genCloudAuthSecret() {
-    return genSalt() + genSalt(); // 32바이트(64자리 hex) 무작위 값
-  }
-  // Supabase 프로젝트의 "Confirm email"이 실수로 켜져 있으면 가입/로그인 자체는
-  // 에러 없이 성공한 것처럼 보이면서도 세션(session)이 비어있는 채로 돌아온다.
-  // 이 경우를 그냥 넘어가면 "로그인은 됐는데 데이터가 하나도 안 보이는" 혼란스러운
-  // 상태가 되므로, 세션이 실제로 만들어졌는지까지 확인한다.
+  // ---- 2026-09 보안 업데이트: cloudAuthSecret 폐지 ----
+  // 예전에는 Supabase Auth 비밀번호로 사람이 입력하는 로그인 비밀번호 대신
+  // 계정마다 따로 저장해둔 무작위 값(cloudAuthSecret)을 썼다. 그런데 로그인
+  // 화면에서 "아이디만으로 계정 종류를 미리 보여주기" 위해 로그인 전(anon)에도
+  // 계정 목록 한 줄을 읽을 수 있게 열어뒀던 탓에, 그 안에 함께 있던
+  // cloudAuthSecret까지 로그인 없이 읽을 수 있는 구조적인 문제가 있었다(RLS는
+  // "행" 단위로만 막을 수 있어 같은 행 안의 값은 가릴 수 없었음). 지금은 사람이
+  // 입력하는 비밀번호 자체가 곧 Supabase Auth 비밀번호이고, 검증도(예전
+  // 계정을 이 방식으로 처음 전환할 때는 물론) 전부 서버 쪽 Edge Function
+  // (supabase/functions/auth-admin)에서만 처리해서, 비밀번호 해시나
+  // cloudAuthSecret이 브라우저로 전혀 나가지 않는다. 자세한 배경은
+  // supabase/auth-lockdown-migration.sql 상단 설명 참고.
   function _hasSession(result) {
     return !!(result && result.data && result.data.session);
   }
-  // 계정을 새로 만들 때: 방금 정한 cloudAuthSecret으로 Supabase Auth에 가입한다.
-  async function cloudAuthSignUp(username, secret) {
+  // 새 계정을 만들 때: 사람이 정한 비밀번호로 곧장 Supabase Auth에 가입한다.
+  async function cloudAuthSignUpDirect(username, password) {
     if (!cloud) return { ok: true }; // 클라우드 연결이 아예 없는 환경(오프라인 전용)이면 그냥 통과
     const email = await toAuthEmail(username);
-    const result = await cloud.auth.signUp({ email, password: secret });
+    const result = await cloud.auth.signUp({ email, password });
     if (result.error) return { ok: false, reason: result.error.message || "클라우드 인증에 실패했어요." };
     if (!_hasSession(result)) {
       return { ok: false, reason: "가입은 됐지만 세션이 생성되지 않았어요. Supabase 프로젝트의 Authentication 설정에서 \"Confirm email\"이 꺼져 있는지 확인해주세요." };
     }
     return { ok: true };
   }
-  // 로그인할 때: 사람용 비밀번호 확인이 끝난 뒤 호출한다. 계정에 저장된
-  // cloudAuthSecret으로 그대로 로그인하고, 아직 없으면(이 업데이트 이전에 만들어진
-  // 계정이라 처음 로그인하는 경우) 지금 새로 만들어서 계정에 저장해둔다.
-  async function cloudAuthSignInForAccount(account) {
+  // 로그인할 때(이미 새 방식으로 전환된 계정): 사람이 입력한 비밀번호로 그대로 로그인한다.
+  async function cloudAuthSignInDirect(username, password) {
     if (!cloud) return { ok: true };
-    const email = await toAuthEmail(account.username);
-    if (account.cloudAuthSecret) {
-      const signIn = await cloud.auth.signInWithPassword({ email, password: account.cloudAuthSecret });
-      if (!signIn.error && _hasSession(signIn)) return { ok: true };
+    const email = await toAuthEmail(username);
+    const signIn = await cloud.auth.signInWithPassword({ email, password });
+    if (signIn.error || !_hasSession(signIn)) {
+      return { ok: false, reason: (signIn.error && signIn.error.message) || "로그인에 실패했어요." };
     }
-    const newSecret = genCloudAuthSecret();
-    const signUp = await cloudAuthSignUp(account.username, newSecret);
-    if (!signUp.ok) return signUp;
-    const list = loadAccounts();
-    const idx = list.findIndex((a) => a.id === account.id);
-    if (idx !== -1) { list[idx] = { ...list[idx], cloudAuthSecret: newSecret }; saveAccounts(list); }
     return { ok: true };
   }
+  // 아직 예전 방식(로컬 해시 비교 + cloudAuthSecret)으로 남아있는 계정을 이번
+  // 로그인에서 한 번만 서버 쪽에서 검증·전환한다 — 비밀번호는 여기서 함수
+  // 호출로만 서버에 전달되고, 성공하면 그 즉시 cloudAuthSignInDirect로 진짜
+  // 세션을 받는다(마이그레이션 자체는 세션을 만들어주지 않음).
+  async function cloudMigrateLegacyLogin(username, password) {
+    if (!cloud) return { ok: true };
+    try {
+      const { data, error } = await cloud.functions.invoke("auth-admin", {
+        body: { action: "migrate-login", username, password },
+      });
+      if (error) return { ok: false, reason: error.message || "로그인 전환에 실패했어요." };
+      if (!data || !data.ok) return { ok: false, reason: (data && data.reason) || "로그인 전환에 실패했어요." };
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, reason: (e && e.message) || "로그인 전환 중 문제가 발생했어요." };
+    }
+  }
 
-  // 기기(브라우저)마다 달라도 되는 값들 — 클라우드에 동기화하지 않는다.
+
+  // 마스터가 다른 계정의 비밀번호를 초기화할 때: 실제 검증·변경은 전부 서버(Edge
+  // Function)에서 하고, 그 함수가 호출자(나)가 진짜 로그인된 마스터인지까지
+  // 자기가 직접 다시 확인한다(클라이언트가 "나는 마스터"라고 보내는 값은 안 믿음).
+  async function cloudAdminResetPassword(targetAccountId, newPassword) {
+    if (!cloud) return { ok: true };
+    try {
+      const { data, error } = await cloud.functions.invoke("auth-admin", {
+        body: { action: "reset-password", targetAccountId, newPassword },
+      });
+      if (error) return { ok: false, reason: error.message || "비밀번호 초기화에 실패했어요." };
+      if (!data || !data.ok) return { ok: false, reason: (data && data.reason) || "비밀번호 초기화에 실패했어요." };
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, reason: (e && e.message) || "비밀번호 초기화 중 문제가 발생했어요." };
+    }
+  }
+
   const CLOUD_EXCLUDED_KEYS = new Set([
     "app-theme-mode",
     "personal-app:session",
