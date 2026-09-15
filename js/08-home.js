@@ -205,7 +205,7 @@
     /* ---- QA(품질 관리) 전체 평균 점수 ----
        이번 달 점수가 아직 입력 안 된 경우가 많으므로(달이 막 바뀐 시점 등),
        이번 달부터 거꾸로 훑어서 점수가 입력된 가장 최근 달을 찾아 보여준다. */
-    const qaAgentsList = qaWorkingAgents();
+    const qaAgentsList = qaWorkingAgents(y, m);
     const qaLatest = qaHomeFindLatestMonthWithData(qaAgentsList, y, m);
     let qaSummaryHtml;
     if (!qaLatest) {

@@ -169,9 +169,39 @@
     if (vals.length === 0) return null;
     return vals.reduce((a, b) => a + b, 0) / vals.length;
   }
-  // 근무중인(재직) 상담사만 QA 관리 대상으로 가져온다. 관리자는 제외한다. "상담사 관리"의 기본 정렬을 그대로 따른다.
-  function qaWorkingAgents() {
-    return sortAgentList(agentsData.filter((a) => a.status !== "RESIGNED" && !a.isAdmin), "shift");
+
+  // ----- 퇴사자의 품질 관리 목록 유지 기간 -----
+  // "상담사 관리"에서 퇴사로 바뀌어도 품질관리에서 바로 사라지지 않는다. 퇴사 처리된
+  // 달과 그 다음 달까지는 이름에 취소선을 그은 채로 목록에 계속 남아있다가, 그 다음
+  // 달(=퇴사월+2)부터는 자연스럽게 목록에서 빠진다.
+  function qaResignMonthKey(resignDate) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(resignDate || "");
+    return m ? `${m[1]}-${m[2]}` : null;
+  }
+  function qaResignKeepUntilKey(resignDate) {
+    const key = qaResignMonthKey(resignDate);
+    if (!key) return null;
+    const parts = key.split("-").map(Number);
+    let year = parts[0], monthIndex = parts[1]; // parts[1]은 1-based 월이므로 그대로 쓰면 "다음 달"의 0-based 인덱스가 된다
+    if (monthIndex > 11) { monthIndex -= 12; year += 1; }
+    return qaMonthKey(year, monthIndex);
+  }
+  // 특정 달의 품질관리 목록에 이 상담사가 보여야 하는지 판단한다.
+  // 재직중이면 항상 보이고, 퇴사자는 퇴사월과 그 다음달까지만 보인다.
+  function qaAgentVisibleInMonth(a, year, monthIndex) {
+    if (a.status !== "RESIGNED") return true;
+    const keepUntil = qaResignKeepUntilKey(a.resignDate);
+    if (!keepUntil) return true; // 퇴사일자 정보가 없으면 안전하게 계속 보여준다
+    return qaMonthKey(year, monthIndex) <= keepUntil;
+  }
+
+  // QA 관리 대상 상담사 목록. 관리자는 제외하고, 재직중인 인원 + (유지 기간 안의) 퇴사자를
+  // 함께 가져온다. year/monthIndex를 생략하면 현재 화면에 보이는 달(qaUi) 기준으로 계산한다.
+  // "상담사 관리"의 기본 정렬을 그대로 따른다.
+  function qaWorkingAgents(year, monthIndex) {
+    const y = (year === undefined || year === null) ? qaUi.year : year;
+    const mi = (monthIndex === undefined || monthIndex === null) ? qaUi.monthIndex : monthIndex;
+    return sortAgentList(agentsData.filter((a) => !a.isAdmin && qaAgentVisibleInMonth(a, y, mi)), "shift");
   }
 
   // 인원마다 점수는 하나뿐이지만, "업무구분"(유선/채팅) · "조"(주간/야간) 태그를 기준으로
@@ -491,12 +521,24 @@
         try {
           const parsed = qaParseWorksheet(ws);
           setQAScore(agent.id, year, monthIndex, String(parsed.totalScore));
-          setQADetail(agent.id, year, monthIndex, {
-            fileName: file.name,
-            sheetName: ws.name,
-            uploadedAt: new Date().toISOString(),
-            rounds: parsed.rounds,
-          });
+          // 퇴사한 상담사는 점수만 반영하고, 차수별 원문(감점/코멘트)은 어차피
+          // 볼 일이 없으므로 가져오지 않는다. 상세 카드에는 "퇴사 인원"이라고만 표시된다.
+          if (agent.status === "RESIGNED") {
+            setQADetail(agent.id, year, monthIndex, {
+              fileName: file.name,
+              sheetName: ws.name,
+              uploadedAt: new Date().toISOString(),
+              rounds: [],
+              resignedNote: true,
+            });
+          } else {
+            setQADetail(agent.id, year, monthIndex, {
+              fileName: file.name,
+              sheetName: ws.name,
+              uploadedAt: new Date().toISOString(),
+              rounds: parsed.rounds,
+            });
+          }
           okCount++;
         } catch (parseErr) {
           failList.push(`${ws.name || file.name}: ${parseErr.message}`);
@@ -731,7 +773,9 @@
 
     const trendHtml = qaTrendSvgHtml(agentId, year, monthIndex);
 
-    const bodyHtml = (!detail || !detail.rounds || !detail.rounds.length)
+    const bodyHtml = (detail && detail.resignedNote)
+      ? `<div class="qa-detail-empty">퇴사 인원이에요.<br>점수만 반영되고, 차수별 감점/코멘트 원문은 가져오지 않아요.</div>`
+      : (!detail || !detail.rounds || !detail.rounds.length)
       ? `<div class="qa-detail-empty">이번 달(${esc(qaMonthLabel())})에 업로드된 QA 평가 엑셀이 없어요.<br>상단 "${esc("엑셀 업로드")}" 버튼으로 이 상담사의 평가표를 올려주세요.</div>`
       : `
         <div class="qa-detail-meta">${metaText}</div>
@@ -947,9 +991,12 @@
                 ? `<td>${val === null ? "-" : val.toFixed(1)}</td>`
                 : qaScoreCellHtml(a, year, monthIndex);
               const highlight = !forCapture && qaHighlightAgentId === a.id;
+              const isResigned = a.status === "RESIGNED";
+              const rowClass = `${highlight ? "qa-row-highlight " : ""}${isResigned ? "qa-row-resigned" : ""}`.trim();
+              const resignedBadge = isResigned ? ` <span class="badge sm resigned">퇴사</span>` : "";
               return `
-                <tr data-qa-row-agent="${a.id}" class="${highlight ? "qa-row-highlight" : ""}">
-                  <td class="qa-col-name"${forCapture ? "" : ` data-qa-name-click="${a.id}"`}>${esc(a.name)}${forCapture ? "" : `<span class="qa-name-search-icon">${ICON_SEARCH_MINI}</span>`}</td>
+                <tr data-qa-row-agent="${a.id}" class="${rowClass}">
+                  <td class="qa-col-name"${forCapture ? "" : ` data-qa-name-click="${a.id}"`}>${esc(a.name)}${resignedBadge}${forCapture ? "" : `<span class="qa-name-search-icon">${ICON_SEARCH_MINI}</span>`}</td>
                   <td class="qa-col-ldap">${esc(a.ldap || "-")}</td>
                   <td>${esc(a.timezone || "-")}</td>
                   <td class="qa-col-badges">${typeBadges || "-"}</td>

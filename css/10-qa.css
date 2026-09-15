@@ -71,6 +71,10 @@
   .qa-table tbody tr.qa-row-highlight { background: var(--accent-dim); transition: background 1.8s ease; }
   .qa-table td.qa-col-name { color: var(--text); font-weight: 600; }
   .qa-table td.qa-col-ldap { color: var(--text-dim); font-weight: 400; }
+  /* 퇴사 처리된 인원: 목록에서 바로 지우지 않고, 이름에 취소선을 그은 채로
+     퇴사월과 그 다음달까지 유지되다가 그 이후 달부터 자연스럽게 목록에서 빠진다. */
+  .qa-table tbody tr.qa-row-resigned { opacity: 0.62; }
+  .qa-table tbody tr.qa-row-resigned td.qa-col-name { text-decoration: line-through; color: var(--text-faint); }
   .qa-table td.qa-empty { text-align: center; color: var(--text-faint); padding: 24px; background: var(--panel); }
   .qa-score-input {
     width: 64px; box-sizing: border-box; text-align: center; border: 1px solid var(--hairline);
