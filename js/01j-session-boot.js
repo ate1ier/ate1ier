@@ -21,6 +21,7 @@
     return;
   }
   _appBooted = true; // 이 시점부터는 renderApp()이 쓰는 값들이 전부 준비됨 — 실시간/탭전환 리스너가 다시 정상 동작해도 안전하다.
+  runDailyAutoBackupIfNeeded().catch(() => {}); // 자정이 지난 뒤 처음 여는 경우, 어제치 백업을 조용히 만들어둠(화면엔 영향 없음). 로그인된 뒤에만 시도한다(쓰기 작업이라 로그인 전엔 항상 실패했음).
   document.body.classList.remove("login-screen");
   const CURRENT_ACCOUNT_ID = _account.id;
   const CURRENT_ACCOUNT_NAME = _account.username;
