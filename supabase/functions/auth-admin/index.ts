@@ -180,7 +180,15 @@ Deno.serve(async (req: Request) => {
       if (!userId) return json({ ok: false, reason: "클라우드 인증 계정을 찾지 못했어요. 관리자에게 문의해주세요." });
 
       const { error: updErr } = await admin.auth.admin.updateUserById(userId, { password });
-      if (updErr) return json({ ok: false, reason: `비밀번호 전환에 실패했어요: ${updErr.message}` });
+      if (updErr) {
+        // Supabase Auth는 비밀번호가 6자 미만이면 무조건 거부한다(관리자 API로도 우회 불가).
+        // 이 계정의 기존 비밀번호가 6자 미만이면, 본인이 로그인만 해서는 절대 이 조건을
+        // 넘길 수 없다 — 마스터가 새 비밀번호(6자 이상)로 초기화해줘야만 풀린다.
+        if (/at least 6 characters/i.test(updErr.message || "")) {
+          return json({ ok: false, reason: "현재 비밀번호가 6자 미만이라 새 로그인 방식으로 자동 전환할 수 없어요. 마스터 계정에게 '마스터 계정 관리'에서 6자 이상의 새 비밀번호로 초기화해달라고 요청해주세요." });
+        }
+        return json({ ok: false, reason: `비밀번호 전환에 실패했어요: ${updErr.message}` });
+      }
 
       accounts[idx] = stripSecretFields(account);
       await saveAccountsRaw(accounts);
@@ -192,7 +200,7 @@ Deno.serve(async (req: Request) => {
       const targetAccountId = String(body?.targetAccountId || "");
       const newPassword = String(body?.newPassword || "");
       if (!targetAccountId || !newPassword) return json({ ok: false, reason: "대상 계정/새 비밀번호가 필요해요." });
-      if (newPassword.length < 4) return json({ ok: false, reason: "비밀번호는 4자 이상이어야 해요." });
+      if (newPassword.length < 6) return json({ ok: false, reason: "비밀번호는 6자 이상이어야 해요." });
 
       // 호출자가 실제로 로그인돼 있고 마스터 계정인지, 클라이언트가 보낸 값이 아니라
       // 요청에 실려온 인증 토큰(Authorization 헤더)으로 서버가 직접 확인한다.

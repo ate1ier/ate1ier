@@ -228,7 +228,7 @@
   // 마스터가 다른 계정의 비밀번호를 새 비밀번호로 초기화한다. 실제 검증·변경은
   // Edge Function(auth-admin)이 서버에서 처리한다 — 클라이언트는 결과만 받는다.
   async function resetAccountPassword(accountId, newPassword) {
-    if (!newPassword || newPassword.length < 4) return { ok: false, reason: "비밀번호는 4자 이상으로 만들어주세요." };
+    if (!newPassword || newPassword.length < 6) return { ok: false, reason: "비밀번호는 6자 이상으로 만들어주세요." };
     const list = loadAccounts();
     const idx = list.findIndex((a) => a.id === accountId);
     if (idx === -1) return { ok: false, reason: "계정을 찾을 수 없어요." };

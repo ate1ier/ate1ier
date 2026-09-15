@@ -116,7 +116,7 @@
             ${isResetting ? `
               <form class="login-form master-reset-form" data-reset-form="${a.id}" style="width:100%; margin-top:10px;">
                 <label class="login-field"><span>새 비밀번호</span>
-                  <input class="add-input" id="reset-password-${a.id}" type="password" autocomplete="new-password" placeholder="비밀번호 (4자 이상)">
+                  <input class="add-input" id="reset-password-${a.id}" type="password" autocomplete="new-password" placeholder="비밀번호 (6자 이상)">
                 </label>
                 <label class="login-field"><span>새 비밀번호 확인</span>
                   <input class="add-input" id="reset-password2-${a.id}" type="password" autocomplete="new-password" placeholder="비밀번호 확인">

@@ -96,7 +96,7 @@
                   ${uiState.signupType === "team" ? `<span class="login-master-hint">팀용은 여러 명이 비밀번호 하나를 같이 쓰고, 로그인할 때 인원만 골라요. 로그인 인원은 나중에 마스터 계정에서 추가할 수 있어요.</span>` : ""}
                 </label>
                 <label class="login-field"><span>비밀번호</span>
-                  <input class="add-input" id="signup-password" type="password" autocomplete="new-password" placeholder="비밀번호 (4자 이상)">
+                  <input class="add-input" id="signup-password" type="password" autocomplete="new-password" placeholder="비밀번호 (6자 이상)">
                 </label>
                 <label class="login-field"><span>비밀번호 확인</span>
                   <input class="add-input" id="signup-password2" type="password" autocomplete="new-password" placeholder="비밀번호 확인">
@@ -226,7 +226,7 @@
           const password = document.getElementById("signup-password").value;
           const password2 = document.getElementById("signup-password2").value;
           if (!username || !password) { uiState.error = "아이디와 비밀번호를 입력해주세요."; draw(); return; }
-          if (password.length < 4) { uiState.error = "비밀번호는 4자 이상으로 만들어주세요."; draw(); return; }
+          if (password.length < 6) { uiState.error = "비밀번호는 6자 이상으로 만들어주세요."; draw(); return; }
           if (password !== password2) { uiState.error = "비밀번호 확인이 일치하지 않아요."; draw(); return; }
           if (!cloud) { uiState.error = "클라우드 연결이 필요해요. 인터넷 연결을 확인한 뒤 다시 시도해주세요."; draw(); return; }
           try {
