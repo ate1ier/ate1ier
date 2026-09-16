@@ -1,0 +1,63 @@
+-- supabase/discord-backup-upload-setup.sql
+--
+-- "매일 자정 지나서 서버가 직접 백업을 만들고 디스코드 채널에 파일로 올리는" 기능을
+-- 예약하는 스크립트예요. discord-notify-setup.sql과 마찬가지로 pg_cron + pg_net을 씁니다.
+-- 새 테이블은 필요 없어요 (기존 kv_store만 읽고 씁니다).
+--
+-- ── 0) 준비물 ─────────────────────────────────────────────────────────
+--   1. 디스코드 채널 설정 → 연동 → 웹후크 → 새 웹후크 → URL 복사
+--   2. supabase secrets set DISCORD_BACKUP_WEBHOOK_URL=복사한_웹훅_URL
+--   3. supabase functions deploy discord-backup-upload --no-verify-jwt
+--   (함수 코드는 supabase/functions/discord-backup-upload/index.ts)
+
+-- ── 1) pg_cron으로 매일 한 번 Edge Function 호출하기 ─────────────────────
+-- 아래 두 확장은 Supabase 대시보드 → Database → Extensions 에서
+-- "pg_cron"과 "pg_net"을 켜면 됩니다 (무료 플랜에서도 사용 가능, discord-notify와 공용).
+--
+-- [방법 A — 추천] 대시보드에서 클릭만으로 설정하기
+--   1. Supabase 대시보드 → Integrations → Cron 으로 이동
+--   2. "Create a new Job" 클릭
+--   3. Type: "Supabase Edge Function" 선택 → discord-backup-upload 함수 선택
+--   4. Schedule: 매일 00:05 (KST) → cron 표현식으로는 UTC 기준 "5 15 * * *"
+--      (대시보드에 자연어 입력칸이 있으면 "every day at 00:05 Asia/Seoul"처럼 입력해도 됨)
+--   → 이러면 아래 [방법 B]의 SQL은 실행할 필요 없어요.
+--
+-- [방법 B] SQL로 직접 예약하기 (대시보드 Cron UI 대신 쓰고 싶을 때)
+--   <프로젝트REF>와 <SERVICE_ROLE_KEY>를 실제 값으로 바꾼 뒤 아래 주석을 풀고 실행하세요.
+--   (SERVICE_ROLE_KEY는 대시보드 → Project Settings → API 에서 확인할 수 있어요.
+--    이 키가 SQL 코드 안에 그대로 남으니, 이 스크립트를 다른 사람과 공유하지 않도록 주의하세요.)
+--
+-- select cron.schedule(
+--   'discord-backup-upload-daily',
+--   '5 15 * * *',  -- UTC 15:05 = KST 00:05 (매일 자정 5분 뒤)
+--   $$
+--   select net.http_post(
+--     url := 'https://<프로젝트REF>.supabase.co/functions/v1/discord-backup-upload',
+--     headers := jsonb_build_object(
+--       'Content-Type', 'application/json',
+--       'Authorization', 'Bearer <SERVICE_ROLE_KEY>'
+--     ),
+--     body := '{}'::jsonb
+--   );
+--   $$
+-- );
+
+-- 예약을 나중에 취소하고 싶으면:
+-- select cron.unschedule('discord-backup-upload-daily');
+
+-- ── 2) 잘 도는지 확인하는 법 ──────────────────────────────────────────
+-- 매번 밤까지 기다릴 필요 없이, 함수를 만든 직후 아무 때나 아래처럼 수동으로
+-- 한 번 호출해서 디스코드 채널에 파일이 올라오는지 바로 테스트할 수 있어요.
+--
+-- select net.http_post(
+--   url := 'https://<프로젝트REF>.supabase.co/functions/v1/discord-backup-upload',
+--   headers := jsonb_build_object(
+--     'Content-Type', 'application/json',
+--     'Authorization', 'Bearer <SERVICE_ROLE_KEY>'
+--   ),
+--   body := '{}'::jsonb
+-- );
+--
+-- 또는 터미널에서 curl로도 테스트 가능합니다:
+--   curl -X POST 'https://<프로젝트REF>.supabase.co/functions/v1/discord-backup-upload' \
+--     -H 'Authorization: Bearer <SERVICE_ROLE_KEY>'

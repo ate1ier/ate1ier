@@ -591,7 +591,9 @@
     cloudDelete(key);
   };
   await cloudHydrate();
-  runDailyAutoBackupIfNeeded().catch(() => {}); // 자정이 지난 뒤 처음 여는 경우, 어제치 백업을 조용히 만들어둠(화면엔 영향 없음)
+  // 자정 자동 백업은 이제 여기서(클라이언트) 만들지 않고, 서버 쪽 Discord 백업
+  // 엣지펑션(discord-backup-upload, pg_cron 매일 00:05 KST)이 전담합니다.
+  // runDailyAutoBackupIfNeeded().catch(() => {});
 
   /* ---- 실시간 구독: 다른 사람(또는 다른 탭)이 저장하면 곧바로 반영한다.
      - 우선 로컬 저장소(localStorage)에도 최신 값을 바로 써둔다. 이렇게 해야 지금 다른
