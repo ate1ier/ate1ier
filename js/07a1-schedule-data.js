@@ -144,7 +144,9 @@
       types: a.workTypes || [],
       isAdmin: !!a.isAdmin,
       // getStaffListForMonth에서 "보고 있는 달" 기준으로 퇴사 여부를 다시 거르는 데 쓰인다.
-      resignDate: a.status === "RESIGNED" ? (a.resignDate || null) : null,
+      // 재직 상태(status)가 아직 "근무중"이어도(=퇴사일자를 미래로 예약해둔 경우) 이 값은
+      // 그대로 채워서, 월별 스케줄에는 예약한 순간 바로 반영되게 한다.
+      resignDate: a.resignDate || null,
     }));
     // 기록(근무/오프/지각 등)을 지울 때는, 지금 "상담사 관리"에 없는 인원이라도
     // 지나간 달의 스냅샷에 남아있는 인원이면 그 달 기록은 지우지 않는다.

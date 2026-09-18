@@ -7,6 +7,28 @@
   }
   let agentsData = loadAgentsData();
 
+  // "오늘" 날짜를 "YYYY-MM-DD" 문자열로. 퇴사일자와 그대로 비교하기 위해 쓴다.
+  function agentTodayStr() { return `${today.getFullYear()}-${pad2(today.getMonth() + 1)}-${pad2(today.getDate())}`; }
+  // 퇴사일자를 미래 날짜로 입력해둔("예약된 퇴사") 사람인지. 이런 사람은 그 날짜가
+  // 되기 전까지는 "상담사 관리"에서 여전히 "근무중"으로 보이고(자동으로는 안 바뀜),
+  // 월별 스케줄에는 입력한 순간 바로 반영돼 있다.
+  function isAgentScheduledResign(a) {
+    return a.status === "WORKING" && !!a.resignDate && a.resignDate > agentTodayStr();
+  }
+  // 예약해둔 퇴사일자가 실제로 지나면(오늘이 되거나 지나면) 자동으로 "퇴사" 상태로
+  // 바꿔준다. 앱을 열 때마다(=날짜가 바뀐 뒤 새로 열었을 때) 한 번씩 확인한다.
+  function autoFlipResignedAgents() {
+    const todayStr = agentTodayStr();
+    let changed = false;
+    agentsData.forEach((a) => {
+      if (a.status === "WORKING" && a.resignDate && a.resignDate <= todayStr) {
+        a.status = "RESIGNED";
+        changed = true;
+      }
+    });
+    return changed;
+  }
+
   const agentsUi = {
     selectedId: null,
     mode: "view", // "view" | "add" | "edit"
@@ -37,7 +59,11 @@
     }
   }
 
+  // 앱을 여는 시점에 예약된 퇴사일이 이미 지난 사람이 있으면 바로 "퇴사"로 넘겨준다.
+  if (autoFlipResignedAgents()) saveAgentsData();
+
   function addAgent(values) {
+
     const id = genId();
     agentsData.push(Object.assign({ id }, values));
     saveAgentsData();
@@ -113,6 +139,9 @@
   // 리스트 안의 배지를 클릭하면 즉시 상태가 바뀌고, 저장과 동시에 월별 스케줄
   // 반영 여부도 자동으로 다시 계산된다. "퇴사"로 바꿀 때는 퇴사일자를 물어보고,
   // 그 날짜부터 해당 월 말일까지 월별 스케줄이 자동으로 "퇴사"로 채워진다.
+  // 입력한 퇴사일자가 오늘보다 미래라면, "상담사 관리"의 재직 상태는 그 날짜가
+  // 될 때까지 "근무중"으로 남아있고(자동으로 바로 "퇴사"로 바뀌지 않음) 그 날짜가
+  // 되면 자동으로 "퇴사"로 전환된다. 다만 월별 스케줄에는 입력한 즉시 반영된다.
   function toggleAgentStatus(id) {
     const agent = agentsData.find((a) => a.id === id);
     if (!agent) return;
@@ -123,9 +152,9 @@
       agent.status = "WORKING";
       agent.resignDate = null;
     } else {
-      const defaultDate = `${today.getFullYear()}-${pad2(today.getMonth() + 1)}-${pad2(today.getDate())}`;
+      const defaultDate = agentTodayStr();
       const input = window.prompt(
-        `${agent.name}님의 퇴사일자를 입력해주세요 (예: ${defaultDate}).\n이 날짜부터 이번 달 말일까지 월별 스케줄에 자동으로 "퇴사"로 표시돼요.`,
+        `${agent.name}님의 퇴사일자를 입력해주세요 (예: ${defaultDate}).\n이 날짜부터 이번 달 말일까지 월별 스케줄에 자동으로 "퇴사"로 표시돼요.\n미래 날짜를 입력하면, 그 날짜가 될 때까지는 "상담사 관리"에서 재직 상태가 "근무중"으로 유지되다가 그 날짜에 자동으로 "퇴사"로 바뀌어요(스케줄에는 지금 바로 반영돼요).`,
         defaultDate
       );
       if (input === null) return; // 취소하면 상태를 바꾸지 않는다
@@ -137,7 +166,7 @@
         flashAgentStatus("퇴사일자 형식이 올바르지 않아요 (예: 2026-09-14)");
         return;
       }
-      agent.status = "RESIGNED";
+      agent.status = trimmed <= agentTodayStr() ? "RESIGNED" : "WORKING";
       agent.resignDate = trimmed;
       if (typeof applyResignedScheduleFrom === "function") applyResignedScheduleFrom(agent.id, trimmed);
     }
@@ -285,7 +314,9 @@
     const typeBadges = (a.workTypes || []).map((t) => `<span class="badge sm ${t === "유선" ? "voice" : "chat"}">${esc(t)}</span>`).join("");
     const groupBadge = `<span class="badge sm ${a.group === "night" ? "night" : "day"}">${a.group === "night" ? "야간" : "주간"}</span>`;
     const isResigned = a.status === "RESIGNED";
-    const statusBadge = `<button type="button" class="badge-btn sm ${isResigned ? "resigned" : "working"}" data-action="toggle-agent-status" data-id="${a.id}" title="클릭하면 재직 상태가 바로 바뀌어요">${isResigned ? "퇴사" : "근무중"}</button>`;
+    const scheduledResign = isAgentScheduledResign(a);
+    const statusLabel = isResigned ? "퇴사" : (scheduledResign ? "근무중(퇴사예정)" : "근무중");
+    const statusBadge = `<button type="button" class="badge-btn sm ${isResigned ? "resigned" : "working"}" data-action="toggle-agent-status" data-id="${a.id}" title="${scheduledResign ? `${a.resignDate}부터 자동으로 퇴사 처리돼요. 클릭하면 재직 상태가 바로 바뀌어요` : "클릭하면 재직 상태가 바로 바뀌어요"}">${statusLabel}</button>`;
     return `
       <div class="agent-row ${selected ? "selected" : ""}" draggable="${draggable ? "true" : "false"}" data-agent-id="${a.id}" data-agent-section="${section}">
         <span class="drag-handle ${draggable ? "" : "drag-handle-disabled"}" title="${draggable ? "드래그해서 순서 변경" : "사용자 지정 정렬에서만 드래그할 수 있어요"}">⠿</span>
@@ -343,7 +374,7 @@
       </div>
       <div class="agent-field">
         <span class="agent-field-label">재직 상태</span>
-        <span class="agent-field-value">${agent.status === "RESIGNED" ? '<span class="badge resigned">퇴사</span>' : '<span class="badge working">근무중</span>'}</span>
+        <span class="agent-field-value">${agent.status === "RESIGNED" ? '<span class="badge resigned">퇴사</span>' : '<span class="badge working">근무중</span>'}${isAgentScheduledResign(agent) ? ` <span class="agent-field-empty">(${esc(agent.resignDate)}부터 자동 퇴사 예정, 월별 스케줄엔 이미 반영됨)</span>` : ""}</span>
       </div>
       ${renderAgentQAPreview(agent)}
       ${renderAgentInterviewSection(agent)}
@@ -355,7 +386,10 @@
     const v = agent || { name: "", ldap: "", empNo: "", hireDate: "", contact: "", workTypes: [], timezone: "", group: "day", isAdmin: false, status: "WORKING", resignDate: "" };
     const workTypes = v.workTypes || [];
     const group = v.group === "night" ? "night" : "day";
-    const status = v.status === "RESIGNED" ? "RESIGNED" : "WORKING";
+    // 아직 날짜가 안 된 "예약된 퇴사"(status는 WORKING인데 resignDate가 미래)여도
+    // 수정 화면에서는 "퇴사" 쪽을 선택해둔 상태로 보여준다. 그래야 나중에 다시
+    // 열었을 때 예약해둔 날짜를 확인하거나 취소(근무중으로 되돌리기)할 수 있다.
+    const status = (v.status === "RESIGNED" || v.resignDate) ? "RESIGNED" : "WORKING";
     return `
       <div class="agent-form-title">${isEdit ? "상담사 정보 수정" : "새 상담사 추가"}</div>
       <form class="agent-form" id="agent-form">
@@ -397,7 +431,7 @@
         </div>
         <label class="agent-form-label" id="agent-resigndate-wrap" style="${status === "RESIGNED" ? "" : "display:none;"}">퇴사일자
           <input type="date" class="add-input" id="agent-input-resigndate" value="${esc(v.resignDate || "")}" autocomplete="off">
-          <span class="agent-form-hint">이 날짜부터 그 달 말일까지 월별 스케줄이 자동으로 "퇴사"로 표시돼요.</span>
+          <span class="agent-form-hint">오늘 이전(또는 오늘) 날짜면 바로 "퇴사"로 처리돼요. 미래 날짜를 넣으면 그 날짜가 될 때까지 재직 상태는 "근무중"으로 유지되다 그 날 자동으로 "퇴사"로 바뀌어요 — 월별 스케줄에는 지금 바로 그 날짜부터 반영됩니다.</span>
         </label>
         <div class="agent-form-label">권한
           <div class="agent-checkbox-row">
@@ -706,7 +740,7 @@
         const isResigned = !!(statusResignedRadio && statusResignedRadio.checked);
         resignWrap.style.display = isResigned ? "" : "none";
         if (isResigned && resignDateInput && !resignDateInput.value) {
-          resignDateInput.value = `${today.getFullYear()}-${pad2(today.getMonth() + 1)}-${pad2(today.getDate())}`;
+          resignDateInput.value = agentTodayStr();
         }
       };
       if (statusWorkingRadio) statusWorkingRadio.onchange = syncResignWrapVisibility;
@@ -726,18 +760,24 @@
         if (document.getElementById("agent-input-chat").checked) workTypes.push("채팅");
         const group = document.getElementById("agent-input-group-night").checked ? "night" : "day";
         const isAdmin = document.getElementById("agent-input-admin").checked;
-        const status = document.getElementById("agent-input-status-resigned").checked ? "RESIGNED" : "WORKING";
+        const selectedResigned = document.getElementById("agent-input-status-resigned").checked;
         let resignDate = null;
-        if (status === "RESIGNED") {
+        if (selectedResigned) {
           const rawResignDate = resignDateInput ? resignDateInput.value.trim() : "";
-          resignDate = rawResignDate || `${today.getFullYear()}-${pad2(today.getMonth() + 1)}-${pad2(today.getDate())}`;
+          resignDate = rawResignDate || agentTodayStr();
         }
+        // 퇴사일자가 오늘 이전(또는 오늘)이면 바로 "퇴사"로 저장하지만, 미래 날짜면
+        // 그 날짜가 될 때까지 재직 상태는 "근무중"으로 남아있다가 그 날 자동으로
+        // "퇴사"로 바뀐다(autoFlipResignedAgents). 월별 스케줄 자동 반영 여부는
+        // 이 저장 상태(status)가 아니라 아래에서 selectedResigned로 따로 판단하므로,
+        // 미래 날짜를 입력해도 스케줄에는 지금 바로 반영된다.
+        const status = (selectedResigned && !(resignDate && resignDate > agentTodayStr())) ? "RESIGNED" : "WORKING";
         const values = { name, ldap, empNo, hireDate, contact, workTypes, timezone, group, isAdmin, status, resignDate };
 
         const prevAgent = (agentsUi.mode === "edit" && agentsUi.editingId)
           ? agentsData.find((a) => a.id === agentsUi.editingId)
           : null;
-        const prevStatus = prevAgent ? prevAgent.status : "WORKING";
+        const prevResigning = !!(prevAgent && prevAgent.resignDate);
         const prevResignDate = prevAgent ? prevAgent.resignDate : null;
 
         let targetId;
@@ -752,13 +792,14 @@
 
         // 재직 상태/퇴사일자가 실제로 바뀐 경우에만 월별 스케줄의 자동 "퇴사" 반영을
         // 다시 계산한다. 퇴사일자를 고쳤을 때는 예전 날짜로 채워둔 칸을 먼저 지우고
-        // 새 날짜로 다시 채운다.
-        if (status === "RESIGNED" && (prevStatus !== "RESIGNED" || prevResignDate !== resignDate)) {
-          if (prevStatus === "RESIGNED" && prevResignDate && typeof clearResignedScheduleFrom === "function") {
+        // 새 날짜로 다시 채운다. (퇴사일자가 미래라 재직 상태 자체는 아직 "근무중"으로
+        // 남아있는 경우에도, 스케줄에는 선택한 날짜를 그대로 바로 반영한다)
+        if (selectedResigned && (!prevResigning || prevResignDate !== resignDate)) {
+          if (prevResigning && prevResignDate && typeof clearResignedScheduleFrom === "function") {
             clearResignedScheduleFrom(targetId, prevResignDate);
           }
           if (typeof applyResignedScheduleFrom === "function") applyResignedScheduleFrom(targetId, resignDate);
-        } else if (status !== "RESIGNED" && prevStatus === "RESIGNED" && prevResignDate) {
+        } else if (!selectedResigned && prevResigning && prevResignDate) {
           if (typeof clearResignedScheduleFrom === "function") clearResignedScheduleFrom(targetId, prevResignDate);
         }
 
