@@ -8039,7 +8039,11 @@
   //   스냅샷이 아직 없는 지난 달이라면(=이번에 처음 그 달이 과거가 된 경우) 지금 시점의
   //   인원 데이터로 스냅샷을 만들어 고정해버린다. 이후로는 "상담사 관리"에서 인원이
   //   바뀌어도 이 스냅샷은 절대 바뀌지 않는다.
-  // - 이번 달과 미래 달은 "상담사 관리"의 실시간 데이터(scheduleData.staff)를 그대로 쓴다.
+  // - 이번 달과 미래 달은 "상담사 관리"의 실시간 데이터(scheduleData.staff)를 기반으로 쓰되,
+  //   "보고 있는 달" 자체를 기준으로 퇴사 여부를 한 번 더 거른다. 퇴사일이 속한 달까지는
+  //   명단에 남고, 그 다음 달부터는(실제 오늘 날짜와 상관없이, 미리 열어보는 미래 달이라도)
+  //   명단에서 완전히 빠진다. (예: 9월 30일에 퇴사해도 9월 스케줄은 그대로 남고, 10월
+  //   스케줄을 미리 열어봐도 그 사람은 더 이상 보이지 않는다)
   function getStaffListForMonth(year, monthIndex) {
     const key = scheduleMonthKey(year, monthIndex);
     if (scheduleData.staffHistory[key]) return scheduleData.staffHistory[key];
@@ -8048,7 +8052,11 @@
       saveScheduleData();
       return scheduleData.staffHistory[key];
     }
-    return scheduleData.staff;
+    return scheduleData.staff.filter((s) => {
+      if (!s.resignDate) return true;
+      const resignMonthKey = s.resignDate.slice(0, 7); // "YYYY-MM"
+      return resignMonthKey >= key;
+    });
   }
 
   // 월별 스케줄의 인원 목록을 "상담사 관리"의 목록으로 자동 반영한다.
@@ -8087,6 +8095,8 @@
       group: a.group === "night" ? "night" : "day",
       types: a.workTypes || [],
       isAdmin: !!a.isAdmin,
+      // getStaffListForMonth에서 "보고 있는 달" 기준으로 퇴사 여부를 다시 거르는 데 쓰인다.
+      resignDate: a.status === "RESIGNED" ? (a.resignDate || null) : null,
     }));
     // 기록(근무/오프/지각 등)을 지울 때는, 지금 "상담사 관리"에 없는 인원이라도
     // 지나간 달의 스냅샷에 남아있는 인원이면 그 달 기록은 지우지 않는다.
@@ -8112,15 +8122,18 @@
   }
 
   // ----- 퇴사 처리 시 월별 스케줄 자동 반영 -----
-  // "상담사 관리"에서 어떤 인원을 "퇴사"로 바꾸면, 입력한 퇴사일자부터 그 달
-  // 말일까지 월별 스케줄의 해당 인원 칸을 전부 "퇴사"로 자동 채운다. 이미
-  // 손으로 다른 값을 넣어둔 칸이라도 퇴사 처리 시점에는 더는 의미가 없으므로
-  // 덮어쓴다. 자동으로 채워진 칸도 잠금 처리는 하지 않으므로, 필요하면
-  // 관리자가 다른 셀과 똑같이 클릭해서 다시 고칠 수 있다.
+  // "상담사 관리"에서 어떤 인원을 "퇴사"로 바꾸면, 입력한 퇴사일자 "다음 날"부터 그 달
+  // 말일까지 월별 스케줄의 해당 인원 칸을 전부 "퇴사"로 자동 채운다(퇴사일 당일까지는
+  // 마지막 근무일로 보고 그대로 둔다). 이미 손으로 다른 값을 넣어둔 칸이라도 퇴사
+  // 처리 시점에는 더는 의미가 없으므로 덮어쓴다. 자동으로 채워진 칸도 잠금 처리는
+  // 하지 않으므로, 필요하면 관리자가 다른 셀과 똑같이 클릭해서 다시 고칠 수 있다.
+  // (퇴사일이 그 달의 말일이면 다음 날이 다음 달로 넘어가므로, 이 달에는 아무 칸도
+  // 바뀌지 않고 그대로 유지된다 — 대신 다음 달 명단에서는 getStaffListForMonth가
+  // 알아서 그 사람을 빼준다)
   function applyResignedScheduleFrom(staffId, resignDateStr) {
     const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(resignDateStr || "");
     if (!m) return;
-    const year = Number(m[1]), monthIndex = Number(m[2]) - 1, startDay = Number(m[3]);
+    const year = Number(m[1]), monthIndex = Number(m[2]) - 1, startDay = Number(m[3]) + 1;
     // 다른 일괄 변경 기능들(붙여넣기/일괄삭제 등)과 마찬가지로, 퇴사일이 속한 달이
     // 잠겨 있으면(이미 확정된 지난 달 등) 자동 반영하지 않고 알려준다.
     if (scheduleIsMonthLocked(year, monthIndex)) {
@@ -8144,7 +8157,7 @@
   function clearResignedScheduleFrom(staffId, resignDateStr) {
     const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(resignDateStr || "");
     if (!m) return;
-    const year = Number(m[1]), monthIndex = Number(m[2]) - 1, startDay = Number(m[3]);
+    const year = Number(m[1]), monthIndex = Number(m[2]) - 1, startDay = Number(m[3]) + 1;
     const daysInMonth = scheduleDaysInMonth(year, monthIndex);
     let changed = false;
     for (let day = startDay; day <= daysInMonth; day++) {
