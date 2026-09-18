@@ -47,7 +47,24 @@
     return `${n}B`;
   }
   function sanitizeAttachmentFileName(name) {
-    return String(name || "file").replace(/[\/\\?%*:|"<>]/g, "_").slice(0, 150);
+    // Supabase Storage 키는 AWS S3 오브젝트 키 규칙(대략 영문/숫자/일부 안전 특수문자)만
+    // 허용하며, 한글 등 비-ASCII 문자가 포함되면 "Invalid key" 오류로 업로드가 실패한다.
+    // 화면에 보이는 파일명(att.name, 다운로드 시 사용)은 원본 그대로 두고, 이 함수는
+    // Storage 저장 경로에만 쓰일 안전한 이름을 만든다.
+    const raw = String(name || "file").trim();
+    const dot = raw.lastIndexOf(".");
+    const hasExt = dot > 0 && dot < raw.length - 1;
+    const rawExt = hasExt ? raw.slice(dot + 1) : "";
+    const rawBase = hasExt ? raw.slice(0, dot) : raw;
+    const ext = rawExt.replace(/[^a-zA-Z0-9]/g, "").slice(0, 10);
+    let base = rawBase
+      .replace(/\s+/g, "_")
+      .replace(/[^a-zA-Z0-9!\-_.'()]/g, "") // 한글 등 비-ASCII 및 기타 특수문자 제거
+      .replace(/_+/g, "_")
+      .replace(/^[_.]+|[_.]+$/g, "")
+      .slice(0, 100);
+    if (!base) base = "file";
+    return ext ? `${base}.${ext}` : base;
   }
   function attachmentStoragePath(noteId, att) {
     return `${CURRENT_ACCOUNT_ID}/${noteId}/${att.id}_${sanitizeAttachmentFileName(att.name)}`;

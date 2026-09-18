@@ -1,4 +1,2407 @@
 (async function () {
+  /* ---- 심플한 라인 아이콘 세트 (이모티콘 대체) ---- */
+  const ICON_HOME = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.3 8.2 8 3.2l5.7 5"/><path d="M3.6 6.8V13h3.1v-4h2.6v4h3.1V6.8"/></svg>`;
+  const ICON_CALENDAR = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="3.4" width="11" height="10.2" rx="1.6"/><path d="M2.5 6.6h11M5.6 2v2.4M10.4 2v2.4"/></svg>`;
+  const ICON_NOTE = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4.3 2.6h5l2.4 2.4v8.4h-7.4z"/><path d="M9.3 2.6V5h2.4"/><path d="M6 8.4h4M6 10.8h4"/></svg>`;
+  const ICON_EDIT = `<svg class="icon-emo" viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M10.6 2.4 13.6 5.4 5.4 13.6 2.2 13.8 2.4 10.6z"/><path d="M9.2 3.8 12.2 6.8"/></svg>`;
+  const ICON_USERS = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2.1"/><path d="M2.4 13c0-2.1 1.6-3.6 3.6-3.6s3.6 1.5 3.6 3.6"/><circle cx="11.3" cy="6.4" r="1.7"/><path d="M9.9 9.6c1.7.2 3 1.5 3 3.4"/></svg>`;
+  const ICON_CLIPBOARD = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.6" y="3" width="8.8" height="11.2" rx="1.4"/><path d="M6.2 3V2.4a1 1 0 0 1 1-1h1.6a1 1 0 0 1 1 1V3"/><path d="M5.8 7.4h4.4M5.8 10h4.4"/></svg>`;
+  const ICON_CHART = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.4 13.6h11.2"/><rect x="3.8" y="8.4" width="2.1" height="4.3"/><rect x="7" y="5.6" width="2.1" height="7.1"/><rect x="10.2" y="9.8" width="2.1" height="2.9"/></svg>`;
+  const ICON_BOOK = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.6 3.4c1.6-.7 3.4-.7 5 0v9.2c-1.6-.7-3.4-.7-5 0V3.4Z"/><path d="M13.4 3.4c-1.6-.7-3.4-.7-5 0v9.2c1.6-.7 3.4-.7 5 0V3.4Z"/></svg>`;
+  const ICON_LOGOUT = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.8 13.2H4.4A1.4 1.4 0 0 1 3 11.8V4.2A1.4 1.4 0 0 1 4.4 2.8h2.4"/><path d="M9.6 5.4 13 8l-3.4 2.6"/><path d="M13 8H6.4"/></svg>`;
+  const ICON_USER = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="5.6" r="2.6"/><path d="M3 13.2c0-2.6 2.2-4.4 5-4.4s5 1.8 5 4.4"/></svg>`;
+  const ICON_SHIELD = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2.2 12.8 4v3.9c0 3.4-2.1 5.7-4.8 6.5-2.7-.8-4.8-3.1-4.8-6.5V4z"/></svg>`;
+  const ICON_MOON = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12.8 9.9A5.1 5.1 0 1 1 6.1 3.2a4.1 4.1 0 0 0 6.7 6.7z"/></svg>`;
+  const ICON_SUN = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="2.7"/><path d="M8 1.8v1.5M8 12.7v1.5M14.2 8h-1.5M3.3 8H1.8M12.3 3.7l-1.1 1.1M4.8 11.2l-1.1 1.1M12.3 12.3l-1.1-1.1M4.8 4.8l-1.1-1.1"/></svg>`;
+  const ICON_QA = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1.6l1.8 3.7 4 .6-2.9 2.8.7 4-3.6-1.9-3.6 1.9.7-4-2.9-2.8 4-.6z"/></svg>`;
+  const ICON_PIN = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2.4 12 6l-1.9 1.9v3.5L8 13.6l-2.1-2.2V7.9L4 6z"/></svg>`;
+  const ICON_DRAG_HANDLE = `<svg class="icon-emo" viewBox="0 0 16 16" width="13" height="13" fill="currentColor"><circle cx="5.3" cy="3.6" r="1.15"/><circle cx="10.7" cy="3.6" r="1.15"/><circle cx="5.3" cy="8" r="1.15"/><circle cx="10.7" cy="8" r="1.15"/><circle cx="5.3" cy="12.4" r="1.15"/><circle cx="10.7" cy="12.4" r="1.15"/></svg>`;
+
+  /* ---- 내비게이션 독 아이콘: macOS 스타일 스퀄클 플랫 아이콘 (메인 좌측 메뉴 전용) ---- */
+  const NAV_ICON_HOME = `<svg class="nav-dock-icon" viewBox="0 0 512 512" aria-hidden="true"><defs><clipPath id="nih"><path d="M512 256L511 369L508 405L504 430L498 450L489 466L479 479L466 489L450 498L430 504L405 508L369 511L256 512L143 511L107 508L82 504L62 498L46 489L33 479L23 466L14 450L8 430L4 405L1 369L0 256L1 143L4 107L8 82L14 62L23 46L33 33L46 23L62 14L82 8L107 4L143 1L256 0L369 1L405 4L430 8L450 14L466 23L479 33L489 46L498 62L504 82L508 107L511 143L512 256Z"/></clipPath></defs><path d="M512 256L511 369L508 405L504 430L498 450L489 466L479 479L466 489L450 498L430 504L405 508L369 511L256 512L143 511L107 508L82 504L62 498L46 489L33 479L23 466L14 450L8 430L4 405L1 369L0 256L1 143L4 107L8 82L14 62L23 46L33 33L46 23L62 14L82 8L107 4L143 1L256 0L369 1L405 4L430 8L450 14L466 23L479 33L489 46L498 62L504 82L508 107L511 143L512 256Z" fill="#c1683f"/><g clip-path="url(#nih)"><path d="M130 260L256 160L382 260" fill="none" stroke="#fdf3e5" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"/><path d="M162 236V366H350V236" fill="#fdf3e5"/><rect x="240" y="292" width="32" height="74" fill="#c1683f"/></g></svg>`;
+  const NAV_ICON_CALENDAR = `<svg class="nav-dock-icon" viewBox="0 0 512 512" aria-hidden="true"><defs><clipPath id="nic"><path d="M512 256L511 369L508 405L504 430L498 450L489 466L479 479L466 489L450 498L430 504L405 508L369 511L256 512L143 511L107 508L82 504L62 498L46 489L33 479L23 466L14 450L8 430L4 405L1 369L0 256L1 143L4 107L8 82L14 62L23 46L33 33L46 23L62 14L82 8L107 4L143 1L256 0L369 1L405 4L430 8L450 14L466 23L479 33L489 46L498 62L504 82L508 107L511 143L512 256Z"/></clipPath></defs><path d="M512 256L511 369L508 405L504 430L498 450L489 466L479 479L466 489L450 498L430 504L405 508L369 511L256 512L143 511L107 508L82 504L62 498L46 489L33 479L23 466L14 450L8 430L4 405L1 369L0 256L1 143L4 107L8 82L14 62L23 46L33 33L46 23L62 14L82 8L107 4L143 1L256 0L369 1L405 4L430 8L450 14L466 23L479 33L489 46L498 62L504 82L508 107L511 143L512 256Z" fill="#33363d"/><g clip-path="url(#nic)"><rect x="126" y="118" width="260" height="288" fill="#f2ead9"/><rect x="126" y="118" width="260" height="56" fill="#c1683f"/><rect x="168" y="90" width="18" height="46" rx="9" fill="#f2ead9"/><rect x="326" y="90" width="18" height="46" rx="9" fill="#f2ead9"/><text x="256" y="330" font-family="Georgia, 'Times New Roman', serif" font-size="170" font-weight="700" fill="#33363d" text-anchor="middle">6</text></g></svg>`;
+  const NAV_ICON_AGENTS = `<svg class="nav-dock-icon" viewBox="0 0 512 512" aria-hidden="true"><defs><clipPath id="nia"><path d="M512 256L511 369L508 405L504 430L498 450L489 466L479 479L466 489L450 498L430 504L405 508L369 511L256 512L143 511L107 508L82 504L62 498L46 489L33 479L23 466L14 450L8 430L4 405L1 369L0 256L1 143L4 107L8 82L14 62L23 46L33 33L46 23L62 14L82 8L107 4L143 1L256 0L369 1L405 4L430 8L450 14L466 23L479 33L489 46L498 62L504 82L508 107L511 143L512 256Z"/></clipPath></defs><path d="M512 256L511 369L508 405L504 430L498 450L489 466L479 479L466 489L450 498L430 504L405 508L369 511L256 512L143 511L107 508L82 504L62 498L46 489L33 479L23 466L14 450L8 430L4 405L1 369L0 256L1 143L4 107L8 82L14 62L23 46L33 33L46 23L62 14L82 8L107 4L143 1L256 0L369 1L405 4L430 8L450 14L466 23L479 33L489 46L498 62L504 82L508 107L511 143L512 256Z" fill="#5f6fae"/><g clip-path="url(#nia)"><circle cx="200" cy="200" r="62" fill="#f2ead9"/><path d="M104 396Q104 300 200 300Q296 300 296 396Z" fill="#f2ead9"/><circle cx="342" cy="222" r="46" fill="#e3d9be"/><path d="M282 400Q282 322 342 310Q402 322 402 400" fill="#e3d9be"/></g></svg>`;
+  const NAV_ICON_NOTES = `<svg class="nav-dock-icon" viewBox="0 0 512 512" aria-hidden="true"><defs><clipPath id="nin"><path d="M512 256L511 369L508 405L504 430L498 450L489 466L479 479L466 489L450 498L430 504L405 508L369 511L256 512L143 511L107 508L82 504L62 498L46 489L33 479L23 466L14 450L8 430L4 405L1 369L0 256L1 143L4 107L8 82L14 62L23 46L33 33L46 23L62 14L82 8L107 4L143 1L256 0L369 1L405 4L430 8L450 14L466 23L479 33L489 46L498 62L504 82L508 107L511 143L512 256Z"/></clipPath></defs><path d="M512 256L511 369L508 405L504 430L498 450L489 466L479 479L466 489L450 498L430 504L405 508L369 511L256 512L143 511L107 508L82 504L62 498L46 489L33 479L23 466L14 450L8 430L4 405L1 369L0 256L1 143L4 107L8 82L14 62L23 46L33 33L46 23L62 14L82 8L107 4L143 1L256 0L369 1L405 4L430 8L450 14L466 23L479 33L489 46L498 62L504 82L508 107L511 143L512 256Z" fill="#d3a03f"/><g clip-path="url(#nin)"><rect x="128" y="96" width="256" height="320" fill="#fdf6e7"/><rect x="164" y="164" width="184" height="16" fill="#d3a03f"/><rect x="164" y="212" width="184" height="16" fill="#d3a03f"/><rect x="164" y="260" width="120" height="16" fill="#d3a03f"/><g transform="translate(300,320) rotate(45)"><rect x="-14" y="-84" width="28" height="140" fill="#33363d"/><polygon points="-14,56 14,56 0,90" fill="#d3a03f"/></g></g></svg>`;
+  const NAV_ICON_INTERVIEWS = `<svg class="nav-dock-icon" viewBox="0 0 512 512" aria-hidden="true"><defs><clipPath id="nii"><path d="M512 256L511 369L508 405L504 430L498 450L489 466L479 479L466 489L450 498L430 504L405 508L369 511L256 512L143 511L107 508L82 504L62 498L46 489L33 479L23 466L14 450L8 430L4 405L1 369L0 256L1 143L4 107L8 82L14 62L23 46L33 33L46 23L62 14L82 8L107 4L143 1L256 0L369 1L405 4L430 8L450 14L466 23L479 33L489 46L498 62L504 82L508 107L511 143L512 256Z"/></clipPath></defs><path d="M512 256L511 369L508 405L504 430L498 450L489 466L479 479L466 489L450 498L430 504L405 508L369 511L256 512L143 511L107 508L82 504L62 498L46 489L33 479L23 466L14 450L8 430L4 405L1 369L0 256L1 143L4 107L8 82L14 62L23 46L33 33L46 23L62 14L82 8L107 4L143 1L256 0L369 1L405 4L430 8L450 14L466 23L479 33L489 46L498 62L504 82L508 107L511 143L512 256Z" fill="#3f8f86"/><g clip-path="url(#nii)"><rect x="146" y="100" width="220" height="312" fill="#f2ead9"/><rect x="198" y="80" width="116" height="42" fill="#e3d9be"/><rect x="178" y="192" width="160" height="14" fill="#3f8f86"/><rect x="178" y="234" width="160" height="14" fill="#3f8f86"/><rect x="178" y="276" width="104" height="14" fill="#3f8f86"/><circle cx="330" cy="352" r="42" fill="#33363d"/><path d="M312 352L324 366L350 336" fill="none" stroke="#f2ead9" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/></g></svg>`;
+  const NAV_ICON_QA = `<svg class="nav-dock-icon" viewBox="0 0 512 512" aria-hidden="true"><defs><clipPath id="niq"><path d="M512 256L511 369L508 405L504 430L498 450L489 466L479 479L466 489L450 498L430 504L405 508L369 511L256 512L143 511L107 508L82 504L62 498L46 489L33 479L23 466L14 450L8 430L4 405L1 369L0 256L1 143L4 107L8 82L14 62L23 46L33 33L46 23L62 14L82 8L107 4L143 1L256 0L369 1L405 4L430 8L450 14L466 23L479 33L489 46L498 62L504 82L508 107L511 143L512 256Z"/></clipPath></defs><path d="M512 256L511 369L508 405L504 430L498 450L489 466L479 479L466 489L450 498L430 504L405 508L369 511L256 512L143 511L107 508L82 504L62 498L46 489L33 479L23 466L14 450L8 430L4 405L1 369L0 256L1 143L4 107L8 82L14 62L23 46L33 33L46 23L62 14L82 8L107 4L143 1L256 0L369 1L405 4L430 8L450 14L466 23L479 33L489 46L498 62L504 82L508 107L511 143L512 256Z" fill="#c26a86"/><g clip-path="url(#niq)"><path d="M256 114L294 219L406 227L320 297L347 405L256 344L165 405L192 297L106 227L218 219Z" fill="#fdf6e7"/><circle cx="256" cy="246" r="48" fill="#c26a86"/><path d="M236 246L250 260L278 228" fill="none" stroke="#fdf6e7" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/></g></svg>`;
+  const NAV_ICON_SCHEDULE = `<svg class="nav-dock-icon" viewBox="0 0 512 512" aria-hidden="true"><defs><clipPath id="nis"><path d="M512 256L511 369L508 405L504 430L498 450L489 466L479 479L466 489L450 498L430 504L405 508L369 511L256 512L143 511L107 508L82 504L62 498L46 489L33 479L23 466L14 450L8 430L4 405L1 369L0 256L1 143L4 107L8 82L14 62L23 46L33 33L46 23L62 14L82 8L107 4L143 1L256 0L369 1L405 4L430 8L450 14L466 23L479 33L489 46L498 62L504 82L508 107L511 143L512 256Z"/></clipPath></defs><path d="M512 256L511 369L508 405L504 430L498 450L489 466L479 479L466 489L450 498L430 504L405 508L369 511L256 512L143 511L107 508L82 504L62 498L46 489L33 479L23 466L14 450L8 430L4 405L1 369L0 256L1 143L4 107L8 82L14 62L23 46L33 33L46 23L62 14L82 8L107 4L143 1L256 0L369 1L405 4L430 8L450 14L466 23L479 33L489 46L498 62L504 82L508 107L511 143L512 256Z" fill="#6fa07a"/><g clip-path="url(#nis)"><rect x="120" y="398" width="272" height="14" fill="#f2ead9"/><rect x="146" y="322" width="52" height="76" fill="#f2ead9"/><rect x="230" y="240" width="52" height="158" fill="#f2ead9"/><rect x="314" y="280" width="52" height="118" fill="#f2ead9"/></g></svg>`;
+  const ICON_CHECK = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2.6" y="2.6" width="10.8" height="10.8" rx="2.4"/><path d="M5 8.2 7 10.1 11 5.9"/></svg>`;
+  const ICON_LOCK = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.6" y="7.2" width="8.8" height="6.4" rx="1.4"/><path d="M5.4 7.2V5.2a2.6 2.6 0 0 1 5.2 0v2"/></svg>`;
+  const ICON_UNLOCK = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.6" y="7.2" width="8.8" height="6.4" rx="1.4"/><path d="M5.4 7.2V5.2a2.6 2.6 0 0 1 4.8-1.9"/></svg>`;
+  const ICON_TRASH = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3.4 5h9.2"/><path d="M6.4 5V3.7c0-.4.3-.7.7-.7h1.8c.4 0 .7.3.7.7V5"/><path d="M4.8 5l.6 7.9c0 .5.5.9 1 .9h3.2c.5 0 .9-.4 1-.9L11.2 5"/><path d="M6.8 7.3v3.9M9.2 7.3v3.9"/></svg>`;
+  const ICON_CAMERA = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6h2.1l1-1.5h4.8l1 1.5h2.1v6.6H2.5z"/><circle cx="8" cy="9.5" r="2.1"/></svg>`;
+  const ICON_DOWNLOAD = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2.5v7.2"/><path d="M5.2 7.1 8 9.9l2.8-2.8"/><path d="M3.2 13h9.6"/></svg>`;
+  const ICON_BELL = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11.2V7.4a4 4 0 0 1 8 0v3.8l1.1 1.5H2.9z"/><path d="M6.6 13.4a1.5 1.5 0 0 0 2.8 0"/></svg>`;
+  const ICON_CLOCK = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="5.6"/><path d="M8 4.8V8l2.4 1.4"/></svg>`;
+  const ICON_CLOSE_SM = `<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg>`;
+  const ICON_CHEVRON_RIGHT = `<svg class="icon-emo" viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.4 10.6 8 6 12.6"/></svg>`;
+  const ICON_UNDO = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4.6v3.4h3.4"/><path d="M4.6 8A5 5 0 1 1 6 11.7"/></svg>`;
+  const ICON_UPLOAD = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 9.7V2.5"/><path d="M5.2 5.3 8 2.5l2.8 2.8"/><path d="M3.2 13h9.6"/></svg>`;
+  const ICON_BACKUP = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.6 4.4c0-1 2.4-1.8 5.4-1.8s5.4.8 5.4 1.8-2.4 1.8-5.4 1.8-5.4-.8-5.4-1.8Z"/><path d="M2.6 4.4V8c0 1 2.4 1.8 5.4 1.8s5.4-.8 5.4-1.8V4.4"/><path d="M2.6 8v3.6c0 1 2.4 1.8 5.4 1.8s5.4-.8 5.4-1.8V8"/></svg>`;
+  const ICON_REFRESH = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 8A5 5 0 1 1 11.4 4.3"/><path d="M13 2.6V6h-3.4"/></svg>`;
+  const ICON_SETTINGS = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="2.1"/><path d="M8 2.4v1.5M8 12.1v1.5M13.6 8h-1.5M3.9 8H2.4M11.9 4.1l-1.05 1.05M5.15 10.85 4.1 11.9M11.9 11.9l-1.05-1.05M5.15 5.15 4.1 4.1"/></svg>`;
+  const ICON_DISCORD = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4.8 3.6C6 3.1 7 3 8 3s2 .1 3.2.6c1 1.4 1.6 3 1.7 4.9-1 .8-2.3 1.3-3.6 1.5l-.4-.8c.6-.2 1.1-.4 1.6-.7-.1-.1-.3-.2-.4-.3-2 1-4.4 1-6.4 0-.1.1-.3.2-.4.3.5.3 1 .5 1.6.7l-.4.8c-1.3-.2-2.6-.7-3.6-1.5.1-1.9.7-3.5 1.7-4.9Z"/><circle cx="6.1" cy="8" r=".8" fill="currentColor" stroke="none"/><circle cx="9.9" cy="8" r=".8" fill="currentColor" stroke="none"/></svg>`;
+  // 하단 독의 "이름 통합 검색"과 같은 모양의 작은 검색 아이콘. 다른 검색창들(상담사 검색,
+  // 면담일지 검색, 면담 대상/관리자 검색)에서도 오른쪽에 똑같이 붙여서 통일감을 준다.
+  const ICON_SEARCH_MINI = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="7" r="4.2"/><path d="M13 13l-2.9-2.9"/></svg>`;
+  /* ===================== ☁️ 클라우드 동기화 (Supabase) =====================
+     계정 목록과 각 계정의 데이터(할일/메모/상담사/면담일지/스케줄/캘린더)를
+     Supabase의 kv_store 테이블에도 함께 저장해서, 다른 기기·다른 사람도
+     같은 데이터를 볼 수 있게 한다. 화면 테마, 내비게이션 접기 상태, 로그인
+     세션처럼 "이 브라우저에서만 의미 있는" 값은 그대로 로컬(localStorage)에만
+     남겨둔다.
+     주의: 지금 구조는 Supabase RLS를 열어둔 간단한 방식이라, anon key만
+     있으면 이 kv_store 테이블을 누구나 읽고 쓸 수 있다. 팀 내부 소규모
+     사용에는 충분하지만, 외부에 공개할 서비스라면 나중에 Supabase Auth
+     기반으로 더 강화해야 한다. */
+  const SUPABASE_URL = "https://zsjnuueknhfrnnfunxad.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpzam51dWVrbmhmcm5uZnVueGFkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc3NDY0NjYsImV4cCI6MjEwMzMyMjQ2Nn0.4bCMYyOcfFID71v4milpoJ8mbAHpH12lPkN72Es_Zd4";
+  const cloud = (window.supabase && SUPABASE_URL && SUPABASE_ANON_KEY)
+    ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+    : null;
+
+  // 기기(브라우저)마다 달라도 되는 값들 — 클라우드에 동기화하지 않는다.
+  const CLOUD_EXCLUDED_KEYS = new Set([
+    "app-theme-mode",
+    "personal-app:session",
+    "personal-app:master-origin",
+    "personal-app:last-active", // 로그인 유지용 하트비트. 이 브라우저(탭)에서만 의미 있는
+    // 값인데 빠져 있어서, 15초마다 모든 사람의 탭에서 클라우드에 저장을 시도하고 있었다.
+    // 그 하트비트는 계정 구분 없이 하나의 키를 공유해서, 다른 사람이 그냥 탭을 열어두기만
+    // 해도 계속 클라우드 쓰기가 발생하는 원인 중 하나였다.
+  ]);
+  function isCloudSynced(key) {
+    if (!cloud) return false;
+    if (CLOUD_EXCLUDED_KEYS.has(key)) return false;
+    if (key.indexOf("personal-app:page") !== -1) return false; // 마지막으로 보던 페이지도 기기별로 달라도 됨
+    return true;
+  }
+  // 진행 중인 클라우드 저장 요청들을 추적한다. location.reload() 같이 페이지를
+  // 새로고침/이동시키는 동작 직전에는 반드시 flushCloudWrites()로 이 목록이
+  // 비워질 때까지 기다려야, 저장 요청이 끝나기 전에 페이지가 새로고침되면서
+  // 네트워크 요청이 그대로 끊겨버리는 문제(= Supabase에 데이터가 저장 안 되는
+  // 것처럼 보이는 문제)를 막을 수 있다.
+  const _pendingCloudWrites = new Set();
+  function _trackCloudWrite(promise) {
+    _pendingCloudWrites.add(promise);
+    const clear = () => _pendingCloudWrites.delete(promise);
+    promise.then(clear, clear);
+    return promise;
+  }
+  async function flushCloudWrites() {
+    if (!_pendingCloudWrites.size) return;
+    await Promise.allSettled(Array.from(_pendingCloudWrites));
+  }
+
+  /* ---- 동기화 상태 토스트: 오른쪽 상단에 "동기화 중… / 저장됨 / 동기화 실패"를
+     잠깐 띄웠다가 자동으로 사라지게 한다. 저장이 연속으로 여러 번 일어나도
+     토스트가 여러 개 쌓이지 않도록 하나의 요소를 재사용한다. */
+  let _syncToastHideTimer = null;
+  let _syncToastSettleTimer = null;
+  let _syncHadError = false;
+  function _syncToastEl() {
+    let el = document.getElementById("cloud-sync-toast");
+    if (!el) {
+      el = document.createElement("div");
+      el.id = "cloud-sync-toast";
+      el.className = "cloud-sync-toast";
+      document.body.appendChild(el);
+    }
+    return el;
+  }
+  function _showSyncToast(status) {
+    clearTimeout(_syncToastHideTimer);
+    const el = _syncToastEl();
+    el.classList.remove("syncing", "saved", "error");
+    el.classList.add(status, "visible");
+    const iconHtml = status === "syncing"
+      ? `<span class="cloud-sync-spinner"></span>`
+      : status === "saved"
+        ? ICON_CHECK
+        : `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="5.6"/><path d="M8 5.2v3.4"/><path d="M8 11v.1"/></svg>`;
+    const label = status === "syncing" ? "동기화 중…" : status === "saved" ? "저장됨" : "동기화 실패";
+    el.innerHTML = `${iconHtml}<span>${label}</span>`;
+    if (status !== "syncing") {
+      _syncToastHideTimer = setTimeout(() => { el.classList.remove("visible"); }, status === "error" ? 4000 : 1800);
+    }
+  }
+  // 클라우드 저장 요청이 시작될 때 호출: 즉시 "동기화 중…" 표시
+  function notifyCloudSyncStart() {
+    if (!cloud) return;
+    clearTimeout(_syncToastSettleTimer);
+    _showSyncToast("syncing");
+  }
+  // 클라우드 저장 요청이 끝날 때 호출: 다른 요청이 이어서 들어올 수 있으니 짧게
+  // 기다렸다가, 더 진행 중인 요청이 없으면 최종 결과(저장됨/실패)를 보여준다.
+  function notifyCloudSyncSettle(ok) {
+    if (!cloud) return;
+    if (!ok) _syncHadError = true;
+    clearTimeout(_syncToastSettleTimer);
+    _syncToastSettleTimer = setTimeout(() => {
+      if (_pendingCloudWrites.size > 0) return;
+      _showSyncToast(_syncHadError ? "error" : "saved");
+      _syncHadError = false;
+    }, 300);
+  }
+
+  /* ---- 동시 편집 충돌 감지 ----
+     _knownServerUpdatedAt: 이 브라우저가 마지막으로 확인한 "서버에 있는" 버전의 updated_at.
+       내가 저장에 성공하거나, 실시간으로 남의 변경을 확인할 때마다 갱신된다.
+     _knownServerValue: 위 시점의 실제 내용(JSON 문자열). 나중에 충돌이 나면 "그때는
+       이랬는데, 나는 이렇게 바꿨고, 지금 서버는 이렇게 바뀌어 있다"를 비교해서 자동으로
+       합칠 수 있는 기준(base)으로 쓴다.
+     _ourWriteTimestamps: 내가 방금 보낸 저장 요청의 updated_at을 key별로 기억해둔다.
+       실시간 이벤트가 돌아왔을 때 "방금 내가 쓴 걸 그대로 되돌려받은 것"인지
+       "남이 새로 고친 것"인지 구분하는 용도.
+     _pushChains: 같은 key에 대한 저장 요청을 한 번에 하나씩만 순서대로 보내서,
+       내가 연달아 두 번 저장했을 뿐인데 스스로와 충돌났다고 오판하는 걸 막는다. */
+  const _knownServerUpdatedAt = {};
+  const _knownServerValue = {};
+  const _ourWriteTimestamps = {};
+  const _pushChains = {};
+  const _conflictedKeys = new Set(); // 자동 병합도 실패해서 정말로 물어봐야 하는 키
+  const _fieldConflictNotices = new Map(); // key -> 자동 병합은 됐지만 "이 부분은 겹쳤어요"라고 알려줄 경로들
+
+  /* ---- 저장 충돌 자동 병합 ----
+     지금까지는 같은 key(예: 면담일지 전체, 스케줄 전체처럼 카테고리 하나를 통째로 담은
+     덩어리)를 다른 사람이 "거의 동시에" 저장하면 무조건 "저장 충돌" 팝업을 띄우고
+     사용자가 직접 "새로 불러오기 / 내 걸로 덮어쓰기" 중 하나를 고르게 했다. 문제는
+     같은 카테고리 안에서 서로 완전히 다른 항목(예: A 상담사 면담 기록 vs B 상담사 면담
+     기록)을 고친 경우에도 "같은 key"라는 이유만으로 매번 충돌로 잡혔다는 점이다.
+     아래 3-way 병합은 "마지막으로 서버와 같았던 상태(base)"를 기준으로 "내가 바꾼 부분"과
+     "남이 바꾼 부분"을 항목 단위(id가 있는 배열)나 키 단위(객체)로 비교해서, 서로 겹치지
+     않으면 조용히 합쳐서 다시 저장한다.
+     예전에는 이 병합 도중 어느 한 군데(예: 스케줄의 특정 날짜·특정 칸 하나)만 정말로
+     서로 다른 값으로 동시에 고쳐져도, 그 즉시 객체 전체 병합을 MERGE_CONFLICT로 실패
+     처리해서 무관한 나머지 변경사항까지 통째로 막고 팝업을 띄웠다. 지금은 그렇게 하지
+     않는다 — 진짜로 겹친 "그 한 군데"만 지금 저장하려던 값으로 우선 적용(그 경로를
+     conflicts 목록에 기록)하고, 나머지는 정상적으로 병합해서 저장을 계속 진행한다.
+     겹친 부분이 있었다는 사실은 저장을 막는 팝업이 아니라, 확인만 하면 사라지는
+     가벼운 알림 배너로 알려준다(_renderFieldConflictBanner). 병합 자체가 시작조차
+     안 되는 경우(최상위 값이 애초에 id 없는 배열이나 문자열/숫자 같은 단일 값이라
+     항목 단위로 쪼갤 방법이 없는 경우, 또는 서버 재조회/JSON 파싱 자체가 실패한 경우)
+     에만 예전처럼 진짜 "저장 충돌" 팝업을 띄운다. */
+  const MERGE_CONFLICT = Symbol("merge-conflict");
+  function _deepEqual(a, b) {
+    if (a === b) return true;
+    if (a === null || b === null || typeof a !== "object" || typeof b !== "object") return false;
+    if (Array.isArray(a) !== Array.isArray(b)) return false;
+    if (Array.isArray(a)) {
+      if (a.length !== b.length) return false;
+      for (let i = 0; i < a.length; i++) if (!_deepEqual(a[i], b[i])) return false;
+      return true;
+    }
+    const ka = Object.keys(a), kb = Object.keys(b);
+    if (ka.length !== kb.length) return false;
+    return ka.every((k) => Object.prototype.hasOwnProperty.call(b, k) && _deepEqual(a[k], b[k]));
+  }
+  // "id를 가진 객체들의 배열"인지 판단한다 (면담 기록, 상담사, 할 일처럼 각 항목을
+  // 하나씩 구분해서 합칠 수 있는 목록). 순서만 있는 배열(즐겨찾기 순서 등)은 해당 없음.
+  function _isIdArray(arr) {
+    return Array.isArray(arr) && arr.length > 0 && arr.every((it) => it && typeof it === "object" && !Array.isArray(it) && (typeof it.id === "string" || typeof it.id === "number"));
+  }
+  // path: 지금 비교 중인 위치를 사람이 읽을 수 있는 경로 문자열로 나타낸 것
+  //   (예: "records[2026-05-01].agentId", "monthLocks[2026-05]"). 최상위 호출에서는
+  //   빈 문자열("")이고, 객체 키로 들어갈 때는 ".key"를, id 배열의 항목으로 들어갈
+  //   때는 "[id]"를 이어붙인다. 진짜로 자동 병합이 안 되는 지점을 만나면 이 경로를
+  //   conflicts 배열에 기록해두고, 그 지점만 "지금 저장하려는 값(local)"으로 정해서
+  //   계속 진행한다 — 그래야 무관한 나머지 변경들이 그 한 지점 때문에 통째로 막히지 않는다.
+  // conflicts: 위에서 기록해두는 경로들을 담을 배열(호출부에서 []로 넘겨서 결과를 받아본다).
+  function _merge3(base, local, remote, path, conflicts) {
+    path = path || "";
+    conflicts = conflicts || [];
+    if (_deepEqual(local, remote)) return local;
+    if (_deepEqual(local, base)) return remote; // 나는 이 부분을 안 바꿨음 → 남의 변경을 그대로 받음
+    if (_deepEqual(remote, base)) return local; // 남은 이 부분을 안 바꿨음 → 내 변경을 그대로 유지
+    // 여기부터는 둘 다 바뀐 경우. 구조를 보고 항목 단위로 합칠 수 있는지 시도한다.
+    if (_isIdArray(local) && _isIdArray(remote)) {
+      const baseArr = Array.isArray(base) ? base : [];
+      const baseById = {}; baseArr.forEach((it) => { if (it && it.id != null) baseById[it.id] = it; });
+      const localById = {}; local.forEach((it) => { localById[it.id] = it; });
+      const remoteById = {}; remote.forEach((it) => { remoteById[it.id] = it; });
+      const ids = []; const seen = new Set();
+      local.forEach((it) => { if (!seen.has(it.id)) { seen.add(it.id); ids.push(it.id); } });
+      remote.forEach((it) => { if (!seen.has(it.id)) { seen.add(it.id); ids.push(it.id); } });
+      const result = [];
+      for (const id of ids) {
+        const inBase = Object.prototype.hasOwnProperty.call(baseById, id);
+        const inLocal = Object.prototype.hasOwnProperty.call(localById, id);
+        const inRemote = Object.prototype.hasOwnProperty.call(remoteById, id);
+        if (inLocal && inRemote) {
+          const merged = _merge3(inBase ? baseById[id] : undefined, localById[id], remoteById[id], path + "[" + id + "]", conflicts);
+          result.push(merged);
+        } else if (inLocal && !inRemote) {
+          // 남에게 없는 항목: 내가 새로 추가했거나, 남이 지운 뒤에도 나는 그대로 갖고 있음 → 유지
+          result.push(localById[id]);
+        } else if (!inLocal && inRemote) {
+          // 나에게 없는 항목: base와 비교해서 남이 그 사이에 손대지 않은 채 나만 지웠다면
+          // 삭제를 존중하고, 남이 그 사이 고치거나 새로 추가했다면 잃어버리지 않게 살려둔다.
+          if (inBase && _deepEqual(baseById[id], remoteById[id])) { /* 삭제 유지 */ }
+          else result.push(remoteById[id]);
+        }
+      }
+      return result;
+    }
+    if (local && remote && typeof local === "object" && typeof remote === "object" && !Array.isArray(local) && !Array.isArray(remote)) {
+      const baseObj = (base && typeof base === "object" && !Array.isArray(base)) ? base : {};
+      const keys = new Set([...Object.keys(baseObj), ...Object.keys(local), ...Object.keys(remote)]);
+      const result = {};
+      for (const k of keys) {
+        const inBase = Object.prototype.hasOwnProperty.call(baseObj, k);
+        const inLocal = Object.prototype.hasOwnProperty.call(local, k);
+        const inRemote = Object.prototype.hasOwnProperty.call(remote, k);
+        if (inLocal && inRemote) {
+          const merged = _merge3(inBase ? baseObj[k] : undefined, local[k], remote[k], path ? path + "." + k : k, conflicts);
+          result[k] = merged;
+        } else if (inLocal && !inRemote) {
+          if (inBase && _deepEqual(baseObj[k], local[k])) { /* 내가 안 바꿨고 남이 지움 → 삭제 유지 */ }
+          else result[k] = local[k];
+        } else if (!inLocal && inRemote) {
+          if (inBase && _deepEqual(baseObj[k], remote[k])) { /* 남이 안 바꿨고 내가 지움 → 삭제 유지 */ }
+          else result[k] = remote[k];
+        }
+      }
+      return result;
+    }
+    // 순서만 있는 배열이나 값 하나(문자열/숫자 등)를 서로 다르게 고친 경우는 자동으로
+    // 합칠 방법이 없다. 이 지점이 애초에 최상위(path === "")라면 — 즉 카테고리 전체가
+    // 통째로 이런 값이라 항목 단위로 쪼갤 여지가 아예 없다면 — 예전처럼 진짜 충돌로
+    // 취급해서 팝업을 띄운다. 하지만 객체나 목록 "안"의 한 지점에서 이런 일이 생긴
+    // 거라면, 그 지점만 지금 저장하려던 값을 우선 적용하고 기록만 남긴 뒤 나머지
+    // 병합은 그대로 계속한다 — 한 군데의 진짜 충돌이 전체 저장을 막지 않도록.
+    if (!path) return MERGE_CONFLICT;
+    conflicts.push(path);
+    return local;
+  }
+  // 충돌이 났을 때 자동 병합을 시도한다. 성공하면 합쳐진 JSON 문자열을, 실패하면
+  // null을 돌려준다. 병합에 성공하면 이 브라우저의 화면(메모리)에도 즉시 반영해서,
+  // 다시 저장을 시도하는 동안 화면이 최신 내용을 보여주게 한다.
+  async function _tryAutoMergeConflict(key, localValue) {
+    try {
+      const { data, error } = await cloud.from("kv_store").select("value,updated_at").eq("key", key).maybeSingle();
+      if (error || !data) return null;
+      _knownServerUpdatedAt[key] = data.updated_at;
+      let baseParsed, localParsed, remoteParsed;
+      try {
+        baseParsed = _knownServerValue[key] !== undefined ? JSON.parse(_knownServerValue[key]) : undefined;
+        localParsed = JSON.parse(localValue);
+        remoteParsed = JSON.parse(data.value);
+      } catch (e) { return null; } // JSON이 아니면 자동 병합을 시도하지 않음
+      const conflicts = [];
+      const merged = _merge3(baseParsed, localParsed, remoteParsed, "", conflicts);
+      if (merged === MERGE_CONFLICT) return null;
+      const mergedStr = JSON.stringify(merged);
+      _origSetItem(key, mergedStr);
+      let affectedPages = [];
+      try { affectedPages = _applyRemoteChangeToMemory(key); } catch (e) {}
+      if (affectedPages.indexOf(state.page) !== -1 && !_hasActiveEditableFocus()) renderApp();
+      // 진짜로 겹친 지점이 일부 있었다면(그래도 저장 자체는 계속 진행됐다) 팝업으로
+      // 막지 않고, 확인하면 사라지는 가벼운 알림 배너로만 알려준다.
+      if (conflicts.length) _noteFieldConflicts(key, conflicts);
+      return mergedStr;
+    } catch (e) { return null; }
+  }
+  function _noteFieldConflicts(key, paths) {
+    let set = _fieldConflictNotices.get(key);
+    if (!set) { set = new Set(); _fieldConflictNotices.set(key, set); }
+    paths.forEach((p) => set.add(p));
+    _renderFieldConflictBanner();
+  }
+
+
+  const CLOUD_KEY_LABELS = [
+    ["personal-schedule:data", "월별 스케줄"],
+    ["personal-qa:data", "품질 관리(QA)"],
+    ["personal-interviews:data", "면담일지"],
+    ["personal-agents:data", "상담사 관리"],
+    ["personal-notes:data", "업무 정리(메모)"],
+    ["personal-calendar:todos", "캘린더/할일"],
+    ["personal-app:accounts", "계정 목록"],
+    ["personal-app:discord-notify-settings", "디스코드 알림 설정"],
+  ];
+  function cloudKeyLabel(key) {
+    const found = CLOUD_KEY_LABELS.find(([frag]) => key.indexOf(frag) !== -1);
+    return found ? found[1] : "데이터";
+  }
+
+  /* ---- 실시간 변경 사항을 "지금 이 화면이 들고 있는 메모리"에 곧바로 반영하기.
+     각 화면(모듈)은 localStorage에서 한 번 읽어들인 값을 자바스크립트 변수(interviewsData,
+     notesData 등)에 담아두고 그걸로 화면을 그린다. 그래서 남이 저장한 내용이 localStorage에만
+     반영되고 이 변수들을 다시 안 읽어오면, 다른 화면 갔다가 돌아와도 여전히 예전 내용이 보인다.
+     아래 함수는 바뀐 key에 맞는 모듈 변수를 즉시 다시 읽어들이고, 그 데이터를 사용하는
+     화면 이름들을 돌려준다 — "지금 보고 있는 화면"이 그 목록에 있을 때만 그 자리에서
+     다시 그려줄지 말지를 판단하는 데 쓴다. */
+  function _monthDataKeyMatch(key) {
+    const m = key.match(/personal-calendar:(\d{4})-(\d{2})$/);
+    if (!m) return null;
+    return { year: Number(m[1]), monthIndex: Number(m[2]) - 1 };
+  }
+  function _applyRemoteChangeToMemory(key) {
+    if (key.indexOf("personal-calendar:todos") !== -1) {
+      todos = loadTodos();
+      return ["calendar", "home"];
+    }
+    const monthMatch = _monthDataKeyMatch(key);
+    if (monthMatch) {
+      // 지금 화면에 열려 있는 달과 같을 때만 그 자리에서 다시 읽어들인다(다른 달 데이터는
+      // 어차피 화면에 안 보이니 나중에 그 달로 이동할 때 자연스럽게 새로 읽힌다).
+      if (cal.year === monthMatch.year && cal.monthIndex === monthMatch.monthIndex) loadMonth(cal.year, cal.monthIndex);
+      return ["calendar", "home"];
+    }
+    if (key.indexOf("personal-notes:data") !== -1) {
+      undoRestoreObjectInPlace(notesData, loadNotesData());
+      return ["notes", "home"];
+    }
+    if (key.indexOf("personal-agents:data") !== -1) {
+      agentsData = loadAgentsData();
+      return ["agents", "home", "interviews", "schedule", "qa"];
+    }
+    if (key.indexOf("personal-qa:data") !== -1) {
+      qaData = loadQAData();
+      return ["qa"];
+    }
+    if (key.indexOf("personal-interviews:data") !== -1) {
+      interviewsData = loadInterviewsData();
+      return ["interviews", "home"];
+    }
+    if (key.indexOf("personal-schedule:data") !== -1) {
+      reloadScheduleData();
+      return ["schedule", "home"];
+    }
+    return [];
+  }
+  // 지금 어딘가에 글자를 입력 중인지(텍스트칸에 커서가 가 있는지) 확인한다. 입력 중일 때
+  // 화면을 억지로 다시 그리면 커서 위치나 아직 저장 안 된 입력 내용이 날아갈 수 있어서,
+  // 그럴 때는 그 자리에서 바로 반영하지 않고 예전처럼 "새로고침" 배너로만 알린다.
+  // 예외: 하단 내비게이션의 "이름 통합 검색"(#global-search-root 안, #gs-input)은
+  // renderApp()이 다시 그리는 #page-inner 밖에 따로 떠 있고, 그 자체 로직도 renderApp()과
+  // 무관하게 매번 자기 결과 패널만 갱신하도록 만들어져 있어서(13-global-search.js 상단 주석
+  // 참고) — renderApp()이 실행돼도 이 입력창의 값이나 커서는 전혀 건드리지 않는다. 그런데도
+  // 이 검사에 포함시키면, 검색창에 커서만 가 있어도(실제로는 아무 데이터도 편집 중이 아닌데)
+  // 다른 사람이 전혀 무관한 걸 저장할 때마다 "다른 관리자가 방금 수정했어요" 배너가 매번
+  // 떠서, 마치 같은 항목을 동시에 고친 것처럼 잘못 보이는 문제가 있었다. 그래서 이 검색창은
+  // "편집 중"으로 치지 않는다.
+  function _hasActiveEditableFocus() {
+    const el = document.activeElement;
+    if (!el) return false;
+    if (el.id === "gs-input") return false;
+    // 목록 화면의 검색/필터 입력칸(면담일지 "상담사 이름 또는 LDAP 검색", 상담사 관리
+    // 검색 등)도 위 gs-input과 똑같은 이유로 예외 처리한다: 이 칸에 값이 있어도 그건
+    // interviewsUi.searchQuery 같은 상태값에 그대로 남아있고 다시 그릴 때도 그 값 그대로
+    // 복원되므로, 화면을 다시 그린다고 해서 "입력 중이던 내용"이 사라지지 않는다. 이런
+    // 칸에 커서만 가 있어도 무관한 저장 때마다 마치 편집 중인 것처럼 취급되는 걸 막는다.
+    if (el.classList && el.classList.contains("agent-search-input-field")) return false;
+    return el.tagName === "TEXTAREA" || el.tagName === "INPUT" || !!el.isContentEditable;
+  }
+  // 지금 이 브라우저 탭이 실제로 화면에 보이고 있는지. 탭을 다른 곳으로 전환해도
+  // document.activeElement는 그대로 남아있어서(포커스가 자동으로 풀리지 않음),
+  // 백그라운드 탭에 있는 동안 들어온 변경까지 "지금 입력 중"으로 오판해 팝업을
+  // 만들어버리는 문제가 있었다. 화면이 실제로 보이는 상태인지까지 함께 확인해서,
+  // 안 보이는 동안 생긴 변경은 조용히 메모리에만 반영하고 팝업 없이 넘어가게 한다.
+  function _isTabVisible() {
+    return document.visibilityState === "visible" && document.hasFocus();
+  }
+
+  /* ---- 배너 UI: "남이 방금 고쳤어요" / "저장 충돌" 을 화면 위쪽에 띄운다.
+     화면을 그 자리에서 억지로 다시 그리면 입력 중이던 내용이 튈 수 있어서,
+     실제 반영은 사용자가 버튼을 눌러 새로고침할 때만 이뤄지게 한다. */
+  function _liveBannerWrap() {
+    let el = document.getElementById("cloud-live-banner-wrap");
+    if (!el) {
+      el = document.createElement("div");
+      el.id = "cloud-live-banner-wrap";
+      el.className = "cloud-live-banner-wrap";
+      document.body.appendChild(el);
+    }
+    return el;
+  }
+  function _renderConflictBanner() {
+    let el = document.getElementById("cloud-conflict-banner");
+    if (!_conflictedKeys.size) { if (el) el.remove(); return; }
+    if (!el) {
+      el = document.createElement("div");
+      el.id = "cloud-conflict-banner";
+      el.className = "cloud-live-banner conflict";
+      _liveBannerWrap().prepend(el);
+    }
+    const labels = Array.from(_conflictedKeys).map(cloudKeyLabel).join(", ");
+    el.innerHTML = `
+      ${ICON_BELL}
+      <div class="cloud-live-banner-body">
+        <div class="cloud-live-banner-title">저장 충돌</div>
+        <div class="cloud-live-banner-desc"><b>${esc(labels)}</b>의 같은 항목을 다른 관리자(또는 다른 탭)가 거의 같은 순간에 고쳐서, 자동으로 합칠 수 없었어요.<br>내가 방금 한 변경이 아직 저장되지 못했어요.</div>
+        <div class="cloud-live-banner-actions">
+          <button type="button" class="ghost-btn" id="cloud-conflict-reload">최신 내용 불러오기</button>
+          <button type="button" class="primary-btn" id="cloud-conflict-force">내 변경으로 덮어쓰기</button>
+        </div>
+      </div>
+    `;
+    document.getElementById("cloud-conflict-reload").onclick = () => location.reload();
+    document.getElementById("cloud-conflict-force").onclick = async () => {
+      const keys = Array.from(_conflictedKeys);
+      _conflictedKeys.clear();
+      _renderConflictBanner();
+      for (const k of keys) {
+        try { await cloudPush(k, localStorage.getItem(k), { force: true }); } catch (e) {}
+      }
+    };
+  }
+  // 예전에는 여기에 "다른 관리자가 방금 수정했어요"라는 배너가 하나 더 있었다. 그런데
+  // 이 배너는 "지금 이 화면과 관련된 데이터가 바뀌었고, 마침 내가 뭔가 입력 중이었다"는
+  // 것만 볼 뿐 실제로 내가 지금 만지고 있는 항목·필드와 겹쳤는지는 전혀 확인하지
+  // 않았다. 그래서 완전히 무관한 항목이 추가/수정돼도(예: 다른 상담사의 면담 기록을
+  // 새로 추가) 화면 아무 입력칸에 커서만 가 있으면(심지어 검색창이거나, 다른 브라우저
+  // 탭으로 넘어가기 전에 마지막으로 커서를 뒀던 칸이어도) 마치 뭔가 겹친 것처럼
+  // 떠버렸다. 진짜로 같은 항목의 같은 필드를 동시에 고쳤는지는 저장 시점의 3-way
+  // 병합(_merge3)이 훨씬 정확하게 판단할 수 있으므로, 이 추측성 배너는 없앴다.
+  // 대신 원격 변경은 아래 실시간 구독 핸들러에서 메모리(및 로컬 저장소)에는 항상
+  // 즉시 반영해두고, 화면을 다시 그리는 것만 "지금 입력 중이 아닐 때"로 미룬다 —
+  // 편집을 마치고 저장하면 그 시점에 자동 병합/충돌 감지가 실제로 겹친 부분만
+  // 정확히 짚어서 알려준다(_renderFieldConflictBanner, _renderConflictBanner).
+  // "저장은 정상적으로 진행됐지만, 그중 일부 지점만 다른 관리자와 겹쳐서 내가 방금
+  // 저장한 값으로 정했어요"를 알려주는 가벼운 배너. _renderConflictBanner(저장 충돌)와
+  // 달리 저장을 막지 않으며, 확인 버튼을 누르면 그냥 사라진다.
+  function _renderFieldConflictBanner() {
+    let el = document.getElementById("cloud-field-conflict-banner");
+    if (!_fieldConflictNotices.size) { if (el) el.remove(); return; }
+    if (!el) {
+      el = document.createElement("div");
+      el.id = "cloud-field-conflict-banner";
+      el.className = "cloud-live-banner";
+      _liveBannerWrap().appendChild(el);
+    }
+    const labels = Array.from(new Set(Array.from(_fieldConflictNotices.keys()).map(cloudKeyLabel))).join(", ");
+    const spotCount = Array.from(_fieldConflictNotices.values()).reduce((sum, s) => sum + s.size, 0);
+    el.innerHTML = `
+      ${ICON_BELL}
+      <div class="cloud-live-banner-body">
+        <div class="cloud-live-banner-title">일부 항목이 거의 동시에 수정됐어요</div>
+        <div class="cloud-live-banner-desc"><b>${esc(labels)}</b>에서 ${spotCount}곳을 다른 관리자(또는 다른 탭)와 겹쳐서 고쳤어요.<br>겹치지 않은 나머지 변경은 자동으로 함께 합쳐 저장했고, 겹친 부분만 방금 내가 저장한 값으로 반영됐어요.<br>혹시 다른 관리자가 그 부분을 다르게 고치려던 거였다면 다시 확인해 주세요.</div>
+        <div class="cloud-live-banner-actions">
+          <button type="button" class="primary-btn" id="cloud-field-conflict-dismiss">확인</button>
+        </div>
+      </div>
+      <button type="button" class="cloud-live-banner-close" id="cloud-field-conflict-close" aria-label="닫기">✕</button>
+    `;
+    const dismiss = () => { _fieldConflictNotices.clear(); _renderFieldConflictBanner(); };
+    document.getElementById("cloud-field-conflict-dismiss").onclick = dismiss;
+    document.getElementById("cloud-field-conflict-close").onclick = dismiss;
+  }
+
+  async function _doCloudPush(key, value, opts) {
+    const force = !!(opts && opts.force);
+    const attempt = (opts && opts.attempt) || 0;
+    try {
+      const newTs = new Date().toISOString();
+      const expected = _knownServerUpdatedAt[key];
+      let wroteOk = true;
+      if (expected && !force) {
+        // 낙관적 동시성 제어: 마지막으로 확인한 서버 버전이 그대로일 때만 저장한다.
+        // 그 사이 다른 사람이 먼저 저장해서 updated_at이 바뀌었으면 이 update는
+        // 아무 행도 바꾸지 못하고 0건으로 끝난다 → 그걸로 충돌을 감지한다.
+        const { data, error } = await cloud
+          .from("kv_store")
+          .update({ value, updated_at: newTs })
+          .eq("key", key)
+          .eq("updated_at", expected)
+          .select("key");
+        if (error) throw error;
+        wroteOk = !!(data && data.length);
+      } else {
+        await cloud.from("kv_store").upsert({ key, value, updated_at: newTs });
+      }
+      if (!wroteOk) {
+        // 곧바로 팝업을 띄우지 않고, 먼저 자동으로 합쳐볼 수 있는지 시도한다. 서로 다른
+        // 항목을 고친 경우가 대부분이라 여기서 대부분 조용히 해결된다(최대 3번 재시도).
+        if (attempt < 3) {
+          const merged = await _tryAutoMergeConflict(key, value);
+          if (merged !== null) return _doCloudPush(key, merged, { force: false, attempt: attempt + 1 });
+        }
+        _conflictedKeys.add(key);
+        _renderConflictBanner();
+        notifyCloudSyncSettle(false);
+        return;
+      }
+      _conflictedKeys.delete(key);
+      _renderConflictBanner();
+      _knownServerUpdatedAt[key] = newTs;
+      _knownServerValue[key] = value;
+      _ourWriteTimestamps[key] = newTs;
+      notifyCloudSyncSettle(true);
+    } catch (e) {
+      /* 네트워크 문제로 실패해도 로컬 저장은 이미 되어 있어 화면은 그대로 동작 */
+      notifyCloudSyncSettle(false);
+    }
+  }
+  function cloudPush(key, value, opts) {
+    if (!isCloudSynced(key)) return Promise.resolve();
+    notifyCloudSyncStart();
+    const force = !!(opts && opts.force);
+    const prev = _pushChains[key] || Promise.resolve();
+    const run = prev.then(
+      () => _doCloudPush(key, value, { force }),
+      () => _doCloudPush(key, value, { force })
+    );
+    _pushChains[key] = run.catch(() => {});
+    return _trackCloudWrite(run);
+  }
+  async function _doCloudDelete(key) {
+    try {
+      await cloud.from("kv_store").delete().eq("key", key);
+      delete _knownServerUpdatedAt[key];
+      delete _knownServerValue[key];
+      _conflictedKeys.delete(key);
+      _renderConflictBanner();
+      notifyCloudSyncSettle(true);
+    } catch (e) { notifyCloudSyncSettle(false); }
+  }
+  function cloudDelete(key) {
+    if (!isCloudSynced(key)) return Promise.resolve();
+    notifyCloudSyncStart();
+    const prev = _pushChains[key] || Promise.resolve();
+    const run = prev.then(() => _doCloudDelete(key), () => _doCloudDelete(key));
+    _pushChains[key] = run.catch(() => {});
+    return _trackCloudWrite(run);
+  }
+  // localStorage.setItem / removeItem을 감싸기 전에 먼저 원본 함수를 바인딩해둔다.
+  // cloudHydrate()가 클라우드에서 값을 끌어올 때 이 "원본" 함수로 직접 저장해야,
+  // 방금 받아온 값을 다시 클라우드로 그대로 되쏘는(불필요한 업서트 + 페이지를 열 때마다
+  // "동기화 중…" 토스트가 잠깐 뜨는) 낭비를 막을 수 있다.
+  const _origSetItem = localStorage.setItem.bind(localStorage);
+  const _origRemoveItem = localStorage.removeItem.bind(localStorage);
+  async function cloudHydrate() {
+    if (!cloud) return;
+    try {
+      const { data, error } = await cloud.from("kv_store").select("key,value,updated_at");
+      if (error || !data) return;
+      data.forEach((row) => {
+        try { _origSetItem(row.key, row.value); } catch (e) {}
+        _knownServerUpdatedAt[row.key] = row.updated_at;
+        _knownServerValue[row.key] = row.value;
+      });
+    } catch (e) { /* 오프라인 등으로 실패하면 이전에 이 브라우저에 남아있던 값으로 동작 */ }
+  }
+  // localStorage.setItem / removeItem을 감싸서, 로컬 저장은 그대로 즉시 처리하고
+  // 필요한 키만 조용히 Supabase에도 함께 저장/삭제한다 (실패해도 화면엔 영향 없음).
+  localStorage.setItem = function (key, value) {
+    _origSetItem(key, value);
+    cloudPush(key, value);
+  };
+  localStorage.removeItem = function (key) {
+    _origRemoveItem(key);
+    cloudDelete(key);
+  };
+  await cloudHydrate();
+  // 자정 자동 백업은 이제 여기서(클라이언트) 만들지 않고, 서버 쪽 Discord 백업
+  // 엣지펑션(discord-backup-upload, pg_cron 매일 00:05 KST)이 전담합니다.
+  // runDailyAutoBackupIfNeeded().catch(() => {});
+
+  /* ---- 실시간 구독: 다른 사람(또는 다른 탭)이 저장하면 곧바로 반영한다.
+     - 우선 로컬 저장소(localStorage)에도 최신 값을 바로 써둔다. 이렇게 해야 지금 다른
+       화면을 보고 있다가 나중에 그 화면으로 돌아왔을 때(또는 그 모듈이 새로 데이터를
+       읽어들일 때) 새로고침 없이도 최신 내용이 보인다.
+     - 그 다음 해당 데이터를 들고 있는 모듈의 메모리 변수도 즉시 다시 읽어들인다.
+     - "지금 보고 있는 화면"이 바로 그 데이터를 쓰는 화면이라면: 입력 중인 칸이 없을 때는
+       그 자리에서 곧장 다시 그려서 보여주고, 입력 중인 칸이 있을 때는(화면을 억지로 다시
+       그리면 커서/미저장 입력이 튈 수 있으므로) 예전처럼 "바뀌었어요 + 새로고침" 배너로만
+       알린다. 지금 보고 있는 화면과 무관한 데이터라면 이미 메모리에 반영해뒀으니 배너 없이
+       조용히 넘어간다. 내가 방금 보낸 저장이 그대로 돌아온 경우(에코)는 제외한다. */
+  if (cloud) {
+    cloud
+      .channel("kv_store_live")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "kv_store" },
+        (payload) => {
+          const row = payload.new && payload.new.key ? payload.new : payload.old;
+          if (!row || !row.key || !isCloudSynced(row.key)) return;
+          if (payload.eventType === "DELETE") {
+            delete _knownServerUpdatedAt[row.key];
+            delete _knownServerValue[row.key];
+            return;
+          }
+          if (_ourWriteTimestamps[row.key] === row.updated_at) return; // 내가 방금 쓴 것의 에코
+          _knownServerUpdatedAt[row.key] = row.updated_at;
+          _knownServerValue[row.key] = row.value;
+          if (localStorage.getItem(row.key) === row.value) return; // 이미 같은 내용이면 반영할 필요 없음
+          _origSetItem(row.key, row.value); // 로컬 저장소에는 언제나 즉시 최신 내용 반영 (탭이 안 보이는 동안에도 마찬가지)
+          let affectedPages = [];
+          try { affectedPages = _applyRemoteChangeToMemory(row.key); } catch (e) {}
+          const isCurrentPageAffected = affectedPages.indexOf(state.page) !== -1;
+          // 화면(그림)을 다시 그리는 것만 "지금 이 탭이 실제로 보이고 있고 + 뭔가
+          // 입력 중인 칸에 커서가 가 있지 않을 때"로 미룬다. 데이터 자체(메모리·로컬
+          // 저장소)는 위에서 이미 최신 상태로 반영해뒀으니, 지금 당장 다시 그리지
+          // 않아도 잃어버리는 내용은 없다 — 나중에 화면이 다시 그려질 때(탭으로
+          // 돌아오거나, 입력을 마치거나, 다른 조작으로 renderApp이 호출될 때) 자동으로
+          // 최신 내용이 보인다. 겹쳤는지 여부를 추측해서 알리는 배너는 띄우지 않는다:
+          // 진짜로 같은 항목·같은 필드가 겹친 경우는 저장 시점의 3-way 병합이 정확하게
+          // 잡아내서 _renderFieldConflictBanner / _renderConflictBanner로 알려준다.
+          if (isCurrentPageAffected && !_hasActiveEditableFocus() && _isTabVisible()) {
+            renderApp();
+          }
+        }
+      )
+      .subscribe();
+  }
+  // 탭이 백그라운드에 있는 동안에도 데이터(메모리·로컬 저장소)는 이미 최신으로
+  // 반영해뒀지만, 화면을 다시 그리는 것만 미뤄뒀을 수 있다. 탭이 다시 보이게 되거나
+  // 입력 중이던 칸에서 포커스가 빠지면, 지금 화면이 안전하게 다시 그릴 수 있는
+  // 상태인지 확인해서 최신 내용으로 갱신한다 — 그래야 "다른 탭 보고 오니 화면이
+  // 예전 내용"인 채로 남아있는 일이 없다. 배너 없이 조용히 갱신만 한다.
+  function _catchUpRenderIfSafe() {
+    if (!_isTabVisible() || _hasActiveEditableFocus()) return;
+    try { renderApp(); } catch (e) {}
+  }
+  document.addEventListener("visibilitychange", _catchUpRenderIfSafe);
+  window.addEventListener("focus", _catchUpRenderIfSafe);
+
+  /* ===================== ↩️ 실행 취소(Undo) =====================
+     스케줄 셀 상태 변경 · 일괄 적용 · 일괄 붙여넣기 · 일괄 삭제, 그리고 메모·폴더·
+     상담사·면담일지·할일·캘린더 일정의 "삭제"처럼 되돌리기 어려운 조작을 하기 직전에
+     관련 localStorage 값을 스냅샷으로 남겨두고, Ctrl+Z(맥은 Cmd+Z) 또는 화면 오른쪽
+     아래 "되돌리기" 버튼으로 바로 직전 동작 하나를 되돌릴 수 있게 한다. 최근 30개까지
+     기억한다. 메모 본문·셀 메모처럼 계속 타이핑하는 값은 스냅샷을 남기지 않는다 —
+     글자 하나하나가 되돌리기 대상이 되면 오히려 불편하기 때문이다. */
+  const UNDO_STACK_LIMIT = 30;
+  const undoStack = [];
+  // const로 선언된 state 객체(notesData 등)는 재할당할 수 없으니, 내용을 비우고
+  // 새로 불러온 값으로 다시 채워 넣는 방식으로 복원한다.
+  function undoRestoreObjectInPlace(obj, fresh) {
+    Object.keys(obj).forEach((k) => delete obj[k]);
+    Object.assign(obj, fresh);
+  }
+  function undoSnapshotKeys(keys) {
+    return (Array.isArray(keys) ? keys : [keys]).map((key) => {
+      let value = null;
+      try { value = localStorage.getItem(key); } catch (e) {}
+      return { key, value };
+    });
+  }
+  // label: 되돌리기 버튼/토스트에 보여줄 동작 이름.
+  // keys: 이 동작으로 바뀌는 localStorage 키(문자열 하나 또는 배열).
+  // reloadFn: 스냅샷을 localStorage에 되돌려놓은 뒤, 화면이 참조하는 메모리상의
+  //           state 변수(scheduleData, notesData 등)를 다시 읽어들이는 함수.
+  function recordUndo(label, keys, reloadFn) {
+    undoStack.push({ label, snaps: undoSnapshotKeys(keys), reloadFn });
+    if (undoStack.length > UNDO_STACK_LIMIT) undoStack.shift();
+    renderUndoToggle();
+  }
+  function performUndo() {
+    const entry = undoStack.pop();
+    if (!entry) { renderUndoToggle(); flashUndoToast("되돌릴 작업이 없어요", true); return; }
+    entry.snaps.forEach(({ key, value }) => {
+      try {
+        if (value === null) localStorage.removeItem(key);
+        else localStorage.setItem(key, value);
+      } catch (e) {}
+    });
+    entry.reloadFn();
+    renderApp();
+    flashUndoToast(`"${entry.label}" 되돌림`);
+  }
+  let undoToastHideTimer = null;
+  function flashUndoToast(msg, isEmpty) {
+    const el = document.getElementById("undo-toast");
+    if (!el) return;
+    el.textContent = msg;
+    el.classList.toggle("undo-toast--empty", !!isEmpty);
+    el.classList.add("visible");
+    clearTimeout(undoToastHideTimer);
+    undoToastHideTimer = setTimeout(() => el.classList.remove("visible"), 2200);
+  }
+  // 입력창에 포커스가 있을 때는 브라우저 기본 Ctrl+Z(텍스트 입력 취소)를 그대로 두고,
+  // 그 외의 경우에만 앱의 되돌리기를 실행한다.
+  document.addEventListener("keydown", (e) => {
+    const k = e.key ? e.key.toLowerCase() : "";
+    if (k !== "z" || !(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey) return;
+    const active = document.activeElement;
+    const tag = (active && active.tagName) || "";
+    if (tag === "INPUT" || tag === "TEXTAREA" || (active && active.isContentEditable)) return;
+    e.preventDefault();
+    performUndo();
+  });
+  // 되돌리기 버튼: 테마·사용설명서 버튼과 같은 자리, 그 위에 항상 떠 있다.
+  function renderUndoToggle() {
+    const root = document.getElementById("undo-toggle-root");
+    if (!root) return;
+    const has = undoStack.length > 0;
+    const lastLabel = has ? undoStack[undoStack.length - 1].label : "";
+    root.innerHTML = `
+      <div class="undo-toggle-wrap">
+        <button class="theme-picker-btn" id="nav-undo-toggle" type="button" ${has ? "" : "disabled"}
+          aria-label="되돌리기" title="${has ? `되돌리기 — ${esc(lastLabel)} (Ctrl+Z)` : "되돌릴 작업이 없어요"}">
+          ${ICON_UNDO}<span class="theme-picker-label">되돌리기</span>
+        </button>
+      </div>
+      <div class="undo-toast" id="undo-toast"></div>
+    `;
+    const btn = document.getElementById("nav-undo-toggle");
+    if (btn) btn.onclick = () => performUndo();
+  }
+
+  /* ===================== 테마(다크/라이트/그레이/파스텔) ===================== */
+  const THEME_KEY = "app-theme-mode";
+  // 각 테마의 미리보기용 색(배경/포인트색)과 라벨. CSS의 실제 변수값과 맞춰서 관리한다.
+  const THEME_LIST = [
+    { id: "dark", label: "다크", bg: "#232327", accent: "#ec6fae" },
+    { id: "light", label: "라이트", bg: "#fcfcfd", accent: "#7c5cd1" },
+  ];
+  function themeMeta(id) { return THEME_LIST.find((t) => t.id === id) || THEME_LIST[0]; }
+  function isValidTheme(id) { return THEME_LIST.some((t) => t.id === id); }
+  function getStoredTheme() {
+    try { return localStorage.getItem(THEME_KEY); } catch (e) { return null; }
+  }
+  function applyTheme(mode) {
+    if (!mode || mode === "dark") document.documentElement.removeAttribute("data-theme");
+    else document.documentElement.setAttribute("data-theme", mode);
+  }
+  function getCurrentTheme() {
+    return document.documentElement.getAttribute("data-theme") || "dark";
+  }
+  function setTheme(mode) {
+    applyTheme(mode);
+    try { localStorage.setItem(THEME_KEY, mode); } catch (e) { /* 저장 실패해도 화면 전환은 그대로 동작 */ }
+    renderNav();
+  }
+  applyTheme(isValidTheme(getStoredTheme()) ? getStoredTheme() : "dark");
+
+  /* ===================== 데스크톱 독(Dock) 펼치기/닫기 =====================
+     독 안에는 메뉴 카테고리(#nav) 말고도 전역 검색 바(#global-search-root)가
+     카테고리 바로 위에 함께 들어있으므로, 펼치기/접기 대상은 그 둘을 함께
+     감싸는 #nav-dock 전체다. */
+  function isDockOpen() {
+    const navDock = document.getElementById("nav-dock");
+    return !!(navDock && navDock.classList.contains("dock-open"));
+  }
+  function dockOutsideHandler(e) {
+    const navDock = document.getElementById("nav-dock");
+    const btn = document.getElementById("dock-toggle-btn");
+    if (navDock && !navDock.contains(e.target) && !(btn && btn.contains(e.target))) closeDock();
+  }
+  function openDock() {
+    const navDock = document.getElementById("nav-dock");
+    const btn = document.getElementById("dock-toggle-btn");
+    if (navDock) navDock.classList.add("dock-open");
+    if (btn) { btn.classList.add("open"); btn.setAttribute("aria-expanded", "true"); btn.title = "메뉴 닫기"; btn.setAttribute("aria-label", "메뉴 닫기"); }
+    setTimeout(() => document.addEventListener("mousedown", dockOutsideHandler, true), 0);
+  }
+  function closeDock() {
+    const navDock = document.getElementById("nav-dock");
+    const btn = document.getElementById("dock-toggle-btn");
+    if (navDock) navDock.classList.remove("dock-open");
+    if (btn) { btn.classList.remove("open"); btn.setAttribute("aria-expanded", "false"); btn.title = "메뉴 열기"; btn.setAttribute("aria-label", "메뉴 열기"); }
+    document.removeEventListener("mousedown", dockOutsideHandler, true);
+    // 독 안에는 전역 검색창도 함께 들어있으므로, 독을 닫을 때 검색했던 내용도
+    // 남아있지 않고 초기화되게 한다.
+    if (typeof resetGlobalSearchQuery === "function") resetGlobalSearchQuery();
+  }
+  function toggleDock() {
+    if (isDockOpen()) closeDock(); else openDock();
+  }
+  const dockToggleBtn = document.getElementById("dock-toggle-btn");
+  if (dockToggleBtn) {
+    dockToggleBtn.onclick = (e) => { e.stopPropagation(); toggleDock(); };
+  }
+
+  /* ===================== 오른쪽 하단 유틸리티 독(다크·사용설명서·백업·되돌리기·새로고침) 접기/펼치기 =====================
+     평소엔 펼치기 버튼만 보이고, 눌러야 5개 항목이 위로 펼쳐진다.
+     다른 곳을 클릭하면 자동으로 다시 접힌다. */
+  function isUtilityDockOpen() {
+    const root = document.getElementById("utility-dock-root");
+    return !!(root && root.classList.contains("open"));
+  }
+  function utilityDockOutsideHandler(e) {
+    const root = document.getElementById("utility-dock-root");
+    const settingsMenu = document.getElementById("settings-menu");
+    if (settingsMenu && settingsMenu.contains(e.target)) return; // 설정 목록 팝업 클릭은 독을 접지 않는다
+    if (root && !root.contains(e.target)) closeUtilityDock();
+  }
+  function openUtilityDock() {
+    const root = document.getElementById("utility-dock-root");
+    const btn = document.getElementById("utility-dock-toggle-btn");
+    if (root) root.classList.add("open");
+    if (btn) { btn.classList.add("open"); btn.setAttribute("aria-expanded", "true"); btn.title = "바로가기 메뉴 닫기"; btn.setAttribute("aria-label", "바로가기 메뉴 닫기"); }
+    setTimeout(() => document.addEventListener("mousedown", utilityDockOutsideHandler, true), 0);
+  }
+  function closeUtilityDock() {
+    const root = document.getElementById("utility-dock-root");
+    const btn = document.getElementById("utility-dock-toggle-btn");
+    if (root) root.classList.remove("open");
+    if (btn) { btn.classList.remove("open"); btn.setAttribute("aria-expanded", "false"); btn.title = "바로가기 메뉴 열기"; btn.setAttribute("aria-label", "바로가기 메뉴 열기"); }
+    document.removeEventListener("mousedown", utilityDockOutsideHandler, true);
+  }
+  function toggleUtilityDock() {
+    if (isUtilityDockOpen()) closeUtilityDock(); else openUtilityDock();
+  }
+  const utilityDockToggleBtn = document.getElementById("utility-dock-toggle-btn");
+  if (utilityDockToggleBtn) {
+    utilityDockToggleBtn.onclick = (e) => { e.stopPropagation(); toggleUtilityDock(); };
+  }
+
+  // 일정/할일 알림을 공지하는 디스코드 서버 초대 링크. 만료되지 않는 링크로 만들어두면 됨.
+  // (실제 알림 발송은 이 사이트가 아니라 Supabase Edge Function + pg_cron이 처리하고,
+  //  여기서는 그 알림이 올라오는 서버로 바로 이동할 수 있는 버튼만 설정 메뉴 안에 보여준다.)
+  const DISCORD_INVITE_URL = "https://discord.gg/QFpBnYMp4";
+
+  // 설정 버튼: 예전에는 테마·사용설명서·데이터 백업이 각각 독립된 버튼으로 오른쪽 아래에
+  // 따로따로 쌓여 있었는데, 항목이 많아질수록 화면이 복잡해 보여서(특히 모바일) 이 세 가지를
+  // "설정" 버튼 하나로 묶고, 그 안에서 목록으로 고르게 했다. 새로고침·되돌리기는 사용 빈도가
+  // 높아 그대로 독립 버튼으로 남겨둔다.
+  function renderSettingsToggle() {
+    const root = document.getElementById("settings-toggle-root");
+    if (!root) return;
+    root.innerHTML = `
+      <div class="manual-toggle-wrap">
+        <button class="theme-picker-btn" id="nav-settings-toggle" type="button" aria-haspopup="true" aria-expanded="false" aria-label="설정 메뉴 열기" title="설정 (테마 · 사용설명서 · 데이터 백업)">
+          ${ICON_SETTINGS}
+          <span class="theme-picker-label">설정</span>
+        </button>
+      </div>
+    `;
+    const settingsBtn = document.getElementById("nav-settings-toggle");
+    if (settingsBtn) {
+      settingsBtn.onclick = (e) => {
+        e.stopPropagation();
+        if (document.getElementById("settings-menu")) { closeSettingsMenu(); return; }
+        openSettingsMenu(settingsBtn);
+      };
+    }
+  }
+
+  /* ===================== 데이터 백업/복원 =====================
+     상담사 정보 · 스케줄 · 면담일지 · QA 점수 · 메모 · 캘린더처럼
+     "acct:{계정id}:" 접두어가 붙어 저장되는 이 계정 소유의 데이터를
+     JSON 파일로 내보내고 다시 불러올 수 있게 한다.
+     가져오기는 파일 안에 어떤 계정 이름이 적혀 있었든 상관없이 항상
+     "지금 로그인한 계정"의 접두어로 다시 저장한다 — 그래야 다른 계정에서
+     내보낸 백업이라도 가져오는 즉시 지금 계정 소유가 되고, 다른 계정의
+     데이터에는 절대 영향을 주지 않는다. */
+  const BACKUP_CATEGORIES = [
+    { key: "calendar", label: "캘린더 · 할 일", icon: ICON_CALENDAR, keyPrefixes: ["personal-calendar:"] },
+    { key: "notes", label: "업무 정리(메모)", icon: ICON_NOTE, keyPrefixes: ["personal-notes:"] },
+    { key: "agents", label: "상담사 관리", icon: ICON_USERS, keyPrefixes: ["personal-agents:"] },
+    { key: "interviews", label: "면담일지", icon: ICON_CLIPBOARD, keyPrefixes: ["personal-interviews:"] },
+    { key: "qa", label: "품질 관리(QA)", icon: ICON_QA, keyPrefixes: ["personal-qa:"] },
+    { key: "schedule", label: "월별 스케줄", icon: ICON_CHART, keyPrefixes: ["personal-schedule:"] },
+  ];
+  function backupAllPrefixes() {
+    return BACKUP_CATEGORIES.reduce((acc, c) => acc.concat(c.keyPrefixes), []);
+  }
+  // 지금 로그인한 계정 소유의 키만 모아서, "acct:{id}:" 접두어를 뗀 상대 키 기준으로 돌려준다.
+  function collectAccountStorageEntries(prefixFilter) {
+    const acctPrefix = `acct:${CURRENT_ACCOUNT_ID}:`;
+    const entries = {};
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (!k || k.indexOf(acctPrefix) !== 0) continue;
+        const rel = k.slice(acctPrefix.length);
+        if (prefixFilter && !prefixFilter.some((p) => rel.indexOf(p) === 0)) continue;
+        const v = localStorage.getItem(k);
+        if (v !== null) entries[rel] = v;
+      }
+    } catch (e) { /* localStorage 접근 실패 시 빈 결과로 진행 */ }
+    return entries;
+  }
+  function buildBackupPayload(categoryKey) {
+    const cat = categoryKey === "all" ? null : BACKUP_CATEGORIES.find((c) => c.key === categoryKey);
+    const entries = collectAccountStorageEntries(cat ? cat.keyPrefixes : backupAllPrefixes());
+    return {
+      app: "업무 종합 관리",
+      backupVersion: 1,
+      exportedAt: new Date().toISOString(),
+      accountName: CURRENT_ACCOUNT_NAME,
+      category: categoryKey,
+      categoryLabel: cat ? cat.label : "전체 데이터",
+      data: entries,
+    };
+  }
+  function backupFilenameStamp() {
+    const d = new Date();
+    return `${d.getFullYear()}${pad2(d.getMonth() + 1)}${pad2(d.getDate())}-${pad2(d.getHours())}${pad2(d.getMinutes())}`;
+  }
+  function sanitizeFilenamePart(s) {
+    return String(s).replace(/[\\/:*?"<>|]/g, "_");
+  }
+  function downloadBackup(categoryKey) {
+    const payload = buildBackupPayload(categoryKey);
+    const json = JSON.stringify(payload, null, 2);
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `백업_${sanitizeFilenamePart(CURRENT_ACCOUNT_NAME)}_${sanitizeFilenamePart(payload.categoryLabel)}_${backupFilenameStamp()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    flashBackupStatus(`"${payload.categoryLabel}" 백업 파일을 내려받았어요.`);
+  }
+  function readBackupFile(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        try { resolve(JSON.parse(reader.result)); }
+        catch (e) { reject(e); }
+      };
+      reader.onerror = () => reject(reader.error);
+      reader.readAsText(file, "utf-8");
+    });
+  }
+  // restrictCategory가 있으면 그 카테고리에 속한 키만 반영하고(다른 카테고리 값은
+  // 파일 안에 섞여 있어도 무시), 없으면(=전체 가져오기) 알려진 모든 카테고리의
+  // 키를 반영한다. 백업 파일에 적힌 계정 이름 등은 참고용일 뿐 저장에는 쓰지
+  // 않고, 항상 "지금 로그인한 계정" 접두어로만 써서 다른 계정에는 영향이 없다.
+  async function applyBackupPayload(payload, restrictCategory) {
+    if (!payload || typeof payload !== "object" || !payload.data || typeof payload.data !== "object") {
+      return { ok: false, reason: "올바른 백업 파일이 아니에요." };
+    }
+    const allowedPrefixes = restrictCategory
+      ? ((BACKUP_CATEGORIES.find((c) => c.key === restrictCategory) || {}).keyPrefixes || [])
+      : backupAllPrefixes();
+    const acctPrefix = `acct:${CURRENT_ACCOUNT_ID}:`;
+    let count = 0;
+    Object.keys(payload.data).forEach((relKey) => {
+      if (!allowedPrefixes.some((p) => relKey.indexOf(p) === 0)) return;
+      const value = payload.data[relKey];
+      if (typeof value !== "string") return;
+      try { localStorage.setItem(acctPrefix + relKey, value); count += 1; } catch (e) {}
+    });
+    if (count === 0) return { ok: false, reason: "이 백업 파일에서 가져올 수 있는 데이터를 찾지 못했어요." };
+    await flushCloudWrites();
+    return { ok: true, count };
+  }
+
+  /* ===================== 🗄️ 자동 일일 백업 =====================
+     서버에 진짜 "정확히 자정 0시"에 실행되는 스케줄러가 있는 게 아니라, 자정이 지난
+     뒤 누군가(어떤 계정이든) 앱을 맨 처음 열 때 "어제 하루치" 백업이 아직 없으면
+     그 시점에 만든다. 그래서 실제로 만들어지는 시각은 자정보다 조금 늦어질 수 있지만
+     (예: 새벽엔 아무도 안 열고 오전 9시에 첫 출근자가 열면 그때 만들어짐), 내용 자체는
+     "그 날짜가 끝난 시점의 데이터" 그대로를 담는다. 같은 날짜는 marker 키로 한 번만
+     만들어지게 막는다. 별도 DB 테이블 없이 기존 kv_store에 다음 키들로 함께 저장한다.
+       - backup:all:{yyyy-mm-dd}                모든 계정의 전체 데이터 스냅샷 (그날 변경 여부와 무관하게 매일)
+       - backup:acct:{accountId}:{yyyy-mm-dd}    그 계정이 그날 바꾼 카테고리 목록(메타데이터)
+       - backup:cat:{accountId}:{category}:{yyyy-mm-dd}  그 계정의 그 카테고리만 담은 개별 스냅샷(바뀐 것만)
+       - backup:marker:{yyyy-mm-dd}              중복 생성 방지용 표시 */
+  const BACKUP_RETENTION_DAYS = 30;
+  function _localDateStr(d) {
+    return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+  }
+  function _prevLocalDateStr() {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    return _localDateStr(d);
+  }
+  function _dateStrMinusOne(dateStr) {
+    const d = new Date(`${dateStr}T00:00:00`);
+    d.setDate(d.getDate() - 1);
+    return _localDateStr(d);
+  }
+  // 특정 계정(대상 계정 아무나)의, 주어진 접두어들에 해당하는 상대 키만 모아 온다.
+  // (기존 buildBackupPayload는 "지금 로그인한 계정"만 다뤘는데, 여기서는 모든 계정을 다뤄야 해서 별도로 둔다.)
+  function _accountCategoryEntries(accountId, prefixes) {
+    const acctPrefix = `acct:${accountId}:`;
+    const entries = {};
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (!k || k.indexOf(acctPrefix) !== 0) continue;
+        const rel = k.slice(acctPrefix.length);
+        if (!prefixes.some((p) => rel.indexOf(p) === 0)) continue;
+        const v = localStorage.getItem(k);
+        if (v !== null) entries[rel] = v;
+      }
+    } catch (e) { /* 접근 실패 시 빈 결과로 진행 */ }
+    return entries;
+  }
+  async function runDailyAutoBackupIfNeeded() {
+    if (!cloud) return;
+    const targetDate = _prevLocalDateStr(); // "어제"를 기준으로 하루치를 남긴다
+    const markerKey = `backup:marker:${targetDate}`;
+    try {
+      const { data } = await cloud.from("kv_store").select("key").eq("key", markerKey).maybeSingle();
+      if (data) return; // 이미 다른 사람이 만들어둔 날짜
+    } catch (e) { return; } // 확인 자체가 안 되면(오프라인 등) 시도하지 않고, 다음에 여는 사람에게 맡긴다
+    try {
+      const accounts = loadAccounts();
+      // 1) 계정 무관 전체 스냅샷 — 바뀐 게 있든 없든 매일 남긴다.
+      const allSnapshot = { createdAt: new Date().toISOString(), date: targetDate, accounts: {} };
+      accounts.forEach((acc) => {
+        const entries = _accountCategoryEntries(acc.id, backupAllPrefixes());
+        if (Object.keys(entries).length) allSnapshot.accounts[acc.id] = { accountName: acc.username, data: entries };
+      });
+      await cloud.from("kv_store").upsert({ key: `backup:all:${targetDate}`, value: JSON.stringify(allSnapshot), updated_at: new Date().toISOString() });
+
+      // 2) 전날 스냅샷과 비교해서, 계정별로 실제 바뀐 카테고리만 개별 저장한다.
+      let prevAllSnapshot = null;
+      try {
+        const { data } = await cloud.from("kv_store").select("value").eq("key", `backup:all:${_dateStrMinusOne(targetDate)}`).maybeSingle();
+        if (data && data.value) prevAllSnapshot = JSON.parse(data.value);
+      } catch (e) { /* 전날 스냅샷이 없으면(첫 백업 등) 전부 "새로 생김" 취급 */ }
+      for (const acc of accounts) {
+        const changedCats = [];
+        const prevAcctData = (prevAllSnapshot && prevAllSnapshot.accounts[acc.id] && prevAllSnapshot.accounts[acc.id].data) || {};
+        for (const cat of BACKUP_CATEGORIES) {
+          const curEntries = _accountCategoryEntries(acc.id, cat.keyPrefixes);
+          if (!Object.keys(curEntries).length) continue;
+          const prevForCat = {};
+          Object.keys(prevAcctData).forEach((k) => { if (cat.keyPrefixes.some((p) => k.indexOf(p) === 0)) prevForCat[k] = prevAcctData[k]; });
+          if (JSON.stringify(curEntries) === JSON.stringify(prevForCat)) continue; // 안 바뀐 카테고리는 건너뜀
+          changedCats.push({ key: cat.key, label: cat.label });
+          await cloud.from("kv_store").upsert({
+            key: `backup:cat:${acc.id}:${cat.key}:${targetDate}`,
+            value: JSON.stringify({ createdAt: new Date().toISOString(), date: targetDate, accountId: acc.id, accountName: acc.username, category: cat.key, categoryLabel: cat.label, data: curEntries }),
+            updated_at: new Date().toISOString(),
+          });
+        }
+        if (changedCats.length) {
+          await cloud.from("kv_store").upsert({
+            key: `backup:acct:${acc.id}:${targetDate}`,
+            value: JSON.stringify({ createdAt: new Date().toISOString(), date: targetDate, accountId: acc.id, accountName: acc.username, categories: changedCats }),
+            updated_at: new Date().toISOString(),
+          });
+        }
+      }
+      await cloud.from("kv_store").upsert({ key: markerKey, value: "1", updated_at: new Date().toISOString() });
+      await _pruneOldBackups();
+    } catch (e) { /* 실패해도 평소 앱 사용에는 영향 없음 — 다음에 여는 사람이 다시 시도하게 된다 */ }
+  }
+  async function _pruneOldBackups() {
+    if (!cloud) return;
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - BACKUP_RETENTION_DAYS);
+    const cutoffStr = _localDateStr(cutoff);
+    try {
+      const { data } = await cloud.from("kv_store").select("key").like("key", "backup:%");
+      if (!data) return;
+      const toDelete = data.filter((r) => {
+        const m = /:(\d{4}-\d{2}-\d{2})$/.exec(r.key);
+        return m && m[1] < cutoffStr;
+      }).map((r) => r.key);
+      for (const k of toDelete) { try { await cloud.from("kv_store").delete().eq("key", k); } catch (e) {} }
+    } catch (e) {}
+  }
+  // 마스터 화면의 "자동 백업" 탭에서 쓸 목록: 날짜별로 묶어서 최신순으로 돌려준다.
+  async function fetchBackupList() {
+    if (!cloud) return [];
+    const { data, error } = await cloud.from("kv_store").select("key,value").like("key", "backup:%");
+    if (error || !data) return [];
+    const byDate = {};
+    data.forEach((row) => {
+      if (/^backup:marker:/.test(row.key)) return;
+      let m;
+      if ((m = /^backup:all:(\d{4}-\d{2}-\d{2})$/.exec(row.key))) {
+        const date = m[1];
+        byDate[date] = byDate[date] || { date, all: null, accounts: {} };
+        try { byDate[date].all = JSON.parse(row.value); } catch (e) {}
+      } else if ((m = /^backup:acct:([^:]+):(\d{4}-\d{2}-\d{2})$/.exec(row.key))) {
+        const [, accountId, date] = m;
+        byDate[date] = byDate[date] || { date, all: null, accounts: {} };
+        try { byDate[date].accounts[accountId] = Object.assign({ categories: [] }, JSON.parse(row.value), { catData: (byDate[date].accounts[accountId] || {}).catData || {} }); } catch (e) {}
+      } else if ((m = /^backup:cat:([^:]+):([^:]+):(\d{4}-\d{2}-\d{2})$/.exec(row.key))) {
+        const [, accountId, catKey, date] = m;
+        byDate[date] = byDate[date] || { date, all: null, accounts: {} };
+        byDate[date].accounts[accountId] = byDate[date].accounts[accountId] || { categories: [], catData: {} };
+        if (!byDate[date].accounts[accountId].catData) byDate[date].accounts[accountId].catData = {};
+        try { byDate[date].accounts[accountId].catData[catKey] = JSON.parse(row.value); } catch (e) {}
+      }
+    });
+    return Object.values(byDate).sort((a, b) => b.date.localeCompare(a.date));
+  }
+
+  // 새로고침 버튼: 백업 버튼이 있던 오른쪽 아래 자리에 항상 떠 있는 고정 버튼으로 표시.
+  // 다른 사람이 다른 기기/탭에서 저장한 내용을 서버에서 다시 받아오기 위한 용도로,
+  // 누른 시점에 보고 있던 페이지(홈/상담사 관리 등)는 그대로 유지된다.
+  function renderRefreshToggle() {
+    const root = document.getElementById("refresh-toggle-root");
+    if (!root) return;
+    root.innerHTML = `
+      <div class="manual-toggle-wrap">
+        <button class="theme-picker-btn" id="nav-refresh-toggle" type="button" aria-label="최신 내용으로 새로고침" title="최신 내용으로 새로고침">
+          ${ICON_REFRESH}
+          <span class="theme-picker-label">새로고침</span>
+        </button>
+      </div>
+    `;
+    const refreshBtn = document.getElementById("nav-refresh-toggle");
+    if (refreshBtn) refreshBtn.onclick = () => performServerRefresh();
+  }
+  function closeBackupModal() {
+    const existing = document.getElementById("backup-modal-overlay");
+    if (existing) existing.remove();
+  }
+  function flashBackupStatus(msg, isError) {
+    const el = document.getElementById("backup-modal-status");
+    if (!el) return;
+    el.textContent = msg;
+    el.classList.toggle("error", !!isError);
+  }
+  function backupCategoryRowHtml(cat) {
+    return `
+      <div class="backup-cat-row">
+        <div class="backup-cat-label">${cat.icon} ${esc(cat.label)}</div>
+        <div class="backup-cat-actions">
+          <button type="button" class="ghost-btn" data-backup-export="${cat.key}">${ICON_DOWNLOAD} 내보내기</button>
+          <button type="button" class="ghost-btn" data-backup-import="${cat.key}">${ICON_UPLOAD} 가져오기</button>
+        </div>
+      </div>
+    `;
+  }
+  // 파일 선택창을 열기 직전에 "이번 가져오기가 어느 카테고리 대상인지"를 여기에
+  // 담아두고, 파일이 선택되면 이 값을 기준으로 어떤 키만 반영할지 정한다.
+  let backupImportRestrict = null;
+  function openBackupModal() {
+    closeBackupModal();
+    const overlay = document.createElement("div");
+    overlay.id = "backup-modal-overlay";
+    overlay.className = "manual-modal-overlay";
+    overlay.innerHTML = `
+      <div class="manual-modal-box backup-modal-box" role="dialog" aria-modal="true" aria-label="데이터 백업/복원">
+        <div class="manual-modal-head">
+          <span>${ICON_BACKUP} 데이터 백업/복원</span>
+          <button type="button" class="manual-modal-close" id="backup-modal-close-x" aria-label="닫기">✕</button>
+        </div>
+        <div class="manual-modal-body">
+          <p class="backup-modal-desc">
+            상담사 정보 · 월별 스케줄 · 면담일지 · QA 점수 · 업무 정리(메모) · 캘린더 등
+            <b>"${esc(CURRENT_ACCOUNT_NAME)}"</b> 계정의 데이터를 JSON 파일로 내려받거나 다시 불러올 수 있어요.
+            가져오기는 파일이 원래 어느 계정에서 만들어졌든 상관없이 항상 <b>지금 로그인한 이 계정에만</b>
+            적용되고, 다른 계정의 데이터에는 전혀 영향을 주지 않아요.
+          </p>
+          <div class="backup-section">
+            <div class="backup-section-title">전체 데이터</div>
+            <div class="backup-all-actions">
+              <button type="button" class="primary-btn" id="backup-export-all">${ICON_DOWNLOAD} 전체 백업 다운로드</button>
+              <button type="button" class="ghost-btn" id="backup-import-all">${ICON_UPLOAD} 전체 백업 가져오기</button>
+            </div>
+          </div>
+          <div class="backup-section">
+            <div class="backup-section-title">카테고리별 백업</div>
+            <div class="backup-cat-list">${BACKUP_CATEGORIES.map(backupCategoryRowHtml).join("")}</div>
+          </div>
+          <div class="status backup-modal-status" id="backup-modal-status"></div>
+          <input type="file" accept="application/json" id="backup-file-input" style="display:none;">
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    overlay.onclick = (e) => { if (e.target === overlay) closeBackupModal(); };
+    document.getElementById("backup-modal-close-x").onclick = () => closeBackupModal();
+
+    const fileInput = document.getElementById("backup-file-input");
+    fileInput.onchange = async () => {
+      const file = fileInput.files && fileInput.files[0];
+      fileInput.value = "";
+      if (!file) return;
+      const restrict = backupImportRestrict;
+      const restrictLabel = restrict
+        ? ((BACKUP_CATEGORIES.find((c) => c.key === restrict) || {}).label || restrict)
+        : "전체 데이터";
+      let payload;
+      try { payload = await readBackupFile(file); }
+      catch (e) { flashBackupStatus("파일을 읽을 수 없어요. 올바른 백업 JSON 파일인지 확인해주세요.", true); return; }
+      const proceed = window.confirm(
+        `"${restrictLabel}" 데이터를 이 백업 파일 내용으로 덮어쓸까요?\n(지금 로그인한 계정 "${CURRENT_ACCOUNT_NAME}"에만 적용되고, 다른 계정에는 영향이 없어요)`
+      );
+      if (!proceed) return;
+      flashBackupStatus("가져오는 중…");
+      const result = await applyBackupPayload(payload, restrict);
+      if (!result.ok) { flashBackupStatus(result.reason, true); return; }
+      flashBackupStatus(`${result.count}개 항목을 가져왔어요. 화면을 새로고침할게요…`);
+      setTimeout(() => location.reload(), 700);
+    };
+
+    document.getElementById("backup-export-all").onclick = () => downloadBackup("all");
+    document.getElementById("backup-import-all").onclick = () => {
+      backupImportRestrict = null;
+      fileInput.click();
+    };
+    overlay.querySelectorAll("[data-backup-export]").forEach((btn) => {
+      btn.onclick = () => downloadBackup(btn.getAttribute("data-backup-export"));
+    });
+    overlay.querySelectorAll("[data-backup-import]").forEach((btn) => {
+      btn.onclick = () => {
+        backupImportRestrict = btn.getAttribute("data-backup-import");
+        fileInput.click();
+      };
+    });
+  }
+
+  // 설정 메뉴 팝오버("설정" 버튼을 누르면 뜨는 목록) — 테마 선택 · 사용설명서 · 데이터 백업을
+  // 한 목록 안에 모아둔다. 항목이 3개뿐이라 테마도 별도 팝업으로 한 번 더 들어가지 않고
+  // 이 목록에서 바로 다크/라이트를 고를 수 있게 했다.
+  function closeSettingsMenu() {
+    const existing = document.getElementById("settings-menu");
+    if (existing) existing.remove();
+    document.removeEventListener("mousedown", settingsMenuOutsideHandler, true);
+    const btn = document.getElementById("nav-settings-toggle");
+    if (btn) { btn.classList.remove("open"); btn.setAttribute("aria-expanded", "false"); }
+  }
+  function settingsMenuOutsideHandler(e) {
+    const menu = document.getElementById("settings-menu");
+    const btn = document.getElementById("nav-settings-toggle");
+    if (menu && !menu.contains(e.target) && !(btn && btn.contains(e.target))) closeSettingsMenu();
+  }
+  function openSettingsMenu(anchorEl) {
+    closeSettingsMenu();
+    anchorEl.classList.add("open");
+    anchorEl.setAttribute("aria-expanded", "true");
+    const rect = anchorEl.getBoundingClientRect();
+    const current = getCurrentTheme();
+    const menu = document.createElement("div");
+    menu.id = "settings-menu";
+    menu.className = "theme-menu settings-menu";
+    menu.innerHTML = `
+      <div class="settings-menu-label">테마</div>
+      ${THEME_LIST.map((t) => `
+        <button type="button" class="theme-menu-item ${t.id === current ? "active" : ""}" data-theme-id="${t.id}">
+          <span class="theme-menu-dot" style="background:${t.bg};"></span>
+          <span class="theme-menu-name">${t.label}</span>
+          ${t.id === current ? '<span class="theme-menu-check">✓</span>' : ""}
+        </button>
+      `).join("")}
+      <div class="settings-menu-divider"></div>
+      <button type="button" class="theme-menu-item" id="settings-manual-btn">
+        ${ICON_BOOK}<span class="theme-menu-name">사용설명서</span>
+      </button>
+      <button type="button" class="theme-menu-item" id="settings-backup-btn">
+        ${ICON_BACKUP}<span class="theme-menu-name">데이터 백업</span>
+      </button>
+      <button type="button" class="theme-menu-item" id="settings-discord-btn">
+        ${ICON_DISCORD}<span class="theme-menu-name">디스코드 채널</span>
+      </button>
+    `;
+    document.body.appendChild(menu);
+    const menuRect = menu.getBoundingClientRect();
+    let top = rect.top - menuRect.height - 8;
+    if (top < 8) top = rect.bottom + 8;
+    let left = rect.left;
+    if (left + menuRect.width > window.innerWidth - 8) left = window.innerWidth - menuRect.width - 8;
+    menu.style.top = `${Math.max(8, top)}px`;
+    menu.style.left = `${Math.max(8, left)}px`;
+    menu.querySelectorAll("[data-theme-id]").forEach((btn) => {
+      btn.onclick = () => {
+        setTheme(btn.getAttribute("data-theme-id"));
+        closeSettingsMenu();
+      };
+    });
+    const manualBtn = document.getElementById("settings-manual-btn");
+    if (manualBtn) manualBtn.onclick = () => { closeSettingsMenu(); openManualModal(); };
+    const backupBtn = document.getElementById("settings-backup-btn");
+    if (backupBtn) backupBtn.onclick = () => { closeSettingsMenu(); openBackupModal(); };
+    const discordBtn = document.getElementById("settings-discord-btn");
+    if (discordBtn) discordBtn.onclick = () => { closeSettingsMenu(); window.open(DISCORD_INVITE_URL, "_blank", "noopener"); };
+    setTimeout(() => document.addEventListener("mousedown", settingsMenuOutsideHandler, true), 0);
+  }
+
+  /* ===================== 공통 유틸 ===================== */
+  function pad2(n) { return String(n).padStart(2, "0"); }
+  function esc(str) {
+    const d = document.createElement("div");
+    d.textContent = str == null ? "" : String(str);
+    return d.innerHTML;
+  }
+  function genId() { return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`; }
+
+  /* ===================== 공용 페이지네이션 ===================== */
+  // 목록이 길어질 때 10개 단위로 잘라서 보여주기 위한 공용 헬퍼.
+  const PAGE_SIZE = 12; // 상담사 관리 / 면담일지 목록 페이지당 표시 개수
+  // list 전체와 원하는 page(1부터 시작)를 넣으면, 범위를 벗어난 page는 알아서
+  // 안쪽으로 보정해서 { items, page, totalPages }를 돌려준다.
+  function paginateList(list, page) {
+    const totalPages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
+    const safePage = Math.min(Math.max(1, page || 1), totalPages);
+    const start = (safePage - 1) * PAGE_SIZE;
+    return { items: list.slice(start, start + PAGE_SIZE), page: safePage, totalPages };
+  }
+  // actionName은 클릭 시 data-page-action 값으로 붙어서, 각 화면에서 이 값으로
+  // 자기 목록의 페이지 상태를 구분해 처리한다.
+  function renderPaginationHtml(page, totalPages, actionName) {
+    if (totalPages <= 1) return "";
+    return `
+      <div class="page-nav" data-page-action="${actionName}">
+        <button type="button" class="page-nav-btn" data-page-nav="prev" ${page <= 1 ? "disabled" : ""}>이전</button>
+        <span class="page-nav-info">${page} / ${totalPages}페이지</span>
+        <button type="button" class="page-nav-btn" data-page-nav="next" ${page >= totalPages ? "disabled" : ""}>다음</button>
+      </div>
+    `;
+  }
+  // renderPaginationHtml로 그려진 이전/다음 버튼에 동작을 붙인다.
+  // 버튼은 이미 범위를 벗어나면 disabled 처리되어 있으므로, 여기서는 그냥
+  // -1(이전)/+1(다음)만큼 페이지를 옮겨달라고 onDelta(delta)를 호출해주면 된다.
+  function attachPaginationHandlers(root, actionName, onDelta) {
+    const nav = root.querySelector(`.page-nav[data-page-action="${actionName}"]`);
+    if (!nav) return;
+    const prevBtn = nav.querySelector('[data-page-nav="prev"]');
+    const nextBtn = nav.querySelector('[data-page-nav="next"]');
+    if (prevBtn) prevBtn.onclick = () => onDelta(-1);
+    if (nextBtn) nextBtn.onclick = () => onDelta(1);
+  }
+
+  /* ===================== 로그인(로컬 전용) 모듈 =====================
+     지금은 서버 없이 이 브라우저의 localStorage에만 계정 정보를 저장하는
+     "로컬 프로토타입" 로그인입니다. 서버가 없는 한 브라우저 안의 어떤 값도
+     완전히 안전할 수는 없으므로, 진짜 보안이 필요해지면 반드시 서버 기반
+     인증(암호화된 비밀번호 저장, 세션/토큰 검증 등)으로 교체해야 합니다.
+     그래도 비밀번호는 브라우저 내장 SubtleCrypto로 계정마다 다른 salt를
+     붙여 SHA-256으로 해시해 저장해서, 평문은 물론 예전의 단순 해시보다
+     레인보우테이블·충돌 공격에 훨씬 강하게 만들어둡니다. 계정별 데이터는
+     저장 키 앞에 "acct:{계정ID}:" 접두어를 붙여 브라우저 안에서만 서로
+     분리해둡니다. */
+  const ACCOUNTS_KEY = "personal-app:accounts";
+  // 로그인 세션(누가 로그인해 있는지)은 localStorage에 저장해서, 탭을 닫았다 새로
+  // 열어도(같은 브라우저인 한) 로그인이 그대로 유지되게 한다. 대신 아래 LAST_ACTIVE_KEY
+  // 하트비트로 "너무 오래(=컴퓨터를 껐다 켤 정도로) 닫혀 있었는지"를 따로 판단해서,
+  // 그 경우에만 자동으로 로그아웃시킨다.
+  const SESSION_KEY = "personal-app:session";
+  // 마스터 계정이 다른 계정을 "들어가서 보기" 했을 때, 원래(마스터) 계정으로
+  // 돌아올 수 있도록 원래 세션을 잠깐 보관해두는 키.
+  const MASTER_ORIGIN_KEY = "personal-app:master-origin";
+  // 이 앱이 마지막으로 화면에 떠 있었던 시각(하트비트). 탭이 열려 있는 동안 주기적으로
+  // 갱신되고, 탭/브라우저가 닫히면 더 이상 갱신되지 않는다. 다음에 열었을 때 이 시각과
+  // 지금 시각의 차이가 SESSION_GAP_LIMIT_MS보다 크면 "그동안 컴퓨터를 껐다 켰거나
+  // 오래 자리를 비운 것"으로 보고 자동 로그아웃시킨다. 그보다 짧으면(탭만 잠깐 닫았다
+  // 연 경우 등) 로그인 상태를 그대로 유지한다. 기준 시간을 바꾸고 싶으면 이 숫자만
+  // 고치면 된다.
+  const LAST_ACTIVE_KEY = "personal-app:last-active";
+  const SESSION_GAP_LIMIT_MS = 5 * 60 * 1000; // 5분
+
+  const HAS_SUBTLE_CRYPTO = !!(window.crypto && window.crypto.subtle);
+  // 예전(salt 없는 단순 해시) 방식 — 신규 계정에는 쓰지 않고, 예전에 만든
+  // 계정을 로그인할 때 한 번 확인해서 새 방식으로 자동 업그레이드하는 용도로만 남겨둔다.
+  function legacyHash(str) {
+    let h = 0;
+    for (let i = 0; i < str.length; i++) {
+      h = (h << 5) - h + str.charCodeAt(i);
+      h |= 0;
+    }
+    return String(h);
+  }
+  function genSalt() {
+    const bytes = crypto.getRandomValues(new Uint8Array(16));
+    return Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
+  }
+  async function sha256Hex(str) {
+    const bytes = new TextEncoder().encode(str);
+    const digest = await crypto.subtle.digest("SHA-256", bytes);
+    return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
+  }
+  // salt를 붙여 비밀번호를 해시한다. SubtleCrypto를 쓸 수 없는 예외적인 환경에서는
+  // (로그인 자체가 막히지 않도록) 예전 단순 해시로 대신한다.
+  async function hashPassword(password, salt) {
+    if (!HAS_SUBTLE_CRYPTO) return legacyHash(`${salt}:${password}`);
+    return sha256Hex(`${salt}:${password}`);
+  }
+  function loadAccounts() {
+    try {
+      const raw = localStorage.getItem(ACCOUNTS_KEY);
+      const parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) { return []; }
+  }
+  function saveAccounts(list) {
+    try { localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(list)); } catch (e) {}
+  }
+  /* ---- 디스코드 알림 허용 계정 설정 ----
+     어떤 계정의 일정/할일을 디스코드로 보낼지를 계정 단위 토글로 관리한다.
+     { [accountId]: true } 형태로 "허용"된 계정만 담아두고, 여기 없는 계정은
+     전부 기본값인 "제한"으로 취급한다(허용 목록 방식이라 새 계정도 자동으로
+     제한 상태로 시작한다). 이 키도 다른 설정들처럼 클라우드(kv_store)에
+     함께 저장돼서 discord-notify 서버 함수가 그대로 읽어갈 수 있다. */
+  const DISCORD_NOTIFY_SETTINGS_KEY = "personal-app:discord-notify-settings";
+  function loadDiscordNotifySettings() {
+    try {
+      const raw = localStorage.getItem(DISCORD_NOTIFY_SETTINGS_KEY);
+      const parsed = raw ? JSON.parse(raw) : {};
+      return (parsed && typeof parsed === "object" && !Array.isArray(parsed)) ? parsed : {};
+    } catch (e) { return {}; }
+  }
+  function saveDiscordNotifySettings(obj) {
+    try { localStorage.setItem(DISCORD_NOTIFY_SETTINGS_KEY, JSON.stringify(obj)); } catch (e) {}
+  }
+  function isDiscordNotifyAllowed(accountId) {
+    return loadDiscordNotifySettings()[accountId] === true;
+  }
+  function setDiscordNotifyAllowed(accountId, allowed) {
+    const settings = loadDiscordNotifySettings();
+    if (allowed) settings[accountId] = true;
+    else delete settings[accountId];
+    saveDiscordNotifySettings(settings);
+  }
+  function getSession() {
+    try { return localStorage.getItem(SESSION_KEY); } catch (e) { return null; }
+  }
+  function setSession(accountId) {
+    try { localStorage.setItem(SESSION_KEY, accountId); } catch (e) {}
+  }
+  function clearSession() {
+    try { localStorage.removeItem(SESSION_KEY); } catch (e) {}
+  }
+  function getMasterOrigin() {
+    try { return localStorage.getItem(MASTER_ORIGIN_KEY); } catch (e) { return null; }
+  }
+  function setMasterOrigin(accountId) {
+    try { localStorage.setItem(MASTER_ORIGIN_KEY, accountId); } catch (e) {}
+  }
+  function clearMasterOrigin() {
+    try { localStorage.removeItem(MASTER_ORIGIN_KEY); } catch (e) {}
+  }
+  function getLastActive() {
+    try { return Number(localStorage.getItem(LAST_ACTIVE_KEY)) || 0; } catch (e) { return 0; }
+  }
+  // 하트비트를 지금 시각으로 갱신한다. 로그인 직후, 그리고 탭이 열려 있는 동안
+  // 주기적으로 호출된다.
+  function touchLastActive() {
+    try { localStorage.setItem(LAST_ACTIVE_KEY, String(Date.now())); } catch (e) {}
+  }
+  function clearLastActive() {
+    try { localStorage.removeItem(LAST_ACTIVE_KEY); } catch (e) {}
+  }
+  // 마스터 계정이 다른 계정으로 들어가서 볼 때 쓰는 함수.
+  // 지금 세션(마스터)을 origin으로 저장해두고, 세션을 대상 계정으로 바꾼다.
+  async function masterEnterAccount(targetAccountId) {
+    const origin = getMasterOrigin() || getSession();
+    if (origin) setMasterOrigin(origin);
+    setSession(targetAccountId);
+    clearTeamLoginMember();
+    await flushCloudWrites();
+    location.reload();
+  }
+  // 마스터가 다른 계정을 보다가 원래 마스터 계정으로 돌아간다.
+  async function masterReturnToOrigin() {
+    const origin = getMasterOrigin();
+    if (!origin) return;
+    clearMasterOrigin();
+    setSession(origin);
+    clearTeamLoginMember();
+    await flushCloudWrites();
+    location.reload();
+  }
+  // 계정을 삭제한다. 현재 로그인 중인 계정이거나, 남은 계정이 1개뿐이면 삭제하지 않는다.
+  // 계정을 지울 때 그 계정의 개인 데이터(acct:{id}: 로 시작하는 저장 값)도 함께 정리한다.
+  function deleteAccount(accountId) {
+    const list = loadAccounts();
+    if (list.length <= 1) return { ok: false, reason: "마지막 남은 계정은 삭제할 수 없어요." };
+    if (accountId === CURRENT_ACCOUNT_ID) return { ok: false, reason: "현재 로그인 중인 계정은 삭제할 수 없어요." };
+    const target = list.find((a) => a.id === accountId);
+    const next = list.filter((a) => a.id !== accountId);
+    saveAccounts(next);
+    setDiscordNotifyAllowed(accountId, false);
+    try {
+      const prefix = `acct:${accountId}:`;
+      const keysToRemove = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.indexOf(prefix) === 0) keysToRemove.push(k);
+      }
+      keysToRemove.forEach((k) => localStorage.removeItem(k));
+    } catch (e) { /* 데이터 정리 실패해도 계정 삭제 자체는 유지 */ }
+    appendActivityLog({
+      accountId,
+      accountName: target ? target.username : accountId,
+      viaMasterName: CURRENT_ACCOUNT_NAME,
+      categoryKey: "account",
+      categoryLabel: "계정 관리",
+      subLabel: "",
+      diff: ["계정이 삭제됐어요."],
+    });
+    return { ok: true };
+  }
+  // 마스터가 다른 계정의 비밀번호를 새 비밀번호로 초기화한다.
+  async function resetAccountPassword(accountId, newPassword) {
+    if (!newPassword || newPassword.length < 4) return { ok: false, reason: "비밀번호는 4자 이상으로 만들어주세요." };
+    const list = loadAccounts();
+    const idx = list.findIndex((a) => a.id === accountId);
+    if (idx === -1) return { ok: false, reason: "계정을 찾을 수 없어요." };
+    const salt = genSalt();
+    const passwordHash = await hashPassword(newPassword, salt);
+    list[idx] = { ...list[idx], salt, passwordHash };
+    saveAccounts(list);
+    appendActivityLog({
+      accountId,
+      accountName: list[idx].username,
+      viaMasterName: CURRENT_ACCOUNT_NAME,
+      categoryKey: "account",
+      categoryLabel: "계정 관리",
+      subLabel: "",
+      diff: ["비밀번호가 초기화됐어요."],
+    });
+    return { ok: true };
+  }
+  // 마스터가 다른 계정의 이름(아이디)을 바꾼다. 이미 쓰이고 있는 이름으로는 바꿀 수 없다.
+  function renameAccount(accountId, newUsername) {
+    const trimmed = (newUsername || "").trim();
+    if (!trimmed) return { ok: false, reason: "계정 이름을 입력해주세요." };
+    const list = loadAccounts();
+    const idx = list.findIndex((a) => a.id === accountId);
+    if (idx === -1) return { ok: false, reason: "계정을 찾을 수 없어요." };
+    const norm = trimmed.toLowerCase();
+    const dup = list.find((a) => a.id !== accountId && a.username.toLowerCase() === norm);
+    if (dup) return { ok: false, reason: "이미 사용 중인 계정 이름이에요." };
+    const oldUsername = list[idx].username;
+    list[idx] = { ...list[idx], username: trimmed };
+    saveAccounts(list);
+    appendActivityLog({
+      accountId,
+      accountName: trimmed,
+      viaMasterName: CURRENT_ACCOUNT_NAME,
+      categoryKey: "account",
+      categoryLabel: "계정 관리",
+      subLabel: "",
+      diff: [`계정 이름: ${oldUsername} → ${trimmed}`],
+    });
+    return { ok: true };
+  }
+  function findAccountByUsername(username) {
+    const norm = username.trim().toLowerCase();
+    return loadAccounts().find((a) => a.username.toLowerCase() === norm) || null;
+  }
+  function findAccountById(id) {
+    return loadAccounts().find((a) => a.id === id) || null;
+  }
+  /* ---- 팀용 계정의 "로그인 인원" ----
+     팀용 계정은 비밀번호 하나를 여러 명이 함께 쓰되, 로그인할 때 누가 접속했는지
+     이름표만 골라서 들어간다. 이 목록(teamMembers)은 마스터 계정에서만 추가/삭제할
+     수 있고, 실제 인증(비밀번호 검증)에는 관여하지 않는다 — 활동 로그 등에서
+     "누가"를 조금 더 구체적으로 보여주기 위한 용도. */
+  function addTeamMember(accountId, name) {
+    const trimmed = (name || "").trim();
+    if (!trimmed) return { ok: false, reason: "이름을 입력해주세요." };
+    const list = loadAccounts();
+    const idx = list.findIndex((a) => a.id === accountId);
+    if (idx === -1) return { ok: false, reason: "계정을 찾을 수 없어요." };
+    if (list[idx].accountType !== "team") return { ok: false, reason: "팀용 계정이 아니에요." };
+    const members = Array.isArray(list[idx].teamMembers) ? list[idx].teamMembers.slice() : [];
+    if (members.some((m) => m.name === trimmed)) return { ok: false, reason: "이미 있는 이름이에요." };
+    members.push({ id: genId(), name: trimmed });
+    list[idx] = { ...list[idx], teamMembers: members };
+    saveAccounts(list);
+    appendActivityLog({
+      accountId,
+      accountName: list[idx].username,
+      viaMasterName: CURRENT_ACCOUNT_NAME,
+      categoryKey: "account",
+      categoryLabel: "계정 관리",
+      subLabel: "로그인 인원",
+      diff: [`로그인 인원 추가: ${trimmed}`],
+    });
+    return { ok: true };
+  }
+  function removeTeamMember(accountId, memberId) {
+    const list = loadAccounts();
+    const idx = list.findIndex((a) => a.id === accountId);
+    if (idx === -1) return { ok: false, reason: "계정을 찾을 수 없어요." };
+    const members = Array.isArray(list[idx].teamMembers) ? list[idx].teamMembers : [];
+    const target = members.find((m) => m.id === memberId);
+    if (!target) return { ok: false, reason: "인원을 찾을 수 없어요." };
+    list[idx] = { ...list[idx], teamMembers: members.filter((m) => m.id !== memberId) };
+    saveAccounts(list);
+    appendActivityLog({
+      accountId,
+      accountName: list[idx].username,
+      viaMasterName: CURRENT_ACCOUNT_NAME,
+      categoryKey: "account",
+      categoryLabel: "계정 관리",
+      subLabel: "로그인 인원",
+      diff: [`로그인 인원 삭제: ${target.name}`],
+    });
+    return { ok: true };
+  }
+  // 마스터가 이미 만들어진 계정의 유형(개인용/팀용)을 바꾼다. 팀용으로 바꿀 때 로그인
+  // 인원 목록이 없으면 빈 목록으로 시작하고, 개인용으로 바꿔도 이미 등록해둔 인원
+  // 목록 자체는 지우지 않는다(나중에 다시 팀용으로 바꾸면 그대로 남아있게).
+  function setAccountType(accountId, newType) {
+    const type = newType === "team" ? "team" : "personal";
+    const list = loadAccounts();
+    const idx = list.findIndex((a) => a.id === accountId);
+    if (idx === -1) return { ok: false, reason: "계정을 찾을 수 없어요." };
+    const prevType = list[idx].accountType === "team" ? "team" : "personal";
+    if (prevType === type) return { ok: true };
+    const updated = { ...list[idx], accountType: type };
+    if (type === "team" && !Array.isArray(updated.teamMembers)) updated.teamMembers = [];
+    list[idx] = updated;
+    saveAccounts(list);
+    appendActivityLog({
+      accountId,
+      accountName: list[idx].username,
+      viaMasterName: CURRENT_ACCOUNT_NAME,
+      categoryKey: "account",
+      categoryLabel: "계정 관리",
+      subLabel: "",
+      diff: [`계정 유형: ${prevType === "team" ? "팀용" : "개인용"} → ${type === "team" ? "팀용" : "개인용"}`],
+    });
+    // 지금 로그인해 있는 계정 자신의 유형이 팀용이 아니게 바뀌면, 남아있던 "로그인 인원"
+    // 선택도 더는 의미가 없으니 같이 지운다.
+    if (accountId === CURRENT_ACCOUNT_ID && type !== "team") clearTeamLoginMember();
+    return { ok: true };
+  }
+  // 지금 선택된 "로그인 인원"(팀용 계정에서만 의미 있음)을 브라우저에 잠깐 저장해서,
+  // 새로고침 후에도(같은 세션이 유지되는 동안) 계속 같은 인원으로 표시되게 한다.
+  const TEAM_MEMBER_KEY = "personal-app:team-login-member";
+  function getTeamLoginMember() {
+    try {
+      const raw = localStorage.getItem(TEAM_MEMBER_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) { return null; }
+  }
+  function setTeamLoginMember(member) {
+    try {
+      if (member) localStorage.setItem(TEAM_MEMBER_KEY, JSON.stringify(member));
+      else localStorage.removeItem(TEAM_MEMBER_KEY);
+    } catch (e) {}
+  }
+  function clearTeamLoginMember() {
+    try { localStorage.removeItem(TEAM_MEMBER_KEY); } catch (e) {}
+  }
+  async function logout() {
+    clearSession();
+    clearMasterOrigin();
+    clearLastActive();
+    clearTeamLoginMember();
+    await flushCloudWrites();
+    location.reload();
+  }
+
+  function renderLoginScreen() {
+    const nav = document.getElementById("nav");
+    if (nav) nav.innerHTML = "";
+    document.body.classList.add("login-screen");
+    const root = document.getElementById("page-inner");
+    root.classList.remove("wide");
+    // uiState.loginStep: "id"(아이디만 입력) → "auth"(팀용이면 인원 선택+비밀번호, 개인용이면 비밀번호만)
+    const uiState = {
+      tab: loadAccounts().length ? "login" : "signup", error: "",
+      loginStep: "id", loginAccount: null,
+    };
+
+    function resetLoginStep() { uiState.loginStep = "id"; uiState.loginAccount = null; }
+
+    function draw() {
+      const accounts = loadAccounts();
+      const hasMaster = accounts.some((a) => a.isMaster);
+      const loginAcc = uiState.loginAccount;
+      const isTeamLogin = !!loginAcc && loginAcc.accountType === "team";
+      const teamMembers = isTeamLogin && Array.isArray(loginAcc.teamMembers) ? loginAcc.teamMembers : [];
+      root.innerHTML = `
+        <div class="login-shell">
+          <div class="login-card">
+            <div class="login-title">업무 종합 관리</div>
+            <div class="login-sub">계정마다 캘린더·메모·상담사·스케줄 데이터가 따로 저장돼요.<br>(현재는 이 브라우저 안에만 로컬로 저장되는 시험 버전이에요)</div>
+            <div class="login-tabs">
+              <button class="login-tab ${uiState.tab === "login" ? "active" : ""}" data-tab="login">로그인</button>
+              <button class="login-tab ${uiState.tab === "signup" ? "active" : ""}" data-tab="signup">계정 만들기</button>
+            </div>
+            ${uiState.error ? `<div class="login-error">${esc(uiState.error)}</div>` : ""}
+            ${uiState.tab === "login" ? (
+              uiState.loginStep === "id" ? `
+                <form class="login-form" id="login-id-form">
+                  <label class="login-field"><span>아이디</span>
+                    <input class="add-input" id="login-username" autocomplete="username" placeholder="아이디">
+                  </label>
+                  <button type="submit" class="primary-btn login-submit">로그인</button>
+                </form>
+                <div class="login-accounts-hint">${accounts.length ? `등록된 계정: ${accounts.map((a) => esc(a.username)).join(", ")}` : `아직 등록된 계정이 없어요.<br>"계정 만들기" 탭에서 먼저 계정을 만들어주세요.`}</div>
+              ` : `
+                <button type="button" class="login-back-link" id="login-back-btn">← 다른 계정으로</button>
+                <div class="login-selected-account">
+                  <b>${esc(loginAcc.username)}</b>${isTeamLogin ? ' <span class="badge sm type">팀용</span>' : ""}
+                </div>
+                <form class="login-form" id="login-auth-form">
+                  ${isTeamLogin ? `
+                    <label class="login-field"><span>로그인 인원</span>
+                      <select class="add-input" id="login-member">
+                        <option value="">${teamMembers.length ? "선택해주세요" : "등록된 인원이 없어요"}</option>
+                        ${teamMembers.map((m) => `<option value="${esc(m.id)}">${esc(m.name)}</option>`).join("")}
+                      </select>
+                    </label>
+                    ${!teamMembers.length ? `<div class="login-accounts-hint">아직 등록된 로그인 인원이 없어요. 마스터 계정에서 먼저 추가해달라고 해주세요.</div>` : ""}
+                  ` : ""}
+                  <label class="login-field"><span>비밀번호</span>
+                    <input class="add-input" id="login-password" type="password" autocomplete="current-password" placeholder="비밀번호">
+                  </label>
+                  <button type="submit" class="primary-btn login-submit" ${isTeamLogin && !teamMembers.length ? "disabled" : ""}>로그인</button>
+                </form>
+              `
+            ) : `
+              <form class="login-form" id="signup-form">
+                <label class="login-field"><span>아이디</span>
+                  <input class="add-input" id="signup-username" autocomplete="username" placeholder="아이디">
+                </label>
+                <label class="login-field"><span>계정 유형</span>
+                  <div class="login-type-radios">
+                    <label class="login-type-radio"><input type="radio" name="signup-type" value="personal" checked> 개인용</label>
+                    <label class="login-type-radio"><input type="radio" name="signup-type" value="team"> 팀용</label>
+                  </div>
+                  <span class="login-master-hint">팀용은 여러 명이 비밀번호 하나를 같이 쓰고, 로그인할 때 인원만 골라요. 로그인 인원은 나중에 마스터 계정에서 추가할 수 있어요.</span>
+                </label>
+                <label class="login-field"><span>비밀번호</span>
+                  <input class="add-input" id="signup-password" type="password" autocomplete="new-password" placeholder="비밀번호 (4자 이상)">
+                </label>
+                <label class="login-field"><span>비밀번호 확인</span>
+                  <input class="add-input" id="signup-password2" type="password" autocomplete="new-password" placeholder="비밀번호 확인">
+                </label>
+                ${!hasMaster ? `
+                  <label class="login-master-check">
+                    <input type="checkbox" id="signup-master">
+                    <span>이 계정을 마스터 계정으로 만들기 <span class="login-master-hint">(마스터 계정은 다른 모든 계정을 선택해서 들어가보고, 삭제할 수 있어요. 아직 마스터 계정이 없어서 지금만 선택할 수 있어요.)</span></span>
+                  </label>
+                ` : ""}
+                <button type="submit" class="primary-btn login-submit">계정 만들고 시작하기</button>
+              </form>
+            `}
+          </div>
+        </div>
+      `;
+
+      root.querySelectorAll("[data-tab]").forEach((btn) => {
+        btn.onclick = () => { uiState.tab = btn.getAttribute("data-tab"); uiState.error = ""; resetLoginStep(); draw(); };
+      });
+
+      const backBtn = document.getElementById("login-back-btn");
+      if (backBtn) {
+        backBtn.onclick = () => { uiState.error = ""; resetLoginStep(); draw(); };
+      }
+
+      // 단계가 바뀔 때마다(아이디 입력→인증 단계) 커서를 직접 옮길 필요 없이 바로
+      // 입력할 수 있게, 지금 단계에 맞는 입력칸에 자동으로 포커스를 준다.
+      if (uiState.tab === "login") {
+        if (uiState.loginStep === "id") {
+          const usernameField = document.getElementById("login-username");
+          if (usernameField) usernameField.focus();
+        } else {
+          const memberSelect = document.getElementById("login-member");
+          const passwordField = document.getElementById("login-password");
+          if (isTeamLogin && memberSelect && !memberSelect.value) {
+            // 팀용 계정: 인원을 먼저 골라야 하니 인원 선택창에 포커스해두고,
+            // 인원을 고르는 순간 바로 비밀번호 칸으로 넘어가게 한다.
+            memberSelect.focus();
+          } else if (passwordField) {
+            passwordField.focus();
+          }
+          if (memberSelect) {
+            memberSelect.onchange = () => {
+              if (memberSelect.value && passwordField) passwordField.focus();
+            };
+          }
+        }
+      }
+
+      const loginIdForm = document.getElementById("login-id-form");
+      if (loginIdForm) {
+        loginIdForm.onsubmit = (e) => {
+          e.preventDefault();
+          const username = document.getElementById("login-username").value.trim();
+          if (!username) { uiState.error = "아이디를 입력해주세요."; draw(); return; }
+          const account = findAccountByUsername(username);
+          if (!account) { uiState.error = "등록된 계정이 없어요."; draw(); return; }
+          uiState.loginAccount = account;
+          uiState.loginStep = "auth";
+          uiState.error = "";
+          draw();
+        };
+      }
+
+      const loginAuthForm = document.getElementById("login-auth-form");
+      if (loginAuthForm) {
+        loginAuthForm.onsubmit = async (e) => {
+          e.preventDefault();
+          const account = uiState.loginAccount;
+          if (!account) { resetLoginStep(); draw(); return; }
+          let member = null;
+          if (account.accountType === "team") {
+            const memberSelect = document.getElementById("login-member");
+            const memberId = memberSelect ? memberSelect.value : "";
+            if (!memberId) { uiState.error = "로그인 인원을 선택해주세요."; draw(); return; }
+            member = (Array.isArray(account.teamMembers) ? account.teamMembers : []).find((m) => m.id === memberId) || null;
+            if (!member) { uiState.error = "로그인 인원을 다시 선택해주세요."; draw(); return; }
+          }
+          const password = document.getElementById("login-password").value;
+          if (!password) { uiState.error = "비밀번호를 입력해주세요."; draw(); return; }
+          let ok;
+          if (account.salt) {
+            ok = account.passwordHash === (await hashPassword(password, account.salt));
+          } else {
+            // salt가 없는 예전 계정: 예전 방식으로 한 번 확인하고, 맞으면 새 방식(salt+SHA-256)으로 조용히 업그레이드한다.
+            ok = account.passwordHash === legacyHash(password);
+            if (ok) {
+              const salt = genSalt();
+              const passwordHash = await hashPassword(password, salt);
+              const list = loadAccounts();
+              const idx = list.findIndex((a) => a.id === account.id);
+              if (idx !== -1) { list[idx] = { ...list[idx], salt, passwordHash }; saveAccounts(list); }
+            }
+          }
+          if (!ok) {
+            uiState.error = "아이디 또는 비밀번호가 올바르지 않아요.";
+            draw();
+            return;
+          }
+          setSession(account.id);
+          setTeamLoginMember(member ? { id: member.id, name: member.name } : null);
+          touchLastActive();
+          try { sessionStorage.setItem("app:just-logged-in", "1"); } catch (e) {}
+          await flushCloudWrites();
+          location.reload();
+        };
+      }
+      const signupForm = document.getElementById("signup-form");
+      if (signupForm) {
+        signupForm.onsubmit = async (e) => {
+          e.preventDefault();
+          const username = document.getElementById("signup-username").value.trim();
+          const password = document.getElementById("signup-password").value;
+          const password2 = document.getElementById("signup-password2").value;
+          if (!username || !password) { uiState.error = "아이디와 비밀번호를 입력해주세요."; draw(); return; }
+          if (password.length < 4) { uiState.error = "비밀번호는 4자 이상으로 만들어주세요."; draw(); return; }
+          if (password !== password2) { uiState.error = "비밀번호 확인이 일치하지 않아요."; draw(); return; }
+          if (findAccountByUsername(username)) { uiState.error = "이미 사용 중인 아이디예요."; draw(); return; }
+          const accountsList = loadAccounts();
+          const wantsMaster = !accountsList.some((a) => a.isMaster) && !!document.getElementById("signup-master") && document.getElementById("signup-master").checked;
+          const typeInput = document.querySelector('input[name="signup-type"]:checked');
+          const accountType = typeInput && typeInput.value === "team" ? "team" : "personal";
+          const salt = genSalt();
+          const passwordHash = await hashPassword(password, salt);
+          const newAccount = {
+            id: genId(), username, salt, passwordHash, createdAt: new Date().toISOString(), isMaster: wantsMaster,
+            accountType, teamMembers: accountType === "team" ? [] : undefined,
+          };
+          accountsList.push(newAccount);
+          saveAccounts(accountsList);
+          setSession(newAccount.id);
+          clearTeamLoginMember();
+          touchLastActive();
+          try { sessionStorage.setItem("app:just-logged-in", "1"); } catch (e) {}
+          await flushCloudWrites();
+          location.reload();
+        };
+      }
+    }
+
+    draw();
+  }
+
+  // 세션 확인: 로그인 상태가 아니면 로그인 화면만 그리고 나머지 앱 코드는 실행하지 않는다.
+  const _session = getSession();
+  let _account = _session ? findAccountById(_session) : null;
+  // 하트비트 확인: 마지막으로 이 앱이 열려 있었던 시각으로부터 너무 오래(컴퓨터를
+  // 껐다 켤 정도로) 지났으면 자동으로 로그아웃 처리한다. 탭만 잠깐 닫았다 연 경우처럼
+  // 그 안에 다시 열렸다면 로그인 상태를 그대로 유지한다.
+  if (_account) {
+    const lastActive = getLastActive();
+    if (!lastActive || Date.now() - lastActive >= SESSION_GAP_LIMIT_MS) {
+      clearSession();
+      clearMasterOrigin();
+      clearLastActive();
+      clearTeamLoginMember();
+      _account = null;
+    }
+  }
+  if (!_account) {
+    renderLoginScreen();
+    return;
+  }
+  document.body.classList.remove("login-screen");
+  const CURRENT_ACCOUNT_ID = _account.id;
+  const CURRENT_ACCOUNT_NAME = _account.username;
+  const CURRENT_ACCOUNT_IS_MASTER = !!_account.isMaster;
+  // 팀용 계정은 여러 명이 하나의 계정(비밀번호)을 같이 쓰되, 로그인할 때 고른 "인원"
+  // 이름표를 함께 들고 있는다. 개인용 계정이거나, 옛날에 만들어져 accountType이 아예
+  // 없는 계정은 전부 "personal"로 취급한다.
+  const CURRENT_ACCOUNT_TYPE = _account.accountType === "team" ? "team" : "personal";
+  const CURRENT_TEAM_MEMBER = CURRENT_ACCOUNT_TYPE === "team" ? getTeamLoginMember() : null;
+  const CURRENT_ACCOUNT_DISPLAY_NAME = CURRENT_TEAM_MEMBER ? `${CURRENT_ACCOUNT_NAME} (${CURRENT_TEAM_MEMBER.name})` : CURRENT_ACCOUNT_NAME;
+  // 마스터 계정이 다른 계정으로 들어와서 보고 있는 중인지 확인 (원래 마스터 계정 정보가 남아있는지로 판단)
+  const _masterOriginId = getMasterOrigin();
+  const MASTER_ORIGIN_ACCOUNT = _masterOriginId && _masterOriginId !== CURRENT_ACCOUNT_ID ? findAccountById(_masterOriginId) : null;
+  if (_masterOriginId && !MASTER_ORIGIN_ACCOUNT) clearMasterOrigin();
+  // 계정별로 데이터를 분리하기 위해 저장 키 앞에 이 접두어를 붙인다.
+  function acctKey(key) { return `acct:${CURRENT_ACCOUNT_ID}:${key}`; }
+
+  /* ===================== 📋 계정 활동 로그 (마스터 전용) =====================
+     각 계정에서 실제 데이터(할일/메모/상담사/면담일지/QA/스케줄 등)가 저장될 때마다
+     "언제 · 누가 · 어디서(어떤 메뉴) · 무엇이 어떻게 바뀌었는지"를 간단히 기록해서
+     쌓아둔다. 이 로그 자체도 클라우드(kv_store)에 함께 저장되므로, 다른 관리자의
+     브라우저에서 생긴 활동도 마스터 계정이라면 새로고침 후 같이 볼 수 있다.
+     계정 목록 자체를 다루는 동작(비밀번호 초기화·이름 변경·삭제)은 acct: 접두어를
+     쓰지 않으므로, 해당 함수(resetAccountPassword 등) 안에서 직접 기록한다. */
+  /* ---- 시각 표시는 항상 한국 표준시(KST, UTC+9)로 ----
+     저장은 new Date().toISOString()(UTC)로 하고, 화면에 보여줄 때 이 함수들을 거쳐
+     KST로 변환한다. 이렇게 해야 보고 있는 사람의 브라우저 시간대 설정과 무관하게
+     항상 한국 시간 기준으로 보인다. (한국은 서머타임이 없어서 항상 UTC+9 고정이면 된다.) */
+  function _toKSTParts(iso) {
+    if (!iso) return null;
+    const t = Date.parse(iso);
+    if (isNaN(t)) return null;
+    const kst = new Date(t + 9 * 60 * 60 * 1000);
+    return {
+      y: kst.getUTCFullYear(), mo: pad2(kst.getUTCMonth() + 1), da: pad2(kst.getUTCDate()),
+      h: pad2(kst.getUTCHours()), mi: pad2(kst.getUTCMinutes()),
+    };
+  }
+  function formatKSTDateTime(iso) {
+    const p = _toKSTParts(iso);
+    return p ? `${p.y}-${p.mo}-${p.da} ${p.h}:${p.mi}` : "-";
+  }
+  function formatKSTTime(iso) {
+    const p = _toKSTParts(iso);
+    return p ? `${p.h}:${p.mi}` : "";
+  }
+
+  const ACTIVITY_LOG_KEY = "activity-log:entries";
+  const ACTIVITY_LOG_MAX = 500; // 너무 오래 쌓이지 않도록 최신 N건만 유지
+  const ACTIVITY_LOG_RETENTION_DAYS = 30; // 이보다 오래된 로그는 자동으로 정리
+  function _pruneOldActivityEntries(list) {
+    const cutoff = Date.now() - ACTIVITY_LOG_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+    return list.filter((e) => {
+      const ts = Date.parse(e.endedAt || e.at || "");
+      return isNaN(ts) ? true : ts >= cutoff; // 날짜를 못 읽으면 안전하게 남겨둔다
+    });
+  }
+  function loadActivityLog() {
+    try {
+      const raw = localStorage.getItem(ACTIVITY_LOG_KEY);
+      const parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) { return []; }
+  }
+  function appendActivityLog(entry) {
+    try {
+      let list = loadActivityLog();
+      list.unshift(Object.assign({ id: genId(), at: new Date().toISOString() }, entry));
+      list = _pruneOldActivityEntries(list);
+      if (list.length > ACTIVITY_LOG_MAX) list.length = ACTIVITY_LOG_MAX;
+      localStorage.setItem(ACTIVITY_LOG_KEY, JSON.stringify(list));
+    } catch (e) { /* 로그 저장 실패가 실제 데이터 저장에 영향을 주면 안 된다 */ }
+  }
+  // 새 활동이 한동안 없어도(=appendActivityLog가 한동안 안 불려도) 30일 지난
+  // 로그는 앱을 열 때마다 한 번씩 조용히 정리한다.
+  function pruneActivityLogIfStale() {
+    try {
+      const list = loadActivityLog();
+      const pruned = _pruneOldActivityEntries(list);
+      if (pruned.length !== list.length) localStorage.setItem(ACTIVITY_LOG_KEY, JSON.stringify(pruned));
+    } catch (e) {}
+  }
+  function clearActivityLog() {
+    try { localStorage.setItem(ACTIVITY_LOG_KEY, JSON.stringify([])); } catch (e) {}
+  }
+  // acct:{id}:personal-xxx:... 형태의 저장 키에서 "어디서 바뀌었는지" 카테고리를 찾아낸다.
+  // (BACKUP_CATEGORIES를 그대로 재사용해 백업 화면의 분류와 일관성을 맞춘다.)
+  function activityCategoryForRelKey(relKey) {
+    const cat = BACKUP_CATEGORIES.find((c) => c.keyPrefixes.some((p) => relKey.indexOf(p) === 0));
+    if (cat) return { key: cat.key, label: cat.label };
+    return { key: "etc", label: "기타" };
+  }
+  // 캘린더처럼 한 카테고리 안에 저장 키가 여러 개(월별 일정 / 할 일 목록)로 나뉜 경우,
+  // 리스트에서 조금 더 구체적으로 어디가 바뀌었는지 보여주기 위한 부가 설명.
+  function activitySubLabel(relKey) {
+    if (relKey === "personal-calendar:todos") return "할 일 목록";
+    const m = /^personal-calendar:(\d{4}-\d{2})$/.exec(relKey);
+    if (m) return `${m[1]} 캘린더 일정`;
+    return "";
+  }
+  function _activityItemLabel(item) {
+    if (item === null || item === undefined) return "(없음)";
+    if (typeof item !== "object") return String(item);
+    const v = item.name || item.title || item.content || item.username || item.label || item.date;
+    if (v) return String(v).slice(0, 40);
+    return item.id ? `#${item.id}` : "항목";
+  }
+  function _activityScalar(v) {
+    if (v === undefined) return "(없음)";
+    if (v === null) return "(비어있음)";
+    if (typeof v === "object") { try { return JSON.stringify(v).slice(0, 60); } catch (e) { return "(객체)"; } }
+    const s = String(v);
+    if (s === "") return "(빈 값)";
+    return s.length > 60 ? `${s.slice(0, 60)}…` : s;
+  }
+  // 저장 전/후 값을 비교해 사람이 읽을 수 있는 변경 내역 줄들을 만든다. 배열은 id 기준으로
+  // 추가/삭제/수정을 구분하고, 객체는 키 기준으로(최대 2단계까지) 비교한다. 완벽한 diff는
+  // 아니지만 "대략 뭐가 바뀌었는지" 파악하기엔 충분한 수준을 목표로 한다.
+  function diffActivityValues(oldVal, newVal, depth) {
+    const lines = [];
+    if (oldVal === undefined && newVal !== undefined) return ["새로 만들어졌어요."];
+    if (oldVal !== undefined && newVal === undefined) return ["삭제됐어요."];
+    if (Array.isArray(oldVal) && Array.isArray(newVal)) {
+      const idBased = (oldVal.length && oldVal.every((x) => x && typeof x === "object" && x.id != null))
+        || (newVal.length && newVal.every((x) => x && typeof x === "object" && x.id != null));
+      if (idBased) {
+        const oldMap = {}; oldVal.forEach((x) => { if (x && x.id != null) oldMap[x.id] = x; });
+        const newMap = {}; newVal.forEach((x) => { if (x && x.id != null) newMap[x.id] = x; });
+        Object.keys(newMap).forEach((id) => {
+          if (!(id in oldMap)) { lines.push(`+ 추가됨: ${_activityItemLabel(newMap[id])}`); return; }
+          const fieldLines = diffActivityValues(oldMap[id], newMap[id], (depth || 0) + 1);
+          if (fieldLines.length) lines.push(`✎ 수정됨: ${_activityItemLabel(newMap[id])} — ${fieldLines.join(" / ")}`);
+        });
+        Object.keys(oldMap).forEach((id) => {
+          if (!(id in newMap)) lines.push(`- 삭제됨: ${_activityItemLabel(oldMap[id])}`);
+        });
+      } else if (JSON.stringify(oldVal) !== JSON.stringify(newVal)) {
+        lines.push(oldVal.length === newVal.length ? "목록 내용이 바뀌었어요." : `목록 항목 수: ${oldVal.length}개 → ${newVal.length}개`);
+      }
+      return lines;
+    }
+    if (oldVal && newVal && typeof oldVal === "object" && typeof newVal === "object") {
+      if ((depth || 0) >= 3) {
+        if (JSON.stringify(oldVal) !== JSON.stringify(newVal)) lines.push("내용이 바뀌었어요.");
+        return lines;
+      }
+      const keys = Array.from(new Set(Object.keys(oldVal).concat(Object.keys(newVal))));
+      keys.forEach((k) => {
+        const ov = oldVal[k];
+        const nv = newVal[k];
+        if (JSON.stringify(ov) === JSON.stringify(nv)) return;
+        if (ov && nv && typeof ov === "object" && typeof nv === "object") {
+          const sub = diffActivityValues(ov, nv, (depth || 0) + 1);
+          if (sub.length) sub.forEach((s) => lines.push(`${k}.${s}`));
+          else lines.push(`${k}: 내용이 바뀌었어요.`);
+        } else {
+          lines.push(`${k}: ${_activityScalar(ov)} → ${_activityScalar(nv)}`);
+        }
+      });
+      return lines;
+    }
+    if (oldVal !== newVal) lines.push(`${_activityScalar(oldVal)} → ${_activityScalar(newVal)}`);
+    return lines;
+  }
+  function buildActivityDiffLines(oldRaw, newRaw) {
+    if (oldRaw === newRaw) return [];
+    let oldVal, newVal;
+    try { oldVal = oldRaw != null ? JSON.parse(oldRaw) : undefined; } catch (e) { oldVal = oldRaw; }
+    try { newVal = newRaw != null ? JSON.parse(newRaw) : undefined; } catch (e) { newVal = newRaw; }
+    const lines = diffActivityValues(oldVal, newVal, 0);
+    if (lines.length > 40) return lines.slice(0, 40).concat([`...외 ${lines.length - 40}건 더`]);
+    return lines.length ? lines : ["내용이 바뀌었어요."];
+  }
+
+  /* ---- 3분 단위로 묶어서 기록하기 ----
+     한 계정에서 짧은 시간 안에 여러 번 수정하면(스케줄 셀 여러 칸 수정 등) 로그가
+     한 줄씩 계속 쌓여서 목록이 너무 많아진다. 그래서 계정별로 "첫 변경이 생긴 시점"
+     부터 3분짜리 타이머를 하나 돌리고, 그 3분 동안 생긴 변경들은 전부 한 줄(리스트
+     항목 하나)로 모아서 기록한다. 3분이 지나면 그 줄은 마감되고, 그다음 변경부터는
+     새로운 3분 타이머(=새로운 줄)로 다시 쌓인다. 진행 중인 묶음은 클라우드에도 같이
+     저장해두므로, 브라우저를 껐다 켜거나 다른 탭/다른 사람이 열어도 이어서 처리된다. */
+  const ACTIVITY_BATCH_WINDOW_MS = 3 * 60 * 1000;
+  const ACTIVITY_PENDING_KEY = "activity-log:pending";
+  const _activityFlushTimers = {}; // accountId -> setTimeout id (이 탭이 열려 있는 동안만 유효)
+  function loadPendingActivityBatches() {
+    try {
+      const raw = localStorage.getItem(ACTIVITY_PENDING_KEY);
+      const parsed = raw ? JSON.parse(raw) : {};
+      return parsed && typeof parsed === "object" ? parsed : {};
+    } catch (e) { return {}; }
+  }
+  function savePendingActivityBatches(map) {
+    try { localStorage.setItem(ACTIVITY_PENDING_KEY, JSON.stringify(map)); } catch (e) {}
+  }
+  function scheduleActivityFlush(accountId, delayMs) {
+    if (_activityFlushTimers[accountId]) return; // 이미 이 탭에서 예약돼 있음
+    _activityFlushTimers[accountId] = setTimeout(() => {
+      delete _activityFlushTimers[accountId];
+      finalizeActivityBatch(accountId);
+    }, Math.max(0, delayMs));
+  }
+  // 진행 중이던 묶음을 하나의 로그 항목으로 마감해서 실제 목록(activity-log:entries)에 올린다.
+  function finalizeActivityBatch(accountId) {
+    if (_activityFlushTimers[accountId]) { clearTimeout(_activityFlushTimers[accountId]); delete _activityFlushTimers[accountId]; }
+    const pending = loadPendingActivityBatches();
+    const batch = pending[accountId];
+    if (!batch || !batch.changes || !batch.changes.length) { delete pending[accountId]; savePendingActivityBatches(pending); return; }
+    delete pending[accountId];
+    savePendingActivityBatches(pending);
+    const whereLabels = [];
+    batch.changes.forEach((c) => {
+      const w = c.subLabel ? `${c.categoryLabel} · ${c.subLabel}` : c.categoryLabel;
+      if (whereLabels.indexOf(w) === -1) whereLabels.push(w);
+    });
+    const categoryLabel = whereLabels.length <= 2 ? whereLabels.join(", ") : `${whereLabels.slice(0, 2).join(", ")} 외 ${whereLabels.length - 2}곳`;
+    const diffLines = [];
+    batch.changes.forEach((c) => {
+      const timeLabel = c.at ? formatKSTTime(c.at) : "";
+      const where = c.subLabel ? `${c.categoryLabel} · ${c.subLabel}` : c.categoryLabel;
+      (c.diff && c.diff.length ? c.diff : ["내용이 바뀌었어요."]).forEach((line) => diffLines.push(`[${timeLabel}] ${where} — ${line}`));
+    });
+    appendActivityLog({
+      at: batch.startedAt,
+      endedAt: new Date().toISOString(),
+      accountId,
+      accountName: batch.accountName,
+      viaMasterName: batch.viaMasterName,
+      categoryKey: "batch",
+      categoryLabel,
+      subLabel: `${batch.changes.length}건`,
+      diff: diffLines,
+    });
+  }
+  // 개별 변경 하나를 계정별 진행 중인 3분 묶음에 쌓는다(묶음이 없거나 이미 3분이
+  // 지났으면 새 묶음을 새로 시작한다).
+  function queueActivityChange(change) {
+    let pending = loadPendingActivityBatches();
+    const existing = pending[change.accountId];
+    if (existing && existing.startedAt && (Date.now() - Date.parse(existing.startedAt)) >= ACTIVITY_BATCH_WINDOW_MS) {
+      finalizeActivityBatch(change.accountId); // 창이 이미 끝난 묶음이면 먼저 마감하고 새로 시작
+      pending = loadPendingActivityBatches();
+    }
+    let batch = pending[change.accountId];
+    if (!batch) {
+      batch = { startedAt: new Date().toISOString(), accountId: change.accountId, accountName: change.accountName, viaMasterName: change.viaMasterName, changes: [] };
+      pending[change.accountId] = batch;
+      scheduleActivityFlush(change.accountId, ACTIVITY_BATCH_WINDOW_MS);
+    } else {
+      batch.accountName = change.accountName;
+      batch.viaMasterName = change.viaMasterName;
+    }
+    batch.changes.push({
+      at: new Date().toISOString(),
+      categoryKey: change.categoryKey,
+      categoryLabel: change.categoryLabel,
+      subLabel: change.subLabel,
+      diff: change.diff,
+    });
+    savePendingActivityBatches(pending);
+  }
+  // 앱을 새로 열 때, 다른 탭/다른 사람이 만들어두고 아직 안 끝난 묶음들을 이어받는다.
+  // 이미 3분이 지나버린 묶음은 바로 마감하고, 아직 남았으면 남은 시간만큼만 다시 예약한다.
+  function resumePendingActivityBatches() {
+    const pending = loadPendingActivityBatches();
+    const now = Date.now();
+    Object.keys(pending).forEach((accountId) => {
+      const batch = pending[accountId];
+      if (!batch || !batch.startedAt) return;
+      const elapsed = now - Date.parse(batch.startedAt);
+      if (elapsed >= ACTIVITY_BATCH_WINDOW_MS) finalizeActivityBatch(accountId);
+      else scheduleActivityFlush(accountId, ACTIVITY_BATCH_WINDOW_MS - elapsed);
+    });
+  }
+  resumePendingActivityBatches();
+  pruneActivityLogIfStale();
+
+  // acct:{계정id}:{나머지 키} 형태의 저장에만 반응해서 활동 로그를 남긴다. 계정 목록
+  // (비밀번호/이름/삭제)처럼 이 접두어를 쓰지 않는 값은 여기서 잡히지 않고, 해당
+  // 동작을 하는 함수(renameAccount 등) 안에서 직접 appendActivityLog를 호출한다.
+  const _preActivityLogSetItem = localStorage.setItem;
+  localStorage.setItem = function (key, value) {
+    const m = typeof key === "string" ? /^acct:([^:]+):(.+)$/.exec(key) : null;
+    let oldRaw = null;
+    if (m) { try { oldRaw = localStorage.getItem(key); } catch (e) {} }
+    _preActivityLogSetItem(key, value);
+    if (!m || oldRaw === value) return; // 실제로 값이 바뀐 경우에만 기록
+    try {
+      const accountId = m[1];
+      const relKey = m[2];
+      const acc = accountId === CURRENT_ACCOUNT_ID ? { username: CURRENT_ACCOUNT_DISPLAY_NAME } : (findAccountById(accountId) || {});
+      const cat = activityCategoryForRelKey(relKey);
+      queueActivityChange({
+        accountId,
+        accountName: acc.username || "(삭제된 계정)",
+        viaMasterName: MASTER_ORIGIN_ACCOUNT ? MASTER_ORIGIN_ACCOUNT.username : null,
+        categoryKey: cat.key,
+        categoryLabel: cat.label,
+        subLabel: activitySubLabel(relKey),
+        diff: buildActivityDiffLines(oldRaw, value),
+      });
+    } catch (e) { /* 로그 기록 실패가 실제 저장에 영향을 주면 안 된다 */ }
+  };
+
+
+  // 화면 오른쪽 아래 "새로고침" 버튼을 누르면, 다른 사람/다른 기기에서 바뀐 내용을
+  // 서버에서 다시 받아오기 위해 페이지를 실제로 다시 불러온다(location.reload()).
+  // 다만 이 경우에는 평소처럼 "홈"으로 돌아가지 않고, 누르기 직전에 보고 있던
+  // 페이지를 그대로 유지해야 하므로, 새로고침 직전에 sessionStorage에 현재 페이지를
+  // 잠깐 남겨두고 새로 불러온 뒤 한 번만 복원하고 지운다.
+  // 방금 로그인/계정 생성으로 들어온 경우에만(=이 새로고침이 로그인 직후인 경우에만)
+  // "오늘의 브리핑" 히어로 팝업을 한 번 띄운다. 세션 유지 중 브라우저를 새로 열거나
+  // "새로고침" 버튼을 눌렀을 때는 뜨지 않는다.
+  let _justLoggedIn = false;
+  try {
+    if (sessionStorage.getItem("app:just-logged-in") === "1") {
+      _justLoggedIn = true;
+      sessionStorage.removeItem("app:just-logged-in");
+    }
+  } catch (e) {}
+
+  const REFRESH_RESTORE_PAGE_KEY = "app:refresh-restore-page";
+  const VALID_PAGES = ["home", "calendar", "agents", "notes", "interviews", "qa", "schedule"];
+  let _refreshRestorePage = null;
+  try {
+    const saved = sessionStorage.getItem(REFRESH_RESTORE_PAGE_KEY);
+    sessionStorage.removeItem(REFRESH_RESTORE_PAGE_KEY);
+    if (saved && VALID_PAGES.indexOf(saved) !== -1) _refreshRestorePage = saved;
+  } catch (e) {}
+
+  const state = {
+    // 마스터 계정은 다른 페이지를 볼 필요가 없으므로 항상 "계정 관리" 페이지만 보여준다.
+    // 마스터가 아닌 계정은 (로그인 직후든, 세션이 유지된 채 브라우저를 껐다 켰든)
+    // 앱을 새로 열 때마다 항상 "홈" 화면을 메인으로 보여준다. 이전에 보던
+    // 페이지를 기억해서 복원하지 않는다. 예외적으로, "새로고침" 버튼을 눌러서
+    // 다시 불러온 경우에는 누르기 직전 페이지를 그대로 복원한다.
+    page: CURRENT_ACCOUNT_IS_MASTER ? "master" : (_refreshRestorePage || "home"),
+  };
+
+  // "새로고침" 버튼 클릭 핸들러: 지금 보던 페이지를 기억해두고 나서 새로 불러온다.
+  // cloudHydrate()가 페이지를 새로 불러올 때 다시 실행되므로, 서버에 가장 최근에
+  // 저장된 내용으로 자연스럽게 갱신된다.
+  function performServerRefresh() {
+    try { sessionStorage.setItem(REFRESH_RESTORE_PAGE_KEY, state.page); } catch (e) {}
+    location.reload();
+  }
+
+  // 목록에서 눌러서 펼쳐본 상태(면담일지 펼침, 캘린더/할일 상세 펼침, 메모 펼침, "더보기" 등)는
+  // 그 화면을 잠깐 보다가 떠나면 초기화해서, 나중에 다시 들어올 때는 항상 접힌 채로 깔끔하게
+  // 보이게 한다. 전역 검색 결과를 눌러 다른 화면의 특정 항목을 펼쳐서 보여주는 기능은 "이동할
+  // 목적지" 화면의 상태를 미리 켜둔 뒤 setPage를 호출하는 방식이라, 여기서는 "떠나는 화면"의
+  // 상태만 초기화해야 서로 부딪히지 않는다.
+  function _resetExpandedStateForPage(p) {
+    if (p === "home") {
+      if (typeof homeUi !== "undefined") homeUi.interviewAlertExpanded = false;
+    } else if (p === "calendar") {
+      if (typeof cal !== "undefined") { cal.expandedEntries = {}; cal.upcomingExpanded = false; }
+      if (typeof todoUi !== "undefined") { todoUi.expanded = {}; todoUi.doneExpanded = false; }
+    } else if (p === "notes") {
+      if (typeof notesUi !== "undefined") notesUi.expanded = {};
+    } else if (p === "interviews") {
+      if (typeof interviewsUi !== "undefined") interviewsUi.expandedIds = new Set();
+    }
+  }
+
+  function setPage(p) {
+    // 마스터 계정은 계정 관리 페이지 외에는 이동하지 않는다.
+    if (CURRENT_ACCOUNT_IS_MASTER) { state.page = "master"; renderApp(); return; }
+    if (p !== state.page) _resetExpandedStateForPage(state.page); // 떠나는 화면의 펼침 상태 초기화
+    // "월별 스케줄" 카테고리를 누르면 항상 실시간 기준 당월 스케줄을 보여준다.
+    if (p === "schedule" && typeof scheduleUi !== "undefined") {
+      scheduleUi.year = today.getFullYear();
+      scheduleUi.monthIndex = today.getMonth();
+    }
+    // "품질 관리" 카테고리를 누르면 항상 실시간 기준 당월 QA 점수를 보여준다.
+    if (p === "qa" && typeof qaUi !== "undefined") {
+      qaUi.year = today.getFullYear();
+      qaUi.monthIndex = today.getMonth();
+    }
+    // 이제 마지막으로 보던 페이지를 저장/복원하지 않으므로(항상 홈에서 시작),
+    // localStorage에 따로 기록하지 않는다.
+    state.page = p;
+    renderApp();
+  }
+
+  /* ===================== 캘린더 모듈 ===================== */
+  const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
+  const MONTH_NAMES = ["1월","2월","3월","4월","5월","6월","7월","8월","9월","10월","11월","12월"];
+  const today = new Date();
+
+  // 대한민국 공휴일 (2026년~2030년, 대체공휴일 포함). 설날/추석/부처님오신날은 음력 기준이라
+  // 해마다 날짜가 달라지므로 연도별로 직접 지정한다. 출처: 인사혁신처 고시 기준 공휴일 안내.
+  const KR_HOLIDAYS = {
+    // 2026년
+    "2026-01-01": "신정",
+    "2026-02-16": "설날연휴",
+    "2026-02-17": "설날",
+    "2026-02-18": "설날연휴",
+    "2026-03-01": "삼일절",
+    "2026-03-02": "대체공휴일",
+    "2026-05-01": "노동절",
+    "2026-05-05": "어린이날",
+    "2026-05-24": "부처님오신날",
+    "2026-05-25": "대체공휴일",
+    "2026-06-03": "지방선거일",
+    "2026-06-06": "현충일",
+    "2026-07-17": "제헌절",
+    "2026-08-15": "광복절",
+    "2026-08-17": "대체공휴일",
+    "2026-09-24": "추석연휴",
+    "2026-09-25": "추석",
+    "2026-09-26": "추석연휴",
+    "2026-10-03": "개천절",
+    "2026-10-05": "대체공휴일",
+    "2026-10-09": "한글날",
+    "2026-12-25": "기독탄신일",
+    // 2027년
+    "2027-01-01": "신정",
+    "2027-02-06": "설날연휴",
+    "2027-02-07": "설날",
+    "2027-02-08": "설날연휴",
+    "2027-02-09": "대체공휴일",
+    "2027-03-01": "삼일절",
+    "2027-05-01": "노동절",
+    "2027-05-03": "대체공휴일",
+    "2027-05-05": "어린이날",
+    "2027-05-13": "부처님오신날",
+    "2027-06-06": "현충일",
+    "2027-07-17": "제헌절",
+    "2027-07-19": "대체공휴일",
+    "2027-08-15": "광복절",
+    "2027-08-16": "대체공휴일",
+    "2027-09-14": "추석연휴",
+    "2027-09-15": "추석",
+    "2027-09-16": "추석연휴",
+    "2027-10-03": "개천절",
+    "2027-10-04": "대체공휴일",
+    "2027-10-09": "한글날",
+    "2027-10-11": "대체공휴일",
+    "2027-12-25": "기독탄신일",
+    "2027-12-27": "대체공휴일",
+    // 2028년
+    "2028-01-01": "신정",
+    "2028-01-26": "설날연휴",
+    "2028-01-27": "설날",
+    "2028-01-28": "설날연휴",
+    "2028-03-01": "삼일절",
+    "2028-04-12": "국회의원선거일",
+    "2028-05-01": "노동절",
+    "2028-05-02": "부처님오신날",
+    "2028-05-05": "어린이날",
+    "2028-06-06": "현충일",
+    "2028-07-17": "제헌절",
+    "2028-08-15": "광복절",
+    "2028-10-02": "추석연휴",
+    "2028-10-03": "개천절·추석",
+    "2028-10-04": "추석연휴",
+    "2028-10-05": "대체공휴일",
+    "2028-10-09": "한글날",
+    "2028-12-25": "기독탄신일",
+    // 2029년
+    "2029-01-01": "신정",
+    "2029-02-12": "설날연휴",
+    "2029-02-13": "설날",
+    "2029-02-14": "설날연휴",
+    "2029-03-01": "삼일절",
+    "2029-05-01": "노동절",
+    "2029-05-05": "어린이날",
+    "2029-05-07": "대체공휴일",
+    "2029-05-20": "부처님오신날",
+    "2029-05-21": "대체공휴일",
+    "2029-06-06": "현충일",
+    "2029-07-17": "제헌절",
+    "2029-08-15": "광복절",
+    "2029-09-21": "추석연휴",
+    "2029-09-22": "추석",
+    "2029-09-23": "추석연휴",
+    "2029-09-24": "대체공휴일",
+    "2029-10-03": "개천절",
+    "2029-10-09": "한글날",
+    "2029-12-25": "기독탄신일",
+    // 2030년
+    "2030-01-01": "신정",
+    "2030-02-02": "설날연휴",
+    "2030-02-03": "설날",
+    "2030-02-04": "설날연휴",
+    "2030-02-05": "대체공휴일",
+    "2030-03-01": "삼일절",
+    "2030-05-01": "노동절",
+    "2030-05-05": "어린이날",
+    "2030-05-06": "대체공휴일",
+    "2030-05-09": "부처님오신날",
+    "2030-06-06": "현충일",
+    "2030-07-17": "제헌절",
+    "2030-08-15": "광복절",
+    "2030-09-11": "추석연휴",
+    "2030-09-12": "추석",
+    "2030-09-13": "추석연휴",
+    "2030-10-03": "개천절",
+    "2030-10-09": "한글날",
+    "2030-12-25": "기독탄신일",
+  };
+
   // ==================== 아이콘 세트 (이모티콘 대체 + 내비게이션 독 아이콘) ====================
   // (예전 01-common.js에서 분리됨 — 실행 순서·내용은 그대로입니다)
   /* ---- 심플한 라인 아이콘 세트 (이모티콘 대체) ---- */
@@ -4307,7 +6710,24 @@
     return `${n}B`;
   }
   function sanitizeAttachmentFileName(name) {
-    return String(name || "file").replace(/[\/\\?%*:|"<>]/g, "_").slice(0, 150);
+    // Supabase Storage 키는 AWS S3 오브젝트 키 규칙(대략 영문/숫자/일부 안전 특수문자)만
+    // 허용하며, 한글 등 비-ASCII 문자가 포함되면 "Invalid key" 오류로 업로드가 실패한다.
+    // 화면에 보이는 파일명(att.name, 다운로드 시 사용)은 원본 그대로 두고, 이 함수는
+    // Storage 저장 경로에만 쓰일 안전한 이름을 만든다.
+    const raw = String(name || "file").trim();
+    const dot = raw.lastIndexOf(".");
+    const hasExt = dot > 0 && dot < raw.length - 1;
+    const rawExt = hasExt ? raw.slice(dot + 1) : "";
+    const rawBase = hasExt ? raw.slice(0, dot) : raw;
+    const ext = rawExt.replace(/[^a-zA-Z0-9]/g, "").slice(0, 10);
+    let base = rawBase
+      .replace(/\s+/g, "_")
+      .replace(/[^a-zA-Z0-9!\-_.'()]/g, "") // 한글 등 비-ASCII 및 기타 특수문자 제거
+      .replace(/_+/g, "_")
+      .replace(/^[_.]+|[_.]+$/g, "")
+      .slice(0, 100);
+    if (!base) base = "file";
+    return ext ? `${base}.${ext}` : base;
   }
   function attachmentStoragePath(noteId, att) {
     return `${CURRENT_ACCOUNT_ID}/${noteId}/${att.id}_${sanitizeAttachmentFileName(att.name)}`;
@@ -5606,6 +8026,1343 @@
 
   /* ===================== 품질 관리(QA) 모듈 ===================== */
   const QA_KEY = acctKey("personal-qa:data");
+
+  function loadQAData() {
+    try {
+      const raw = localStorage.getItem(QA_KEY);
+      const parsed = raw ? JSON.parse(raw) : null;
+      return (parsed && typeof parsed === "object" && parsed.scores) ? parsed : { scores: {} };
+    } catch (e) { return { scores: {} }; }
+  }
+  let qaData = loadQAData();
+  // 월별 스케줄과 동일한 방식의 "월별 잠금". 잠긴 달은 점수 입력이 막힌다.
+  if (!qaData.monthLocks || typeof qaData.monthLocks !== "object") qaData.monthLocks = {};
+  // 엑셀 업로드로 뽑아낸 상세 QA 내역(회차별 감점/코멘트 원문 + 정리된 텍스트 캐시).
+  // qaData(=계정별 클라우드 동기화 대상) 안에 같이 저장한다.
+  if (!qaData.details || typeof qaData.details !== "object") qaData.details = {};
+
+  // ----- 업로드한 엑셀 원문의 자동 만료 -----
+  // 업로드일로부터 3개월이 지나면 회차별 원문(감점 항목/코멘트)을 서버(클라우드)와
+  // 이 기기 양쪽 모두에서 완전히 지운다. 예전 요약본을 남겨두지 않고, 흔적 없이 삭제한다.
+  const QA_DETAIL_EXPIRY_MONTHS = 3;
+  function qaDetailExpiryDate(detail) {
+    if (!detail || !detail.uploadedAt) return null;
+    const d = new Date(detail.uploadedAt);
+    if (isNaN(d.getTime())) return null;
+    d.setMonth(d.getMonth() + QA_DETAIL_EXPIRY_MONTHS);
+    return d;
+  }
+  function qaIsDetailExpired(detail) {
+    const exp = qaDetailExpiryDate(detail);
+    return !!exp && new Date() >= exp;
+  }
+  function qaPurgeExpiredDetails() {
+    let changed = false;
+    Object.keys(qaData.details).forEach((key) => {
+      const detail = qaData.details[key];
+      if (!detail || detail.purged) return;
+      if (!qaIsDetailExpired(detail)) return;
+      (detail.rounds || []).forEach((round) => {
+        // 원문(감점/코멘트)을 흔적 없이 완전히 지운다. 별도 요약본도 남기지 않는다.
+        round.items = [];
+        delete round.localSummary;
+      });
+      detail.fileName = "";
+      detail.purged = true;
+      changed = true;
+    });
+    // saveQAData()가 localStorage에 쓰는 즉시 클라우드(Supabase)에도 같은 내용으로
+    // 덮어써지므로, 지워진 원문은 이 기기뿐 아니라 서버에도 남지 않는다.
+    if (changed) saveQAData();
+  }
+  qaPurgeExpiredDetails();
+
+  function qaDetailKey(agentId, year, monthIndex) { return `${agentId}|${qaMonthKey(year, monthIndex)}`; }
+  function getQADetail(agentId, year, monthIndex) { return qaData.details[qaDetailKey(agentId, year, monthIndex)] || null; }
+  function setQADetail(agentId, year, monthIndex, detailObj) {
+    qaData.details[qaDetailKey(agentId, year, monthIndex)] = detailObj;
+    saveQAData();
+  }
+  // 상담사 1명의 등록된 엑셀(원문+정리된 텍스트 전부)을 완전히 삭제한다.
+  function deleteQADetail(agentId, year, monthIndex) {
+    delete qaData.details[qaDetailKey(agentId, year, monthIndex)];
+    saveQAData();
+  }
+  // 해당 달에 등록된 모든 상담사의 엑셀(원문+정리된 텍스트 전부)을 한 번에 삭제한다.
+  function deleteAllQADetails(year, monthIndex) {
+    const suffix = `|${qaMonthKey(year, monthIndex)}`;
+    let count = 0;
+    Object.keys(qaData.details).forEach((key) => {
+      if (key.endsWith(suffix)) { delete qaData.details[key]; count++; }
+    });
+    if (count > 0) saveQAData();
+    return count;
+  }
+
+  let qaStatusTimer = null;
+  function flashQAStatus(msg) {
+    const el = document.getElementById("qa-status");
+    if (!el) return;
+    el.textContent = msg;
+    clearTimeout(qaStatusTimer);
+    qaStatusTimer = setTimeout(() => { el.textContent = ""; }, 1200);
+  }
+  function saveQAData() {
+    try { localStorage.setItem(QA_KEY, JSON.stringify(qaData)); flashQAStatus("저장됨"); }
+    catch (e) { flashQAStatus("저장 실패"); }
+  }
+
+  const qaUi = {
+    year: today.getFullYear(),
+    monthIndex: today.getMonth(), // 0-based. 실시간 기준 당월로 시작한다.
+    searchQuery: "", // 상담사 검색어. 쉼표(,)로 여러 명을 한 번에 검색할 수 있다.
+  };
+
+  // ----- 상담사 검색 -----
+  // "상담사 관리"의 검색(이름/LDAP/초성)과 같은 방식을 쓰되, "주간"/"야간"/"채팅"/"유선"
+  // 키워드를 입력하면 그 조건에 해당하는 인원이 모두 걸린다. 쉼표(,)로 여러 조건을 구분해서
+  // 입력하면(이름+키워드를 섞어도 됨) 그 중 하나라도 일치하는 상담사를 모두 보여준다.
+  function qaAgentMatchesSearch(a, query) {
+    const terms = (query || "").split(",").map((t) => t.trim()).filter(Boolean);
+    if (terms.length === 0) return true;
+    return terms.some((t) => agentMatchesSearch(a, t));
+  }
+  // 상담사 상세에서 "품질 관리로 이동"을 눌렀을 때, 이동한 화면에서 그 인원의 행을
+  // 한 번 강조해서 보여주기 위한 값. 렌더링 후 바로 비워서 다음 화면 갱신부터는
+  // 강조가 남지 않게 한다.
+  let qaHighlightAgentId = null;
+
+  function qaMonthKey(year, monthIndex) { return `${year}-${pad2(monthIndex + 1)}`; }
+  function qaMonthLabel() { return `${qaUi.year}년 ${qaUi.monthIndex + 1}월`; }
+  function qaScoreEntryKey(agentId, year, monthIndex) { return `${agentId}|${qaMonthKey(year, monthIndex)}`; }
+
+  // ----- 월별 "잠금" (월별 스케줄과 동일한 규칙) -----
+  // monthLocks[key] === true  → 사용자가 강제로 잠가둔 상태
+  // monthLocks[key] === false → 사용자가 강제로 잠금을 풀어둔 상태(지나간 달이라도 수정 가능)
+  // 없으면 → 지나간 달은 기본적으로 잠기고, 이번 달·미래 달은 기본적으로 풀려 있다.
+  function qaCurrentMonthKey() { return qaMonthKey(today.getFullYear(), today.getMonth()); }
+  function qaIsMonthPast(year, monthIndex) { return qaMonthKey(year, monthIndex) < qaCurrentMonthKey(); }
+  function qaIsMonthLocked(year, monthIndex) {
+    const key = qaMonthKey(year, monthIndex);
+    if (Object.prototype.hasOwnProperty.call(qaData.monthLocks, key)) return !!qaData.monthLocks[key];
+    return qaIsMonthPast(year, monthIndex);
+  }
+  function qaToggleMonthLock(year, monthIndex) {
+    const key = qaMonthKey(year, monthIndex);
+    qaData.monthLocks[key] = !qaIsMonthLocked(year, monthIndex);
+    saveQAData();
+    renderApp();
+  }
+
+  function qaShiftMonth(delta) {
+    let m = qaUi.monthIndex + delta;
+    let y = qaUi.year;
+    while (m < 0) { m += 12; y -= 1; }
+    while (m > 11) { m -= 12; y += 1; }
+    qaUi.monthIndex = m;
+    qaUi.year = y;
+    renderApp();
+  }
+
+  // 해당 인원·월의 점수를 반환한다. 없으면 null.
+  // (예전 버전에서는 유선/채팅 점수를 따로 저장했는데, 그 형식으로 남아있는 데이터는
+  //  두 값의 평균으로 자동 변환해서 보여준다.)
+  function getQAScore(agentId, year, monthIndex) {
+    const rec = qaData.scores[qaScoreEntryKey(agentId, year, monthIndex)];
+    if (rec === undefined || rec === null) return null;
+    if (typeof rec === "object") {
+      const vals = [rec.voice, rec.chat].filter((v) => v !== null && v !== undefined);
+      return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+    }
+    return rec;
+  }
+  // rawValue가 빈 문자열이면 그 값을 지운다.
+  function setQAScore(agentId, year, monthIndex, rawValue) {
+    if (qaIsMonthLocked(year, monthIndex)) { flashQAStatus("잠긴 달이에요. 잠금을 해제한 뒤 입력해주세요."); return; }
+    const key = qaScoreEntryKey(agentId, year, monthIndex);
+    const trimmed = String(rawValue == null ? "" : rawValue).trim();
+    if (trimmed === "") { delete qaData.scores[key]; saveQAData(); return; }
+    const parsed = Number(trimmed);
+    if (isNaN(parsed)) return;
+    qaData.scores[key] = Math.max(0, Math.min(100, parsed));
+    saveQAData();
+  }
+
+  // 한 인원의 그 달 점수(입력값 그 자체).
+  function qaOverallScore(agentId, year, monthIndex) {
+    return getQAScore(agentId, year, monthIndex);
+  }
+
+  function qaAvg(list) {
+    const vals = list.filter((v) => v !== null && v !== undefined);
+    if (vals.length === 0) return null;
+    return vals.reduce((a, b) => a + b, 0) / vals.length;
+  }
+
+  // ----- 퇴사자의 품질 관리 목록 유지 기간 -----
+  // "상담사 관리"에서 퇴사로 바뀌어도 품질관리에서 바로 사라지지 않는다. 퇴사 처리된
+  // 달과 그 다음 달까지는 이름에 취소선을 그은 채로 목록에 계속 남아있다가, 그 다음
+  // 달(=퇴사월+2)부터는 자연스럽게 목록에서 빠진다.
+  function qaResignMonthKey(resignDate) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(resignDate || "");
+    return m ? `${m[1]}-${m[2]}` : null;
+  }
+  function qaResignKeepUntilKey(resignDate) {
+    const key = qaResignMonthKey(resignDate);
+    if (!key) return null;
+    const parts = key.split("-").map(Number);
+    let year = parts[0], monthIndex = parts[1]; // parts[1]은 1-based 월이므로 그대로 쓰면 "다음 달"의 0-based 인덱스가 된다
+    if (monthIndex > 11) { monthIndex -= 12; year += 1; }
+    return qaMonthKey(year, monthIndex);
+  }
+  // 특정 달의 품질관리 목록에 이 상담사가 보여야 하는지 판단한다.
+  // 재직중이면 항상 보이고, 퇴사자는 퇴사월과 그 다음달까지만 보인다.
+  function qaAgentVisibleInMonth(a, year, monthIndex) {
+    if (a.status !== "RESIGNED") return true;
+    const keepUntil = qaResignKeepUntilKey(a.resignDate);
+    if (!keepUntil) return true; // 퇴사일자 정보가 없으면 안전하게 계속 보여준다
+    return qaMonthKey(year, monthIndex) <= keepUntil;
+  }
+
+  // QA 관리 대상 상담사 목록. 관리자는 제외하고, 재직중인 인원 + (유지 기간 안의) 퇴사자를
+  // 함께 가져온다. year/monthIndex를 생략하면 현재 화면에 보이는 달(qaUi) 기준으로 계산한다.
+  // "상담사 관리"의 기본 정렬을 그대로 따른다.
+  function qaWorkingAgents(year, monthIndex) {
+    const y = (year === undefined || year === null) ? qaUi.year : year;
+    const mi = (monthIndex === undefined || monthIndex === null) ? qaUi.monthIndex : monthIndex;
+    return sortAgentList(agentsData.filter((a) => !a.isAdmin && qaAgentVisibleInMonth(a, y, mi)), "shift");
+  }
+
+  // 인원마다 점수는 하나뿐이지만, "업무구분"(유선/채팅) · "조"(주간/야간) 태그를 기준으로
+  // 그 점수를 여러 통계에 나눠 담는다.
+  function qaComputeStats(agentsList, year, monthIndex) {
+    const hasVoice = (a) => (a.workTypes || []).indexOf("유선") !== -1;
+    const hasChat = (a) => (a.workTypes || []).indexOf("채팅") !== -1;
+    const isDay = (a) => a.group !== "night";
+    const isNight = (a) => a.group === "night";
+    const scoreOf = (a) => qaOverallScore(a.id, year, monthIndex);
+
+    return {
+      voice: qaAvg(agentsList.filter(hasVoice).map(scoreOf)),
+      chat: qaAvg(agentsList.filter(hasChat).map(scoreOf)),
+      day: qaAvg(agentsList.filter(isDay).map(scoreOf)),
+      night: qaAvg(agentsList.filter(isNight).map(scoreOf)),
+      dayChat: qaAvg(agentsList.filter((a) => isDay(a) && hasChat(a)).map(scoreOf)),
+      dayVoice: qaAvg(agentsList.filter((a) => isDay(a) && hasVoice(a)).map(scoreOf)),
+      nightChat: qaAvg(agentsList.filter((a) => isNight(a) && hasChat(a)).map(scoreOf)),
+      nightVoice: qaAvg(agentsList.filter((a) => isNight(a) && hasVoice(a)).map(scoreOf)),
+      total: qaAvg(agentsList.map(scoreOf)),
+    };
+  }
+
+  function qaPrevMonth(year, monthIndex) {
+    let m = monthIndex - 1;
+    let y = year;
+    if (m < 0) { m = 11; y -= 1; }
+    return { year: y, monthIndex: m };
+  }
+
+  /* ---- 홈 화면 QA 카드: "이번 달"이 아니라 "점수가 입력된 가장 최근 달" 찾기 ----
+     달이 막 바뀌면 그 달 점수는 한동안 입력이 안 되어 있는 게 정상이라, 이번 달
+     기준으로만 보면 계속 "점수 없음"으로 보인다. 이번 달부터 거꾸로 훑어서 전체
+     평균이 있는 첫 달을 찾아 그 달 기준으로 보여준다. */
+  const QA_HOME_LATEST_LOOKBACK_MONTHS = 12;
+  function qaHomeFindLatestMonthWithData(agentsList, year, monthIndex) {
+    let y = year, m = monthIndex;
+    for (let i = 0; i < QA_HOME_LATEST_LOOKBACK_MONTHS; i++) {
+      const stats = qaComputeStats(agentsList, y, m);
+      if (stats.total !== null) return { year: y, monthIndex: m, stats };
+      const prev = qaPrevMonth(y, m);
+      y = prev.year; m = prev.monthIndex;
+    }
+    return null;
+  }
+
+  /* ---- 홈 화면 QA 카드: 최근 N개월 전체 평균 추이 꺾은선 그래프 ----
+     qaTrendSvgHtml(개인별)과 같은 방식이지만, 인원 개인이 아니라 매달 전체
+     평균(qaComputeStats(...).total)을 점으로 찍는다. */
+  const QA_HOME_TREND_MONTHS = 6;
+  function qaHomeComputeTrend(agentsList, year, monthIndex, count) {
+    const months = [];
+    for (let i = count - 1; i >= 0; i--) {
+      let m = monthIndex - i;
+      let y = year;
+      while (m < 0) { m += 12; y -= 1; }
+      months.push({ year: y, monthIndex: m, score: qaComputeStats(agentsList, y, m).total });
+    }
+    return months;
+  }
+  function qaHomeTrendSvgHtml(agentsList, year, monthIndex) {
+    const months = qaHomeComputeTrend(agentsList, year, monthIndex, QA_HOME_TREND_MONTHS);
+    const validScores = months.map((mo) => mo.score).filter((s) => s !== null);
+    if (validScores.length === 0) return "";
+
+    const W = 560, H = 148, padL = 10, padR = 10, padT = 22, padB = 24;
+    const plotW = W - padL - padR, plotH = H - padT - padB;
+    const n = months.length;
+    const xAt = (i) => padL + (n === 1 ? plotW / 2 : (plotW * i) / (n - 1));
+    let min = Math.min(...validScores);
+    let max = Math.max(...validScores);
+    if (min === max) { min -= 5; max += 5; } else { const pad = (max - min) * 0.2; min -= pad; max += pad; }
+    min = Math.max(0, min);
+    max = Math.min(100, max);
+    if (max - min < 1) max = min + 1;
+    const yAt = (score) => padT + plotH - ((score - min) / (max - min)) * plotH;
+
+    const segments = [];
+    let cur = [];
+    months.forEach((mo, i) => {
+      if (mo.score === null) { if (cur.length) segments.push(cur); cur = []; }
+      else cur.push({ x: xAt(i), y: yAt(mo.score) });
+    });
+    if (cur.length) segments.push(cur);
+    const pathHtml = segments.map((seg) => {
+      const d = seg.map((p, idx) => `${idx === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
+      return `<path d="${d}" fill="none" stroke="var(--accent)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>`;
+    }).join("");
+
+    const dotHtml = months.map((mo, i) => {
+      if (mo.score === null) return "";
+      const x = xAt(i), y = yAt(mo.score);
+      return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.6" fill="var(--accent)"/><text x="${x.toFixed(1)}" y="${(y - 10).toFixed(1)}" text-anchor="middle" class="qa-trend-value">${mo.score.toFixed(1)}</text>`;
+    }).join("");
+
+    const labelHtml = months.map((mo, i) => {
+      const x = xAt(i);
+      const isCurrent = mo.year === year && mo.monthIndex === monthIndex;
+      return `<text x="${x.toFixed(1)}" y="${H - 6}" text-anchor="middle" class="qa-trend-month${isCurrent ? " current" : ""}">${mo.monthIndex + 1}월</text>`;
+    }).join("");
+
+    return `
+      <div class="qa-trend-block home-qa-trend-block">
+        <div class="qa-trend-title">최근 ${QA_HOME_TREND_MONTHS}개월 전체 평균 추이</div>
+        <svg viewBox="0 0 ${W} ${H}" class="qa-trend-svg" preserveAspectRatio="xMidYMid meet">
+          ${pathHtml}
+          ${dotHtml}
+          ${labelHtml}
+        </svg>
+      </div>
+    `;
+  }
+
+  /* ===================== QA 평가 엑셀 업로드 → 점수/상세 자동 반영 ===================== */
+  // 파일마다 "평균" 행, "총점" 열, "구분" 열의 실제 위치(행/열)가 달라질 수 있어서
+  // 매번 셀 값을 직접 탐색해서 찾는다(고정된 셀 주소를 쓰지 않음).
+
+  function qaColLetterToNum(letters) {
+    let n = 0;
+    for (let i = 0; i < letters.length; i++) n = n * 26 + (letters.charCodeAt(i) - 64);
+    return n;
+  }
+  // 병합 셀·수식 셀 어디서든 "실제로 화면에 보이는 값"을 안전하게 꺼낸다.
+  function qaCellRawValue(ws, row, col) {
+    const cell = ws.getRow(row).getCell(col);
+    let val = cell.value;
+    if (cell.isMerged && cell.master && cell.master !== cell) val = cell.master.value;
+    if (val && typeof val === "object") {
+      if (val instanceof Date) return val;
+      if (Object.prototype.hasOwnProperty.call(val, "result")) val = val.result;
+      else if (Array.isArray(val.richText)) val = val.richText.map((t) => t.text).join("");
+      else if (Object.prototype.hasOwnProperty.call(val, "text")) val = val.text;
+      else if (Object.prototype.hasOwnProperty.call(val, "error")) val = null;
+    }
+    return val;
+  }
+  function qaCellText(ws, row, col) {
+    const v = qaCellRawValue(ws, row, col);
+    if (v === null || v === undefined) return "";
+    if (v instanceof Date) return "";
+    return String(v).trim();
+  }
+  // 시트 전체(또는 위쪽 몇 줄)에서 특정 텍스트와 정확히 일치하는 칸을 찾는다.
+  function qaFindCell(ws, targetText, opts) {
+    opts = opts || {};
+    const maxRow = opts.maxRow || ws.rowCount;
+    const maxCol = opts.maxCol || ws.columnCount;
+    for (let r = 1; r <= maxRow; r++) {
+      for (let c = 1; c <= maxCol; c++) {
+        if (qaCellText(ws, r, c) === targetText) return { row: r, col: c };
+      }
+    }
+    return null;
+  }
+  // 위와 같지만 "포함" 여부로 찾는다(칸 이름이 "상담ID", "상담 ID" 등으로 조금씩 달라도 잡히게).
+  function qaFindCellContains(ws, targetText, opts) {
+    opts = opts || {};
+    const maxRow = opts.maxRow || ws.rowCount;
+    const maxCol = opts.maxCol || ws.columnCount;
+    for (let r = 1; r <= maxRow; r++) {
+      for (let c = 1; c <= maxCol; c++) {
+        const t = qaCellText(ws, r, c).replace(/\s+/g, "");
+        if (t && t.indexOf(targetText) !== -1) return { row: r, col: c };
+      }
+    }
+    return null;
+  }
+
+  // 시트 하나를 분석해서 { totalScore, rounds } 형태로 돌려준다.
+  // rounds: 구분 열의 "1차/2차/…" 라벨이 여러 행에 걸쳐 병합된 블록마다,
+  // 그 블록 안에서 2칸 이상 가로로 병합된(=서술형 코멘트) 칸의 내용을 모은 것.
+  function qaParseWorksheet(ws) {
+    const avgCell = qaFindCell(ws, "평균");
+    const totalCell = qaFindCell(ws, "총점", { maxRow: 12 });
+    if (!avgCell || !totalCell) throw new Error("'평균' 행 또는 '총점' 열을 찾지 못했어요.");
+    const rawScore = qaCellRawValue(ws, avgCell.row, totalCell.col);
+    const scoreNum = Number(rawScore);
+    if (rawScore === null || rawScore === undefined || isNaN(scoreNum)) throw new Error("평균×총점 칸의 값이 숫자가 아니에요.");
+    // 엑셀 수식이 내부적으로 81.166666...처럼 소수점 아래 여러 자리를 들고 있어도,
+    // 엑셀 화면(및 우리 목록)에는 소수점 첫째 자리까지만 보이므로 그 표시값과
+    // 저장되는 값이 어긋나지 않도록 여기서 미리 소수 첫째 자리로 반올림해서 저장한다.
+    const score = Math.round(scoreNum * 10) / 10;
+
+    const merges = (ws.model && ws.model.merges ? ws.model.merges : [])
+      .map((rangeStr) => {
+        const m = /^([A-Z]+)(\d+):([A-Z]+)(\d+)$/.exec(rangeStr);
+        if (!m) return null;
+        return { c1: qaColLetterToNum(m[1]), r1: parseInt(m[2], 10), c2: qaColLetterToNum(m[3]), r2: parseInt(m[4], 10) };
+      })
+      .filter(Boolean);
+
+    const gubunCell = qaFindCell(ws, "구분");
+    const gubunCol = gubunCell ? gubunCell.col : 2;
+
+    const roundBlocks = merges
+      .filter((mg) => mg.c1 === gubunCol && mg.c2 === gubunCol && mg.r2 > mg.r1)
+      .map((mg) => ({ label: qaCellText(ws, mg.r1, mg.c1).replace(/\s+/g, ""), startRow: mg.r1, endRow: mg.r2 }))
+      .filter((b) => /^\d+차$/.test(b.label))
+      .sort((a, b) => a.startRow - b.startRow);
+
+    const roundSummaryRows = [];
+    for (let r = 1; r <= ws.rowCount; r++) {
+      const label = qaCellText(ws, r, gubunCol).replace(/\s+/g, "");
+      if (!/^\d+차$/.test(label)) continue;
+      if (roundBlocks.some((b) => r >= b.startRow && r <= b.endRow)) continue;
+      roundSummaryRows.push({ label, row: r });
+    }
+    const dateCell = qaFindCell(ws, "상담일", { maxRow: 12 });
+    // "상담ID"의 실제 헤더가 "상담 ID"처럼 띄어쓰기가 다르거나, 맨 위 12행이 아니라
+    // 각 차수 표 근처(더 아래쪽)에 있을 수도 있어서 시트 전체를 대상으로 찾는다.
+    const idCell = qaFindCell(ws, "상담ID") || qaFindCellContains(ws, "상담ID") || qaFindCellContains(ws, "상담아이디");
+    // 서술형 피드백 칸은 항상 "총점" 열에서 끝나는 가로 병합(예: S19:X19)으로 되어 있다.
+    // (카테고리 라벨처럼 폭이 좁은 다른 가로 병합과 구분하기 위한 기준)
+    const feedbackMerges = merges.filter((mg) => mg.c2 > mg.c1 && mg.r1 === mg.r2 && mg.c2 === totalCell.col);
+    const guidelineRe = /^\[-?\d+\]\s*/;
+
+    const rounds = roundBlocks.map((block) => {
+      const summary = roundSummaryRows.find((s) => s.label === block.label);
+      let dateVal = summary && dateCell ? qaCellRawValue(ws, summary.row, dateCell.col) : null;
+      if (dateVal instanceof Date) dateVal = `${dateVal.getFullYear()}-${pad2(dateVal.getMonth() + 1)}-${pad2(dateVal.getDate())}`;
+      else dateVal = dateVal ? String(dateVal).trim() : "";
+      // "상담ID"는 요약표(구분/상담사/상담일)가 아니라, 각 회차 상세표의 시작 행에만
+      // 한 번 들어있다(예: "1차" 블록의 첫 행). summary.row(요약표) 기준으로 읽으면
+      // 그 자리엔 상담사 이름이 있어서 엉뚱한 값이 나온다.
+      let idVal = idCell ? qaCellRawValue(ws, block.startRow, idCell.col) : null;
+      idVal = (idVal === null || idVal === undefined) ? "" : String(idVal).trim();
+      const roundScoreRaw = summary ? qaCellRawValue(ws, summary.row, totalCell.col) : null;
+      const roundScoreNum = Number(roundScoreRaw);
+      const roundScore = (roundScoreRaw === null || roundScoreRaw === undefined || isNaN(roundScoreNum)) ? null : Math.round(roundScoreNum * 10) / 10;
+
+      const items = [];
+      for (let r = block.startRow; r <= block.endRow; r++) {
+        const fbMerge = feedbackMerges.find((mg) => mg.r1 === r);
+        const feedbackText = fbMerge ? qaCellText(ws, fbMerge.r1, fbMerge.c1) : "";
+        if (!feedbackText) continue; // 코멘트가 없는(만점) 항목은 요약 대상에서 제외
+        let guideline = "";
+        const rowWidth = Math.min(ws.columnCount, 40);
+        for (let c = 1; c <= rowWidth; c++) {
+          const t = qaCellText(ws, r, c);
+          if (t && guidelineRe.test(t)) { guideline = t.replace(guidelineRe, "").trim(); break; }
+        }
+        items.push({ guideline, feedback: feedbackText });
+      }
+      // itemCount는 원문이 나중에 만료되어 items가 비워져도 "원래 감점 항목이 있었는지"를
+      // 계속 구분할 수 있도록 별도로 남겨둔다.
+      return { label: block.label, date: dateVal, consultId: idVal, score: roundScore, items, itemCount: items.length };
+    });
+
+    return { totalScore: score, rounds };
+  }
+
+  // 여러 개의 xlsx 파일(상담사 1명당 1개, 또는 여러 상담사가 시트로 나뉜 파일 모두 지원)을
+  // 한 번에 받아서, 시트 이름(없으면 파일명)을 상담사 이름과 맞춰 자동으로 반영한다.
+  async function qaHandleExcelFiles(fileList) {
+    console.log("[QA 업로드] onchange 발생, 선택된 파일 수:", fileList ? fileList.length : 0);
+    const files = Array.from(fileList || []);
+    if (!files.length) {
+      console.warn("[QA 업로드] 선택된 파일이 없어요 (파일 선택 대화상자에서 취소했거나, 브라우저가 파일을 전달하지 못했어요).");
+      return;
+    }
+    console.log("[QA 업로드] 파일 목록:", files.map((f) => f.name));
+    const { year, monthIndex } = qaUi;
+    if (qaIsMonthLocked(year, monthIndex)) {
+      console.warn("[QA 업로드] 이 달은 잠겨 있어서 업로드를 막았어요:", qaMonthLabel());
+      flashQAStatus("잠긴 달이에요. 잠금을 해제한 뒤 업로드해주세요.");
+      alert(`${qaMonthLabel()}은(는) 잠겨 있어서 업로드할 수 없어요.\n상단의 "잠금 해제" 버튼을 먼저 눌러주세요.`);
+      return;
+    }
+    if (typeof ExcelJS === "undefined") {
+      console.error("[QA 업로드] ExcelJS 라이브러리가 로드되지 않았어요. CDN(cdn.jsdelivr.net)이 차단됐거나 인터넷 연결이 끊겼을 수 있어요. 개발자도구 Network 탭에서 exceljs.min.js 요청이 실패했는지 확인해주세요.");
+      flashQAStatus("엑셀 처리 기능을 불러오지 못했어요 (인터넷 연결 확인)");
+      alert("엑셀 처리 기능을 불러오지 못했어요.\n\n인터넷 연결을 확인하거나, 방화벽/보안 프로그램이 cdn.jsdelivr.net 접속을 막고 있지 않은지 확인해주세요.\n(F12 개발자도구 → Network 탭에서 exceljs.min.js 요청이 실패(빨간색)로 뜨는지 확인하시면 정확한 원인을 알 수 있어요.)");
+      return;
+    }
+
+    let allAgents, normName, matchAgentByName, okCount, failList;
+    try {
+      allAgents = agentsData.filter((a) => !a.isAdmin);
+      normName = (s) => String(s || "").trim().replace(/\s+/g, "");
+      matchAgentByName = (name) => {
+        const target = normName(name);
+        if (!target) return null;
+        return allAgents.find((a) => normName(a.name) === target) || null;
+      };
+      okCount = 0;
+      failList = [];
+    } catch (setupErr) {
+      console.error("[QA 업로드] 초기화 단계에서 오류가 발생했어요:", setupErr);
+      alert(`엑셀 업로드 준비 중 오류가 발생했어요.\n\n${setupErr.message}\n\n(F12 콘솔에 자세한 내용이 남았어요. 개발자에게 이 메시지를 전달해주세요.)`);
+      return;
+    }
+    flashQAStatus("엑셀을 분석하고 있어요...");
+
+    for (const file of files) {
+      let wb;
+      try {
+        const buf = await file.arrayBuffer();
+        wb = new ExcelJS.Workbook();
+        await wb.xlsx.load(buf);
+      } catch (readErr) {
+        console.error(readErr);
+        failList.push(`${file.name}: 파일을 읽지 못했어요 (.xlsx 파일이 맞는지 확인해주세요)`);
+        continue;
+      }
+      const sheets = wb.worksheets || [];
+      if (!sheets.length) { failList.push(`${file.name}: 시트를 찾지 못했어요.`); continue; }
+      let matchedAny = false;
+      for (const ws of sheets) {
+        let agent = matchAgentByName(ws.name);
+        if (!agent && sheets.length === 1) agent = matchAgentByName(file.name.replace(/\.xlsx$/i, ""));
+        if (!agent) {
+          console.warn(`[QA 업로드] 이름이 일치하는 상담사를 못 찾았어요. 시트명="${ws.name}", 파일명="${file.name}". 등록된 상담사 이름 목록:`, allAgents.map((a) => a.name));
+          continue;
+        }
+        matchedAny = true;
+        try {
+          const parsed = qaParseWorksheet(ws);
+          setQAScore(agent.id, year, monthIndex, String(parsed.totalScore));
+          // 퇴사한 상담사는 점수만 반영하고, 차수별 원문(감점/코멘트)은 어차피
+          // 볼 일이 없으므로 가져오지 않는다. 상세 카드에는 "퇴사 인원"이라고만 표시된다.
+          if (agent.status === "RESIGNED") {
+            setQADetail(agent.id, year, monthIndex, {
+              fileName: file.name,
+              sheetName: ws.name,
+              uploadedAt: new Date().toISOString(),
+              rounds: [],
+              resignedNote: true,
+            });
+          } else {
+            setQADetail(agent.id, year, monthIndex, {
+              fileName: file.name,
+              sheetName: ws.name,
+              uploadedAt: new Date().toISOString(),
+              rounds: parsed.rounds,
+            });
+          }
+          okCount++;
+        } catch (parseErr) {
+          failList.push(`${ws.name || file.name}: ${parseErr.message}`);
+        }
+      }
+      if (!matchedAny) failList.push(`${file.name}: 이름이 일치하는 상담사를 찾지 못했어요 (시트명 또는 파일명을 상담사 이름과 맞춰주세요)`);
+    }
+
+    renderApp();
+    if (failList.length) {
+      flashQAStatus(`${okCount}명 반영됨 · ${failList.length}건 실패`);
+      alert(`엑셀 업로드 결과\n\n반영됨: ${okCount}건\n실패: ${failList.length}건\n\n${failList.join("\n")}`);
+    } else {
+      flashQAStatus(`${okCount}명 반영됨`);
+    }
+  }
+
+  /* ===================== 상담사 이름 클릭 → QA 상세 카드 팝업 (엑셀 원문 정리) ===================== */
+  function qaFormatSummaryHtml(text) {
+    return esc(text || "")
+      .split("\n")
+      .map((line) => {
+        // 혹시 남아있는 마크다운 강조 기호(**)가 있어도 화면엔 남지 않게 제거한다.
+        const clean = line.replace(/\*\*/g, "");
+        const trimmed = clean.trim();
+        // "[가이드라인명]" 같은 대괄호 제목 줄은 굵게 표시한다.
+        if (/^\[[^\[\]]+\]$/.test(trimmed)) return `<strong>${trimmed}</strong>`;
+        return clean;
+      })
+      .join("<br>");
+  }
+
+  // 엑셀에서 뽑아온 감점/코멘트 원문(items)을 그대로 읽기 좋게 줄바꿈해서 나열한다.
+  // 항목마다 "[가이드라인]" 제목 줄 + 코멘트 원문 줄로 나열하고, 가이드라인이 없는
+  // 항목은 번호만 붙여 구분한다. "원문 전체 보기"에 쓰인다.
+  function qaOrganizeItemsText(items) {
+    return items
+      .map((it, i) => {
+        const label = it.guideline ? `[${it.guideline}]` : `[${i + 1}번째 항목]`;
+        return `${label}\n${it.feedback}`;
+      })
+      .join("\n\n");
+  }
+
+  function qaRoundSummaryLine(round) {
+    const scoreText = (round.score === null || round.score === undefined) ? "-" : round.score;
+    const dateText = round.date ? ` · ${esc(round.date)}` : "";
+    const idText = round.consultId ? ` · 상담ID ${esc(round.consultId)}` : "";
+    return `${esc(round.label)}${dateText}${idText} · 총점 ${esc(String(scoreText))}`;
+  }
+
+  /* ---- QA 상세 카드 상단: 최근 6개월 점수 추이 그래프 ----
+     이미 있는 getQAScore()로 최근 N개월치 점수를 모아서, 데이터 없이 순수 SVG로
+     간단한 라인 차트를 그린다(차트 라이브러리 없이 아이콘들과 같은 방식). 점수가
+     없는 달은 그 지점만 건너뛰고 선을 잇지 않는다(중간에 끊긴 구간으로 표시).
+     이번 달 라벨은 강조 색으로 표시해서 지금이 어디인지 바로 알 수 있게 한다. */
+  const QA_TREND_MONTHS = 6;
+  function qaComputeAgentTrend(agentId, year, monthIndex, count) {
+    const months = [];
+    for (let i = count - 1; i >= 0; i--) {
+      let m = monthIndex - i;
+      let y = year;
+      while (m < 0) { m += 12; y -= 1; }
+      months.push({ year: y, monthIndex: m, score: getQAScore(agentId, y, m) });
+    }
+    return months;
+  }
+  function qaTrendSvgHtml(agentId, year, monthIndex) {
+    const months = qaComputeAgentTrend(agentId, year, monthIndex, QA_TREND_MONTHS);
+    const validScores = months.map((m) => m.score).filter((s) => s !== null);
+    if (validScores.length === 0) {
+      return `<div class="qa-trend-empty">최근 ${QA_TREND_MONTHS}개월간 입력된 점수가 없어요.</div>`;
+    }
+    const W = 560, H = 148, padL = 10, padR = 10, padT = 22, padB = 24;
+    const plotW = W - padL - padR, plotH = H - padT - padB;
+    const n = months.length;
+    const xAt = (i) => padL + (n === 1 ? plotW / 2 : (plotW * i) / (n - 1));
+    let min = Math.min(...validScores);
+    let max = Math.max(...validScores);
+    if (min === max) { min -= 5; max += 5; } else { const pad = (max - min) * 0.2; min -= pad; max += pad; }
+    min = Math.max(0, min);
+    max = Math.min(100, max);
+    if (max - min < 1) max = min + 1;
+    const yAt = (score) => padT + plotH - ((score - min) / (max - min)) * plotH;
+
+    // 점수가 있는 달들끼리만 이어서 선을 그린다. 중간에 값이 없는 달이 끼어 있으면
+    // 그 구간만 끊기고, 앞뒤 구간은 각각 따로 이어진다.
+    const segments = [];
+    let cur = [];
+    months.forEach((m, i) => {
+      if (m.score === null) { if (cur.length) segments.push(cur); cur = []; }
+      else cur.push({ x: xAt(i), y: yAt(m.score) });
+    });
+    if (cur.length) segments.push(cur);
+    const pathHtml = segments.map((seg) => {
+      const d = seg.map((p, idx) => `${idx === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
+      return `<path d="${d}" fill="none" stroke="var(--accent)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>`;
+    }).join("");
+
+    const dotHtml = months.map((m, i) => {
+      if (m.score === null) return "";
+      const x = xAt(i), y = yAt(m.score);
+      return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.6" fill="var(--accent)"/><text x="${x.toFixed(1)}" y="${(y - 10).toFixed(1)}" text-anchor="middle" class="qa-trend-value">${m.score.toFixed(1)}</text>`;
+    }).join("");
+
+    const labelHtml = months.map((m, i) => {
+      const x = xAt(i);
+      const isCurrent = m.year === year && m.monthIndex === monthIndex;
+      return `<text x="${x.toFixed(1)}" y="${H - 6}" text-anchor="middle" class="qa-trend-month${isCurrent ? " current" : ""}">${m.monthIndex + 1}월</text>`;
+    }).join("");
+
+    return `
+      <div class="qa-trend-block">
+        <div class="qa-trend-title">최근 ${QA_TREND_MONTHS}개월 추이</div>
+        <svg viewBox="0 0 ${W} ${H}" class="qa-trend-svg" preserveAspectRatio="xMidYMid meet">
+          ${pathHtml}
+          ${dotHtml}
+          ${labelHtml}
+        </svg>
+      </div>
+    `;
+  }
+
+  function closeQAUploadModal() {
+    const existing = document.getElementById("qa-upload-overlay");
+    if (existing) existing.remove();
+    document.removeEventListener("keydown", qaUploadEscHandler, true);
+  }
+  function qaUploadEscHandler(e) { if (e.key === "Escape") closeQAUploadModal(); }
+
+  function openQAUploadModal() {
+    closeQAUploadModal();
+    const { year, monthIndex } = qaUi;
+    if (qaIsMonthLocked(year, monthIndex)) { flashQAStatus("잠긴 달이에요. 잠금을 해제한 뒤 업로드해주세요."); return; }
+
+    const overlay = document.createElement("div");
+    overlay.id = "qa-upload-overlay";
+    overlay.className = "sch-preview-overlay";
+    overlay.innerHTML = `
+      <div class="sch-preview-box qa-upload-box">
+        <div class="sch-preview-head">
+          <span>QA 평가 엑셀 업로드 · ${esc(qaMonthLabel())}</span>
+          <button type="button" class="sch-preview-close" id="qa-upload-close-x" aria-label="닫기">✕</button>
+        </div>
+        <div class="sch-preview-body qa-upload-body">
+          <div class="qa-upload-dropzone" id="qa-upload-dropzone">
+            <div class="qa-upload-dropzone-icon">${ICON_UPLOAD}</div>
+            <div class="qa-upload-dropzone-text">여기로 엑셀 파일을 끌어다 놓아주세요</div>
+            <div class="qa-upload-dropzone-sub">여러 상담사 파일을 한꺼번에 놓아도 돼요</div>
+            <button type="button" class="ghost-btn" id="qa-upload-pick-btn">파일 선택</button>
+            <input type="file" id="qa-upload-input" accept=".xlsx" multiple style="display:none;">
+          </div>
+          <div class="qa-help-text" style="margin:12px 0 0;">상담사 1명당 파일 1개(시트명 또는 파일명 = 상담사 이름)도, 여러 상담사가 시트로 나뉜 파일 하나도 모두 지원돼요.</div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    overlay.onclick = (e) => { if (e.target === overlay) closeQAUploadModal(); };
+    document.getElementById("qa-upload-close-x").onclick = () => closeQAUploadModal();
+    document.addEventListener("keydown", qaUploadEscHandler, true);
+
+    const dropzone = document.getElementById("qa-upload-dropzone");
+    const fileInput = document.getElementById("qa-upload-input");
+
+    const runUpload = (fileList, source) => {
+      console.log(`[QA 업로드] ${source}로 전달된 파일 수:`, fileList ? fileList.length : 0);
+      if (!fileList || !fileList.length) {
+        flashQAStatus("파일을 인식하지 못했어요.");
+        return;
+      }
+      closeQAUploadModal();
+      qaHandleExcelFiles(fileList).catch((err) => {
+        console.error(`[QA 업로드] ${source} 처리 중 예상치 못한 오류:`, err);
+        alert(`엑셀 업로드 중 예상치 못한 오류가 발생했어요.\n\n${err && err.message ? err.message : err}\n\nF12 콘솔에 자세한 내용이 남았어요.`);
+      });
+    };
+
+    document.getElementById("qa-upload-pick-btn").onclick = () => fileInput.click();
+    fileInput.onchange = (e) => {
+      const files = e.target.files;
+      e.target.value = "";
+      runUpload(files, "파일 선택");
+    };
+
+    ["dragenter", "dragover"].forEach((evt) => {
+      dropzone.addEventListener(evt, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropzone.classList.add("qa-upload-dropzone-active");
+      });
+    });
+    ["dragleave", "dragend"].forEach((evt) => {
+      dropzone.addEventListener(evt, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropzone.classList.remove("qa-upload-dropzone-active");
+      });
+    });
+    dropzone.addEventListener("drop", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dropzone.classList.remove("qa-upload-dropzone-active");
+      runUpload(e.dataTransfer && e.dataTransfer.files, "드래그앤드롭");
+    });
+    // 모달 밖(브라우저 창 전체)에 실수로 파일을 떨어뜨려서 브라우저가 그 파일을
+    // 통째로 열어버리는 사고 방지.
+    ["dragover", "drop"].forEach((evt) => {
+      overlay.addEventListener(evt, (e) => { if (e.target === overlay) e.preventDefault(); });
+    });
+  }
+
+  function closeQADetailModal() {
+    const existing = document.getElementById("qa-detail-overlay");
+    if (existing) existing.remove();
+    document.removeEventListener("keydown", qaDetailEscHandler, true);
+  }
+  function qaDetailEscHandler(e) { if (e.key === "Escape") closeQADetailModal(); }
+
+  function openQADetailModal(agentId) {
+    closeQADetailModal();
+    qaPurgeExpiredDetails();
+    const agent = agentsData.find((a) => a.id === agentId);
+    if (!agent) return;
+    const { year, monthIndex } = qaUi;
+    const detail = getQADetail(agentId, year, monthIndex);
+
+    const metaText = detail && detail.purged
+      ? `원본 엑셀은 업로드 후 ${QA_DETAIL_EXPIRY_MONTHS}개월이 지나 자동 삭제됐어요 · 차수 ${detail.rounds.length}개`
+      : detail
+        ? `${esc(detail.fileName || "")} 업로드됨 · 차수 ${detail.rounds.length}개 (원문은 업로드 후 ${QA_DETAIL_EXPIRY_MONTHS}개월 뒤 자동 삭제돼요)`
+        : "";
+
+    const trendHtml = qaTrendSvgHtml(agentId, year, monthIndex);
+
+    const bodyHtml = (detail && detail.resignedNote)
+      ? `<div class="qa-detail-empty">퇴사 인원이에요.<br>점수만 반영되고, 차수별 감점/코멘트 원문은 가져오지 않아요.</div>`
+      : (!detail || !detail.rounds || !detail.rounds.length)
+      ? `<div class="qa-detail-empty">이번 달(${esc(qaMonthLabel())})에 업로드된 QA 평가 엑셀이 없어요.<br>상단 "${esc("엑셀 업로드")}" 버튼으로 이 상담사의 평가표를 올려주세요.</div>`
+      : `
+        <div class="qa-detail-meta">${metaText}</div>
+        <div class="qa-detail-rounds">
+          ${detail.rounds.map((round, idx) => {
+            // itemCount가 없는 예전 데이터(이 필드가 생기기 전에 저장된 회차)는
+            // items 개수로 대신 판단한다. items도 없다면(정말 원문이 없는 경우) 0으로 취급.
+            const effectiveItemCount = (round.itemCount !== undefined && round.itemCount !== null)
+              ? round.itemCount
+              : (round.items ? round.items.length : 0);
+            const isPerfect = effectiveItemCount === 0;
+            const rawGone = !isPerfect && round.items.length === 0; // 원문 만료로 사라진 경우
+            let bodyBlock;
+            if (isPerfect) {
+              bodyBlock = `<div class="qa-round-empty">감점/코멘트 항목이 없어요 (만점 처리된 차수예요).</div>`;
+            } else if (rawGone) {
+              bodyBlock = `<div class="qa-round-summary-box" id="qa-round-summary-${idx}"><span class="qa-round-hint" style="color:var(--red);">원문이 ${QA_DETAIL_EXPIRY_MONTHS}개월 만료되어 삭제됐어요.</span></div>`;
+            } else {
+              bodyBlock = `
+              <div class="qa-round-raw">
+                <button type="button" class="qa-round-raw-toggle" data-qa-raw-toggle="${idx}">원문 보기</button>
+                <div class="qa-round-raw-box" id="qa-round-raw-${idx}" style="display:none;"></div>
+              </div>`;
+            }
+            return `
+            <div class="qa-round-card">
+              <div class="qa-round-head" data-qa-round-toggle="${idx}">
+                <div class="qa-round-title"><span class="qa-round-chevron" id="qa-round-chevron-${idx}">▶</span>${qaRoundSummaryLine(round)}</div>
+              </div>
+              <div class="qa-round-body" id="qa-round-body-${idx}" style="display:none;">
+                ${bodyBlock}
+              </div>
+            </div>
+          `;
+          }).join("")}
+        </div>
+      `;
+
+    const overlay = document.createElement("div");
+    overlay.id = "qa-detail-overlay";
+    overlay.className = "sch-preview-overlay";
+    overlay.innerHTML = `
+      <div class="sch-preview-box qa-detail-box">
+        <div class="sch-preview-head">
+          <span>${esc(agent.name)} · ${esc(qaMonthLabel())} QA 상세</span>
+          <div class="qa-detail-head-actions">
+            ${detail ? `<button type="button" class="ghost-btn qa-detail-delete-btn" id="qa-detail-delete-btn">${ICON_TRASH} 엑셀 삭제</button>` : ""}
+            <button type="button" class="sch-preview-close" id="qa-detail-close-x" aria-label="닫기">✕</button>
+          </div>
+        </div>
+        <div class="sch-preview-body qa-detail-body">
+          ${trendHtml}
+          ${bodyHtml}
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    overlay.onclick = (e) => { if (e.target === overlay) closeQADetailModal(); };
+    document.getElementById("qa-detail-close-x").onclick = () => closeQADetailModal();
+    const deleteBtn = document.getElementById("qa-detail-delete-btn");
+    if (deleteBtn) {
+      deleteBtn.onclick = () => {
+        if (!confirm(`${agent.name}님의 ${qaMonthLabel()} QA 엑셀 데이터를 삭제할까요?\n원문과 정리된 내용이 모두 함께 삭제되며, 되돌릴 수 없어요.`)) return;
+        deleteQADetail(agentId, year, monthIndex);
+        flashQAStatus("삭제됐어요.");
+        openQADetailModal(agentId); // 모달을 "업로드된 엑셀 없음" 상태로 다시 그림
+      };
+    }
+
+    // "원문 보기" 토글: 개별 버튼이 아니라 오버레이 전체에 위임해서 클릭을 잡는다.
+    // 기본은 접힌 상태(style="display:none")이고, 누를 때마다 펼치고/접는다.
+    overlay.addEventListener("click", (e) => {
+      const toggleBtn = e.target.closest && e.target.closest("[data-qa-raw-toggle]");
+      if (!toggleBtn) return;
+      e.stopPropagation();
+      const idx = Number(toggleBtn.getAttribute("data-qa-raw-toggle"));
+      const round = detail.rounds[idx];
+      const rawBox = document.getElementById(`qa-round-raw-${idx}`);
+      if (!round || !rawBox) return;
+      const opening = rawBox.style.display === "none";
+      if (opening && !rawBox.dataset.filled) {
+        rawBox.innerHTML = qaFormatSummaryHtml(qaOrganizeItemsText(round.items));
+        rawBox.dataset.filled = "1";
+      }
+      rawBox.style.display = opening ? "" : "none";
+      toggleBtn.textContent = opening ? "원문 접기" : "원문 보기";
+    });
+
+    // 회차 카드 헤드를 누르면 펼치기/접기 (버튼 클릭은 위에서 stopPropagation으로 분리됨)
+    overlay.querySelectorAll("[data-qa-round-toggle]").forEach((head) => {
+      head.onclick = () => {
+        const idx = head.getAttribute("data-qa-round-toggle");
+        const body = document.getElementById(`qa-round-body-${idx}`);
+        const chevron = document.getElementById(`qa-round-chevron-${idx}`);
+        if (!body) return;
+        const opening = body.style.display === "none";
+        body.style.display = opening ? "" : "none";
+        if (chevron) chevron.textContent = opening ? "▼" : "▶";
+      };
+    });
+
+    setTimeout(() => document.addEventListener("keydown", qaDetailEscHandler, true), 0);
+  }
+
+  function qaScoreCellHtml(agent, year, monthIndex) {
+    const val = getQAScore(agent.id, year, monthIndex);
+    const locked = qaIsMonthLocked(year, monthIndex);
+    return `<td><input type="number" class="qa-score-input" min="0" max="100" step="0.1" inputmode="decimal"
+      data-qa-agent="${agent.id}" value="${val === null ? "" : val.toFixed(1)}" placeholder="-" title="점수"${locked ? " disabled" : ""}></td>`;
+  }
+
+  function qaDiffHtml(agent, year, monthIndex) {
+    const cur = qaOverallScore(agent.id, year, monthIndex);
+    if (cur === null) return `<span class="qa-diff flat">-</span>`;
+    const prev = qaPrevMonth(year, monthIndex);
+    const prevScore = qaOverallScore(agent.id, prev.year, prev.monthIndex);
+    if (prevScore === null) return `<span class="qa-diff flat">신규</span>`;
+    const diff = cur - prevScore;
+    if (Math.abs(diff) < 0.05) return `<span class="qa-diff flat">±0.0</span>`;
+    const cls = diff > 0 ? "up" : "down";
+    const sign = diff > 0 ? "▲" : "▼";
+    return `<span class="qa-diff ${cls}">${sign} ${Math.abs(diff).toFixed(1)}</span>`;
+  }
+
+  // ----- 상담사 상세 카드용 "최근 QA 점수" 미리보기 -----
+  // 이번 달 포함 최근 3개월 점수를 관리자→월별 스케줄 이동 없이 바로 보여준다.
+  // QA 관리 대상이 아닌 관리자 계정은 표시하지 않는다.
+  function renderAgentQAPreview(agent) {
+    if (agent.isAdmin) return "";
+    const months = [];
+    for (let i = 0; i < 3; i++) {
+      let m = today.getMonth() - i;
+      let y = today.getFullYear();
+      while (m < 0) { m += 12; y -= 1; }
+      months.push({ year: y, monthIndex: m });
+    }
+    const cellsHtml = months.map(({ year, monthIndex }, idx) => {
+      const val = getQAScore(agent.id, year, monthIndex);
+      const label = idx === 0 ? "이번 달" : `${monthIndex + 1}월`;
+      return `
+        <div class="agent-qa-cell">
+          <div class="agent-qa-cell-label">${esc(label)}</div>
+          <div class="agent-qa-cell-value${val === null ? " empty" : ""}">${val === null ? "데이터 없음" : val.toFixed(1)}</div>
+          <div class="agent-qa-cell-diff">${qaDiffHtml(agent, year, monthIndex)}</div>
+        </div>
+      `;
+    }).join("");
+    return `
+      <div class="agent-interview-section agent-qa-preview">
+        <div class="agent-interview-header">
+          <div class="agent-interview-title">${ICON_QA} 최근 QA 점수</div>
+          <button class="ghost-btn" data-action="agent-goto-qa" data-id="${agent.id}">${ICON_CHEVRON_RIGHT} 품질 관리로 이동</button>
+        </div>
+        <div class="agent-qa-preview-grid">${cellsHtml}</div>
+      </div>
+    `;
+  }
+
+  function qaStatDiff(cur, prev) {
+    if (cur === null || prev === null || prev === undefined) return null;
+    const diff = cur - prev;
+    if (Math.abs(diff) < 0.05) return { cls: "flat", sign: "±", abs: 0 };
+    return { cls: diff > 0 ? "up" : "down", sign: diff > 0 ? "▲" : "▼", abs: Math.abs(diff) };
+  }
+
+  function qaStatItemHtml(label, value, prevValue, accent) {
+    const isEmpty = value === null;
+    const d = qaStatDiff(value, prevValue);
+    const diffHtml = d ? ` <span class="qa-stat-diff ${d.cls}">${d.sign} ${d.abs.toFixed(1)}</span>` : "";
+    return `<div class="qa-stat-item${accent ? " accent" : ""}">
+      <div class="qa-stat-num${isEmpty ? " empty" : ""}">${isEmpty ? "데이터 없음" : value.toFixed(1)}</div>
+      <div class="qa-stat-label">${esc(label)}${diffHtml}</div>
+    </div>`;
+  }
+
+  // 이미지 저장 시 유형별로 인원을 걸러낼 때 쓴다. (월별 스케줄과 동일한 구분 기준)
+  function qaFilterAgentsByMode(agentsList, mode) {
+    if (!mode || mode === "ALL") return agentsList;
+    const hasVoice = (a) => (a.workTypes || []).indexOf("유선") !== -1;
+    const hasChat = (a) => (a.workTypes || []).indexOf("채팅") !== -1;
+    if (mode === "DAY") return agentsList.filter((a) => a.group !== "night");
+    if (mode === "NIGHT") return agentsList.filter((a) => a.group === "night");
+    if (mode === "VOICE") return agentsList.filter(hasVoice);
+    if (mode === "CHAT") return agentsList.filter(hasChat);
+    return agentsList;
+  }
+
+  // 화면에 보이는 표와 이미지 캡처용 표가 같은 마크업을 쓰도록 분리해뒀다.
+  // forCapture가 true면 점수 입력칸 대신 텍스트로 값을 보여준다(캡처 이미지에 <input>이 그대로 찍히지 않도록).
+  function buildQATableHtml(agentsList, year, monthIndex, forCapture) {
+    return `
+      <div class="qa-table-wrap">
+        <table class="qa-table">
+          <thead>
+            <tr>
+              <th>이름</th>
+              <th>LDAP</th>
+              <th>시간대</th>
+              <th>업무구분</th>
+              <th>조</th>
+              <th>점수</th>
+              <th>전월 대비</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${agentsList.length === 0 ? `
+              <tr><td class="qa-empty" colspan="7">${forCapture ? "해당하는 상담사가 없어요." : `근무중인 상담사가 없어요. "상담사 관리"에서 인원을 등록해주세요.`}</td></tr>
+            ` : agentsList.map((a) => {
+              const typeBadges = (a.workTypes || []).map((t) => `<span class="badge sm ${t === "유선" ? "voice" : "chat"}">${esc(t)}</span>`).join(" ");
+              const groupBadge = `<span class="badge sm ${a.group === "night" ? "night" : "day"}">${a.group === "night" ? "야간" : "주간"}</span>`;
+              const val = getQAScore(a.id, year, monthIndex);
+              const scoreCell = forCapture
+                ? `<td>${val === null ? "-" : val.toFixed(1)}</td>`
+                : qaScoreCellHtml(a, year, monthIndex);
+              const highlight = !forCapture && qaHighlightAgentId === a.id;
+              const isResigned = a.status === "RESIGNED";
+              const rowClass = `${highlight ? "qa-row-highlight " : ""}${isResigned ? "qa-row-resigned" : ""}`.trim();
+              const resignedBadge = isResigned ? ` <span class="badge sm resigned">퇴사</span>` : "";
+              return `
+                <tr data-qa-row-agent="${a.id}" class="${rowClass}">
+                  <td class="qa-col-name"${forCapture ? "" : ` data-qa-name-click="${a.id}"`}>${esc(a.name)}${resignedBadge}${forCapture ? "" : `<span class="qa-name-search-icon">${ICON_SEARCH_MINI}</span>`}</td>
+                  <td class="qa-col-ldap">${esc(a.ldap || "-")}</td>
+                  <td>${esc(a.timezone || "-")}</td>
+                  <td class="qa-col-badges">${typeBadges || "-"}</td>
+                  <td>${groupBadge}</td>
+                  ${scoreCell}
+                  <td>${qaDiffHtml(a, year, monthIndex)}</td>
+                </tr>
+              `;
+            }).join("")}
+          </tbody>
+        </table>
+      </div>
+    `;
+  }
+
+  // 검색창 자체는 다시 그리지 않고 표 영역만 갱신한다(agents/interviews 화면과 같은 방식).
+  // IME(한글) 조합 중에도 입력이 끊기지 않고, 타이핑 즉시 결과가 반영된다.
+  function updateQATableArea() {
+    const tableArea = document.getElementById("qa-table-area");
+    if (!tableArea) return;
+    const { year, monthIndex } = qaUi;
+    const filteredList = qaWorkingAgents().filter((a) => qaAgentMatchesSearch(a, qaUi.searchQuery));
+    tableArea.innerHTML = buildQATableHtml(filteredList, year, monthIndex, false);
+    attachQATableAreaHandlers(tableArea, filteredList, year, monthIndex);
+  }
+
+  function attachQATableAreaHandlers(root, agentsList, year, monthIndex) {
+    root.querySelectorAll("[data-qa-name-click]").forEach((el) => {
+      el.onclick = () => openQADetailModal(el.getAttribute("data-qa-name-click"));
+    });
+
+    root.querySelectorAll(".qa-score-input").forEach((input) => {
+      // 필요인력 입력칸과 같은 방식: blur(포커스 아웃) 또는 Enter일 때만 저장해서
+      // 타이핑 중에 표 전체가 다시 그려지며 깜빡이거나 포커스가 빠지지 않게 한다.
+      input.onchange = () => {
+        setQAScore(
+          input.getAttribute("data-qa-agent"),
+          year, monthIndex,
+          input.value
+        );
+        renderApp();
+      };
+      // 엑셀처럼 Enter/Tab으로 다음(아래) 칸, Shift+Enter/Shift+Tab으로 이전(위) 칸으로
+      // 바로 이동한다. blur()를 호출하면 값이 바뀐 경우 change 이벤트가 이 안에서
+      // 그대로(동기적으로) 발생해서 저장 + 표 다시 그리기까지 끝나므로, blur() 호출이
+      // 끝난 뒤에 다음 칸을 찾아 포커스를 옮기면 된다(다시 그려졌든 안 그려졌든 그
+      // 시점엔 이미 최종 DOM이 갖춰져 있다).
+      input.onkeydown = (e) => {
+        if (e.key !== "Enter" && e.key !== "Tab") return;
+        e.preventDefault();
+        const idx = agentsList.findIndex((a) => a.id === input.getAttribute("data-qa-agent"));
+        const delta = e.shiftKey ? -1 : 1;
+        const nextAgent = idx !== -1 ? agentsList[idx + delta] : null;
+        input.blur();
+        if (nextAgent) qaFocusScoreInput(nextAgent.id);
+      };
+    });
+  }
+
+  function renderQAPage(root) {
+    const agentsList = qaWorkingAgents();
+    const filteredList = agentsList.filter((a) => qaAgentMatchesSearch(a, qaUi.searchQuery));
+    const { year, monthIndex } = qaUi;
+    // 통계(평균)는 검색어와 무관하게 항상 재직중인 전체 인원 기준으로 보여준다.
+    const stats = qaComputeStats(agentsList, year, monthIndex);
+    const prevYm = qaPrevMonth(year, monthIndex);
+    const prevStats = qaComputeStats(agentsList, prevYm.year, prevYm.monthIndex);
+    const locked = qaIsMonthLocked(year, monthIndex);
+
+    root.innerHTML = `
+      <div class="qa-top">
+        <div class="qa-title">품질 관리</div>
+        <div class="schedule-month-nav">
+          <button class="schedule-month-btn" id="qa-prev-month">‹</button>
+          <div class="schedule-month-label">${qaMonthLabel()}${locked ? ` <span class="sch-locked-badge">${ICON_LOCK} 확정됨</span>` : ""}</div>
+          <button class="schedule-month-btn" id="qa-next-month">›</button>
+          <button class="ghost-btn sch-lock-toggle-btn ${locked ? "locked" : ""}" id="qa-lock-btn" style="margin-left:8px;">${locked ? `${ICON_UNLOCK} 잠금 해제` : `${ICON_LOCK} 이 달 잠그기`}</button>
+          <button class="ghost-btn" id="qa-excel-upload-btn">${ICON_UPLOAD} 엑셀 업로드</button>
+          <button class="ghost-btn qa-bulk-delete-btn" id="qa-bulk-delete-btn">${ICON_TRASH} 엑셀 일괄삭제</button>
+          <button class="ghost-btn" id="qa-capture-btn">${ICON_CAMERA} 이미지로 저장 ▾</button>
+        </div>
+      </div>
+      <div class="qa-help-text">QA 평가 엑셀(.xlsx)을 올리면 "평균" 행 × "총점" 열 값을 자동으로 점수에 반영해요.<br>상담사 1명당 파일 1개(시트명 또는 파일명 = 상담사 이름)도, 여러 상담사가 시트로 나뉜 파일 하나도 모두 지원돼요.<br>이름을 누르면 회차별 상세 내용을 볼 수 있어요.</div>
+      <div class="status" id="qa-status"></div>
+      <div class="qa-stat-row">
+        <div class="agent-search-input">
+          <input type="text" class="agent-search-input-field" id="qa-search-input" placeholder="이름 검색" title="상담사 검색 (이름/주간/야간/채팅/유선, 쉼표로 여러 개)" value="${esc(qaUi.searchQuery)}" autocomplete="off">
+          ${ICON_SEARCH_MINI}
+        </div>
+        <div class="qa-stat-grid">
+          ${qaStatItemHtml("전체 평균", stats.total, prevStats.total, true)}
+          ${qaStatItemHtml("유선 점수 평균", stats.voice, prevStats.voice)}
+          ${qaStatItemHtml("채팅 점수 평균", stats.chat, prevStats.chat)}
+          ${qaStatItemHtml("주간 점수 평균", stats.day, prevStats.day)}
+          ${qaStatItemHtml("야간 점수 평균", stats.night, prevStats.night)}
+          ${qaStatItemHtml("주간 채팅 평균", stats.dayChat, prevStats.dayChat)}
+          ${qaStatItemHtml("주간 유선 평균", stats.dayVoice, prevStats.dayVoice)}
+          ${qaStatItemHtml("야간 채팅 평균", stats.nightChat, prevStats.nightChat)}
+          ${qaStatItemHtml("야간 유선 평균", stats.nightVoice, prevStats.nightVoice)}
+        </div>
+      </div>
+      <div id="qa-table-area">${buildQATableHtml(filteredList, year, monthIndex, false)}</div>
+    `;
+
+    // 상담사 상세에서 "품질 관리로 이동"으로 넘어온 경우, 그 인원의 행으로
+    // 스크롤하고 한 번만 강조 표시한다.
+    if (qaHighlightAgentId) {
+      const targetId = qaHighlightAgentId;
+      qaHighlightAgentId = null;
+      const row = root.querySelector(`[data-qa-row-agent="${CSS.escape(targetId)}"]`);
+      if (row) {
+        row.scrollIntoView({ behavior: "smooth", block: "center" });
+        setTimeout(() => row.classList.remove("qa-row-highlight"), 2200);
+      }
+    }
+
+    document.getElementById("qa-prev-month").onclick = () => qaShiftMonth(-1);
+    document.getElementById("qa-next-month").onclick = () => qaShiftMonth(1);
+    document.getElementById("qa-lock-btn").onclick = () => qaToggleMonthLock(year, monthIndex);
+    document.getElementById("qa-capture-btn").onclick = (e) => openQACaptureMenu(e.currentTarget);
+    document.getElementById("qa-bulk-delete-btn").onclick = () => {
+      if (qaIsMonthLocked(year, monthIndex)) { flashQAStatus("잠긴 달이에요. 잠금을 해제한 뒤 삭제해주세요."); return; }
+      if (!confirm(`${qaMonthLabel()}에 등록된 모든 상담사의 QA 엑셀 데이터를 일괄삭제할까요?\n원문과 정리된 내용이 모두 함께 삭제되며, 되돌릴 수 없어요.`)) return;
+      const count = deleteAllQADetails(year, monthIndex);
+      flashQAStatus(count > 0 ? `${count}건 삭제됐어요.` : "삭제할 데이터가 없어요.");
+      renderApp();
+    };
+    document.getElementById("qa-excel-upload-btn").onclick = () => openQAUploadModal();
+
+    const qaSearchInput = document.getElementById("qa-search-input");
+    if (qaSearchInput) {
+      qaSearchInput.oninput = (e) => {
+        qaUi.searchQuery = e.target.value;
+        updateQATableArea();
+      };
+    }
+
+    attachQATableAreaHandlers(root.querySelector("#qa-table-area"), filteredList, year, monthIndex);
+  }
+  // 특정 상담사의 점수 입력칸에 포커스를 주고 기존 값을 선택 상태로 만든다
+  // (Enter/Tab으로 다음 칸으로 넘어갈 때, 바로 덮어쓸 수 있게).
+  function qaFocusScoreInput(agentId) {
+    const el = document.querySelector(`.qa-score-input[data-qa-agent="${CSS.escape(agentId)}"]`);
+    if (!el || el.disabled) return;
+    el.focus();
+    el.select();
+  }
+
+  // ----- 품질 관리 표를 이미지로 저장: 전체/주간/야간/유선/채팅 -----
+  const QA_CAPTURE_MODES = [
+    { key: "ALL", label: "전체 저장" },
+    { key: "DAY", label: "주간 저장" },
+    { key: "NIGHT", label: "야간 저장" },
+    { key: "VOICE", label: "유선 저장" },
+    { key: "CHAT", label: "채팅 저장" },
+  ];
+
+  function closeQAPreview() {
+    const existing = document.getElementById("qa-preview-overlay");
+    if (existing) existing.remove();
+    document.removeEventListener("keydown", qaPreviewEscHandler, true);
+  }
+  function qaPreviewEscHandler(e) {
+    if (e.key === "Escape") closeQAPreview();
+  }
+  function openQAPreview(dataUrl, filename, modeName) {
+    closeQAPreview();
+    const overlay = document.createElement("div");
+    overlay.id = "qa-preview-overlay";
+    overlay.className = "sch-preview-overlay";
+    overlay.innerHTML = `
+      <div class="sch-preview-box">
+        <div class="sch-preview-head">
+          <span>${modeName ? `${esc(modeName)} 이미지 미리보기` : "이미지 미리보기"}</span>
+          <button type="button" class="sch-preview-close" id="qa-preview-close-x" aria-label="닫기">✕</button>
+        </div>
+        <div class="sch-preview-body">
+          <img src="${dataUrl}" alt="품질 관리 캡처 미리보기">
+        </div>
+        <div class="sch-preview-actions">
+          <button type="button" class="ghost-btn" id="qa-preview-cancel">닫기</button>
+          <button type="button" class="primary-btn" id="qa-preview-download">${ICON_DOWNLOAD} 이미지 다운로드</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    overlay.onclick = (e) => { if (e.target === overlay) closeQAPreview(); };
+    document.getElementById("qa-preview-close-x").onclick = () => closeQAPreview();
+    document.getElementById("qa-preview-cancel").onclick = () => closeQAPreview();
+    document.getElementById("qa-preview-download").onclick = () => {
+      const link = document.createElement("a");
+      link.download = filename;
+      link.href = dataUrl;
+      link.click();
+      closeQAPreview();
+      flashQAStatus("이미지 저장됨");
+    };
+    setTimeout(() => document.addEventListener("keydown", qaPreviewEscHandler, true), 0);
+  }
+
+  function closeQAMenu() {
+    const existing = document.getElementById("qa-menu");
+    if (existing) existing.remove();
+    document.removeEventListener("mousedown", qaMenuOutsideHandler, true);
+  }
+  function qaMenuOutsideHandler(e) {
+    const menu = document.getElementById("qa-menu");
+    if (menu && !menu.contains(e.target)) closeQAMenu();
+  }
+  function openQACaptureMenu(anchorEl) {
+    closeQAMenu();
+    const rect = anchorEl.getBoundingClientRect();
+    const menu = document.createElement("div");
+    menu.id = "qa-menu";
+    menu.className = "sch-menu";
+    menu.innerHTML = QA_CAPTURE_MODES.map((o) =>
+      `<button type="button" data-capture-mode="${o.key}">${ICON_CAMERA} ${o.label}</button>`
+    ).join("");
+    document.body.appendChild(menu);
+    const top = Math.min(rect.bottom + 4, window.innerHeight - menu.offsetHeight - 8);
+    const left = Math.min(rect.left, window.innerWidth - menu.offsetWidth - 8);
+    menu.style.top = `${Math.max(8, top)}px`;
+    menu.style.left = `${Math.max(8, left)}px`;
+    menu.querySelectorAll("button[data-capture-mode]").forEach((btn) => {
+      btn.onclick = () => {
+        const mode = btn.getAttribute("data-capture-mode");
+        closeQAMenu();
+        captureQAPage(mode);
+      };
+    });
+    setTimeout(() => document.addEventListener("mousedown", qaMenuOutsideHandler, true), 0);
+  }
+
+  // 품질 관리 표를 통째로 PNG 이미지로 캡처해서 다운로드한다. (월별 스케줄 캡처와 동일한 방식)
+  function captureQAPage(mode) {
+    const captureMode = mode || "ALL";
+    const modeMeta = QA_CAPTURE_MODES.find((m) => m.key === captureMode) || QA_CAPTURE_MODES[0];
+    const modeName = modeMeta.label.replace(/ 저장$/, "");
+    const btn = document.getElementById("qa-capture-btn");
+    if (typeof html2canvas === "undefined") {
+      flashQAStatus("캡처 기능을 불러오지 못했어요 (인터넷 연결 확인)");
+      return;
+    }
+    if (btn) { btn.disabled = true; btn.textContent = "이미지 생성 중..."; }
+
+    const cs = getComputedStyle(document.documentElement);
+    const themeColor = (name) => cs.getPropertyValue(name).trim();
+    const cBg = themeColor("--bg");
+    const cText = themeColor("--text");
+    const cTextDim = themeColor("--text-dim");
+    const cHairline = themeColor("--hairline");
+
+    const { year, monthIndex } = qaUi;
+    const agentsList = qaFilterAgentsByMode(qaWorkingAgents(), captureMode);
+    const lockedTag = qaIsMonthLocked(year, monthIndex) ? " · 확정됨" : "";
+    const titleSuffix = captureMode === "ALL" ? "" : ` · ${modeName}`;
+
+    // "전체 저장"일 때만 상단 평균 통계도 표 위에 같이 캡처되게 한다.
+    // 화면과 완전히 같은 마크업(qaStatItemHtml)을 그대로 재사용해서 스타일이 어긋나지 않게 한다.
+    const stats = qaComputeStats(agentsList, year, monthIndex);
+    const capturePrevYm = qaPrevMonth(year, monthIndex);
+    const prevStats = qaComputeStats(agentsList, capturePrevYm.year, capturePrevYm.monthIndex);
+    const statsHtml = captureMode === "ALL" ? `
+      <div class="qa-stat-grid" style="margin-bottom:20px;padding-bottom:20px;border-bottom:1px solid ${cHairline};">
+        ${qaStatItemHtml("전체 평균", stats.total, prevStats.total, true)}
+        ${qaStatItemHtml("유선 점수 평균", stats.voice, prevStats.voice)}
+        ${qaStatItemHtml("채팅 점수 평균", stats.chat, prevStats.chat)}
+        ${qaStatItemHtml("주간 점수 평균", stats.day, prevStats.day)}
+        ${qaStatItemHtml("야간 점수 평균", stats.night, prevStats.night)}
+        ${qaStatItemHtml("주간 채팅 평균", stats.dayChat, prevStats.dayChat)}
+        ${qaStatItemHtml("주간 유선 평균", stats.dayVoice, prevStats.dayVoice)}
+        ${qaStatItemHtml("야간 채팅 평균", stats.nightChat, prevStats.nightChat)}
+        ${qaStatItemHtml("야간 유선 평균", stats.nightVoice, prevStats.nightVoice)}
+      </div>
+    ` : "";
+
+    const wrapper = document.createElement("div");
+    wrapper.className = "sch-capture-flatten";
+    wrapper.style.position = "fixed";
+    wrapper.style.left = "-99999px";
+    wrapper.style.top = "0";
+    wrapper.style.background = cBg;
+    wrapper.style.padding = "28px";
+    wrapper.style.fontFamily = "'KoPub Dotum', system-ui, sans-serif";
+    wrapper.style.color = cText;
+    wrapper.style.width = "fit-content";
+    wrapper.style.maxWidth = "none";
+    wrapper.style.overflow = "visible";
+    wrapper.innerHTML = `
+      <div style="font-size:22px;margin-bottom:4px;color:${cText};">품질 관리${titleSuffix}</div>
+      <div style="font-size:15px;color:${cTextDim};margin-bottom:16px;">${esc(qaMonthLabel())}${lockedTag} · 캡처일 ${esc(todayISO())}</div>
+      ${statsHtml}
+      ${buildQATableHtml(agentsList, year, monthIndex, true)}
+    `;
+    document.body.appendChild(wrapper);
+
+    function cleanup(label) {
+      if (wrapper.parentNode) document.body.removeChild(wrapper);
+      if (btn) { btn.disabled = false; btn.innerHTML = ICON_CAMERA + " 이미지로 저장 ▾"; }
+      if (label) flashQAStatus(label);
+    }
+
+    requestAnimationFrame(() => {
+      // 표는 CSS(display:table + margin:auto)만으로 이미 표 크기에 맞춰 가운데 정렬된다.
+      // 통계 줄은 fit-content 래퍼 안에서는 justify-content:space-between이 퍼질 공간이
+      // 없으므로, 표의 실제 렌더링 너비에 맞춰 폭을 직접 지정해서 표와 나란히 맞춘다.
+      const statGridEl = wrapper.querySelector(".qa-stat-grid");
+      const tableWrapEl = wrapper.querySelector(".qa-table-wrap");
+      if (statGridEl && tableWrapEl) {
+        statGridEl.style.width = tableWrapEl.getBoundingClientRect().width + "px";
+      }
+
+      const fullW = wrapper.scrollWidth;
+      const fullH = wrapper.scrollHeight;
+      html2canvas(wrapper, {
+        backgroundColor: cBg,
+        scale: 2,
+        width: fullW,
+        height: fullH,
+        windowWidth: fullW,
+        windowHeight: fullH,
+      }).then((canvas) => {
+        const fileSuffix = captureMode === "ALL" ? "" : `_${modeName}`;
+        const filename = `품질관리${fileSuffix}_${year}-${pad2(monthIndex + 1)}.png`;
+        const dataUrl = canvas.toDataURL("image/png");
+        cleanup("");
+        openQAPreview(dataUrl, filename, captureMode === "ALL" ? null : modeName);
+      }).catch((err) => {
+        console.error(err);
+        cleanup("캡처 실패");
+      });
+    });
+  }
+
+  /* ===================== 면담일지 모듈 ===================== */
+  const INTERVIEWS_KEY = acctKey("personal-interviews:data");
+  const INTERVIEW_TYPES = ["정기", "비정기", "경고", "퇴사"];
 
   // 05a-qa-data.js — 데이터 로드/저장, 상세 만료 처리, 월 잠금
   // (05-qa.js를 기능 단위로 분할한 파일 중 하나. 실행 순서는 파일명 정렬로 유지됨)
@@ -7932,6 +11689,3051 @@
   /* ===================== 내비게이션 + 앱 렌더 ===================== */
   /* ===================== 월별 스케줄 모듈 ===================== */
   const SCHEDULE_KEY = acctKey("personal-schedule:data");
+
+  function loadScheduleData() {
+    try {
+      const raw = localStorage.getItem(SCHEDULE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && Array.isArray(parsed.staff) && parsed.records && typeof parsed.records === "object") {
+          if (!parsed.staffHistory || typeof parsed.staffHistory !== "object") parsed.staffHistory = {};
+          if (typeof parsed.lastSyncMonthKey !== "string") parsed.lastSyncMonthKey = null;
+          return parsed;
+        }
+      }
+    } catch (e) {}
+    return { staff: [], records: {}, staffHistory: {}, lastSyncMonthKey: null, requiredHeadcount: {}, monthLocks: {}, memos: {} };
+  }
+  function normalizeScheduleData(d) {
+    if (!d.requiredHeadcount) d.requiredHeadcount = {};
+    // 셀(인원×날짜)마다 남길 수 있는 메모. key는 scheduleRecordKey와 같은 형식(staffId|dateKey).
+    if (!d.memos || typeof d.memos !== "object") d.memos = {};
+    // 사용자가 직접 켜고 끄는 "월별 잠금". 잠긴 달은 셀 클릭·일괄 붙여넣기·삭제·필요인력 입력 등
+    // 데이터를 바꾸는 조작이 전부 막혀서 실수로 수정되는 걸 막아준다. 다시 버튼을 눌러 풀면 그대로 수정 가능.
+    if (!d.monthLocks || typeof d.monthLocks !== "object") d.monthLocks = {};
+    // 사용자가 직접 접어둔 열/행 상태(행 그룹, 열 그룹, 개별로 숨긴 날짜·정보열·인원·집계행).
+    // 달(월)마다 날짜 개수·인원 구성이 달라지므로 달 단위("YYYY-MM")로 따로 저장해서,
+    // 그 달을 다시 열면(다른 사람이 열어도) 접어뒀던 그대로 보이게 한다.
+    if (!d.collapseByMonth || typeof d.collapseByMonth !== "object") d.collapseByMonth = {};
+    return d;
+  }
+  // 특정 달의 접기 상태 저장 칸을 가져온다(없으면 빈 상태로 만들어서 돌려준다).
+  function scheduleGetMonthCollapseState(year, monthIndex) {
+    const key = scheduleMonthKey(year, monthIndex);
+    if (!scheduleData.collapseByMonth) scheduleData.collapseByMonth = {};
+    if (!scheduleData.collapseByMonth[key]) {
+      scheduleData.collapseByMonth[key] = {
+        collapsedRowGroups: [], colGroups: [], manualHiddenDays: [],
+        manualHiddenStaffIds: [], manualHiddenInfoCols: [], manualHiddenSummaryRows: [],
+        manualHiddenBatches: [],
+      };
+    }
+    return scheduleData.collapseByMonth[key];
+  }
+  // 되돌리기(undo)로 스냅샷을 복원한 뒤 이 함수를 호출해 scheduleData를 다시 읽어들인다.
+  function reloadScheduleData() {
+    scheduleData = normalizeScheduleData(loadScheduleData());
+    // 되돌리기(undo)나 다른 사람의 원격 변경으로 데이터를 다시 읽어들인 뒤에도,
+    // 지금 보고 있는 달의 접기 상태를 최신 저장값으로 다시 맞춰준다.
+    scheduleSyncUiCollapseFromData();
+  }
+  let scheduleData = normalizeScheduleData(loadScheduleData());
+
+  // "YYYY-MM" 형태의 달 키. 과거 달을 고정(확정)하고 식별하는 데 쓴다.
+  function scheduleMonthKey(year, monthIndex) { return `${year}-${pad2(monthIndex + 1)}`; }
+  function scheduleCurrentMonthKey() { return scheduleMonthKey(today.getFullYear(), today.getMonth()); }
+  // 실제 오늘 날짜 기준으로 이미 지나간 달인지 (이번 달·미래 달이면 false).
+  // 지나간 달의 인원 스냅샷(staffHistory)을 고정할지 판단하는 용도로만 쓰인다.
+  function scheduleIsMonthPast(year, monthIndex) {
+    return scheduleMonthKey(year, monthIndex) < scheduleCurrentMonthKey();
+  }
+  // ----- 월별 "잠금" -----
+  // 달이 지나서 확정되면 자동으로 잠기고, 사용자가 잠금 버튼으로 언제든 다시 풀거나 잠글 수 있다.
+  // monthLocks[key] === true  → 사용자가 강제로 잠가둔 상태
+  // monthLocks[key] === false → 사용자가 강제로 잠금을 풀어둔 상태(지나간 달이라도 수정 가능)
+  // monthLocks[key]가 아예 없으면 → 지나간 달은 기본적으로 잠기고, 이번 달·미래 달은 기본적으로 풀려 있다.
+  // 잠긴 달은 셀 클릭 편집, 일괄 붙여넣기, 일정 삭제, 필요인력 입력이 모두 막힌다.
+  function scheduleIsMonthLocked(year, monthIndex) {
+    const key = scheduleMonthKey(year, monthIndex);
+    if (Object.prototype.hasOwnProperty.call(scheduleData.monthLocks, key)) {
+      return !!scheduleData.monthLocks[key];
+    }
+    return scheduleIsMonthPast(year, monthIndex);
+  }
+  function scheduleToggleMonthLock(year, monthIndex) {
+    const key = scheduleMonthKey(year, monthIndex);
+    scheduleData.monthLocks[key] = !scheduleIsMonthLocked(year, monthIndex);
+    saveScheduleData();
+    renderApp();
+  }
+  // 지금 편집하려는 날짜(dateKey, "YYYY-MM-DD")가 속한 달이 잠겨 있는지 확인.
+  function scheduleIsDateLocked(dateKey) {
+    const parts = (dateKey || "").split("-");
+    if (parts.length < 2) return false;
+    return scheduleIsMonthLocked(Number(parts[0]), Number(parts[1]) - 1);
+  }
+  // 특정 달에 적용할 인원 목록을 반환한다.
+  // - 이미 지나간(확정된) 달은 그 시점에 저장해둔 스냅샷(staffHistory)을 그대로 쓴다.
+  //   스냅샷이 아직 없는 지난 달이라면(=이번에 처음 그 달이 과거가 된 경우) 지금 시점의
+  //   인원 데이터로 스냅샷을 만들어 고정해버린다. 이후로는 "상담사 관리"에서 인원이
+  //   바뀌어도 이 스냅샷은 절대 바뀌지 않는다.
+  // - 이번 달과 미래 달은 "상담사 관리"의 실시간 데이터(scheduleData.staff)를 그대로 쓴다.
+  function getStaffListForMonth(year, monthIndex) {
+    const key = scheduleMonthKey(year, monthIndex);
+    if (scheduleData.staffHistory[key]) return scheduleData.staffHistory[key];
+    if (scheduleIsMonthPast(year, monthIndex)) {
+      scheduleData.staffHistory[key] = JSON.parse(JSON.stringify(scheduleData.staff));
+      saveScheduleData();
+      return scheduleData.staffHistory[key];
+    }
+    return scheduleData.staff;
+  }
+
+  // 월별 스케줄의 인원 목록을 "상담사 관리"의 목록으로 자동 반영한다.
+  // 이름/사번/입사일/근무시간/업무구분(채팅·유선)/조(주간·야간) 모두
+  // 상담사 관리 쪽 값을 그대로 따라간다. 조는 스케줄 화면에서도 바로
+  // 바꿀 수 있는데, 그 경우 "상담사 관리" 쪽 값도 함께 바뀌어 항상 서로 일치한다.
+  function syncScheduleStaffFromAgents() {
+    // 실제 오늘 날짜가 이전에 동기화했던 달을 지나 새 달로 넘어갔다면,
+    // 그 이전 달은 이제 "지나간 달"이므로 지금까지의 실시간 인원 데이터를
+    // 스냅샷으로 고정해서 남겨둔다. (해당 달을 아직 한 번도 안 열어봤어도
+    // 여기서 바로 고정되므로, 나중에 상담사 관리에서 인원이 바뀌어도 안전하다)
+    const currentMonthKey = scheduleCurrentMonthKey();
+    if (scheduleData.lastSyncMonthKey && scheduleData.lastSyncMonthKey !== currentMonthKey) {
+      if (!scheduleData.staffHistory[scheduleData.lastSyncMonthKey]) {
+        scheduleData.staffHistory[scheduleData.lastSyncMonthKey] = JSON.parse(JSON.stringify(scheduleData.staff));
+      }
+    }
+    scheduleData.lastSyncMonthKey = currentMonthKey;
+
+    // 월별 스케줄에는 "근무중" 상태인 인원과, "퇴사" 처리됐어도 아직 퇴사일이
+    // 속한 달까지는(그 달이 지나기 전까지는) 계속 반영한다. 실제 오늘 날짜가
+    // 퇴사일이 속한 달을 완전히 지나야(다음 달이 되어야) 명단에서 빠진다.
+    // (단, 이미 지나간 달에 대한 기록·스냅샷은 그대로 보존된다)
+    scheduleData.staff = agentsData.filter((a) => {
+      if (a.status !== "RESIGNED") return true;
+      if (!a.resignDate) return false;
+      const resignMonthKey = a.resignDate.slice(0, 7); // "YYYY-MM"
+      return resignMonthKey >= currentMonthKey;
+    }).map((a) => ({
+      id: a.id,
+      nickname: a.ldap || a.name,
+      name: a.name,
+      empNo: a.empNo,
+      hireDate: a.hireDate,
+      workHours: a.timezone,
+      group: a.group === "night" ? "night" : "day",
+      types: a.workTypes || [],
+      isAdmin: !!a.isAdmin,
+    }));
+    // 기록(근무/오프/지각 등)을 지울 때는, 지금 "상담사 관리"에 없는 인원이라도
+    // 지나간 달의 스냅샷에 남아있는 인원이면 그 달 기록은 지우지 않는다.
+    // (지나간 달을 고정해두는 의미가 없어지지 않도록)
+    const validIds = {};
+    agentsData.forEach((a) => { validIds[a.id] = true; });
+    Object.keys(scheduleData.staffHistory).forEach((mk) => {
+      (scheduleData.staffHistory[mk] || []).forEach((s) => { validIds[s.id] = true; });
+    });
+    Object.keys(scheduleData.records).forEach((key) => {
+      const staffId = key.split("|")[0];
+      if (!validIds[staffId]) delete scheduleData.records[key];
+    });
+    Object.keys(scheduleData.memos).forEach((key) => {
+      const staffId = key.split("|")[0];
+      if (!validIds[staffId]) delete scheduleData.memos[key];
+    });
+  }
+
+  function saveScheduleData() {
+    try { localStorage.setItem(SCHEDULE_KEY, JSON.stringify(scheduleData)); flashScheduleStatus("저장됨"); }
+    catch (e) { flashScheduleStatus("저장 실패"); }
+  }
+
+  // ----- 퇴사 처리 시 월별 스케줄 자동 반영 -----
+  // "상담사 관리"에서 어떤 인원을 "퇴사"로 바꾸면, 입력한 퇴사일자부터 그 달
+  // 말일까지 월별 스케줄의 해당 인원 칸을 전부 "퇴사"로 자동 채운다. 이미
+  // 손으로 다른 값을 넣어둔 칸이라도 퇴사 처리 시점에는 더는 의미가 없으므로
+  // 덮어쓴다. 자동으로 채워진 칸도 잠금 처리는 하지 않으므로, 필요하면
+  // 관리자가 다른 셀과 똑같이 클릭해서 다시 고칠 수 있다.
+  function applyResignedScheduleFrom(staffId, resignDateStr) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(resignDateStr || "");
+    if (!m) return;
+    const year = Number(m[1]), monthIndex = Number(m[2]) - 1, startDay = Number(m[3]);
+    // 다른 일괄 변경 기능들(붙여넣기/일괄삭제 등)과 마찬가지로, 퇴사일이 속한 달이
+    // 잠겨 있으면(이미 확정된 지난 달 등) 자동 반영하지 않고 알려준다.
+    if (scheduleIsMonthLocked(year, monthIndex)) {
+      flashScheduleStatus("퇴사일이 속한 달이 잠겨 있어 스케줄에 자동 반영되지 않았어요.");
+      return;
+    }
+    // 다른 일괄 변경 기능들처럼 되돌리기(undo) 스택에도 남겨서, 실수로 반영됐을 때
+    // 관리자가 "되돌리기"로 바로 취소할 수 있게 한다.
+    recordUndo("퇴사 처리 자동 반영", SCHEDULE_KEY, reloadScheduleData);
+    const daysInMonth = scheduleDaysInMonth(year, monthIndex);
+    for (let day = startDay; day <= daysInMonth; day++) {
+      const key = scheduleRecordKey(staffId, scheduleDateKey(year, monthIndex, day));
+      scheduleData.records[key] = { status: "RESIGNED", attendance: null };
+    }
+    saveScheduleData();
+  }
+  // 퇴사 처리를 취소(다시 "근무중"으로)하거나 퇴사일자를 다른 날짜로 고칠 때,
+  // 예전 퇴사일자부터 채워뒀던 "퇴사" 칸을 지운다. 그사이 관리자가 개별 셀에서
+  // 손으로 다른 값으로 바꿔둔 칸까지 지우지 않도록, 지금 값이 여전히 "퇴사"인
+  // 칸만 지운다(지우면 기본값인 "근무"로 되돌아간다).
+  function clearResignedScheduleFrom(staffId, resignDateStr) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(resignDateStr || "");
+    if (!m) return;
+    const year = Number(m[1]), monthIndex = Number(m[2]) - 1, startDay = Number(m[3]);
+    const daysInMonth = scheduleDaysInMonth(year, monthIndex);
+    let changed = false;
+    for (let day = startDay; day <= daysInMonth; day++) {
+      const key = scheduleRecordKey(staffId, scheduleDateKey(year, monthIndex, day));
+      if (scheduleData.records[key] && scheduleData.records[key].status === "RESIGNED") changed = true;
+    }
+    if (!changed) return; // 지울 게 없으면 undo 스택도 더럽히지 않는다
+    recordUndo("퇴사 취소로 스케줄 되돌리기", SCHEDULE_KEY, reloadScheduleData);
+    for (let day = startDay; day <= daysInMonth; day++) {
+      const key = scheduleRecordKey(staffId, scheduleDateKey(year, monthIndex, day));
+      if (scheduleData.records[key] && scheduleData.records[key].status === "RESIGNED") {
+        delete scheduleData.records[key];
+      }
+    }
+    saveScheduleData();
+  }
+
+  let scheduleStatusTimer = null;
+  function flashScheduleStatus(msg) {
+    const el = document.getElementById("schedule-status");
+    if (!el) return;
+    el.textContent = msg;
+    clearTimeout(scheduleStatusTimer);
+    scheduleStatusTimer = setTimeout(() => { el.textContent = ""; }, 1200);
+  }
+
+  const scheduleUi = {
+    year: today.getFullYear(),
+    monthIndex: today.getMonth(), // 0-based. 실시간 기준 당월로 시작한다.
+    collapsedRowGroups: new Set(), // 접힌 행 그룹(관리자/주간/야간/채팅/유선 등)의 키 모음
+    colGroups: [], // 사용자가 지정한 열(날짜) 그룹: { id, start, end, collapsed }
+    manualHiddenDays: new Set(), // 열 머리글을 직접 선택해서 접은 날짜(일자 숫자) 모음
+    manualHiddenStaffIds: new Set(), // 인원 이름칸을 직접 선택해서 접은 staffId 모음
+    manualHiddenInfoCols: new Set(), // 직접 선택해서 접은 인원 정보 열(닉네임~결근) 키 모음
+    manualHiddenSummaryRows: new Set(), // 직접 선택해서 접은 집계행(관리자 인원/필요인력/대비 등) 키 모음
+    // 인원 정보 칸·인원·집계행을 "한 번에 여러 개 선택해서 접었을 때" 그 묶음을 기억해두는 목록.
+    // { id, infoCols: [key,...], staffIds: [id,...], summaryRows: [key,...] } 형태.
+    // "숨긴 열/행" 패널에서 같이 접은 항목들을 한 덩어리로 보여주고, 버튼 하나로 한 번에
+    // 펼칠 수 있게 하려는 용도다(날짜는 연속 여부로 자동 판단하므로 여기 포함 안 함).
+    manualHiddenBatches: [],
+    searchQuery: "", // 상담사 검색어. 쉼표(,)로 여러 명을 한 번에 검색할 수 있다.
+  };
+
+  // 지금 보고 있는 달(scheduleUi.year/monthIndex)의 접기 상태를 scheduleData.collapseByMonth에
+  // 그대로 옮겨 담고 saveScheduleData()로 저장한다. saveScheduleData()가 localStorage에
+  // 쓰는 순간 클라우드(Supabase)에도 함께 올라가므로, 접어둔 열/행이 다른 사람 화면에도
+  // 그대로 보이고 새로고침해도 유지된다. 열/행을 접거나 펼치는 모든 동작 뒤에 호출한다.
+  function scheduleSaveCollapseState() {
+    const state = scheduleGetMonthCollapseState(scheduleUi.year, scheduleUi.monthIndex);
+    state.collapsedRowGroups = Array.from(scheduleUi.collapsedRowGroups);
+    state.colGroups = scheduleUi.colGroups.map((g) => ({ ...g }));
+    state.manualHiddenDays = Array.from(scheduleUi.manualHiddenDays);
+    state.manualHiddenStaffIds = Array.from(scheduleUi.manualHiddenStaffIds);
+    state.manualHiddenInfoCols = Array.from(scheduleUi.manualHiddenInfoCols);
+    state.manualHiddenSummaryRows = Array.from(scheduleUi.manualHiddenSummaryRows);
+    state.manualHiddenBatches = scheduleUi.manualHiddenBatches.map((b) => ({ ...b }));
+    saveScheduleData();
+  }
+  // scheduleData.collapseByMonth에 저장돼 있던(=서버에서 불러온) 지금 달의 접기 상태를
+  // 화면이 실제로 쓰는 scheduleUi로 되살린다. 페이지를 처음 열었을 때, 달을 이동했을 때,
+  // 되돌리기(undo)나 다른 사람의 원격 변경으로 scheduleData를 다시 읽어들였을 때 호출한다.
+  function scheduleSyncUiCollapseFromData() {
+    const state = scheduleGetMonthCollapseState(scheduleUi.year, scheduleUi.monthIndex);
+    scheduleUi.collapsedRowGroups = new Set(state.collapsedRowGroups || []);
+    scheduleUi.colGroups = (state.colGroups || []).map((g) => ({ ...g }));
+    scheduleUi.manualHiddenDays = new Set(state.manualHiddenDays || []);
+    scheduleUi.manualHiddenStaffIds = new Set(state.manualHiddenStaffIds || []);
+    scheduleUi.manualHiddenInfoCols = new Set(state.manualHiddenInfoCols || []);
+    scheduleUi.manualHiddenSummaryRows = new Set(state.manualHiddenSummaryRows || []);
+    scheduleUi.manualHiddenBatches = (state.manualHiddenBatches || []).map((b) => ({ ...b }));
+  }
+  // 페이지가 처음 로드될 때, 지금 보고 있는 달(기본은 이번 달)에 저장돼 있던 접기 상태를
+  // 곧바로 불러와둔다.
+  scheduleSyncUiCollapseFromData();
+
+  // ----- 상담사 검색 -----
+  // "상담사 관리"·"면담 관리"와 같은 방식: 이름/닉네임(LDAP)/사번 일부만 입력해도 찾고,
+  // 초성만 입력해도 찾는다("ㅎㄱㅇ" → "홍길동"). "주간"/"야간"/"채팅"/"유선" 키워드를 입력하면
+  // 그 조건에 해당하는 인원이 모두 걸린다. 쉼표(,)로 여러 조건을 구분해서 입력하면
+  // 그 중 하나라도 일치하는 인원을 모두 보여준다(이름+키워드를 섞어도 됨. 예: "홍길동,야간").
+  // 이름/닉네임/사번/초성 외에, "주간"/"야간"/"채팅"/"유선" 근무 형태 키워드로도 검색할 수 있게 한다.
+  const SCHEDULE_SEARCH_KEYWORD_MATCHERS = {
+    "주간": (s) => s.group !== "night",
+    "야간": (s) => s.group === "night",
+    "채팅": (s) => (s.types || []).indexOf("채팅") !== -1,
+    "유선": (s) => (s.types || []).indexOf("유선") !== -1,
+  };
+  function scheduleStaffMatchesSearchTerm(s, needle) {
+    if (!needle) return true;
+    if ((s.name || "").toLowerCase().indexOf(needle) !== -1) return true;
+    if ((s.nickname || "").toLowerCase().indexOf(needle) !== -1) return true;
+    if ((s.empNo || "").toLowerCase().indexOf(needle) !== -1) return true;
+    if (getChosungString(s.name || "").indexOf(needle) !== -1) return true;
+    if (getChosungString(s.nickname || "").indexOf(needle) !== -1) return true;
+    const keywordFn = SCHEDULE_SEARCH_KEYWORD_MATCHERS[needle];
+    if (keywordFn && keywordFn(s)) return true;
+    return false;
+  }
+  function scheduleStaffMatchesSearch(s, query) {
+    const terms = (query || "").split(",").map((t) => t.trim().toLowerCase()).filter(Boolean);
+    if (terms.length === 0) return true;
+    return terms.some((t) => scheduleStaffMatchesSearchTerm(s, t));
+  }
+
+  // ----- 월별 스케줄 표: 행(인원 그룹)·열(날짜) 접기/펼치기 -----
+  // 행 그룹 키는 "필터모드::그룹이름" 형태로 만들어서, 전체보기/주간보기/야간보기 등
+  // 화면마다 접힌 상태가 서로 섞이지 않게 한다.
+  function scheduleRowGroupKey(filterMode, name) { return `${filterMode || "ALL"}::${name}`; }
+  // "숨긴 항목" 패널에서 행 key를 사람이 읽기 좋은 한글로 대충 바꿔서 보여준다.
+  // (완벽히 다듬어진 문구는 아니지만, 어떤 행인지 알아볼 수 있는 정도면 충분하다.)
+  function schedulePrettyRowKey(key) {
+    const map = {
+      ADMIN: "관리자", DAY: "주간", NIGHT: "야간", CHAT: "채팅", VOICE: "유선",
+      ETC: "업무 구분 미지정", DAY_TYPED: "주간", NIGHT_TYPED: "야간", total: "합계", ALL: null,
+    };
+    return key.split(/::|·/).filter(Boolean).map((seg) => (seg in map ? map[seg] : seg)).filter(Boolean).join(" · ") || key;
+  }
+  function scheduleIsRowGroupCollapsed(key) { return scheduleUi.collapsedRowGroups.has(key); }
+  function scheduleToggleRowGroup(key) {
+    if (scheduleUi.collapsedRowGroups.has(key)) scheduleUi.collapsedRowGroups.delete(key);
+    else scheduleUi.collapsedRowGroups.add(key);
+    scheduleSaveCollapseState();
+    renderApp();
+  }
+
+  function scheduleAddColGroup(start, end) {
+    const s = Math.min(start, end), e = Math.max(start, end);
+    scheduleUi.colGroups.push({ id: `cg${Date.now()}${Math.random().toString(36).slice(2, 6)}`, start: s, end: e, collapsed: true });
+    scheduleSaveCollapseState();
+    renderApp();
+  }
+  function scheduleRemoveColGroup(id) {
+    scheduleUi.colGroups = scheduleUi.colGroups.filter((g) => g.id !== id);
+    scheduleSaveCollapseState();
+    renderApp();
+  }
+  function scheduleToggleColGroup(id) {
+    const g = scheduleUi.colGroups.find((g) => g.id === id);
+    if (g) g.collapsed = !g.collapsed;
+    scheduleSaveCollapseState();
+    renderApp();
+  }
+  // "숨긴 열/행" 버튼 옆에 표시할 개수: 열 그룹(접힌 것) + 개별로 숨긴 열·행을 모두 합친다.
+  function scheduleHiddenCount() {
+    const collapsedColGroups = (scheduleUi.colGroups || []).filter((g) => g.collapsed).length;
+    return collapsedColGroups + scheduleUi.manualHiddenDays.size + scheduleUi.manualHiddenInfoCols.size
+      + scheduleUi.manualHiddenStaffIds.size + scheduleUi.manualHiddenSummaryRows.size;
+  }
+  // 이번 달 기준으로, 접혀 있는 열 그룹 + 개별로 접은 날짜들을 합쳐 돌려준다.
+  function scheduleCollapsedDaySet() {
+    const set = new Set(scheduleUi.manualHiddenDays);
+    (scheduleUi.colGroups || []).forEach((g) => {
+      if (!g.collapsed) return;
+      for (let d = g.start; d <= g.end; d++) set.add(d);
+    });
+    return set;
+  }
+
+  // ----- 표에서 열 머리글(날짜)·행 머리글(닉네임 칸)을 직접 클릭해서 선택 → 오른쪽 클릭으로 접기 -----
+  // 열 그룹(범위 지정)이나 행 그룹(관리자/주간/야간 등 미리 정해진 묶음) 접기와는 별개로,
+  // 표를 보다가 필요없는 날짜 몇 개·인원 몇 명만 바로 골라서 접을 수 있게 해준다.
+  // 클릭할 때마다 선택 상태가 토글되고(다시 누르면 선택 해제), 헤더가 아닌 곳을 클릭하면
+  // 선택이 전부 풀린다. 선택된 상태에서 오른쪽 마우스를 누르면 "접기" 메뉴가 뜬다.
+  let scheduleHeaderSelCols = new Set(); // 선택된 열의 key. 날짜 열은 "d:3", 인원정보 열은 "i:empno" 형태
+  let scheduleHeaderSelRows = new Set(); // 선택된 staffId(행)
+  let scheduleHiddenPanelOpen = false; // "숨긴 열/행" 패널(열 그룹 관리 + 접은 열·행을 다시 펼치는 곳) 열림 여부
+
+  function scheduleApplyHeaderSelectionHighlight() {
+    const root = document.getElementById("schedule-table-area");
+    if (!root) return;
+    root.querySelectorAll(".sch-col-th").forEach((th) => {
+      th.classList.toggle("sch-th--selected", scheduleHeaderSelCols.has(th.getAttribute("data-col-key")));
+    });
+    root.querySelectorAll(".sch-row-th").forEach((td) => {
+      td.classList.toggle("sch-th--selected", scheduleHeaderSelRows.has(td.getAttribute("data-row-key")));
+    });
+  }
+  function scheduleClearHeaderSelection() {
+    if (scheduleHeaderSelCols.size === 0 && scheduleHeaderSelRows.size === 0) return;
+    scheduleHeaderSelCols = new Set();
+    scheduleHeaderSelRows = new Set();
+    scheduleApplyHeaderSelectionHighlight();
+  }
+  function scheduleToggleColSelection(colKey) {
+    if (scheduleHeaderSelCols.has(colKey)) scheduleHeaderSelCols.delete(colKey);
+    else scheduleHeaderSelCols.add(colKey);
+    scheduleApplyHeaderSelectionHighlight();
+  }
+  function scheduleToggleRowSelection(rowKey) {
+    if (scheduleHeaderSelRows.has(rowKey)) scheduleHeaderSelRows.delete(rowKey);
+    else scheduleHeaderSelRows.add(rowKey);
+    scheduleApplyHeaderSelectionHighlight();
+  }
+  // 오른쪽 클릭으로 바로 접기 메뉴를 연다. 우클릭한 헤더가 지금 선택 목록에 없으면
+  // (다른 걸 선택해둔 채 엉뚱한 헤더를 우클릭한 경우 등) 그 헤더 하나만 선택한 것으로
+  // 다시 잡아준다. 이미 선택된 헤더를 우클릭하면 지금까지 골라둔 선택을 그대로 유지한다.
+  function scheduleHeaderRightClick(el, e) {
+    e.preventDefault();
+    e.stopPropagation();
+    const isCol = el.classList.contains("sch-col-th");
+    if (isCol) {
+      const colKey = el.getAttribute("data-col-key");
+      if (!scheduleHeaderSelCols.has(colKey)) {
+        scheduleHeaderSelCols = new Set([colKey]);
+        scheduleHeaderSelRows = new Set();
+      }
+    } else {
+      const rowKey = el.getAttribute("data-row-key");
+      if (!scheduleHeaderSelRows.has(rowKey)) {
+        scheduleHeaderSelRows = new Set([rowKey]);
+        scheduleHeaderSelCols = new Set();
+      }
+    }
+    scheduleApplyHeaderSelectionHighlight();
+    openScheduleHideMenu(e);
+  }
+  // 선택된 열·행을 실제로 접는다(=목록에 추가). 데이터 자체는 그대로 두고 화면에서만 숨긴다.
+  // 행 key는 인원이면 "s:staffId", 집계행(관리자 인원/필요인력/대비 등)이면 "r:행고유키" 형태.
+  function scheduleCollapseHeaderSelection() {
+    const n = scheduleHeaderSelCols.size + scheduleHeaderSelRows.size;
+    const batchInfoCols = [];
+    const batchStaffIds = [];
+    const batchSummaryRows = [];
+    scheduleHeaderSelCols.forEach((k) => {
+      if (k.startsWith("d:")) scheduleUi.manualHiddenDays.add(Number(k.slice(2)));
+      else if (k.startsWith("i:")) { const key = k.slice(2); scheduleUi.manualHiddenInfoCols.add(key); batchInfoCols.push(key); }
+    });
+    scheduleHeaderSelRows.forEach((k) => {
+      if (k.startsWith("s:")) { const id = k.slice(2); scheduleUi.manualHiddenStaffIds.add(id); batchStaffIds.push(id); }
+      else if (k.startsWith("r:")) { const key = k.slice(2); scheduleUi.manualHiddenSummaryRows.add(key); batchSummaryRows.push(key); }
+    });
+    // 날짜 외에(정보 칸·인원·집계행 중 하나라도) 같이 접은 게 있으면, "숨긴 열/행" 패널에서
+    // 한 덩어리로 묶어서 보여주고 한 번에 펼칠 수 있도록 이번에 접은 조합을 기록해둔다.
+    if (batchInfoCols.length || batchStaffIds.length || batchSummaryRows.length) {
+      scheduleUi.manualHiddenBatches.push({
+        id: `hb${Date.now()}${Math.random().toString(36).slice(2, 6)}`,
+        infoCols: batchInfoCols, staffIds: batchStaffIds, summaryRows: batchSummaryRows,
+      });
+    }
+    scheduleHeaderSelCols = new Set();
+    scheduleHeaderSelRows = new Set();
+    closeScheduleMenu();
+    scheduleSaveCollapseState();
+    renderApp();
+    flashScheduleStatus(`${n}개 접었어요.`);
+  }
+  // 배치(한 번에 같이 접은 정보 칸·인원·집계행 묶음)를 한 번에 펼친다.
+  function scheduleUnhideBatch(batchId) {
+    const batch = scheduleUi.manualHiddenBatches.find((b) => b.id === batchId);
+    if (!batch) return;
+    (batch.infoCols || []).forEach((key) => scheduleUi.manualHiddenInfoCols.delete(key));
+    (batch.staffIds || []).forEach((id) => scheduleUi.manualHiddenStaffIds.delete(id));
+    (batch.summaryRows || []).forEach((key) => scheduleUi.manualHiddenSummaryRows.delete(key));
+    scheduleUi.manualHiddenBatches = scheduleUi.manualHiddenBatches.filter((b) => b.id !== batchId);
+    scheduleSaveCollapseState();
+    renderApp();
+  }
+  // 배치 목록에서, 이미 다른 경로로 펼쳐졌거나(개별 펼치기) 지워진 항목은 걸러내고
+  // 실제로 아직 숨겨져 있는 항목만 남긴 배치를 돌려준다. 빈 배치는 통째로 제외한다.
+  function scheduleEffectiveHiddenBatches() {
+    return scheduleUi.manualHiddenBatches
+      .map((b) => ({
+        id: b.id,
+        infoCols: (b.infoCols || []).filter((key) => scheduleUi.manualHiddenInfoCols.has(key)),
+        staffIds: (b.staffIds || []).filter((id) => scheduleUi.manualHiddenStaffIds.has(id)),
+        summaryRows: (b.summaryRows || []).filter((key) => scheduleUi.manualHiddenSummaryRows.has(key)),
+      }))
+      .filter((b) => b.infoCols.length + b.staffIds.length + b.summaryRows.length > 1); // 1개짜리는 기존 개별 칩으로 표시
+  }
+  function openScheduleHideMenu(e) {
+    closeScheduleMenu();
+    const menu = document.createElement("div");
+    menu.id = "sch-menu";
+    menu.className = "sch-menu";
+    const labelParts = [];
+    if (scheduleHeaderSelCols.size > 0) labelParts.push(`열 ${scheduleHeaderSelCols.size}개`);
+    if (scheduleHeaderSelRows.size > 0) labelParts.push(`행 ${scheduleHeaderSelRows.size}개`);
+    menu.innerHTML = `<div class="sch-menu-title">${labelParts.join(" · ")} 선택됨</div>` +
+      `<button type="button" data-collapse-header-sel="1">접기</button>` +
+      `<button type="button" class="sch-menu-reset" data-clear-header-sel="1">선택 해제</button>`;
+    document.body.appendChild(menu);
+    const clientX = e ? e.clientX : window.innerWidth / 2;
+    const clientY = e ? e.clientY : window.innerHeight / 2;
+    const top = Math.min(clientY + 4, window.innerHeight - menu.offsetHeight - 8);
+    const left = Math.min(clientX, window.innerWidth - menu.offsetWidth - 8);
+    menu.style.top = `${Math.max(8, top)}px`;
+    menu.style.left = `${Math.max(8, left)}px`;
+    menu.querySelector("[data-collapse-header-sel]").onclick = () => scheduleCollapseHeaderSelection();
+    const clearBtn = menu.querySelector("[data-clear-header-sel]");
+    clearBtn.onclick = () => { closeScheduleMenu(); scheduleClearHeaderSelection(); };
+    setTimeout(() => document.addEventListener("mousedown", scheduleMenuOutsideHandler, true), 0);
+  }
+  // 개별로 접어둔 날짜/인원정보열/인원/집계행을 다시 펼친다.
+  // 연속된 날짜 구간(start~end)을 한 번에 펼친다. "숨긴 열/행" 패널에서 여러 날짜를
+  // 한 번에 접었을 때 하나로 묶여 보이는 범위 칩의 "펼치기" 버튼에서 쓰인다.
+  function scheduleUnhideDayRange(start, end) {
+    for (let d = start; d <= end; d++) scheduleUi.manualHiddenDays.delete(d);
+    scheduleSaveCollapseState();
+    renderApp();
+  }
+  // 접혀 있는 날짜들을 정렬한 뒤, 연속된(바로 다음날) 구간끼리 묶어서
+  // [{start, end}, ...] 형태로 돌려준다. 예: [11,12,13,15] → [{11,13},{15,15}]
+  // 여러 날짜를 한 번에 선택해서 접으면 "09/11~09/13" 처럼 범위 하나로 보여주고,
+  // 그 범위를 한 번에 펼칠 수 있게 하기 위함이다.
+  function scheduleGroupConsecutiveDays(days) {
+    const sorted = Array.from(days).sort((a, b) => a - b);
+    const ranges = [];
+    for (const d of sorted) {
+      const last = ranges[ranges.length - 1];
+      if (last && d === last.end + 1) last.end = d;
+      else ranges.push({ start: d, end: d });
+    }
+    return ranges;
+  }
+  function scheduleUnhideInfoCol(key) {
+    scheduleUi.manualHiddenInfoCols.delete(key);
+    scheduleSaveCollapseState();
+    renderApp();
+  }
+  function scheduleUnhideSummaryRow(key) {
+    scheduleUi.manualHiddenSummaryRows.delete(key);
+    scheduleSaveCollapseState();
+    renderApp();
+  }
+  function scheduleUnhideStaff(staffId) {
+    scheduleUi.manualHiddenStaffIds.delete(staffId);
+    scheduleSaveCollapseState();
+    renderApp();
+  }
+  function scheduleUnhideAll() {
+    scheduleUi.manualHiddenDays = new Set();
+    scheduleUi.manualHiddenInfoCols = new Set();
+    scheduleUi.manualHiddenStaffIds = new Set();
+    scheduleUi.manualHiddenSummaryRows = new Set();
+    scheduleUi.manualHiddenBatches = [];
+    scheduleUi.collapsedRowGroups = new Set();
+    scheduleUi.colGroups = [];
+    scheduleSaveCollapseState();
+    renderApp();
+  }
+
+  // ----- 월별 스케줄 일괄 붙여넣기 -----
+  // "이름 [공백] 1일값 [공백] 2일값 ... [공백] 말일값" 형태의 한 줄짜리 텍스트를
+  // (엑셀 등에서 복사해온) 여러 줄 붙여넣으면, 이름으로 인원을 찾아 그 달 1일부터
+  // 순서대로 각 칸의 상태를 반영해준다. 공백(스페이스·탭 모두)이 나올 때마다
+  // 다음 날짜로 넘어간다고 보고 값을 나눈다.
+  let scheduleBulkPasteOpen = false;
+  let scheduleBulkPasteMsg = "";
+
+  // 붙여넣기 텍스트에 쓰인 표현을 내부 상태값으로 변환한다. 인식하지 못하는
+  // 값은 null을 반환해서 결과 메시지에 "인식 못한 값"으로 알려준다.
+  function scheduleTokenToRecord(tokRaw) {
+    const tok = (tokRaw || "").trim();
+    if (tok === "1" || tok === "근무" || tok === "출근") return { status: "WORK", attendance: null };
+    if (tok === "휴일" || tok === "오프" || tok === "휴무" || tok === "휴") return { status: "OFF", attendance: null };
+    if (tok === "연차") return { status: "ANNUAL", attendance: null };
+    if (tok === "대휴") return { status: "DAEHYU", attendance: null };
+    if (tok === "반차") return { status: "HALF", attendance: null };
+    if (tok === "공휴") return { status: "GONGHYU", attendance: null };
+    if (tok === "공가") return { status: "GONGGA", attendance: null };
+    if (tok === "육휴" || tok === "육아휴직") return { status: "MATERNITY", attendance: null };
+    if (tok === "특휴" || tok === "특별휴가") return { status: "SPECIAL", attendance: null };
+    if (tok === "교육") return { status: "EDUCATION", attendance: null };
+    if (tok === "지각") return { status: "WORK", attendance: "LATE" };
+    if (tok === "결근") return { status: "WORK", attendance: "ABSENT" };
+    if (tok === "퇴사") return { status: "RESIGNED", attendance: null };
+    return null;
+  }
+
+  function applyScheduleBulkPaste(text) {
+    const { year, monthIndex } = scheduleUi;
+    if (scheduleIsMonthLocked(year, monthIndex)) {
+      scheduleBulkPasteMsg = "이 달은 잠겨 있어요. 잠금을 해제한 뒤 붙여넣어주세요.";
+      return;
+    }
+    const numDays = scheduleDaysInMonth(year, monthIndex);
+    const monthStaff = getStaffListForMonth(year, monthIndex);
+    const lines = (text || "").split(/\r?\n/).map((l) => l.trim()).filter((l) => l.length > 0);
+
+    if (lines.length === 0) {
+      scheduleBulkPasteMsg = "붙여넣은 내용이 없어요.";
+      return;
+    }
+
+    recordUndo("스케줄 일괄 붙여넣기", SCHEDULE_KEY, reloadScheduleData);
+    let matchedLines = 0;
+    let filledCells = 0;
+    const unmatchedNames = [];
+    const unknownTokens = [];
+
+    lines.forEach((line) => {
+      const parts = line.split(/\s+/).filter((p) => p.length > 0);
+      if (parts.length < 2) return;
+      const name = parts[0];
+      const tokens = parts.slice(1);
+      const staff = monthStaff.find((s) => s.name === name) || monthStaff.find((s) => s.nickname === name);
+      if (!staff) { unmatchedNames.push(name); return; }
+      matchedLines += 1;
+      const dayCount = Math.min(numDays, tokens.length);
+      for (let i = 0; i < dayCount; i++) {
+        const day = i + 1;
+        const mapped = scheduleTokenToRecord(tokens[i]);
+        if (!mapped) { unknownTokens.push(`${name} ${day}일 "${tokens[i]}"`); continue; }
+        const dateKey = scheduleDateKey(year, monthIndex, day);
+        const key = scheduleRecordKey(staff.id, dateKey);
+        if (mapped.status === "WORK" && !mapped.attendance) {
+          delete scheduleData.records[key];
+        } else {
+          scheduleData.records[key] = { status: mapped.status, attendance: mapped.attendance || null };
+        }
+        filledCells += 1;
+      }
+    });
+
+    saveScheduleData();
+
+    const msgParts = [`${matchedLines}명 반영 완료 (총 ${filledCells}칸).`];
+    if (unmatchedNames.length > 0) msgParts.push(`이름을 찾지 못함: ${unmatchedNames.join(", ")}`);
+    if (unknownTokens.length > 0) msgParts.push(`인식 못한 값: ${unknownTokens.join(", ")}`);
+    scheduleBulkPasteMsg = msgParts.join("\n");
+  }
+
+  const SCHEDULE_STATUS_META = {
+    WORK: { label: "1", cls: "st-work" },
+    OFF: { label: "오프", cls: "st-off" },
+    ANNUAL: { label: "연차", cls: "st-annual" },
+    DAEHYU: { label: "대휴", cls: "st-daehyu" },
+    HALF: { label: "반차", cls: "st-half" },
+    GONGHYU: { label: "공휴", cls: "st-gonghyu" },
+    GONGGA: { label: "공가", cls: "st-gongga" },
+    MATERNITY: { label: "육휴", cls: "st-maternity" },
+    SPECIAL: { label: "특휴", cls: "st-special" },
+    EDUCATION: { label: "교육", cls: "st-education" },
+    RESIGNED: { label: "퇴사", cls: "st-resigned" },
+  };
+
+  // 표 왼쪽에 고정된(스크롤해도 안 움직이는) 인원 정보 열들. 순서·너비는 CSS(.sch-col-*)와
+  // 반드시 맞춰야 한다 — 개별 열을 접었을 때 나머지 고정 열들의 위치(left)를 여기 너비값으로
+  // 다시 계산해서 밀어주기 때문. summaryOnly는 이미지 캡처(hideSummaryCols=true)에서는
+  // 아예 마크업에서 빠지는 근무~결근 집계 열 5개를 표시한다.
+  const SCHEDULE_INFO_COLS = [
+    { key: "nickname", label: "닉네임", width: 92 },
+    { key: "name", label: "이름", width: 60 },
+    { key: "empno", label: "사번", width: 84 },
+    { key: "hiredate", label: "입사일자", width: 92 },
+    { key: "workhours", label: "근무시간", width: 92 },
+    { key: "work", label: "근무", width: 48, summaryOnly: true },
+    { key: "off", label: "오프", width: 48, summaryOnly: true },
+    { key: "annual", label: "연차", width: 48, summaryOnly: true },
+    { key: "daehyu", label: "대휴", width: 48, summaryOnly: true },
+    { key: "absent", label: "결근", width: 48, summaryOnly: true },
+  ];
+  // 지금 화면(hideSummaryCols=false 기준)에서, 접히지 않은 고정 열들이 각각 왼쪽에서
+  // 몇 px 위치에 붙어야 하는지 계산한다. 접힌 열은 폭이 0이 되므로 뒤 열들이 그만큼 당겨진다.
+  function scheduleInfoColLeftOffsets() {
+    let offset = 0;
+    const lefts = {};
+    let lastVisibleKey = null;
+    SCHEDULE_INFO_COLS.forEach((c) => {
+      if (scheduleUi.manualHiddenInfoCols.has(c.key)) { lefts[c.key] = null; return; }
+      lefts[c.key] = offset;
+      offset += c.width;
+      lastVisibleKey = c.key;
+    });
+    return { lefts, lastVisibleKey };
+  }
+
+  function scheduleDaysInMonth(year, monthIndex) { return new Date(year, monthIndex + 1, 0).getDate(); }
+  function scheduleDateKey(year, monthIndex, day) { return `${year}-${pad2(monthIndex + 1)}-${pad2(day)}`; }
+  function scheduleRecordKey(staffId, dateKey) { return `${staffId}|${dateKey}`; }
+  // ----- 주간/야간 · 채팅/유선 "필요인력" (사용자가 직접 입력하는 값) -----
+  // 그룹(DAY/NIGHT) · 업무구분(채팅/유선) · 날짜별로 하나씩 숫자를 저장한다.
+  // 값을 입력하지 않은 날짜는 null로 취급해서 "대비"·"인력 대비 편성"을 비워둔다.
+  function scheduleRequiredKey(year, monthIndex, group, type, day) {
+    return `${scheduleMonthKey(year, monthIndex)}|${group}|${type}|${day}`;
+  }
+  function getRequiredHeadcount(year, monthIndex, group, type, day) {
+    const v = scheduleData.requiredHeadcount[scheduleRequiredKey(year, monthIndex, group, type, day)];
+    return (typeof v === "number" && !isNaN(v)) ? v : null;
+  }
+  function setRequiredHeadcount(year, monthIndex, group, type, day, rawValue) {
+    if (scheduleIsMonthLocked(year, monthIndex)) { flashScheduleStatus("잠긴 달이에요. 잠금을 해제한 뒤 수정해주세요."); return; }
+    const key = scheduleRequiredKey(year, monthIndex, group, type, day);
+    const trimmed = (rawValue || "").toString().trim();
+    if (trimmed === "") {
+      delete scheduleData.requiredHeadcount[key];
+    } else {
+      const n = Number(trimmed);
+      if (isNaN(n)) return;
+      scheduleData.requiredHeadcount[key] = n;
+    }
+    saveScheduleData();
+  }
+  // 특정 날짜에 실제로 투입(출근)된 인원 수. summaryRowHtml과 같은 집계 기준을 쓴다.
+  function scheduleActualCount(staffList, type, dateKey) {
+    return staffList.filter((s) => (!type || (s.types || []).indexOf(type) !== -1) && scheduleCountsAsWorked(getScheduleRecord(s.id, dateKey))).length;
+  }
+  function getScheduleRecord(staffId, dateKey) {
+    return scheduleData.records[scheduleRecordKey(staffId, dateKey)] || { status: "WORK", attendance: null };
+  }
+  function setScheduleRecord(staffId, dateKey, patch) {
+    if (scheduleIsDateLocked(dateKey)) { flashScheduleStatus("잠긴 달이에요. 잠금을 해제한 뒤 수정해주세요."); return; }
+    recordUndo("스케줄 셀 변경", SCHEDULE_KEY, reloadScheduleData);
+    const key = scheduleRecordKey(staffId, dateKey);
+    const cur = scheduleData.records[key] || { status: "WORK", attendance: null };
+    const next = Object.assign({}, cur, patch);
+    if (next.status === "WORK" && !next.attendance) {
+      delete scheduleData.records[key]; // 기본값이면 굳이 저장하지 않음
+    } else {
+      scheduleData.records[key] = next;
+    }
+    saveScheduleData();
+  }
+  // ----- 셀 메모 (엑셀의 "메모/노트"처럼, 스케줄 상태와 별개로 짧은 텍스트를 남긴다) -----
+  function getScheduleMemo(staffId, dateKey) {
+    return scheduleData.memos[scheduleRecordKey(staffId, dateKey)] || "";
+  }
+  function setScheduleMemo(staffId, dateKey, text) {
+    if (scheduleIsDateLocked(dateKey)) { flashScheduleStatus("잠긴 달이에요. 잠금을 해제한 뒤 수정해주세요."); return; }
+    const key = scheduleRecordKey(staffId, dateKey);
+    const trimmed = (text || "").trim();
+    if (trimmed === "") {
+      delete scheduleData.memos[key];
+    } else {
+      scheduleData.memos[key] = trimmed;
+    }
+    saveScheduleData();
+  }
+  // ----- 메모 문구 기반 "가감점 취합" -----
+  // 메모 안에 아래 문구들이 포함되어 있으면 해당 날짜를 카테고리별로 모아서 보여준다.
+  // 표기가 다양해도(공백 유무 등) 같은 카테고리로 합쳐지도록 정리해뒀다.
+  // "역동석"이 "동석"의 부분 문자열이라, 역동석을 먼저 확인하고 그 부분을 제거한 뒤에
+  // 동석을 검사해서 한 메모가 "역동석"과 "동석" 두 개로 중복 집계되지 않게 한다.
+  const SCHEDULE_ADJUST_CATEGORIES = [
+    { label: "선 투입", patterns: ["선투입", "선 투입"] },
+    { label: "연장 근무", patterns: ["연장근무", "연장 근무", "연장"] },
+    { label: "초과", patterns: ["초과"] },
+    { label: "라운딩", patterns: ["라운딩"] },
+    { label: "역동석", patterns: ["역동석", "역 동석"] },
+    { label: "동석", patterns: ["동석"] },
+  ];
+  // 한 메모(셀) 안에 여러 문구가 섞여 있어도(예: "선투입 후 연장근무"), 그중 텍스트상
+  // 가장 앞에 나오는 문구 하나만 대표로 가져온다. 같은 위치에서 시작하는 경우
+  // (예: "역동석" 안의 "동석") 더 긴/구체적인 문구가 우선하도록 한다.
+  // 한 메모(셀) 안에 문구가 하나뿐이면 그걸 그대로 쓰고, 두 개 이상 섞여 있으면
+  // (예: "선투입 후 연장근무") 어떤 조합이 섞여 있는지만 알려준다.
+  // "역동석"이 "동석"의 부분 문자열이라, 역동석을 먼저 확인하고 그 부분을 제거한 뒤에
+  // 동석을 검사해서 한 메모가 "역동석"과 "동석" 두 개로 중복 집계되지 않게 한다.
+  // 반환값은 항상 SCHEDULE_ADJUST_CATEGORIES에 정의된 순서를 따른다(텍스트상 등장 순서가 아님).
+  // → 같은 조합(예: "선 투입"+"연장 근무")이 여러 번 나와도 항상 같은 순서로 후보가 정해지고,
+  //    그 순서를 기준으로 번갈아 뽑을 수 있게 하기 위함.
+  function scheduleDetectMemoCategories(memoText) {
+    let working = memoText || "";
+    if (!working) return [];
+    const found = [];
+    SCHEDULE_ADJUST_CATEGORIES.forEach((cat) => {
+      const hit = cat.patterns.some((p) => working.indexOf(p) !== -1);
+      if (!hit) return;
+      found.push(cat.label);
+      cat.patterns.forEach((p) => { working = working.split(p).join(""); });
+    });
+    return found;
+  }
+  // 지금 화면에 보이는 달(scheduleUi.year/monthIndex) 기준으로, 메모에 위 문구가 포함된
+  // 날짜를 상담사별로 모아서 [{ id, name, nickname, entries: [{ day, label }] }, ...] 형태로 돌려준다.
+  // entries는 날짜순으로 정렬되고, 상담사는 이름 가나다순으로 정렬된다.
+  // 한 메모에 문구가 두 개 이상 섞여 있는 "애매한" 경우엔 그중 하나만 골라야 하는데,
+  // 이때 같은 상담사에게 같은 조합(예: "선 투입"+"연장 근무")이 여러 번 나오면
+  // 매번 같은 것만 뽑지 않고 날짜 순서대로 번갈아가며 뽑는다.
+  // (예: 8/12에 선투입+연장근무 → 선 투입, 8/14에 또 선투입+연장근무 → 연장 근무, 8/20에 또 나오면 → 다시 선 투입 ...)
+  function scheduleBuildAdjustSummary(year, monthIndex) {
+    const monthPrefix = `${year}-${pad2(monthIndex + 1)}-`;
+    const staffList = getStaffListForMonth(year, monthIndex);
+    const byStaff = {};
+    Object.keys(scheduleData.memos).forEach((key) => {
+      const sep = key.lastIndexOf("|");
+      if (sep === -1) return;
+      const staffId = key.slice(0, sep);
+      const dateKey = key.slice(sep + 1);
+      if (dateKey.indexOf(monthPrefix) !== 0) return;
+      const day = parseInt(dateKey.slice(monthPrefix.length), 10);
+      if (!day) return;
+      const categories = scheduleDetectMemoCategories(scheduleData.memos[key]);
+      if (!categories.length) return;
+      if (!byStaff[staffId]) byStaff[staffId] = [];
+      byStaff[staffId].push({ day, categories });
+    });
+    const result = Object.keys(byStaff).map((staffId) => {
+      const staff = staffList.find((s) => s.id === staffId) || scheduleData.staff.find((s) => s.id === staffId);
+      const raw = byStaff[staffId].sort((a, b) => a.day - b.day);
+      const comboCounters = {}; // 같은 조합이 반복될 때 번갈아 뽑기 위한 카운터
+      const entries = raw.map((item) => {
+        let label;
+        if (item.categories.length === 1) {
+          label = item.categories[0];
+        } else {
+          const comboKey = item.categories.join("+");
+          const idx = comboCounters[comboKey] || 0;
+          label = item.categories[idx % item.categories.length];
+          comboCounters[comboKey] = idx + 1;
+        }
+        return { day: item.day, label };
+      });
+      return {
+        id: staffId,
+        name: staff ? staff.name : "(삭제된 인원)",
+        nickname: staff ? staff.nickname : "",
+        entries,
+      };
+    });
+    result.sort((a, b) => a.name.localeCompare(b.name, "ko"));
+    return result;
+  }
+
+  function scheduleCellDisplay(record) {
+    if (record.status === "WORK" && record.attendance === "LATE") return { label: "지각", cls: "st-late" };
+    if (record.status === "WORK" && record.attendance === "ABSENT") return { label: "결근", cls: "st-absent" };
+    const meta = SCHEDULE_STATUS_META[record.status] || SCHEDULE_STATUS_META.WORK;
+    return meta;
+  }
+  function scheduleCountsAsWorked(record) {
+    return record.status === "WORK" && record.attendance !== "ABSENT";
+  }
+
+  // 이번 달 근무/오프/연차/대휴/결근 일수를 인원별로 집계.
+  // "오프" 합계는 스케줄상 오프뿐 아니라 대휴·공휴·육휴·특휴까지 모두 포함해서 셈한다.
+  // (대휴는 별도 열에도 단독으로 계속 표시되므로 DAEHYU 값 자체는 그대로 둔다)
+  function scheduleStaffMonthCounts(staffId, year, monthIndex) {
+    const numDays = scheduleDaysInMonth(year, monthIndex);
+    const counts = { WORK: 0, OFF: 0, ANNUAL: 0, DAEHYU: 0, ABSENT: 0 };
+    // "오프" 합계에 함께 포함시킬 휴무성 상태 목록 (대휴는 아래에서 DAEHYU로 별도 집계도 함께 함)
+    const OFF_GROUP_STATUSES = ["OFF", "DAEHYU", "GONGHYU", "MATERNITY", "SPECIAL"];
+    for (let d = 1; d <= numDays; d++) {
+      const dateKey = scheduleDateKey(year, monthIndex, d);
+      const record = getScheduleRecord(staffId, dateKey);
+      if (record.status === "WORK" && record.attendance === "ABSENT") counts.ABSENT += 1;
+      else if (record.status === "WORK") counts.WORK += 1;
+      else if (record.status === "ANNUAL") counts.ANNUAL += 1;
+      else if (record.status === "DAEHYU") counts.DAEHYU += 1;
+      if (OFF_GROUP_STATUSES.indexOf(record.status) !== -1) counts.OFF += 1;
+    }
+    return counts;
+  }
+
+  // 조(주간/야간)는 "상담사 관리"에 등록된 값이 기본으로 반영되지만,
+  // 이 스케줄 화면에서도 바로 전환할 수 있다. 이때는 "상담사 관리" 쪽
+  // 데이터도 함께 바꿔서 두 화면이 항상 같은 값을 보여주도록 한다.
+  // 이름/사번/입사일 등 나머지 정보는 "상담사 관리"에서 수정하면 자동으로 반영된다.
+  function scheduleMonthLabel() { return `${scheduleUi.year}년 ${scheduleUi.monthIndex + 1}월`; }
+  function scheduleShiftMonth(delta) {
+    let m = scheduleUi.monthIndex + delta;
+    let y = scheduleUi.year;
+    while (m < 0) { m += 12; y -= 1; }
+    while (m > 11) { m -= 12; y += 1; }
+    scheduleUi.monthIndex = m;
+    scheduleUi.year = y;
+    // 달이 바뀌면 지금 선택 중이던 헤더는 의미가 없어지므로 선택 상태만 초기화하고,
+    // 접기 상태는 새로 보는 달에 맞춰 서버에 저장돼 있던 값(scheduleData.collapseByMonth)을
+    // 그대로 불러와서 유지한다 — 그래야 이전에 이 달을 접어뒀다면(나든 다른 사람이든)
+    // 다시 열었을 때도 그 모습 그대로 보인다.
+    scheduleHeaderSelCols = new Set();
+    scheduleHeaderSelRows = new Set();
+    scheduleSyncUiCollapseFromData();
+    renderApp();
+  }
+
+  // 채팅 담당자를 먼저, 유선만 담당하는 인원을 그다음에 배치하기 위한 순위.
+  // (채팅+유선을 함께 하는 인원은 채팅 쪽에 먼저 표시)
+  function scheduleTypeRank(s) {
+    const types = s.types || [];
+    if (types.indexOf("채팅") !== -1) return 0;
+    if (types.indexOf("유선") !== -1) return 1;
+    return 2;
+  }
+  // 근무시간(예: "09:00-18:00")에서 시작 시각을 분 단위로 추출한다.
+  // 시간 형식을 찾을 수 없으면 맨 뒤로 보내기 위해 아주 큰 값을 반환한다.
+  function scheduleStartMinutes(s) {
+    const wh = s.workHours || "";
+    const m = wh.match(/(\d{1,2}):(\d{2})/);
+    if (!m) return Infinity;
+    return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+  }
+  // 업무 구분(채팅/유선) 순으로 정렬하고, 같은 구분 안에서는 근무시간(시작 시각) 순으로,
+  // 시간이 같거나 없으면 기존 등록 순서를 유지한다.
+  function sortStaffByType(list) {
+    return list
+      .map((s, idx) => ({ s, idx }))
+      .sort((a, b) => {
+        const r = scheduleTypeRank(a.s) - scheduleTypeRank(b.s);
+        if (r !== 0) return r;
+        const t = scheduleStartMinutes(a.s) - scheduleStartMinutes(b.s);
+        return t !== 0 ? t : a.idx - b.idx;
+      })
+      .map((x) => x.s);
+  }
+  function splitByType(list) {
+    return {
+      chat: list.filter((s) => scheduleTypeRank(s) === 0),
+      voice: list.filter((s) => scheduleTypeRank(s) === 1),
+      etc: list.filter((s) => scheduleTypeRank(s) === 2),
+    };
+  }
+
+  // filterMode: 인자를 안 주면(undefined) 지금까지와 같은 "전체" 표(관리자+주간+야간)를 그린다.
+  // "DAY"/"NIGHT"를 주면 그 조만, "VOICE"/"CHAT"을 주면 주야간을 통합하되 표 안에서는
+  // 주간/야간 구획을 나눠서 보여준다. (월별 스케줄 캡처의 "주간 저장"·"야간 저장"·
+  // "유선 저장"·"채팅 저장" 기능에서 사용)
+  // hideRequiredRows: true면 "필요인력"/"대비"/"인력 대비 편성" 3행 묶음(입력칸 포함)을 아예 빼고 그린다.
+  // (이미지로 저장할 때 켜서 씀. 이 행에는 <input>이 들어있어 캡처 대상에서 빼는 게 더 안전하고,
+  //  캡처 이미지 안에 사용자가 직접 편집하는 입력용 요소가 노출되지 않게 한다.)
+  function buildScheduleTableHtml(filterMode, hideSummaryCols, hideRequiredRows, hideMemoMarks) {
+    const { year, monthIndex } = scheduleUi;
+    const numDays = scheduleDaysInMonth(year, monthIndex);
+    const days = [];
+    for (let d = 1; d <= numDays; d++) days.push(d);
+    // 상담사 검색 중(캡처용 표는 제외)이면 그룹 제목 행·소제목 행·집계행(관리자 인원/필요인력/대비/
+    // 인력 대비 편성/총 인원 등)을 전부 숨기고, 검색어와 일치하는 인원 행만 보이게 한다.
+    const searchActive = !hideSummaryCols && !!(scheduleUi.searchQuery && scheduleUi.searchQuery.trim());
+    const collapsedDays = scheduleCollapsedDaySet();
+    const colHiddenCls = (d) => (collapsedDays.has(d) ? " sch-col-hidden" : "");
+    // 이미지로 저장할 때는 근무~결근 집계 열 5개를 표에서 아예 빼고 그린다.
+    // 화면(hideSummaryCols가 false)에서 개별로 접은 인원정보 열(사번 등)도 같은 이유로
+    // "안 보이게" CSS로 숨기는 대신 마크업 자체에서 통째로 빼버린다 — "관리자 인원" 같은
+    // 요약행들이 인원정보 영역 전체를 colspan 하나로 합친 칸을 쓰는데, 이 표에서는
+    // CSS로 열을 숨기는 방식으로는 그 colspan 너비 계산이 정확히 안 맞아서(브라우저가
+    // 숨긴 셀만큼 너비를 못 줄여줌) 표가 밀려 보인다. 아예 셀 자체를 안 만들면 이 문제가 없다.
+    const infoColCount = hideSummaryCols
+      ? 5
+      : SCHEDULE_INFO_COLS.filter((c) => !scheduleUi.manualHiddenInfoCols.has(c.key)).length;
+    const { lefts: infoColLefts, lastVisibleKey: infoColLastVisible } = scheduleInfoColLeftOffsets();
+
+    const monthStaff = getStaffListForMonth(year, monthIndex);
+    const adminStaff = monthStaff.filter((s) => s.isAdmin);
+    const dayStaff = sortStaffByType(monthStaff.filter((s) => s.group !== "night" && !s.isAdmin));
+    const nightStaff = sortStaffByType(monthStaff.filter((s) => s.group === "night" && !s.isAdmin));
+    // 인원 정보 열(닉네임~결근) 하나를 그려주는 헬퍼. asTh=true면 헤더 셀(선택 가능),
+    // false면 각 인원 행의 값 칸(행 선택 가능)을 만든다. 개별로 접어둔 열은 아예 마크업에서
+    // 빼버린다(위 infoColCount 주석 참고) — 그래야 요약행들의 colspan 너비도 같이 맞는다.
+    function infoColHtml(colDef, asTh, valueHtml, extraCls, staffId) {
+      if (hideSummaryCols) {
+        // 캡처용 마크업: 개별 열 숨김을 적용하지 않고 항상 그대로 그린다.
+        if (colDef.summaryOnly) return "";
+        const tag = asTh ? "th" : "td";
+        return `<${tag} class="sch-info sch-col-${colDef.key}${extraCls ? ` ${extraCls}` : ""}">${asTh ? colDef.label : valueHtml}</${tag}>`;
+      }
+      if (scheduleUi.manualHiddenInfoCols.has(colDef.key)) return "";
+      const tag = asTh ? "th" : "td";
+      const stickyEndCls = colDef.key === infoColLastVisible ? " sch-sticky-end" : "";
+      const leftStyle = ` style="left:${infoColLefts[colDef.key]}px"`;
+      const selCls = asTh ? " sch-col-th" : " sch-row-th";
+      const dataAttrs = asTh
+        ? ` data-col-key="i:${colDef.key}" title="클릭해서 선택, 선택 후 오른쪽 클릭으로 접기"`
+        : ` data-staff-id="${staffId || ""}" data-row-key="s:${staffId || ""}"`;
+      return `<${tag} class="sch-info sch-col-${colDef.key}${stickyEndCls}${selCls}${extraCls ? ` ${extraCls}` : ""}"${leftStyle}${dataAttrs}>${asTh ? colDef.label : valueHtml}</${tag}>`;
+    }
+
+    const headRow1 = `<th class="sch-info" colspan="${infoColCount}"></th>` + days.map((d) => {
+      const wd = new Date(year, monthIndex, d).getDay();
+      const isHoliday = !!getHoliday(scheduleDateKey(year, monthIndex, d));
+      const cls = wd === 6 ? "wd-sat" : (isHoliday || wd === 0) ? "wd-sun" : "";
+      return `<th class="${cls}${colHiddenCls(d)} sch-col-th" data-col-key="d:${d}" title="${isHoliday ? esc(getHoliday(scheduleDateKey(year, monthIndex, d))) : "클릭해서 선택, 선택 후 오른쪽 클릭으로 접기"}">${pad2(monthIndex + 1)}/${pad2(d)}</th>`;
+    }).join("");
+    const headRow2 = SCHEDULE_INFO_COLS.map((c) => infoColHtml(c, true)).join("") +
+      days.map((d) => {
+        const wd = new Date(year, monthIndex, d).getDay();
+        const isHoliday = !!getHoliday(scheduleDateKey(year, monthIndex, d));
+        const cls = wd === 6 ? "wd-sat" : (isHoliday || wd === 0) ? "wd-sun" : "";
+        return `<th class="${cls}${colHiddenCls(d)} sch-col-th" data-col-key="d:${d}" title="클릭해서 선택, 선택 후 오른쪽 클릭으로 접기">${WEEKDAYS[wd]}</th>`;
+      }).join("");
+
+    let scheduleRowCounter = 0; // 드래그 선택의 사각형 범위 계산에 쓰는, 렌더링될 때마다 매겨지는 행 순번
+    function staffRowHtml(s) {
+      const rowIdx = scheduleRowCounter++;
+      const searchHidden = !scheduleStaffMatchesSearch(s, scheduleUi.searchQuery);
+      const rowHiddenCls = (scheduleUi.manualHiddenStaffIds.has(s.id) || searchHidden) ? " sch-row-hidden" : "";
+      const cells = days.map((d) => {
+        const dateKey = scheduleDateKey(year, monthIndex, d);
+        const record = getScheduleRecord(s.id, dateKey);
+        const disp = scheduleCellDisplay(record);
+        const memo = getScheduleMemo(s.id, dateKey);
+        const memoDot = (memo && !hideMemoMarks) ? `<span class="sch-memo-dot" title="${esc(memo)}"></span>` : "";
+        return `<td class="sch-cell ${disp.cls}${colHiddenCls(d)}" data-staff-id="${s.id}" data-date="${dateKey}" data-row-idx="${rowIdx}" data-day="${d}" title="${esc(memo)}" tabindex="0"><span class="sch-cell-label">${disp.label}</span>${memoDot}</td>`;
+      }).join("");
+      const counts = scheduleStaffMonthCounts(s.id, year, monthIndex);
+      const infoColValues = {
+        nickname: esc(s.nickname), name: esc(s.name), empno: esc(s.empNo),
+        hiredate: esc(s.hireDate), workhours: esc(s.workHours),
+        work: counts.WORK, off: counts.OFF, annual: counts.ANNUAL, daehyu: counts.DAEHYU, absent: counts.ABSENT,
+      };
+      const infoCells = SCHEDULE_INFO_COLS.map((c) => {
+        const extraCls = c.key === "nickname" ? "sch-nickname" : (c.summaryOnly ? "sch-count" : "");
+        return infoColHtml(c, false, infoColValues[c.key], extraCls, s.id);
+      }).join("");
+      return `
+        <tr class="${rowHiddenCls.trim()}">
+          ${infoCells}
+          ${cells}
+        </tr>
+      `;
+    }
+
+    // 집계행(관리자 인원/필요인력/대비 등) 왼쪽 라벨 칸. rowKey가 있으면(=캡처가 아니면) 클릭해서
+    // 선택 → 오른쪽 클릭으로 그 행 전체를 접을 수 있게 만든다.
+    function summaryLabelCellHtml(rowKey, label) {
+      if (hideSummaryCols || !rowKey) return `<td class="sch-info" colspan="${infoColCount}">${label}</td>`;
+      return `<td class="sch-info sch-row-th" colspan="${infoColCount}" data-row-key="r:${esc(rowKey)}" title="클릭해서 선택, 선택 후 오른쪽 클릭으로 접기">${label}</td>`;
+    }
+    function summaryRowHiddenCls(rowKey) {
+      if (hideSummaryCols) return "";
+      if (searchActive) return " sch-row-hidden";
+      return (rowKey && scheduleUi.manualHiddenSummaryRows.has(rowKey)) ? " sch-row-hidden" : "";
+    }
+    // type이 null/undefined면 업무 구분(채팅/유선)과 무관하게 목록 전체를 집계한다.
+    // (관리자 인원 집계처럼 채팅/유선 구분 없이 셀 때 사용)
+    function summaryRowHtml(label, staffList, type, rowKey) {
+      const cells = days.map((d) => {
+        const dateKey = scheduleDateKey(year, monthIndex, d);
+        const count = staffList.filter((s) => (!type || (s.types || []).indexOf(type) !== -1) && scheduleCountsAsWorked(getScheduleRecord(s.id, dateKey))).length;
+        return `<td class="${colHiddenCls(d).trim()}">${count}</td>`;
+      }).join("");
+      return `<tr class="sch-summary-row${summaryRowHiddenCls(rowKey)}">${summaryLabelCellHtml(rowKey, label)}${cells}</tr>`;
+    }
+
+    // "필요인력" 행: 사용자가 직접 숫자를 입력하는 칸(인풋). groupKey는 "DAY"/"NIGHT", type은 "채팅"/"유선".
+    // 이 달이 잠겨 있으면(확정됨) 다른 스케줄 셀과 마찬가지로 입력칸 자체를 비활성화해서
+    // 클릭·타이핑 자체가 안 먹게 한다. (예전에는 blur 시점에만 저장을 막아서, 입력은 계속
+    // 가능해 보이는데 실제로는 저장이 안 되는 것처럼 보이는 문제가 있었다.)
+    const monthLocked = scheduleIsMonthLocked(year, monthIndex);
+    function requiredHeadcountRowHtml(groupKey, type, label, rowKey) {
+      const cells = days.map((d) => {
+        const val = getRequiredHeadcount(year, monthIndex, groupKey, type, d);
+        return `<td class="sch-required-cell${colHiddenCls(d)}"><input type="number" class="sch-required-input${monthLocked ? " sch-required-input--locked" : ""}" min="0" step="1" inputmode="numeric" data-required-group="${groupKey}" data-required-type="${esc(type)}" data-required-day="${d}" value="${val === null ? "" : val}" placeholder="-"${monthLocked ? " disabled title=\"잠긴 달이에요. 잠금을 해제한 뒤 수정해주세요.\"" : ""}></td>`;
+      }).join("");
+      return `<tr class="sch-required-row${summaryRowHiddenCls(rowKey)}">${summaryLabelCellHtml(rowKey, label)}${cells}</tr>`;
+    }
+    // "대비" 행: 실제 투입 인력 - 필요인력 (필요인력을 입력하지 않은 날짜는 빈칸)
+    function requiredDiffRowHtml(groupKey, type, staffList, label, rowKey) {
+      const cells = days.map((d) => {
+        const dateKey = scheduleDateKey(year, monthIndex, d);
+        const required = getRequiredHeadcount(year, monthIndex, groupKey, type, d);
+        const diff = required === null ? "" : (scheduleActualCount(staffList, type, dateKey) - required);
+        return `<td class="${colHiddenCls(d).trim()}">${diff}</td>`;
+      }).join("");
+      return `<tr class="sch-diff-row${summaryRowHiddenCls(rowKey)}">${summaryLabelCellHtml(rowKey, label)}${cells}</tr>`;
+    }
+    // "인력 대비 편성" 행: 대비가 0 이상이면 O, 음수면 X (필요인력 미입력 날짜는 빈칸)
+    function requiredStatusRowHtml(groupKey, type, staffList, label, rowKey) {
+      const cells = days.map((d) => {
+        const dateKey = scheduleDateKey(year, monthIndex, d);
+        const required = getRequiredHeadcount(year, monthIndex, groupKey, type, d);
+        let mark = "";
+        let statusCls = "";
+        if (required !== null) {
+          const diff = scheduleActualCount(staffList, type, dateKey) - required;
+          mark = diff >= 0 ? "O" : "X";
+          statusCls = diff >= 0 ? " sch-status-ok" : " sch-status-ng";
+        }
+        return `<td class="${(colHiddenCls(d).trim() + statusCls).trim()}">${mark}</td>`;
+      }).join("");
+      return `<tr class="sch-status-row${summaryRowHiddenCls(rowKey)}">${summaryLabelCellHtml(rowKey, label)}${cells}</tr>`;
+    }
+    // 그룹(주간/야간)의 채팅·유선 필요인력 3행 묶음(필요인력/대비/인력 대비 편성)을 한 번에 만든다.
+    function requiredHeadcountBlockHtml(groupKey, groupLabel, staffList) {
+      return (
+        requiredHeadcountRowHtml(groupKey, "채팅", `${groupLabel} 채팅 필요인력`, `${groupKey}·채팅·필요인력`) +
+        requiredDiffRowHtml(groupKey, "채팅", staffList, "대비", `${groupKey}·채팅·대비`) +
+        requiredStatusRowHtml(groupKey, "채팅", staffList, "인력 대비 편성", `${groupKey}·채팅·인력대비편성`) +
+        requiredHeadcountRowHtml(groupKey, "유선", `${groupLabel} 유선 필요인력`, `${groupKey}·유선·필요인력`) +
+        requiredDiffRowHtml(groupKey, "유선", staffList, "대비", `${groupKey}·유선·대비`) +
+        requiredStatusRowHtml(groupKey, "유선", staffList, "인력 대비 편성", `${groupKey}·유선·인력대비편성`)
+      );
+    }
+
+    function totalRowHtml(label, groups, rowKey) {
+      const cells = days.map((d) => {
+        const dateKey = scheduleDateKey(year, monthIndex, d);
+        let total = 0;
+        groups.forEach(({ staffList, type }) => {
+          total += staffList.filter((s) => (s.types || []).indexOf(type) !== -1 && scheduleCountsAsWorked(getScheduleRecord(s.id, dateKey))).length;
+        });
+        return `<td class="${colHiddenCls(d).trim()}">${total}</td>`;
+      }).join("");
+      return `<tr class="sch-total-row${summaryRowHiddenCls(rowKey)}">${summaryLabelCellHtml(rowKey, label)}${cells}</tr>`;
+    }
+
+    // 행 그룹(관리자/주간/야간 등) 제목 행. 클릭하면 접히고 펼쳐지는 삼각형 토글을 함께 넣는다.
+    function groupHeaderRow(key, label, isStatic) {
+      const collapsed = scheduleIsRowGroupCollapsed(key);
+      const toggle = `<span class="sch-row-toggle" data-toggle-row-group="${key}">${collapsed ? "▸" : "▾"}</span>`;
+      const hiddenCls = summaryRowHiddenCls(key);
+      const tdCls = hideSummaryCols ? "" : " sch-row-th";
+      const tdAttrs = hideSummaryCols ? "" : ` data-row-key="r:${esc(key)}" title="클릭해서 선택, 선택 후 오른쪽 클릭으로 접기"`;
+      return `<tr class="sch-group-row${isStatic ? " sch-group-row--static" : ""}${hiddenCls}" data-group-key="${key}"><td class="${tdCls.trim()}" colspan="${infoColCount + numDays}"${tdAttrs}>${toggle}${label}</td></tr>`;
+    }
+    // 소제목 행(채팅/유선/업무 구분 미지정). 부모 그룹 키에 이어 붙여서 고유 키를 만든다.
+    function subGroupHeaderRow(key, label) {
+      const collapsed = scheduleIsRowGroupCollapsed(key);
+      const toggle = `<span class="sch-row-toggle" data-toggle-row-group="${key}">${collapsed ? "▸" : "▾"}</span>`;
+      const hiddenCls = summaryRowHiddenCls(key);
+      const tdCls = hideSummaryCols ? "" : " sch-row-th";
+      const tdAttrs = hideSummaryCols ? "" : ` data-row-key="r:${esc(key)}" title="클릭해서 선택, 선택 후 오른쪽 클릭으로 접기"`;
+      return `<tr class="sch-subgroup-row${hiddenCls}" data-group-key="${key}"><td class="${tdCls.trim()}" colspan="${infoColCount + numDays}"${tdAttrs}>${toggle}${label}</td></tr>`;
+    }
+    // 접힌 그룹은 제목 행만 남기고 본문(인원 행·집계 행)은 렌더링하지 않는다.
+    function groupBody(key, renderFn) {
+      return scheduleIsRowGroupCollapsed(key) ? "" : renderFn();
+    }
+
+    // 그룹(주간/야간) 안에서 다시 채팅 담당 → 유선 담당 순으로 소제목을 나눠 보여준다.
+    function subGroupsHtml(staffList, parentKey) {
+      const { chat, voice, etc } = splitByType(staffList);
+      let html = "";
+      if (chat.length > 0) {
+        const key = `${parentKey}::CHAT`;
+        html += subGroupHeaderRow(key, `채팅 (${chat.length}명)`);
+        html += groupBody(key, () => chat.map(staffRowHtml).join(""));
+      }
+      if (voice.length > 0) {
+        const key = `${parentKey}::VOICE`;
+        html += subGroupHeaderRow(key, `유선 (${voice.length}명)`);
+        html += groupBody(key, () => voice.map(staffRowHtml).join(""));
+      }
+      if (etc.length > 0) {
+        const key = `${parentKey}::ETC`;
+        html += subGroupHeaderRow(key, `업무 구분 미지정 (${etc.length}명)`);
+        html += groupBody(key, () => etc.map(staffRowHtml).join(""));
+      }
+      return html;
+    }
+
+    let bodyHtml = "";
+    if (filterMode === "ADMIN") {
+      // "관리자 저장": 관리자로 등록된 인원만 보여준다.
+      if (adminStaff.length === 0) {
+        bodyHtml = `<tr><td class="sch-info sch-empty" colspan="${infoColCount + numDays}">등록된 관리자가 없어요.</td></tr>`;
+      } else {
+        const key = scheduleRowGroupKey(filterMode, "ADMIN");
+        bodyHtml += groupHeaderRow(key, `${ICON_SHIELD} 관리자 (${adminStaff.length}명)`, true);
+        bodyHtml += groupBody(key, () => adminStaff.map(staffRowHtml).join("") + summaryRowHtml("관리자 인원", adminStaff, null, "관리자"));
+      }
+    } else if (filterMode === "DAY" || filterMode === "NIGHT") {
+      // "주간 저장" / "야간 저장": 관리자는 빼고 해당 조만 보여준다.
+      const staffList = filterMode === "DAY" ? dayStaff : nightStaff;
+      const groupTitle = filterMode === "DAY" ? `${ICON_SUN} 아침조 / 주간 (${staffList.length}명)` : `${ICON_MOON} 야간조 (${staffList.length}명)`;
+      if (staffList.length === 0) {
+        bodyHtml = `<tr><td class="sch-info sch-empty" colspan="${infoColCount + numDays}">등록된 인원이 없어요.</td></tr>`;
+      } else {
+        const key = scheduleRowGroupKey(filterMode, filterMode);
+        bodyHtml += groupHeaderRow(key, groupTitle);
+        bodyHtml += groupBody(key, () =>
+          subGroupsHtml(staffList, key) + summaryRowHtml("채팅 인원", staffList, "채팅", `${filterMode}·채팅인원`) + summaryRowHtml("유선 인원", staffList, "유선", `${filterMode}·유선인원`) +
+          (hideRequiredRows ? "" : requiredHeadcountBlockHtml(filterMode, filterMode === "DAY" ? "주간" : "야간", staffList))
+        );
+      }
+    } else if (filterMode === "VOICE" || filterMode === "CHAT") {
+      // "유선 저장" / "채팅 저장": 주야간은 통합하되, 캡처 안에서는 주간/야간 구획을 나눠 보여준다.
+      const typeName = filterMode === "VOICE" ? "유선" : "채팅";
+      const typeKey = filterMode === "VOICE" ? "voice" : "chat";
+      const dayTyped = splitByType(dayStaff)[typeKey];
+      const nightTyped = splitByType(nightStaff)[typeKey];
+      if (dayTyped.length === 0 && nightTyped.length === 0) {
+        bodyHtml = `<tr><td class="sch-info sch-empty" colspan="${infoColCount + numDays}">${typeName} 담당 인원이 없어요.</td></tr>`;
+      } else {
+        if (dayTyped.length > 0) {
+          const key = scheduleRowGroupKey(filterMode, "DAY_TYPED");
+          bodyHtml += groupHeaderRow(key, `${ICON_SUN} 주간 · ${typeName} (${dayTyped.length}명)`);
+          bodyHtml += groupBody(key, () => dayTyped.map(staffRowHtml).join("") + summaryRowHtml(`${typeName} 인원`, dayTyped, typeName, `DAY_TYPED·${typeKey}`));
+        }
+        if (nightTyped.length > 0) {
+          const key = scheduleRowGroupKey(filterMode, "NIGHT_TYPED");
+          bodyHtml += groupHeaderRow(key, `${ICON_MOON} 야간 · ${typeName} (${nightTyped.length}명)`);
+          bodyHtml += groupBody(key, () => nightTyped.map(staffRowHtml).join("") + summaryRowHtml(`${typeName} 인원`, nightTyped, typeName, `NIGHT_TYPED·${typeKey}`));
+        }
+        if (dayTyped.length > 0 && nightTyped.length > 0) {
+          bodyHtml += totalRowHtml(`주/야간 총 ${typeName} 출근 인원`, [{ staffList: dayTyped, type: typeName }, { staffList: nightTyped, type: typeName }], `total·${typeKey}`);
+        }
+      }
+    } else if (dayStaff.length === 0 && nightStaff.length === 0 && adminStaff.length === 0) {
+      bodyHtml = `<tr><td class="sch-info sch-empty" colspan="${infoColCount + numDays}">등록된 인원이 없어요. "상담사 관리"에서 상담사를 등록하면 자동으로 표시돼요.</td></tr>`;
+    } else {
+      if (adminStaff.length > 0) {
+        const key = scheduleRowGroupKey(filterMode, "ADMIN");
+        bodyHtml += groupHeaderRow(key, `${ICON_SHIELD} 관리자 (${adminStaff.length}명)`, true);
+        bodyHtml += groupBody(key, () => adminStaff.map(staffRowHtml).join("") + summaryRowHtml("관리자 인원", adminStaff, null, "관리자"));
+      }
+      if (dayStaff.length > 0) {
+        const key = scheduleRowGroupKey(filterMode, "DAY");
+        bodyHtml += groupHeaderRow(key, `${ICON_SUN} 아침조 / 주간 (${dayStaff.length}명)`);
+        bodyHtml += groupBody(key, () =>
+          subGroupsHtml(dayStaff, key) + summaryRowHtml("채팅 인원", dayStaff, "채팅", "DAY·채팅인원") + summaryRowHtml("유선 인원", dayStaff, "유선", "DAY·유선인원") +
+          (hideRequiredRows ? "" : requiredHeadcountBlockHtml("DAY", "주간", dayStaff))
+        );
+      }
+      if (nightStaff.length > 0) {
+        const key = scheduleRowGroupKey(filterMode, "NIGHT");
+        bodyHtml += groupHeaderRow(key, `${ICON_MOON} 야간조 (${nightStaff.length}명)`);
+        bodyHtml += groupBody(key, () =>
+          subGroupsHtml(nightStaff, key) + summaryRowHtml("채팅 인원", nightStaff, "채팅", "NIGHT·채팅인원") + summaryRowHtml("유선 인원", nightStaff, "유선", "NIGHT·유선인원") +
+          (hideRequiredRows ? "" : requiredHeadcountBlockHtml("NIGHT", "야간", nightStaff))
+        );
+      }
+      if (dayStaff.length > 0 && nightStaff.length > 0) {
+        bodyHtml += totalRowHtml("주/야간 총 채팅 출근 인원", [{ staffList: dayStaff, type: "채팅" }, { staffList: nightStaff, type: "채팅" }], "total·채팅");
+        bodyHtml += totalRowHtml("주/야간 총 유선 출근 인원", [{ staffList: dayStaff, type: "유선" }, { staffList: nightStaff, type: "유선" }], "total·유선");
+      }
+    }
+
+    return `
+      <table class="schedule-table">
+        <thead>
+          <tr>${headRow1}</tr>
+          <tr>${headRow2}</tr>
+        </thead>
+        <tbody>${bodyHtml}</tbody>
+      </table>
+    `;
+  }
+
+
+  // 화면의 월별 스케줄 표와 같은 내용을 엑셀(.xlsx) 파일로 내려받는다.
+  // HTML 표를 그대로 파싱하지 않고, 표를 만들 때 쓰는 것과 같은 데이터를
+  // 다시 조립해서 셀 값(라벨 텍스트)을 그대로 넣는다.
+  // 1-based 열 번호 -> 엑셀 열 문자(A, B, ..., Z, AA, ...)
+  function scheduleColLetter(n) {
+    let s = "";
+    while (n > 0) {
+      const rem = (n - 1) % 26;
+      s = String.fromCharCode(65 + rem) + s;
+      n = Math.floor((n - 1) / 26);
+    }
+    return s;
+  }
+
+  // 월별 스케줄 표를 엑셀(.xlsx)로 내려받는다.
+  // - 화면(월별 스케줄 표)에 실제 적용 중인 색을 그대로 읽어와 상태별 셀 배경에 입혀서
+  //   전체/관리자/주간/야간/유선/채팅 구분이 눈에 잘 들어오게 한다.
+  // - 근무/오프/연차/대휴/결근 합계, 채팅·유선·관리자 인원 집계, 주야간 합계는 값이 아니라
+  //   COUNTIF·합계 수식으로 넣어서, 엑셀에서 날짜 칸을 직접 고쳐도 합계가 자동으로 다시 계산된다.
+  async function exportScheduleToExcel() {
+    if (typeof ExcelJS === "undefined") {
+      flashScheduleStatus("엑셀 변환 기능을 불러오지 못했어요. 인터넷 연결을 확인해주세요.");
+      return;
+    }
+    const btn = document.getElementById("sch-excel-btn");
+    if (btn) { btn.disabled = true; btn.textContent = "엑셀 생성 중..."; }
+
+    try {
+      const { year, monthIndex } = scheduleUi;
+      const numDays = scheduleDaysInMonth(year, monthIndex);
+      const days = [];
+      for (let d = 1; d <= numDays; d++) days.push(d);
+      const infoCols = 10;
+      const totalCols = infoCols + numDays;
+
+      const monthStaff = getStaffListForMonth(year, monthIndex);
+      const adminStaff = monthStaff.filter((s) => s.isAdmin);
+      const dayStaff = sortStaffByType(monthStaff.filter((s) => s.group !== "night" && !s.isAdmin));
+      const nightStaff = sortStaffByType(monthStaff.filter((s) => s.group === "night" && !s.isAdmin));
+
+      // 엑셀은 화면 밖에서(인쇄·공유 등) 보는 경우가 많으므로, 현재 켜둔 화면 테마(다크 등)와
+      // 상관없이 항상 밝고 차분한 "보고용" 팔레트를 쓴다. 상태별 배경은 화면 월별 스케줄 표와
+      // 같은 색을 옅게(흰 배경에 얹은 배지색) 넣고, 글자는 그 진한 원색을 써서 어떤 색인지는
+      // 한눈에 들어오되 셀 전체가 원색으로 칠해지지 않게 한다.
+      const blendWithWhite = (hex, alpha) => {
+        const r = parseInt(hex.slice(0, 2), 16), g = parseInt(hex.slice(2, 4), 16), b = parseInt(hex.slice(4, 6), 16);
+        const a = alpha / 255;
+        const mix = (c) => Math.round(c * a + 255 * (1 - a)).toString(16).padStart(2, "0").toUpperCase();
+        return mix(r) + mix(g) + mix(b);
+      };
+      const solid = (hex) => "FF" + hex;
+      const pastel = (hex, alpha) => "FF" + blendWithWhite(hex, alpha || 0x26);
+
+      const COLOR = {
+        header: solid("EEF0F3"),
+        headerText: solid("4D5057"),
+        group: solid("E4E6EA"),
+        groupText: solid("6C4FC2"),
+        subgroup: solid("F2F3F5"),
+        subgroupText: solid("5B5E66"),
+        summary: solid("FAFBFC"),
+        summaryText: solid("5B5E66"),
+        total: pastel("6C4FC2", 0x30),
+        totalText: solid("3D2E70"),
+        border: solid("DEE1E6"),
+        nickname: solid("24262B"),
+        requiredBg: pastel("3778B0", 0x22),
+        requiredText: solid("3D2E70"),
+        statusOkText: solid("2C7F96"),
+        statusNgText: solid("C94F4F"),
+      };
+      // 월별 스케줄 표의 범례와 같은 상태별 색(배경은 옅게, 글자는 진하게)
+      const STATUS_BASE = {
+        "오프": "3778B0",
+        "연차": "B9791E",
+        "대휴": "2C7F96",
+        "반차": "C2603F",
+        "공휴": "227D75",
+        "공가": "7454B5",
+        "육휴": "B5548F",
+        "특휴": "A554B6",
+        "교육": "2F9E63",
+        "지각": "8A6A1F",
+        "결근": "C94F4F",
+      };
+      const STATUS_FILL = {};
+      const STATUS_TEXT = {};
+      Object.keys(STATUS_BASE).forEach((label) => {
+        STATUS_FILL[label] = pastel(STATUS_BASE[label]);
+        STATUS_TEXT[label] = solid(STATUS_BASE[label]);
+      });
+      STATUS_FILL["퇴사"] = solid("E4E6EA");
+      STATUS_TEXT["퇴사"] = solid("7C7D84");
+
+      const wb = new ExcelJS.Workbook();
+      const ws = wb.addWorksheet(`${year}년 ${monthIndex + 1}월`, {
+        views: [{ state: "frozen", xSplit: infoCols, ySplit: 2, showGridLines: false }],
+      });
+      ws.columns = [
+        { width: 12 }, { width: 8 }, { width: 10 }, { width: 11 }, { width: 12 },
+        { width: 6 }, { width: 6 }, { width: 6 }, { width: 6 }, { width: 6 },
+      ].concat(days.map(() => ({ width: 5 })));
+
+      const thinBorder = { style: "thin", color: { argb: COLOR.border } };
+      function applyBorder(cell) {
+        cell.border = { top: thinBorder, left: thinBorder, bottom: thinBorder, right: thinBorder };
+      }
+
+      // 1행: 날짜, 2행: 항목명 · 요일
+      const row1Vals = new Array(infoCols).fill("");
+      days.forEach((d) => row1Vals.push(`${pad2(monthIndex + 1)}/${pad2(d)}`));
+      const row1 = ws.addRow(row1Vals);
+      ws.mergeCells(1, 1, 1, infoCols);
+
+      const row2Vals = ["닉네임", "이름", "사번", "입사일자", "근무시간", "근무", "오프", "연차", "대휴", "결근"];
+      days.forEach((d) => {
+        const wd = new Date(year, monthIndex, d).getDay();
+        row2Vals.push(WEEKDAYS[wd]);
+      });
+      const row2 = ws.addRow(row2Vals);
+
+      // 화면의 월별 스케줄 표와 같은 기준(토=파랑, 일/공휴일=빨강)으로 날짜 열 글자색을 정한다.
+      const dateColColor = days.map((d) => {
+        const wd = new Date(year, monthIndex, d).getDay();
+        const isHoliday = !!getHoliday(scheduleDateKey(year, monthIndex, d));
+        if (wd === 6) return solid("3778B0");
+        if (isHoliday || wd === 0) return solid("C94F4F");
+        return null;
+      });
+
+      [row1, row2].forEach((row) => {
+        for (let c = 1; c <= totalCols; c++) {
+          const cell = row.getCell(c);
+          const dateColor = c > infoCols ? dateColColor[c - infoCols - 1] : null;
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR.header } };
+          cell.font = { color: { argb: dateColor || COLOR.headerText }, bold: true };
+          cell.alignment = { horizontal: "center", vertical: "middle" };
+          applyBorder(cell);
+        }
+      });
+
+      function addLabelRow(label, kind) {
+        const row = ws.addRow([label]);
+        ws.mergeCells(row.number, 1, row.number, totalCols);
+        const fill = kind === "subgroup" ? COLOR.subgroup : COLOR.group;
+        const textColor = kind === "subgroup" ? COLOR.subgroupText : COLOR.groupText;
+        for (let c = 1; c <= totalCols; c++) {
+          const cell = row.getCell(c);
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: fill } };
+          cell.font = { color: { argb: textColor }, bold: kind !== "subgroup" };
+          cell.alignment = { horizontal: "left", vertical: "middle" };
+          applyBorder(cell);
+        }
+        return row.number;
+      }
+
+      function addStaffRow(s) {
+        const rowValues = new Array(totalCols).fill("");
+        rowValues[0] = s.nickname || "";
+        rowValues[1] = s.name || "";
+        rowValues[2] = s.empNo || "";
+        rowValues[3] = s.hireDate || "";
+        rowValues[4] = s.workHours || "";
+        const labels = days.map((d) => {
+          const dateKey = scheduleDateKey(year, monthIndex, d);
+          return scheduleCellDisplay(getScheduleRecord(s.id, dateKey)).label;
+        });
+        labels.forEach((label, i) => { rowValues[infoCols + i] = label; });
+
+        const row = ws.addRow(rowValues);
+        const r = row.number;
+        const rangeRef = `${scheduleColLetter(infoCols + 1)}${r}:${scheduleColLetter(infoCols + numDays)}${r}`;
+        // 근무=WORK(라벨 "1")+지각, 연차/대휴/결근은 해당 라벨 개수를 그대로 센다.
+        // 오프는 화면 집계(scheduleStaffMonthCounts)와 동일하게 오프뿐 아니라
+        // 대휴·공휴·육휴·특휴까지 모두 포함해서 센다. (대휴는 별도 열에도 단독 표시됨)
+        row.getCell(6).value = { formula: `COUNTIF(${rangeRef},"1")+COUNTIF(${rangeRef},"지각")` };
+        row.getCell(7).value = { formula: `COUNTIF(${rangeRef},"오프")+COUNTIF(${rangeRef},"대휴")+COUNTIF(${rangeRef},"공휴")+COUNTIF(${rangeRef},"육휴")+COUNTIF(${rangeRef},"특휴")` };
+        row.getCell(8).value = { formula: `COUNTIF(${rangeRef},"연차")` };
+        row.getCell(9).value = { formula: `COUNTIF(${rangeRef},"대휴")` };
+        row.getCell(10).value = { formula: `COUNTIF(${rangeRef},"결근")` };
+
+        for (let c = 1; c <= totalCols; c++) applyBorder(row.getCell(c));
+        row.getCell(1).font = { bold: true, color: { argb: COLOR.nickname } };
+        row.getCell(1).alignment = { horizontal: "center", vertical: "middle" };
+        for (let c = 2; c <= 5; c++) row.getCell(c).alignment = { horizontal: "left", vertical: "middle" };
+        for (let c = 6; c <= 10; c++) row.getCell(c).alignment = { horizontal: "center", vertical: "middle" };
+
+        labels.forEach((label, i) => {
+          const cell = row.getCell(infoCols + 1 + i);
+          cell.alignment = { horizontal: "center", vertical: "middle" };
+          const fillArgb = STATUS_FILL[label];
+          if (fillArgb) {
+            cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: fillArgb } };
+            cell.font = { bold: label === "지각" || label === "결근", color: { argb: STATUS_TEXT[label] || COLOR.nickname } };
+          }
+          // 화면에서 남긴 셀 메모는 엑셀에서 "메모(노트)"로 그대로 들어간다 (셀에 빨간 삼각형 표시,
+          // 마우스를 올리면 내용이 보임). 이미지 저장(html2canvas 캡처)과 달리 엑셀에는 항상 반영된다.
+          const dayNum = days[i];
+          const memo = getScheduleMemo(s.id, scheduleDateKey(year, monthIndex, dayNum));
+          if (memo) {
+            cell.note = { texts: [{ text: memo }], margins: { insetmode: "auto" } };
+          }
+        });
+        return r;
+      }
+
+      // rowRanges: [{start,end}, ...] 연속된 행 구간들을 그대로 더한다. 구간이 없으면(해당
+      // 업무 구분 인원이 0명) 수식 대신 0을 넣는다.
+      function addSummaryRow(label, rowRanges) {
+        const row = ws.addRow([label]);
+        ws.mergeCells(row.number, 1, row.number, infoCols);
+        days.forEach((d, i) => {
+          const col = infoCols + 1 + i;
+          const colL = scheduleColLetter(col);
+          const cell = row.getCell(col);
+          if (rowRanges.length === 0) {
+            cell.value = 0;
+          } else {
+            const parts = rowRanges.map(({ start, end }) => `COUNTIF(${colL}${start}:${colL}${end},"1")+COUNTIF(${colL}${start}:${colL}${end},"지각")`);
+            cell.value = { formula: parts.join("+") };
+          }
+        });
+        for (let c = 1; c <= totalCols; c++) {
+          const cell = row.getCell(c);
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR.summary } };
+          cell.font = { color: { argb: COLOR.summaryText } };
+          cell.alignment = { horizontal: "center", vertical: "middle" };
+          applyBorder(cell);
+        }
+        return row.number;
+      }
+
+      // summaryRowNums: 같은 날짜 열끼리 더할 위쪽 요약행들의 행 번호
+      function addTotalRow(label, summaryRowNums) {
+        const row = ws.addRow([label]);
+        ws.mergeCells(row.number, 1, row.number, infoCols);
+        days.forEach((d, i) => {
+          const col = infoCols + 1 + i;
+          const colL = scheduleColLetter(col);
+          row.getCell(col).value = { formula: summaryRowNums.map((rn) => `${colL}${rn}`).join("+") };
+        });
+        for (let c = 1; c <= totalCols; c++) {
+          const cell = row.getCell(c);
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR.total } };
+          cell.font = { color: { argb: COLOR.totalText }, bold: true };
+          cell.alignment = { horizontal: "center", vertical: "middle" };
+          applyBorder(cell);
+        }
+        return row.number;
+      }
+
+      // "필요인력" 행: 화면에서 사용자가 직접 입력한 숫자를 그대로 값으로 넣는다(입력 안 한 날짜는 빈칸).
+      function addRequiredHeadcountRow(groupKey, type, label) {
+        const row = ws.addRow([label]);
+        ws.mergeCells(row.number, 1, row.number, infoCols);
+        days.forEach((d, i) => {
+          const col = infoCols + 1 + i;
+          const val = getRequiredHeadcount(year, monthIndex, groupKey, type, d);
+          if (val !== null) row.getCell(col).value = val;
+        });
+        for (let c = 1; c <= totalCols; c++) {
+          const cell = row.getCell(c);
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR.requiredBg } };
+          cell.font = { color: { argb: COLOR.requiredText } };
+          cell.alignment = { horizontal: "center", vertical: "middle" };
+          applyBorder(cell);
+        }
+        return row.number;
+      }
+      // "대비" 행: 실제 투입 인력 - 필요인력(위 요약행의 COUNTIF 수식을 그대로 참조).
+      // 필요인력 칸이 비어 있으면 빈칸을 유지하는 수식(IF)으로 넣어, 엑셀에서 값을 고쳐도 다시 계산된다.
+      function addRequiredDiffRow(label, requiredRowNum, summaryRowNum) {
+        const row = ws.addRow([label]);
+        ws.mergeCells(row.number, 1, row.number, infoCols);
+        days.forEach((d, i) => {
+          const col = infoCols + 1 + i;
+          const colL = scheduleColLetter(col);
+          row.getCell(col).value = { formula: `IF(${colL}${requiredRowNum}="","",${colL}${summaryRowNum}-${colL}${requiredRowNum})` };
+        });
+        for (let c = 1; c <= totalCols; c++) {
+          const cell = row.getCell(c);
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR.summary } };
+          cell.font = { color: { argb: COLOR.summaryText } };
+          cell.alignment = { horizontal: "center", vertical: "middle" };
+          applyBorder(cell);
+        }
+        return row.number;
+      }
+      // "인력 대비 편성" 행: 대비가 0 이상이면 O, 음수면 X, 필요인력 미입력 날짜는 빈칸.
+      // computeMark는 셀 글자색(O=녹색/X=빨강)을 정하기 위해 화면과 같은 방식으로 미리 계산한 값이고,
+      // 실제 셀 값은 수식으로 넣어 엑셀에서 원본 데이터를 고치면 자동으로 다시 계산된다.
+      function addRequiredStatusRow(label, groupKey, type, staffList, requiredRowNum, summaryRowNum) {
+        const row = ws.addRow([label]);
+        ws.mergeCells(row.number, 1, row.number, infoCols);
+        days.forEach((d, i) => {
+          const col = infoCols + 1 + i;
+          const colL = scheduleColLetter(col);
+          row.getCell(col).value = { formula: `IF(${colL}${requiredRowNum}="","",IF(${colL}${summaryRowNum}-${colL}${requiredRowNum}>=0,"O","X"))` };
+          const required = getRequiredHeadcount(year, monthIndex, groupKey, type, d);
+          const cell = row.getCell(col);
+          if (required !== null) {
+            const dateKey = scheduleDateKey(year, monthIndex, d);
+            const diff = scheduleActualCount(staffList, type, dateKey) - required;
+            cell.font = { bold: true, color: { argb: diff >= 0 ? COLOR.statusOkText : COLOR.statusNgText } };
+          }
+        });
+        for (let c = 1; c <= totalCols; c++) {
+          const cell = row.getCell(c);
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR.summary } };
+          if (!cell.font) cell.font = { color: { argb: COLOR.summaryText } };
+          cell.alignment = { horizontal: "center", vertical: "middle" };
+          applyBorder(cell);
+        }
+        return row.number;
+      }
+      // 그룹(주간/야간)의 채팅·유선 필요인력 3행 묶음(필요인력/대비/인력 대비 편성)을 한 번에 만든다.
+      // chatSummaryRowNum·voiceSummaryRowNum은 위에서 이미 만든 "채팅 인원"/"유선 인원" 요약행 번호.
+      function addRequiredHeadcountBlock(groupKey, groupLabel, staffList, chatSummaryRowNum, voiceSummaryRowNum) {
+        const chatReqRow = addRequiredHeadcountRow(groupKey, "채팅", `${groupLabel} 채팅 필요인력`);
+        addRequiredDiffRow("대비", chatReqRow, chatSummaryRowNum);
+        addRequiredStatusRow("인력 대비 편성", groupKey, "채팅", staffList, chatReqRow, chatSummaryRowNum);
+        const voiceReqRow = addRequiredHeadcountRow(groupKey, "유선", `${groupLabel} 유선 필요인력`);
+        addRequiredDiffRow("대비", voiceReqRow, voiceSummaryRowNum);
+        addRequiredStatusRow("인력 대비 편성", groupKey, "유선", staffList, voiceReqRow, voiceSummaryRowNum);
+      }
+
+      // staffList를 채팅/유선/미지정 순으로 나눠 행을 쓰고, 채팅·유선 각각의(연속된) 행
+      // 범위를 돌려준다. 요약행 수식이 이 범위를 그대로 참조하므로 화면 표와 항상 일치한다.
+      function addSubGroups(staffList) {
+        const { chat, voice, etc } = splitByType(staffList);
+        const ranges = {};
+        if (chat.length > 0) {
+          addLabelRow(`채팅 (${chat.length}명)`, "subgroup");
+          const start = ws.rowCount + 1;
+          chat.forEach(addStaffRow);
+          ranges.chat = { start, end: ws.rowCount };
+        }
+        if (voice.length > 0) {
+          addLabelRow(`유선 (${voice.length}명)`, "subgroup");
+          const start = ws.rowCount + 1;
+          voice.forEach(addStaffRow);
+          ranges.voice = { start, end: ws.rowCount };
+        }
+        if (etc.length > 0) {
+          addLabelRow(`업무 구분 미지정 (${etc.length}명)`, "subgroup");
+          etc.forEach(addStaffRow);
+        }
+        return ranges;
+      }
+
+      if (dayStaff.length === 0 && nightStaff.length === 0 && adminStaff.length === 0) {
+        addLabelRow("등록된 인원이 없어요.");
+      } else {
+        let dayChatSummaryRow = null, dayVoiceSummaryRow = null;
+        let nightChatSummaryRow = null, nightVoiceSummaryRow = null;
+
+        if (adminStaff.length > 0) {
+          addLabelRow(`관리자 (${adminStaff.length}명)`);
+          const start = ws.rowCount + 1;
+          adminStaff.forEach(addStaffRow);
+          addSummaryRow("관리자 인원", [{ start, end: ws.rowCount }]);
+        }
+        if (dayStaff.length > 0) {
+          addLabelRow(`아침조 / 주간 (${dayStaff.length}명)`);
+          const ranges = addSubGroups(dayStaff);
+          dayChatSummaryRow = addSummaryRow("채팅 인원", ranges.chat ? [ranges.chat] : []);
+          dayVoiceSummaryRow = addSummaryRow("유선 인원", ranges.voice ? [ranges.voice] : []);
+          addRequiredHeadcountBlock("DAY", "주간", dayStaff, dayChatSummaryRow, dayVoiceSummaryRow);
+        }
+        if (nightStaff.length > 0) {
+          addLabelRow(`야간조 (${nightStaff.length}명)`);
+          const ranges = addSubGroups(nightStaff);
+          nightChatSummaryRow = addSummaryRow("채팅 인원", ranges.chat ? [ranges.chat] : []);
+          nightVoiceSummaryRow = addSummaryRow("유선 인원", ranges.voice ? [ranges.voice] : []);
+          addRequiredHeadcountBlock("NIGHT", "야간", nightStaff, nightChatSummaryRow, nightVoiceSummaryRow);
+        }
+        if (dayStaff.length > 0 && nightStaff.length > 0) {
+          addTotalRow("주/야간 총 채팅 출근 인원", [dayChatSummaryRow, nightChatSummaryRow]);
+          addTotalRow("주/야간 총 유선 출근 인원", [dayVoiceSummaryRow, nightVoiceSummaryRow]);
+        }
+      }
+
+      // 셀마다 색상·굵기 등은 이미 위에서 개별로 지정했으므로, 그 속성은 그대로 두고
+      // 폰트 크기만 기본 10으로 통일해준다.
+      ws.eachRow((row) => {
+        row.eachCell({ includeEmpty: true }, (cell) => {
+          cell.font = Object.assign({}, cell.font, { size: 10 });
+        });
+      });
+
+      const buffer = await wb.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `월별상담사스케줄_${year}${pad2(monthIndex + 1)}.xlsx`;
+      link.click();
+      URL.revokeObjectURL(url);
+      flashScheduleStatus("엑셀 파일을 다운로드했어요.");
+    } catch (err) {
+      console.error(err);
+      flashScheduleStatus("엑셀 파일을 만들지 못했어요.");
+    } finally {
+      if (btn) { btn.disabled = false; btn.innerHTML = ICON_CHART + " 엑셀로 다운로드"; }
+    }
+  }
+
+  // buildScheduleTableHtml의 filterMode와 같은 기준으로, 캡처 대상 인원만 골라
+  // "이번 달 지각·결근 기록"도 캡처된 표 안의 인원과 항상 일치하도록 한다.
+  function scheduleLogStaffForFilter(monthStaff, filterMode) {
+    if (!filterMode) return monthStaff;
+    if (filterMode === "ADMIN") return monthStaff.filter((s) => s.isAdmin);
+    const nonAdmin = monthStaff.filter((s) => !s.isAdmin);
+    if (filterMode === "DAY") return nonAdmin.filter((s) => s.group !== "night");
+    if (filterMode === "NIGHT") return nonAdmin.filter((s) => s.group === "night");
+    if (filterMode === "VOICE") return nonAdmin.filter((s) => (s.types || []).indexOf("유선") !== -1);
+    if (filterMode === "CHAT") return nonAdmin.filter((s) => (s.types || []).indexOf("채팅") !== -1);
+    return monthStaff;
+  }
+
+  function buildScheduleLogHtml(filterMode) {
+    const { year, monthIndex } = scheduleUi;
+    const numDays = scheduleDaysInMonth(year, monthIndex);
+    const monthStaff = scheduleLogStaffForFilter(getStaffListForMonth(year, monthIndex), filterMode);
+    const entries = [];
+    for (let d = 1; d <= numDays; d++) {
+      const dateKey = scheduleDateKey(year, monthIndex, d);
+      monthStaff.forEach((s) => {
+        const rec = scheduleData.records[scheduleRecordKey(s.id, dateKey)];
+        if (rec && rec.attendance) {
+          entries.push({ dateKey, d, staff: s, attendance: rec.attendance });
+        }
+      });
+    }
+    if (entries.length === 0) {
+      return `<div class="agent-list-empty">이번 달에는 등록된 지각·결근 기록이 없어요.</div>`;
+    }
+    const items = entries.map((e) => {
+      const tagCls = e.attendance === "LATE" ? "late" : "absent";
+      const tagLabel = e.attendance === "LATE" ? "지각" : "결근";
+      return `
+        <div class="sch-log-item">
+          <span class="sch-log-date">${pad2(monthIndex + 1)}/${pad2(e.d)}</span>
+          <span class="sch-log-name">${esc(e.staff.nickname)} · ${esc(e.staff.name)}</span>
+          <span class="sch-log-tag ${tagCls}">${tagLabel}</span>
+          <button class="sch-staff-btn sch-log-clear" data-action="clear-sch-attendance" data-staff-id="${e.staff.id}" data-date="${e.dateKey}">되돌리기</button>
+        </div>
+      `;
+    }).join("");
+    return `<div class="sch-log-list">${items}</div>`;
+  }
+
+  function syncScheduleLogWidth() {
+    const tableWrap = document.querySelector("#schedule-table-area .schedule-table-wrap");
+    const logArea = document.getElementById("schedule-log-area");
+    if (!tableWrap || !logArea) return;
+    const w = tableWrap.offsetWidth;
+    if (w > 0) {
+      logArea.style.width = `${w}px`;
+      logArea.style.maxWidth = "100%";
+    }
+  }
+
+  // 메인 페이지의 월별 스케줄 표는 가로 스크롤 없이 항상 한 화면에 다 보이도록,
+  // 표를 원래 크기로 그린 뒤 폭에 맞춰 JS로 축소(scale)한다.
+  // (예전엔 축소 비율이 일정 밑으로 내려가면 더 줄이지 않고 가로 스크롤로 넘기게 했었는데,
+  //  그러면 오른쪽 날짜 칸들이 화면 밖으로 잘려서 안 보이는 문제가 있었다. 그래서 지금은
+  //  글씨가 아무리 작아지더라도 항상 폭에 딱 맞춰 전체 날짜가 한 번에 다 보이게 한다.)
+  function fitScheduleTable() {
+    const wrap = document.querySelector("#schedule-table-area .schedule-table-wrap");
+    const inner = wrap ? wrap.querySelector(".schedule-scale-inner") : null;
+    const table = inner ? inner.querySelector("table") : null;
+    if (!wrap || !inner || !table) return;
+    inner.style.transform = "none";
+    inner.style.width = "auto";
+    inner.style.height = "auto";
+    wrap.style.height = "auto";
+    // 모바일 화면에서는 표를 억지로 축소해서 글씨를 읽을 수 없게 만드는 대신,
+    // 표를 원래 크기 그대로 두고 가로 스크롤(스크린 좌우로 넘기기)로 보게 한다.
+    // (고정된 인원 정보 열이 sticky로 남아있어 스크롤해도 어떤 상담사인지 계속 보임)
+    if (window.innerWidth <= 720) return;
+    const naturalW = table.offsetWidth;
+    const naturalH = table.offsetHeight;
+    const availW = wrap.clientWidth;
+    if (naturalW <= 0 || availW <= 0) return;
+    const scale = Math.min(availW / naturalW, 1);
+    const scaledW = naturalW * scale;
+    const offsetX = Math.max(0, (availW - scaledW) / 2);
+    inner.style.width = `${naturalW}px`;
+    inner.style.height = `${naturalH}px`;
+    inner.style.transform = `translateX(${offsetX}px) scale(${scale})`;
+    wrap.style.overflowX = "hidden";
+    wrap.style.height = `${naturalH * scale}px`;
+  }
+
+  // wrap의 너비를 안정적으로 관찰해서, 폰트 늦게 로드/레이아웃 지연/화면 회전 등
+  // 어떤 이유로 폭이 나중에 바뀌더라도 항상 다시 맞춤 계산되도록 한다.
+  // (단순 window resize 이벤트만으로는 컨테이너 폭만 바뀌는 경우를 놓칠 수 있음)
+  let _scheduleFitObserver = null;
+  function watchScheduleTableSize() {
+    const wrap = document.querySelector("#schedule-table-area .schedule-table-wrap");
+    if (!wrap) return;
+    if (_scheduleFitObserver) _scheduleFitObserver.disconnect();
+    if (typeof ResizeObserver === "undefined") return;
+    let lastW = 0;
+    _scheduleFitObserver = new ResizeObserver((entries) => {
+      const w = entries[0] && entries[0].contentRect ? entries[0].contentRect.width : 0;
+      if (Math.abs(w - lastW) < 1) return;
+      lastW = w;
+      fitScheduleTable();
+      syncScheduleLogWidth();
+    });
+    _scheduleFitObserver.observe(wrap);
+  }
+
+  function updateScheduleTableArea() {
+    const tableArea = document.getElementById("schedule-table-area");
+    const logArea = document.getElementById("schedule-log-area");
+    if (tableArea) {
+      tableArea.innerHTML = `<div class="schedule-table-wrap"><div class="schedule-scale-inner">${buildScheduleTableHtml()}</div></div>`;
+      attachScheduleTableHandlers(tableArea);
+    }
+    if (logArea) {
+      logArea.innerHTML = buildScheduleLogHtml();
+      attachScheduleLogHandlers(logArea);
+    }
+    fitScheduleTable();
+    syncScheduleLogWidth();
+    watchScheduleTableSize();
+  }
+
+  // 월별 스케줄 표를 통째로 PNG 이미지로 캡처해서 다운로드한다.
+  // 화면에 보이는 축소된 표 대신, 화면 밖에 원본 크기 그대로 다시 그려서 캡처하기 때문에
+  // 화면 크기와 상관없이 항상 선명하고 잘리지 않은 이미지가 만들어진다.
+  // 캡처 이미지의 배경/글자/범례 색은 하드코딩하지 않고, 캡처하는 시점에 실제 적용 중인
+  // 다크모드/라이트모드 색상 변수를 그대로 읽어와 사용한다. (라이트모드에서 캡처해도
+  // 검은 배경으로 나오지 않고, 현재 화면과 같은 톤으로 저장됨)
+  // mode: "ALL"(기본, 전체) / "DAY"(주간) / "NIGHT"(야간) / "VOICE"(유선, 주야간 통합)
+  // / "CHAT"(채팅, 주야간 통합). buildScheduleTableHtml·buildScheduleLogHtml에는
+  // "ALL"일 때만 filterMode 없이(undefined) 넘겨서 지금까지와 완전히 같은 전체 표를 유지한다.
+  function captureSchedulePage(mode) {
+    const captureMode = mode || "ALL";
+    const modeMeta = SCHEDULE_CAPTURE_MODES.find((m) => m.key === captureMode) || SCHEDULE_CAPTURE_MODES[0];
+    const modeName = modeMeta.label.replace(/ 저장$/, "");
+    const tableFilter = captureMode === "ALL" ? undefined : captureMode;
+    const btn = document.getElementById("sch-capture-btn");
+    if (typeof html2canvas === "undefined") {
+      flashScheduleStatus("캡처 기능을 불러오지 못했어요 (인터넷 연결 확인)");
+      return;
+    }
+    if (btn) { btn.disabled = true; btn.textContent = "이미지 생성 중..."; }
+
+    const cs = getComputedStyle(document.documentElement);
+    const themeColor = (name) => cs.getPropertyValue(name).trim();
+    const cBg = themeColor("--bg");
+    const cText = themeColor("--text");
+    const cTextDim = themeColor("--text-dim");
+    const cBlue = themeColor("--blue");
+    const cOrange = themeColor("--orange");
+    const cGreen = themeColor("--green");
+    const cSalmon = themeColor("--salmon");
+    const cTeal = themeColor("--teal");
+    const cPurple = themeColor("--purple");
+    const cPink = themeColor("--pink");
+    const cIndigo = themeColor("--indigo");
+    const cEdu = themeColor("--edu");
+    const cYellow = themeColor("--yellow");
+    const cRed = themeColor("--red");
+    const cFaint = themeColor("--text-faint");
+
+    const wrapper = document.createElement("div");
+    wrapper.className = "sch-capture-flatten";
+    wrapper.style.position = "fixed";
+    wrapper.style.left = "-99999px";
+    wrapper.style.top = "0";
+    wrapper.style.background = cBg;
+    wrapper.style.padding = "28px";
+    wrapper.style.fontFamily = "'KoPub Dotum', system-ui, sans-serif";
+    wrapper.style.color = cText;
+    wrapper.style.width = "fit-content";
+    wrapper.style.maxWidth = "none";
+    wrapper.style.overflow = "visible";
+    const lockedTag = scheduleIsMonthLocked(scheduleUi.year, scheduleUi.monthIndex) ? " · 확정됨" : "";
+    const titleSuffix = captureMode === "ALL" ? "" : ` · ${modeName}`;
+    wrapper.innerHTML = `
+      <div style="font-size:22px;margin-bottom:4px;color:${cText};">월별 스케줄${titleSuffix}</div>
+      <div style="font-size:15px;color:${cTextDim};margin-bottom:16px;">${esc(scheduleMonthLabel())}${lockedTag} · 캡처일 ${esc(todayISO())}</div>
+      <div class="schedule-legend" style="margin-bottom:14px;">
+        <span class="item"><span class="swatch" style="background:${cBlue};"></span>오프</span>
+        <span class="item"><span class="swatch" style="background:${cOrange};"></span>연차</span>
+        <span class="item"><span class="swatch" style="background:${cGreen};"></span>대휴</span>
+        <span class="item"><span class="swatch" style="background:${cSalmon};"></span>반차</span>
+        <span class="item"><span class="swatch" style="background:${cTeal};"></span>공휴</span>
+        <span class="item"><span class="swatch" style="background:${cPurple};"></span>공가</span>
+        <span class="item"><span class="swatch" style="background:${cPink};"></span>육휴</span>
+        <span class="item"><span class="swatch" style="background:${cIndigo};"></span>특휴</span>
+        <span class="item"><span class="swatch" style="background:${cEdu};"></span>교육</span>
+        <span class="item"><span class="swatch" style="background:${cYellow};"></span>지각</span>
+        <span class="item"><span class="swatch" style="background:${cRed};"></span>결근</span>
+        <span class="item"><span class="swatch" style="background:${cFaint};"></span>퇴사</span>
+      </div>
+      ${buildScheduleTableHtml(tableFilter, true, true, true)}
+    `;
+    document.body.appendChild(wrapper);
+
+    function cleanup(label) {
+      if (wrapper.parentNode) document.body.removeChild(wrapper);
+      if (btn) { btn.disabled = false; btn.innerHTML = ICON_CAMERA + " 이미지로 저장 ▾"; }
+      if (label) flashScheduleStatus(label);
+    }
+
+    requestAnimationFrame(() => {
+      const fullW = wrapper.scrollWidth;
+      const fullH = wrapper.scrollHeight;
+      html2canvas(wrapper, {
+        backgroundColor: cBg,
+        scale: 2,
+        width: fullW,
+        height: fullH,
+        windowWidth: fullW,
+        windowHeight: fullH,
+      }).then((canvas) => {
+        const fileSuffix = captureMode === "ALL" ? "" : `_${modeName}`;
+        const filename = `상담사_스케줄${fileSuffix}_${scheduleUi.year}-${pad2(scheduleUi.monthIndex + 1)}.png`;
+        const dataUrl = canvas.toDataURL("image/png");
+        cleanup("");
+        openSchedulePreview(dataUrl, filename, captureMode === "ALL" ? null : modeName);
+      }).catch((err) => {
+        console.error(err);
+        cleanup("캡처 실패");
+      });
+    });
+  }
+
+  function closeScheduleMenu() {
+    const existing = document.getElementById("sch-menu");
+    if (existing) existing.remove();
+    document.removeEventListener("mousedown", scheduleMenuOutsideHandler, true);
+    scheduleClearSelection();
+  }
+  function scheduleMenuOutsideHandler(e) {
+    const menu = document.getElementById("sch-menu");
+    if (menu && !menu.contains(e.target)) closeScheduleMenu();
+  }
+  // ----- 스케줄 셀 드래그로 여러 칸 선택 후 한 번에 상태 적용 -----
+  // 마우스로 셀을 누른 채 다른 셀 위로 드래그하면(행·열 사각형 범위) 선택되고,
+  // 뗄 때 상태 선택 메뉴가 한 번만 뜬다. 드래그 없이 그냥 클릭하면 기존처럼
+  // 그 칸 하나만 다루는 메뉴(openScheduleMenu)가 뜬다.
+  let scheduleSelectDragging = false;
+  let scheduleSelectMoved = false;
+  let scheduleSelectAnchor = null; // { rowIdx, day }
+  let scheduleSelectCurrent = null; // { rowIdx, day }
+
+  function scheduleSelectionRectCells(root, anchor, current) {
+    if (!root || !anchor || !current) return [];
+    const minRow = Math.min(anchor.rowIdx, current.rowIdx);
+    const maxRow = Math.max(anchor.rowIdx, current.rowIdx);
+    const minDay = Math.min(anchor.day, current.day);
+    const maxDay = Math.max(anchor.day, current.day);
+    return Array.from(root.querySelectorAll(".sch-cell")).filter((cell) => {
+      const rowIdx = Number(cell.getAttribute("data-row-idx"));
+      const day = Number(cell.getAttribute("data-day"));
+      return rowIdx >= minRow && rowIdx <= maxRow && day >= minDay && day <= maxDay;
+    });
+  }
+  function scheduleApplySelectionHighlight() {
+    const root = document.getElementById("schedule-table-area");
+    if (!root) return;
+    const selected = new Set(scheduleSelectionRectCells(root, scheduleSelectAnchor, scheduleSelectCurrent));
+    root.querySelectorAll(".sch-cell").forEach((cell) => {
+      cell.classList.toggle("sch-cell--selected", selected.has(cell));
+    });
+  }
+  function scheduleClearSelection() {
+    scheduleSelectDragging = false;
+    scheduleSelectMoved = false;
+    scheduleSelectAnchor = null;
+    scheduleSelectCurrent = null;
+    const root = document.getElementById("schedule-table-area");
+    if (root) root.querySelectorAll(".sch-cell--selected").forEach((cell) => cell.classList.remove("sch-cell--selected"));
+  }
+  // 선택된 여러 칸에 상태를 한 번에 적용한다. 칸마다 저장하지 않고 한 번만 저장/동기화한다.
+  function scheduleApplyBulk(cells, patch) {
+    if (cells.length) recordUndo(`셀 ${cells.length}개 일괄 변경`, SCHEDULE_KEY, reloadScheduleData);
+    cells.forEach((cell) => {
+      const staffId = cell.getAttribute("data-staff-id");
+      const dateKey = cell.getAttribute("data-date");
+      const key = scheduleRecordKey(staffId, dateKey);
+      const cur = scheduleData.records[key] || { status: "WORK", attendance: null };
+      const next = Object.assign({}, cur, patch);
+      if (next.status === "WORK" && !next.attendance) delete scheduleData.records[key];
+      else scheduleData.records[key] = next;
+    });
+    saveScheduleData();
+  }
+  const SCHEDULE_STATUS_OPTIONS = [
+    ["WORK", null, "근무"],
+    ["OFF", null, "오프"],
+    ["ANNUAL", null, "연차"],
+    ["DAEHYU", null, "대휴"],
+    ["HALF", null, "반차"],
+    ["GONGHYU", null, "공휴"],
+    ["GONGGA", null, "공가"],
+    ["MATERNITY", null, "육휴"],
+    ["SPECIAL", null, "특휴"],
+    ["EDUCATION", null, "교육"],
+    ["WORK", "LATE", "지각"],
+    ["WORK", "ABSENT", "결근"],
+    ["RESIGNED", null, "퇴사"],
+  ];
+  function openScheduleBulkMenu(cells, evt) {
+    // 선택 범위 안에 잠긴 달의 날짜가 하나라도 있으면 전체를 막는다 (개별 셀 잠금 규칙과 동일).
+    const lockedFound = cells.some((cell) => scheduleIsDateLocked(cell.getAttribute("data-date")));
+    if (lockedFound) {
+      flashScheduleStatus("선택한 범위에 잠긴 달이 포함돼 있어요. 잠금을 해제한 뒤 다시 선택해주세요.");
+      scheduleClearSelection();
+      return;
+    }
+    closeScheduleMenu();
+    cells.forEach((cell) => cell.classList.add("sch-cell--selected")); // closeScheduleMenu가 지운 하이라이트를 다시 표시
+    const menu = document.createElement("div");
+    menu.id = "sch-menu";
+    menu.className = "sch-menu";
+    menu.innerHTML = `<div class="sch-menu-title">${cells.length}칸 선택됨</div>` +
+      SCHEDULE_STATUS_OPTIONS.map((o) =>
+        `<button type="button" data-status="${o[0]}" data-attendance="${o[1] || ""}">${o[2]}</button>`
+      ).join("") +
+      `<button type="button" class="sch-menu-reset" data-reset="1">기본값(근무)으로</button>`;
+    document.body.appendChild(menu);
+    const clientX = evt ? evt.clientX : window.innerWidth / 2;
+    const clientY = evt ? evt.clientY : window.innerHeight / 2;
+    const top = Math.min(clientY + 4, window.innerHeight - menu.offsetHeight - 8);
+    const left = Math.min(clientX, window.innerWidth - menu.offsetWidth - 8);
+    menu.style.top = `${Math.max(8, top)}px`;
+    menu.style.left = `${Math.max(8, left)}px`;
+    function applyAndClose(status, attendance) {
+      scheduleApplyBulk(cells, { status, attendance: attendance || null });
+      closeScheduleMenu();
+      updateScheduleTableArea();
+      flashScheduleStatus(`${cells.length}칸에 적용했어요.`);
+    }
+    menu.querySelectorAll("button[data-status]").forEach((btn) => {
+      btn.onclick = () => applyAndClose(btn.getAttribute("data-status"), btn.getAttribute("data-attendance"));
+    });
+    const resetBtn = menu.querySelector("[data-reset]");
+    if (resetBtn) resetBtn.onclick = () => applyAndClose("WORK", null);
+    setTimeout(() => document.addEventListener("mousedown", scheduleMenuOutsideHandler, true), 0);
+  }
+  // 마우스를 뗄 때(문서 전체 기준): 드래그해서 여러 칸을 옮겨다녔으면 일괄 적용 메뉴를 띄우고,
+  // 그냥 제자리에서 뗐으면(=클릭) 선택만 풀고 끝낸다. 그 칸 하나의 메뉴(상태 변경 등)는
+  // 더 이상 왼쪽 클릭으로 열리지 않고, 셀의 오른쪽 클릭(우클릭, oncontextmenu)으로 연다.
+  function scheduleSelectionMouseUpHandler(e) {
+    if (!scheduleSelectDragging) return;
+    const root = document.getElementById("schedule-table-area");
+    const wasMoved = scheduleSelectMoved;
+    const anchor = scheduleSelectAnchor;
+    const current = scheduleSelectCurrent;
+    scheduleSelectDragging = false;
+    if (wasMoved && root) {
+      const cells = scheduleSelectionRectCells(root, anchor, current);
+      if (cells.length > 1) {
+        openScheduleBulkMenu(cells, e);
+        return;
+      }
+    }
+    scheduleClearSelection();
+  }
+  document.addEventListener("mouseup", scheduleSelectionMouseUpHandler);
+
+  function openScheduleMenu(anchorEl, staffId, dateKey) {
+    closeScheduleMenu();
+    const locked = scheduleIsDateLocked(dateKey);
+    const rect = anchorEl.getBoundingClientRect();
+    const menu = document.createElement("div");
+    menu.id = "sch-menu";
+    menu.className = "sch-menu";
+    if (locked) {
+      // 잠긴 달은 수정은 막되, 수정 이력만큼은 그대로 볼 수 있게 한다.
+      menu.innerHTML = `<div class="sch-menu-title">잠긴 달이에요</div>`
+        + `<button type="button" data-history="1">${ICON_CLOCK || ""} 수정 이력 보기</button>`;
+    } else {
+      const options = SCHEDULE_STATUS_OPTIONS;
+      const hasMemo = !!getScheduleMemo(staffId, dateKey);
+      const memoLabel = hasMemo ? `${ICON_NOTE || ""} 메모 수정` : `${ICON_NOTE || ""} 메모 추가`;
+      const memoDeleteBtnHtml = hasMemo ? `<button type="button" class="sch-menu-danger" data-memo-delete="1">${ICON_TRASH || ""} 메모 삭제</button>` : "";
+      menu.innerHTML = options.map((o) =>
+        `<button type="button" data-status="${o[0]}" data-attendance="${o[1] || ""}">${o[2]}</button>`
+      ).join("")
+        + `<div class="sch-menu-divider"></div>`
+        + `<button type="button" data-memo="1">${memoLabel}</button>`
+        + memoDeleteBtnHtml
+        + `<button type="button" data-history="1">${ICON_CLOCK || ""} 수정 이력 보기</button>`
+        + `<button type="button" class="sch-menu-reset" data-reset="1">기본값(근무)으로</button>`;
+    }
+    document.body.appendChild(menu);
+    const top = Math.min(rect.bottom + 4, window.innerHeight - menu.offsetHeight - 8);
+    const left = Math.min(rect.left, window.innerWidth - menu.offsetWidth - 8);
+    menu.style.top = `${Math.max(8, top)}px`;
+    menu.style.left = `${Math.max(8, left)}px`;
+    menu.querySelectorAll("button[data-status]").forEach((btn) => {
+      btn.onclick = () => {
+        setScheduleRecord(staffId, dateKey, { status: btn.getAttribute("data-status"), attendance: btn.getAttribute("data-attendance") || null });
+        closeScheduleMenu();
+        updateScheduleTableArea();
+      };
+    });
+    const memoBtn = menu.querySelector("[data-memo]");
+    if (memoBtn) {
+      memoBtn.onclick = () => {
+        closeScheduleMenu();
+        openScheduleMemoModal(staffId, dateKey);
+      };
+    }
+    const memoDeleteBtn = menu.querySelector("[data-memo-delete]");
+    if (memoDeleteBtn) {
+      memoDeleteBtn.onclick = () => {
+        setScheduleMemo(staffId, dateKey, "");
+        closeScheduleMenu();
+        updateScheduleTableArea();
+      };
+    }
+    const resetBtn = menu.querySelector("[data-reset]");
+    if (resetBtn) {
+      resetBtn.onclick = () => {
+        setScheduleRecord(staffId, dateKey, { status: "WORK", attendance: null });
+        closeScheduleMenu();
+        updateScheduleTableArea();
+      };
+    }
+    const historyBtn = menu.querySelector("[data-history]");
+    if (historyBtn) {
+      historyBtn.onclick = () => {
+        closeScheduleMenu();
+        openScheduleCellHistoryModal(staffId, dateKey);
+      };
+    }
+    setTimeout(() => document.addEventListener("mousedown", scheduleMenuOutsideHandler, true), 0);
+  }
+
+  // ----- 스케줄 셀 "수정 이력" -----
+  // 스케줄 저장은 전체 스케줄 데이터를 한 번에 저장하는 구조라, 실제 변경 이력은
+  // 계정 활동 로그(appendActivityLog)에 "records.{staffId}|{dateKey}...", "memos.{staffId}|{dateKey}..."
+  // 형태의 일반 diff 텍스트로 이미 쌓이고 있다. 이 함수들은 그 로그에서 특정 셀(사람×날짜)에
+  // 해당하는 줄만 골라내 사람이 읽기 쉬운 문장으로 바꿔준다.
+  function scheduleHistoryStatusLabel(status, attendance) {
+    if (status === "WORK" && attendance === "LATE") return "지각";
+    if (status === "WORK" && attendance === "ABSENT") return "결근";
+    if (status === "WORK") return "근무";
+    const meta = SCHEDULE_STATUS_META[status];
+    return meta ? meta.label : (status || "근무");
+  }
+  function scheduleHistoryTranslateFieldValue(fieldName, raw) {
+    if (raw === "(없음)" || raw === "(비어있음)" || raw === "(빈 값)") return "없음";
+    if (fieldName === "status") {
+      if (raw === "WORK") return "근무";
+      const meta = SCHEDULE_STATUS_META[raw];
+      return meta ? meta.label : raw;
+    }
+    if (fieldName === "attendance") {
+      if (raw === "LATE") return "지각";
+      if (raw === "ABSENT") return "결근";
+      return raw;
+    }
+    return raw;
+  }
+  function scheduleHistoryDescribeBlob(raw) {
+    if (raw === "(없음)" || raw === "(비어있음)" || raw === "(빈 값)") return "없음";
+    try {
+      const obj = JSON.parse(raw);
+      if (obj && typeof obj === "object" && "status" in obj) return scheduleHistoryStatusLabel(obj.status, obj.attendance);
+    } catch (e) { /* 잘렸거나 JSON이 아니면 원문 그대로 보여준다 */ }
+    return raw;
+  }
+  // 활동 로그 한 줄(예: "[14:32] 월별 스케줄 — records.abc123|2026-08-12.status: WORK → OFF")에서
+  // 이 셀(cellKey)에 해당하는 부분만 사람이 읽기 쉬운 { time, text } 형태로 뽑아낸다.
+  // 이 셀과 무관한 줄이면 null을 돌려준다.
+  function scheduleDescribeCellHistoryLine(cellKey, rawLine) {
+    const sepIdx = rawLine.indexOf(" — ");
+    if (sepIdx === -1) return null;
+    const prefix = rawLine.slice(0, sepIdx);
+    const content = rawLine.slice(sepIdx + 3);
+    const timeMatch = /^\[(\d{2}:\d{2})\]/.exec(prefix);
+    const time = timeMatch ? timeMatch[1] : "";
+    const recPrefix = `records.${cellKey}`;
+    const memoPrefix = `memos.${cellKey}`;
+    let isMemo = false, rest = null;
+    if (content.indexOf(recPrefix) === 0) rest = content.slice(recPrefix.length);
+    else if (content.indexOf(memoPrefix) === 0) { isMemo = true; rest = content.slice(memoPrefix.length); }
+    if (rest === null) return null;
+    let m = /^\.(\w+): (.*) → (.*)$/.exec(rest);
+    if (m) {
+      const fieldName = m[1];
+      if (isMemo) return { time, text: `메모: "${m[2]}" → "${m[3]}"` };
+      const fieldLabel = fieldName === "status" ? "근태" : (fieldName === "attendance" ? "출결" : fieldName);
+      const oldLabel = scheduleHistoryTranslateFieldValue(fieldName, m[2]);
+      const newLabel = scheduleHistoryTranslateFieldValue(fieldName, m[3]);
+      return { time, text: `${fieldLabel}: ${oldLabel} → ${newLabel}` };
+    }
+    m = /^: (.*) → (.*)$/.exec(rest);
+    if (m) {
+      if (isMemo) {
+        const oldLabel = (m[1] === "(없음)" || m[1] === "(비어있음)" || m[1] === "(빈 값)") ? "없음" : m[1];
+        const newLabel = (m[2] === "(없음)" || m[2] === "(비어있음)" || m[2] === "(빈 값)") ? "없음" : m[2];
+        return { time, text: `메모: "${oldLabel}" → "${newLabel}"` };
+      }
+      return { time, text: `근태: ${scheduleHistoryDescribeBlob(m[1])} → ${scheduleHistoryDescribeBlob(m[2])}` };
+    }
+    // 정규식으로 못 잡은 형태는 원문이라도 그대로 보여준다(정보 유실 방지).
+    return { time, text: rest.replace(/^[.:]\s*/, "") || content };
+  }
+  // 이 계정(CURRENT_ACCOUNT_ID)의 활동 로그 전체를 훑어서, 특정 사람×날짜 셀에 대한
+  // 변경 내역만 최신순으로 모아 돌려준다. { when, who, text }[] 형태.
+  // (활동 로그는 이제 변경이 생기자마자 곧바로 activity-log:entries에 기록되므로,
+  // 방금 고친 셀도 바로 이 목록에 나타난다. "여러 변경을 묶어서 보여주기"는 마스터
+  // 계정의 활동 로그 화면에서만 화면 표시용으로 따로 처리한다.)
+  function scheduleCellHistoryEntries(staffId, dateKey) {
+    const cellKey = scheduleRecordKey(staffId, dateKey);
+    const log = loadActivityLog();
+    const out = [];
+    log.forEach((entry) => {
+      if (entry.accountId !== CURRENT_ACCOUNT_ID) return;
+      const lines = Array.isArray(entry.diff) ? entry.diff : [];
+      lines.forEach((line) => {
+        if (line.indexOf(`records.${cellKey}`) === -1 && line.indexOf(`memos.${cellKey}`) === -1) return;
+        const parsed = scheduleDescribeCellHistoryLine(cellKey, line);
+        if (!parsed) return;
+        const ts = entry.endedAt || entry.at || "";
+        const dateStr = formatKSTDateTime(ts).slice(0, 10);
+        out.push({
+          sortKey: `${ts}|${parsed.time}`,
+          when: parsed.time ? `${dateStr} ${parsed.time}` : dateStr,
+          who: entry.viaMasterName ? `${entry.accountName || "-"} (마스터 진입: ${entry.viaMasterName})` : (entry.accountName || "-"),
+          text: parsed.text,
+        });
+      });
+    });
+    out.sort((a, b) => b.sortKey.localeCompare(a.sortKey));
+    return out;
+  }
+  function closeScheduleCellHistoryModal() {
+    const existing = document.getElementById("sch-history-overlay");
+    if (existing) existing.remove();
+    document.removeEventListener("keydown", scheduleCellHistoryEscHandler, true);
+  }
+  function scheduleCellHistoryEscHandler(e) {
+    if (e.key === "Escape") closeScheduleCellHistoryModal();
+  }
+  function openScheduleCellHistoryModal(staffId, dateKey) {
+    closeScheduleCellHistoryModal();
+    const staff = getStaffListForMonth(scheduleUi.year, scheduleUi.monthIndex).find((s) => s.id === staffId) || scheduleData.staff.find((s) => s.id === staffId);
+    const d = new Date(`${dateKey}T00:00:00`);
+    const wd = isNaN(d.getTime()) ? "" : WEEKDAYS[d.getDay()];
+    const dateLabel = wd ? `${dateKey} (${wd})` : dateKey;
+    const entries = scheduleCellHistoryEntries(staffId, dateKey);
+    const rows = entries.map((e) => `
+      <div class="sch-history-row">
+        <div class="sch-history-meta"><span class="sch-history-when">${esc(e.when)}</span><span class="sch-history-who">${esc(e.who)}</span></div>
+        <div class="sch-history-text">${esc(e.text)}</div>
+      </div>
+    `).join("");
+    const overlay = document.createElement("div");
+    overlay.id = "sch-history-overlay";
+    overlay.className = "sch-preview-overlay";
+    overlay.innerHTML = `
+      <div class="sch-preview-box sch-history-box">
+        <div class="sch-preview-head">
+          <span>${esc(staff ? staff.name : "")} · ${esc(dateLabel)} 수정 이력</span>
+          <button type="button" class="sch-preview-close" id="sch-history-close-x" aria-label="닫기">✕</button>
+        </div>
+        <div class="sch-preview-body sch-history-body">
+          <div class="sch-adjust-desc">최근 ${ACTIVITY_LOG_RETENTION_DAYS}일 이내에 이 칸에서 있었던 변경 내역이에요.</div>
+          ${rows ? `<div class="sch-history-list">${rows}</div>` : `<div class="sch-adjust-empty">이 칸에는 아직 기록된 변경 이력이 없어요.</div>`}
+        </div>
+        <div class="sch-preview-actions">
+          <button type="button" class="ghost-btn" id="sch-history-close-btn">닫기</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    overlay.onclick = (e) => { if (e.target === overlay) closeScheduleCellHistoryModal(); };
+    document.getElementById("sch-history-close-x").onclick = () => closeScheduleCellHistoryModal();
+    document.getElementById("sch-history-close-btn").onclick = () => closeScheduleCellHistoryModal();
+    setTimeout(() => document.addEventListener("keydown", scheduleCellHistoryEscHandler, true), 0);
+  }
+
+  // ----- 셀 메모 입력 모달 -----
+  function closeScheduleMemoModal() {
+    const existing = document.getElementById("sch-memo-overlay");
+    if (existing) existing.remove();
+    document.removeEventListener("keydown", scheduleMemoEscHandler, true);
+  }
+  function scheduleMemoEscHandler(e) {
+    if (e.key === "Escape") closeScheduleMemoModal();
+  }
+  function openScheduleMemoModal(staffId, dateKey) {
+    if (scheduleIsDateLocked(dateKey)) {
+      flashScheduleStatus("잠긴 달이에요. 잠금을 해제한 뒤 수정해주세요.");
+      return;
+    }
+    closeScheduleMemoModal();
+    const staff = getStaffListForMonth(scheduleUi.year, scheduleUi.monthIndex).find((s) => s.id === staffId) || scheduleData.staff.find((s) => s.id === staffId);
+    const current = getScheduleMemo(staffId, dateKey);
+    const overlay = document.createElement("div");
+    overlay.id = "sch-memo-overlay";
+    overlay.className = "sch-preview-overlay";
+    overlay.innerHTML = `
+      <div class="sch-preview-box sch-memo-box">
+        <div class="sch-preview-head">
+          <span>${esc(staff ? staff.name : "")} · ${esc(dateKey)} 메모</span>
+          <button type="button" class="sch-preview-close" id="sch-memo-close-x" aria-label="닫기">✕</button>
+        </div>
+        <div class="sch-preview-body sch-memo-body">
+          <textarea class="add-input sch-memo-textarea" id="sch-memo-textarea" placeholder="이 날짜에 남길 메모를 입력하세요">${esc(current)}</textarea>
+        </div>
+        <div class="sch-preview-actions">
+          ${current ? `<button type="button" class="ghost-btn danger" id="sch-memo-delete">삭제</button>` : ""}
+          <button type="button" class="ghost-btn" id="sch-memo-cancel">취소</button>
+          <button type="button" class="primary-btn" id="sch-memo-save">저장</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    overlay.onclick = (e) => { if (e.target === overlay) closeScheduleMemoModal(); };
+    document.getElementById("sch-memo-close-x").onclick = () => closeScheduleMemoModal();
+    document.getElementById("sch-memo-cancel").onclick = () => closeScheduleMemoModal();
+    const deleteBtn = document.getElementById("sch-memo-delete");
+    if (deleteBtn) {
+      deleteBtn.onclick = () => {
+        setScheduleMemo(staffId, dateKey, "");
+        closeScheduleMemoModal();
+        updateScheduleTableArea();
+      };
+    }
+    document.getElementById("sch-memo-save").onclick = () => {
+      const val = document.getElementById("sch-memo-textarea").value;
+      setScheduleMemo(staffId, dateKey, val);
+      closeScheduleMemoModal();
+      updateScheduleTableArea();
+    };
+    setTimeout(() => {
+      document.addEventListener("keydown", scheduleMemoEscHandler, true);
+      const ta = document.getElementById("sch-memo-textarea");
+      if (ta) { ta.focus(); ta.select(); }
+    }, 0);
+  }
+
+  // ----- "가감점 취합" 팝업: 메모에 선 투입/연장/초과/라운딩/동석/역동석 문구가 있는
+  // 날짜를 상담사별로 모아서 보여준다. -----
+  function closeScheduleAdjustModal() {
+    const existing = document.getElementById("sch-adjust-overlay");
+    if (existing) existing.remove();
+    document.removeEventListener("keydown", scheduleAdjustEscHandler, true);
+  }
+  function scheduleAdjustEscHandler(e) {
+    if (e.key === "Escape") closeScheduleAdjustModal();
+  }
+  // 한 상담사의 entries를 "8/12 선투입, 8/14 연장근무" 형태의 텍스트로 만든다.
+  function scheduleAdjustCopyText(monthIndex, entries) {
+    return entries.map((en) => `${monthIndex + 1}/${en.day} ${en.label}`).join(", ");
+  }
+  function openScheduleAdjustModal() {
+    closeScheduleAdjustModal();
+    const { year, monthIndex } = scheduleUi;
+    const summary = scheduleBuildAdjustSummary(year, monthIndex);
+    const bodyHtml = summary.length === 0
+      ? `<div class="sch-adjust-empty">${esc(scheduleMonthLabel())}에는 "선 투입 / 연장 / 초과 / 라운딩 / 동석 / 역동석" 문구가 담긴 메모가 없어요.</div>`
+      : `<div class="sch-adjust-list">
+          ${summary.map((agent) => `
+            <div class="sch-adjust-row" data-staff-id="${esc(agent.id)}">
+              <div class="sch-adjust-row-head">
+                <div class="sch-adjust-name">${esc(agent.name)}${agent.nickname ? ` <span class="sch-adjust-nick">${esc(agent.nickname)}</span>` : ""}</div>
+                <button type="button" class="sch-adjust-copy-btn" data-copy-staff="${esc(agent.id)}">${ICON_CLIPBOARD} 복사</button>
+              </div>
+              <div class="sch-adjust-detail">${agent.entries.map((en) => `<span class="sch-adjust-chip">${monthIndex + 1}/${en.day} ${esc(en.label)}</span>`).join("")}</div>
+            </div>
+          `).join("")}
+        </div>`;
+
+    const overlay = document.createElement("div");
+    overlay.id = "sch-adjust-overlay";
+    overlay.className = "sch-preview-overlay";
+    overlay.innerHTML = `
+      <div class="sch-preview-box sch-adjust-box">
+        <div class="sch-preview-head">
+          <span>가감점 취합 · ${esc(scheduleMonthLabel())}</span>
+          <button type="button" class="sch-preview-close" id="sch-adjust-close-x" aria-label="닫기">✕</button>
+        </div>
+        <div class="sch-preview-body sch-adjust-body">
+          <div class="sch-adjust-desc">메모에 <b>선투입 / 선 투입 / 연장 / 연장근무 / 연장 근무 / 초과 / 라운딩 / 동석 / 역동석</b> 문구가 포함된 날짜를 상담사별로 모아서 보여줘요.</div>
+          ${bodyHtml}
+        </div>
+        <div class="sch-preview-actions">
+          <button type="button" class="ghost-btn" id="sch-adjust-close-btn">닫기</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    overlay.onclick = (e) => { if (e.target === overlay) closeScheduleAdjustModal(); };
+    document.getElementById("sch-adjust-close-x").onclick = () => closeScheduleAdjustModal();
+    document.getElementById("sch-adjust-close-btn").onclick = () => closeScheduleAdjustModal();
+    overlay.querySelectorAll(".sch-adjust-copy-btn").forEach((btn) => {
+      btn.onclick = () => {
+        const staffId = btn.getAttribute("data-copy-staff");
+        const agent = summary.find((a) => a.id === staffId);
+        if (!agent) return;
+        const text = scheduleAdjustCopyText(monthIndex, agent.entries);
+        scheduleCopyTextToClipboard(text, () => {
+          const original = `${ICON_CLIPBOARD} 복사`;
+          btn.innerHTML = "복사됨!";
+          btn.classList.add("is-copied");
+          setTimeout(() => { btn.innerHTML = original; btn.classList.remove("is-copied"); }, 1200);
+        });
+      };
+    });
+    setTimeout(() => document.addEventListener("keydown", scheduleAdjustEscHandler, true), 0);
+  }
+  // 클립보드 복사 (구형 환경 대비 execCommand 폴백 포함)
+  function scheduleCopyTextToClipboard(text, onDone) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(() => { if (onDone) onDone(); }).catch(() => {
+        scheduleCopyTextFallback(text, onDone);
+      });
+    } else {
+      scheduleCopyTextFallback(text, onDone);
+    }
+  }
+  function scheduleCopyTextFallback(text, onDone) {
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+      if (onDone) onDone();
+    } catch (e) {
+      flashScheduleStatus("복사 실패");
+    }
+  }
+
+  // ----- 스케줄 셀: 키보드로 상하좌우/Tab 이동 + 텍스트 직접 입력 -----
+  // 칸을 클릭하거나 방향키로 이동해서 포커스를 두면(파란 테두리), 그 상태에서
+  // 글자를 바로 치기 시작하면 입력창이 뜬다. Enter/Tab으로 확정하고, 확정한 값이
+  // scheduleTokenToRecord가 알아보는 값(근무/오프/연차 등)이 아니면 저장하지 않고
+  // 빨간 테두리로 오류를 표시한 채 그 칸에 그대로 머문다. Esc는 취소.
+  let scheduleActiveEdit = null; // { cell }
+
+  function scheduleFindCell(staffId, dateKey) {
+    const root = document.getElementById("schedule-table-area");
+    if (!root) return null;
+    const cells = root.querySelectorAll(".sch-cell");
+    for (let i = 0; i < cells.length; i++) {
+      if (cells[i].getAttribute("data-staff-id") === staffId && cells[i].getAttribute("data-date") === dateKey) return cells[i];
+    }
+    return null;
+  }
+  function scheduleVisibleCells() {
+    const root = document.getElementById("schedule-table-area");
+    if (!root) return [];
+    return Array.from(root.querySelectorAll(".sch-cell")).filter((c) => {
+      if (c.classList.contains("sch-col-hidden")) return false;
+      const tr = c.closest("tr");
+      if (tr && tr.classList.contains("sch-row-hidden")) return false;
+      return true;
+    });
+  }
+  function scheduleNeighborCell(cell, dir) {
+    const visible = scheduleVisibleCells();
+    const rowIdx = Number(cell.getAttribute("data-row-idx"));
+    const day = Number(cell.getAttribute("data-day"));
+    if (dir === "left" || dir === "right") {
+      const rowCells = visible.filter((c) => Number(c.getAttribute("data-row-idx")) === rowIdx)
+        .sort((a, b) => Number(a.getAttribute("data-day")) - Number(b.getAttribute("data-day")));
+      const idx = rowCells.indexOf(cell);
+      if (idx === -1) return null;
+      return (dir === "right") ? (rowCells[idx + 1] || null) : (rowCells[idx - 1] || null);
+    }
+    const colCells = visible.filter((c) => Number(c.getAttribute("data-day")) === day)
+      .sort((a, b) => Number(a.getAttribute("data-row-idx")) - Number(b.getAttribute("data-row-idx")));
+    const idx2 = colCells.indexOf(cell);
+    if (idx2 === -1) return null;
+    return (dir === "down") ? (colCells[idx2 + 1] || null) : (colCells[idx2 - 1] || null);
+  }
+  function scheduleMoveFocus(cell, dir) {
+    const target = scheduleNeighborCell(cell, dir);
+    if (target) target.focus();
+  }
+  // 편집 중 저장/취소가 끝나면 표를 다시 그리고, 가능하면 같은 칸(또는 이동한 칸)에 포커스를 되돌린다.
+  function scheduleExitCellEdit(staffId, dateKey, moveDir) {
+    scheduleActiveEdit = null;
+    updateScheduleTableArea();
+    const cell = (staffId != null && dateKey != null) ? scheduleFindCell(staffId, dateKey) : null;
+    if (!cell) return;
+    if (moveDir) scheduleMoveFocus(cell, moveDir);
+    else cell.focus();
+  }
+  // 입력값을 확정 시도한다. 빈 값이면 기본값(근무)으로, 알아보는 근태 표현이면 그 값으로 저장.
+  // 알아보지 못하는 텍스트면 mode에 따라: "block"=그 칸에 그대로 머물며 오류 표시,
+  // "revert"=저장하지 않고 원래 값으로 되돌리며 안내만 띄움.
+  // 반환값: 실제로 편집 모드를 빠져나갔으면(저장/되돌림) true, 오류로 그 칸에 계속 머물면 false.
+  function scheduleFinalizeCellEdit(cell, staffId, dateKey, rawValue, mode, moveDir) {
+    const trimmed = (rawValue || "").trim();
+    const mapped = trimmed === "" ? { status: "WORK", attendance: null } : scheduleTokenToRecord(trimmed);
+    if (!mapped) {
+      if (mode === "revert") {
+        scheduleExitCellEdit(staffId, dateKey, null);
+        flashScheduleStatus(`인식할 수 없는 값이라 되돌렸어요: "${trimmed}"`);
+        return true;
+      }
+      const input = cell.querySelector(".sch-cell-input");
+      if (input) {
+        input.classList.add("sch-cell-input--error");
+        input.title = `"${trimmed}"은(는) 등록된 근태가 아니에요.`;
+        input.focus();
+        input.select();
+      }
+      flashScheduleStatus(`인식할 수 없는 값이에요: "${trimmed}"`);
+      return false;
+    }
+    setScheduleRecord(staffId, dateKey, { status: mapped.status, attendance: mapped.attendance || null });
+    scheduleExitCellEdit(staffId, dateKey, moveDir);
+    return true;
+  }
+  function scheduleStartCellEdit(cell, typedChar) {
+    if (cell.classList.contains("sch-cell--editing")) return;
+    const staffId = cell.getAttribute("data-staff-id");
+    const dateKey = cell.getAttribute("data-date");
+    if (scheduleIsDateLocked(dateKey)) { flashScheduleStatus("잠긴 달이에요. 잠금을 해제한 뒤 수정해주세요."); return; }
+    closeScheduleMenu();
+    const labelEl = cell.querySelector(".sch-cell-label");
+    const originalLabel = labelEl ? labelEl.textContent : "";
+    const startValue = (typedChar === null) ? originalLabel : typedChar;
+    cell.classList.add("sch-cell--editing");
+    cell.innerHTML = `<input type="text" class="sch-cell-input" />`;
+    const input = cell.querySelector(".sch-cell-input");
+    input.value = startValue;
+    scheduleActiveEdit = { cell };
+    let finished = false;
+    // 값이 틀려서 그 칸에 그대로 머무는 경우(mode="block"이고 인식 실패)엔 finished를
+    // true로 고정하면 안 된다. 그러면 사용자가 값을 바로잡아도 이후의 Enter/Tab이
+    // "이미 끝난 편집"으로 취급되어 아무 반응이 없는 문제가 생긴다.
+    function finish(mode, moveDir) {
+      if (finished) return;
+      if (mode === "cancel") { finished = true; scheduleExitCellEdit(staffId, dateKey, null); return; }
+      const done = scheduleFinalizeCellEdit(cell, staffId, dateKey, input.value, mode, moveDir);
+      if (done) finished = true;
+    }
+    input.onkeydown = (e) => {
+      e.stopPropagation();
+      if (e.key === "Enter") { e.preventDefault(); finish("block", null); }
+      else if (e.key === "Escape") { e.preventDefault(); finish("cancel", null); }
+      else if (e.key === "Tab") { e.preventDefault(); finish("block", e.shiftKey ? "left" : "right"); }
+    };
+    // 오류로 빨갛게 표시된 뒤 글자를 다시 고치기 시작하면, 확정하기 전이라도 오류 표시를 지운다.
+    input.oninput = () => {
+      if (input.classList.contains("sch-cell-input--error")) {
+        input.classList.remove("sch-cell-input--error");
+        input.title = "";
+      }
+    };
+    input.onblur = () => finish("revert", null);
+    requestAnimationFrame(() => {
+      input.focus();
+      if (typedChar === null) input.select();
+      else input.setSelectionRange(input.value.length, input.value.length);
+    });
+  }
+  function scheduleCommitActiveEditIfOutside(target) {
+    if (!scheduleActiveEdit) return;
+    if (scheduleActiveEdit.cell.contains(target)) return;
+    // 이 핸들러는 mousedown "캡처" 단계라, 사용자가 실제로 누른 요소(target)에
+    // 이벤트가 도달하기도 전에 먼저 실행된다. 여기서 곧바로 blur()를 호출해
+    // 표 전체를 innerHTML로 다시 그리면, 방금 클릭한 그 DOM 노드가 target에
+    // 닿기 전에 파괴되어 click 이벤트 자체가 발생하지 않는 문제가 있었다
+    // (다른 칸 클릭, 행 그룹 접기/펼치기 화살표 클릭 등 첫 클릭이 씹힘).
+    // 그래서 커밋(재렌더링)을 한 틱(setTimeout 0) 늦춰서, 원래 클릭이 target까지
+    // 정상적으로 전달되고 처리된 뒤에 편집을 정리하도록 한다.
+    const cellAtCapture = scheduleActiveEdit.cell;
+    setTimeout(() => {
+      if (!scheduleActiveEdit || scheduleActiveEdit.cell !== cellAtCapture) return; // 그 사이 이미 다른 방식으로 정리됨
+      if (!document.contains(cellAtCapture)) { scheduleActiveEdit = null; return; } // 그 사이 다른 재렌더링으로 이미 떨어져 나감
+      const input = cellAtCapture.querySelector(".sch-cell-input");
+      if (input) input.blur(); // blur 핸들러(finish("revert"))가 정리를 맡는다.
+    }, 0);
+  }
+  document.addEventListener("mousedown", (e) => scheduleCommitActiveEditIfOutside(e.target), true);
+
+  function scheduleCellKeydown(e, cell) {
+    if (cell.classList.contains("sch-cell--editing")) return;
+    const key = e.key;
+    if (key === "ArrowUp") { e.preventDefault(); scheduleMoveFocus(cell, "up"); return; }
+    if (key === "ArrowDown") { e.preventDefault(); scheduleMoveFocus(cell, "down"); return; }
+    if (key === "ArrowLeft") { e.preventDefault(); scheduleMoveFocus(cell, "left"); return; }
+    if (key === "ArrowRight") { e.preventDefault(); scheduleMoveFocus(cell, "right"); return; }
+    if (key === "Tab") { e.preventDefault(); scheduleMoveFocus(cell, e.shiftKey ? "left" : "right"); return; }
+    if (key === "Enter" || key === "F2") { e.preventDefault(); scheduleStartCellEdit(cell, null); return; }
+    if (key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      e.preventDefault();
+      scheduleStartCellEdit(cell, key);
+    }
+  }
+
+  function attachScheduleTableHandlers(root) {
+    root.querySelectorAll(".sch-cell").forEach((cell) => {
+      // 왼쪽 클릭(드래그 없이 눌렀다 뗌)은 이제 메뉴를 열지 않는다 — 셀 선택/드래그 선택
+      // 용도로만 쓰고, 그 칸 하나의 메뉴(상태 변경/메모/이력 등)는 오른쪽 클릭(우클릭)
+      // 으로 연다.
+      cell.oncontextmenu = (e) => {
+        e.preventDefault();
+        openScheduleMenu(cell, cell.getAttribute("data-staff-id"), cell.getAttribute("data-date"));
+      };
+      cell.onmousedown = (e) => {
+        if (e.button !== 0) return; // 왼쪽 버튼만
+        scheduleSelectDragging = true;
+        scheduleSelectMoved = false;
+        scheduleSelectAnchor = { rowIdx: Number(cell.getAttribute("data-row-idx")), day: Number(cell.getAttribute("data-day")) };
+        scheduleSelectCurrent = scheduleSelectAnchor;
+        e.preventDefault(); // 드래그 중 글자 선택(파랗게 칠해지는 것) 방지
+        // mousedown에서 preventDefault()를 하면 브라우저가 클릭에 따른 기본 포커스 이동까지
+        // 취소해버려서, 셀을 클릭해도 이 tabindex="0" 셀에 실제 포커스가 잡히지 않는 문제가
+        // 있었다. 그러면 클릭 직후 방향키·Tab 이동이나 글자 바로 입력(scheduleCellKeydown)이
+        // 전혀 동작하지 않으므로, 여기서 명시적으로 포커스를 줘서 이어서 키보드 조작이
+        // 가능하게 한다.
+        cell.focus();
+      };
+      cell.onmouseenter = () => {
+        if (!scheduleSelectDragging) return;
+        const rowIdx = Number(cell.getAttribute("data-row-idx"));
+        const day = Number(cell.getAttribute("data-day"));
+        if (rowIdx !== scheduleSelectAnchor.rowIdx || day !== scheduleSelectAnchor.day) scheduleSelectMoved = true;
+        scheduleSelectCurrent = { rowIdx, day };
+        scheduleApplySelectionHighlight();
+      };
+      cell.onkeydown = (e) => scheduleCellKeydown(e, cell);
+    });
+    root.querySelectorAll(".sch-required-input").forEach((input) => {
+      // 입력칸을 벗어날 때(blur) 또는 Enter 시 저장. 매 타이핑마다 전체를 다시 그리지 않아
+      // 숫자 입력 중 표가 깜빡이거나 포커스가 빠지지 않는다.
+      input.onchange = () => {
+        const { year, monthIndex } = scheduleUi;
+        setRequiredHeadcount(
+          year, monthIndex,
+          input.getAttribute("data-required-group"),
+          input.getAttribute("data-required-type"),
+          Number(input.getAttribute("data-required-day")),
+          input.value
+        );
+        renderApp();
+      };
+      input.onkeydown = (e) => { if (e.key === "Enter") input.blur(); };
+    });
+    root.querySelectorAll("[data-toggle-row-group]").forEach((el) => {
+      el.onclick = (e) => {
+        e.stopPropagation();
+        scheduleToggleRowGroup(el.getAttribute("data-toggle-row-group"));
+      };
+    });
+    // 열 머리글(날짜)·행 머리글(닉네임 칸) 클릭 = 선택 토글, 오른쪽 클릭 = 접기 메뉴 열기
+    root.querySelectorAll(".sch-col-th").forEach((th) => {
+      th.onclick = (e) => { e.stopPropagation(); scheduleToggleColSelection(th.getAttribute("data-col-key")); };
+      th.oncontextmenu = (e) => scheduleHeaderRightClick(th, e);
+    });
+    root.querySelectorAll(".sch-row-th").forEach((td) => {
+      td.onclick = (e) => { e.stopPropagation(); scheduleToggleRowSelection(td.getAttribute("data-row-key")); };
+      td.oncontextmenu = (e) => scheduleHeaderRightClick(td, e);
+    });
+    // 헤더가 아닌 다른 곳을 클릭하면 열/행 선택을 해제한다.
+    root.onclick = (e) => {
+      if (!e.target.closest(".sch-col-th") && !e.target.closest(".sch-row-th")) scheduleClearHeaderSelection();
+    };
+    scheduleApplyHeaderSelectionHighlight();
+  }
+
+  // ----- 월별 스케줄 일괄 삭제 -----
+  // "등록된 일정 전체 삭제" 및 조/업무 구분별 삭제(주간 채팅·주간 유선·야간 채팅·야간 유선)를
+  // 지원한다. 대상은 항상 "현재 화면에 보이는 달"이며, 대상 인원의 해당 달 1일~말일 기록을
+  // 전부 기본값(근무)으로 되돌린다. 실수로 누르는 걸 막기 위해 실행 전에 꼭 확인을 받는다.
+  const SCHEDULE_DELETE_SCOPES = [
+    { key: "ALL", label: "등록된 일정 전체 삭제", danger: true },
+    { key: "ADMIN", label: "관리자 삭제" },
+    { key: "DAY_CHAT", label: "주간 채팅 삭제" },
+    { key: "DAY_VOICE", label: "주간 유선 삭제" },
+    { key: "NIGHT_CHAT", label: "야간 채팅 삭제" },
+    { key: "NIGHT_VOICE", label: "야간 유선 삭제" },
+  ];
+
+  // scope에 해당하는 인원 목록과 화면 표시용 라벨을 반환한다.
+  // (표를 그릴 때 쓰는 것과 같은 분류 기준 — 관리자/주간/야간, 채팅/유선 — 을 그대로 사용해서
+  // "표에서 보이는 그룹"과 "삭제 대상"이 항상 일치하도록 한다)
+  function scheduleDeleteTargets(scope, year, monthIndex) {
+    const monthStaff = getStaffListForMonth(year, monthIndex);
+    if (scope === "ALL") return monthStaff;
+    if (scope === "ADMIN") return monthStaff.filter((s) => s.isAdmin);
+    const nonAdmin = monthStaff.filter((s) => !s.isAdmin);
+    const dayStaff = nonAdmin.filter((s) => s.group !== "night");
+    const nightStaff = nonAdmin.filter((s) => s.group === "night");
+    if (scope === "DAY_CHAT") return splitByType(dayStaff).chat;
+    if (scope === "DAY_VOICE") return splitByType(dayStaff).voice;
+    if (scope === "NIGHT_CHAT") return splitByType(nightStaff).chat;
+    if (scope === "NIGHT_VOICE") return splitByType(nightStaff).voice;
+    return [];
+  }
+
+  function scheduleBulkDelete(scope) {
+    const meta = SCHEDULE_DELETE_SCOPES.find((s) => s.key === scope);
+    const label = meta ? meta.label.replace(/ 삭제$/, "") : "선택한";
+    const { year, monthIndex } = scheduleUi;
+    if (scheduleIsMonthLocked(year, monthIndex)) {
+      flashScheduleStatus("이 달은 잠겨 있어요. 잠금을 해제한 뒤 삭제해주세요.");
+      return;
+    }
+    const targetStaff = scheduleDeleteTargets(scope, year, monthIndex);
+
+    if (targetStaff.length === 0) {
+      flashScheduleStatus(`${label} 대상 인원이 없어요.`);
+      return;
+    }
+    const ok = window.confirm(
+      `${scheduleMonthLabel()} "${label}" 일정을 모두 삭제할까요?\n대상 인원 ${targetStaff.length}명 · 이 달의 모든 날짜가 기본값(근무)으로 되돌아가요. (Ctrl+Z로 되돌리기 가능)`
+    );
+    if (!ok) return;
+
+    recordUndo(`${label} 일괄 삭제`, SCHEDULE_KEY, reloadScheduleData);
+    const numDays = scheduleDaysInMonth(year, monthIndex);
+    let cleared = 0;
+    targetStaff.forEach((s) => {
+      for (let d = 1; d <= numDays; d++) {
+        const dateKey = scheduleDateKey(year, monthIndex, d);
+        const key = scheduleRecordKey(s.id, dateKey);
+        if (scheduleData.records[key]) {
+          delete scheduleData.records[key];
+          cleared += 1;
+        }
+      }
+    });
+    saveScheduleData();
+    updateScheduleTableArea();
+    flashScheduleStatus(cleared > 0 ? `${label} 일정 삭제됨 (${targetStaff.length}명 · ${cleared}칸)` : `${label}에는 삭제할 일정이 없었어요.`);
+  }
+
+  function openScheduleDeleteMenu(anchorEl) {
+    closeScheduleMenu();
+    const rect = anchorEl.getBoundingClientRect();
+    const menu = document.createElement("div");
+    menu.id = "sch-menu";
+    menu.className = "sch-menu";
+    menu.innerHTML = SCHEDULE_DELETE_SCOPES.map((o, idx) => {
+      const divider = idx === 1 ? `<div class="sch-menu-divider"></div>` : "";
+      return `${divider}<button type="button" class="${o.danger ? "sch-menu-danger" : ""}" data-scope="${o.key}">${o.danger ? ICON_TRASH + " " : ""}${o.label}</button>`;
+    }).join("");
+    document.body.appendChild(menu);
+    const top = Math.min(rect.bottom + 4, window.innerHeight - menu.offsetHeight - 8);
+    const left = Math.min(rect.left, window.innerWidth - menu.offsetWidth - 8);
+    menu.style.top = `${Math.max(8, top)}px`;
+    menu.style.left = `${Math.max(8, left)}px`;
+    menu.querySelectorAll("button[data-scope]").forEach((btn) => {
+      btn.onclick = () => {
+        const scope = btn.getAttribute("data-scope");
+        closeScheduleMenu();
+        scheduleBulkDelete(scope);
+      };
+    });
+    setTimeout(() => document.addEventListener("mousedown", scheduleMenuOutsideHandler, true), 0);
+  }
+
+  // ----- 이미지로 저장: 다운로드 전 미리보기 모달 -----
+  function closeSchedulePreview() {
+    const existing = document.getElementById("sch-preview-overlay");
+    if (existing) existing.remove();
+    document.removeEventListener("keydown", schedulePreviewEscHandler, true);
+  }
+  function schedulePreviewEscHandler(e) {
+    if (e.key === "Escape") closeSchedulePreview();
+  }
+  // dataUrl: html2canvas로 만든 캡처 이미지, filename: 실제 다운로드할 때 쓸 파일명,
+  // modeName: "주간"/"유선" 등 캡처 모드 이름 (전체 저장이면 null)
+  function openSchedulePreview(dataUrl, filename, modeName) {
+    closeSchedulePreview();
+    const overlay = document.createElement("div");
+    overlay.id = "sch-preview-overlay";
+    overlay.className = "sch-preview-overlay";
+    overlay.innerHTML = `
+      <div class="sch-preview-box">
+        <div class="sch-preview-head">
+          <span>${modeName ? `${esc(modeName)} 이미지 미리보기` : "이미지 미리보기"}</span>
+          <button type="button" class="sch-preview-close" id="sch-preview-close-x" aria-label="닫기">✕</button>
+        </div>
+        <div class="sch-preview-body">
+          <img src="${dataUrl}" alt="월별 스케줄 캡처 미리보기">
+        </div>
+        <div class="sch-preview-actions">
+          <button type="button" class="ghost-btn" id="sch-preview-cancel">닫기</button>
+          <button type="button" class="primary-btn" id="sch-preview-download">${ICON_DOWNLOAD} 이미지 다운로드</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    overlay.onclick = (e) => { if (e.target === overlay) closeSchedulePreview(); };
+    document.getElementById("sch-preview-close-x").onclick = () => closeSchedulePreview();
+    document.getElementById("sch-preview-cancel").onclick = () => closeSchedulePreview();
+    document.getElementById("sch-preview-download").onclick = () => {
+      const link = document.createElement("a");
+      link.download = filename;
+      link.href = dataUrl;
+      link.click();
+      closeSchedulePreview();
+      flashScheduleStatus("이미지 저장됨");
+    };
+    setTimeout(() => document.addEventListener("keydown", schedulePreviewEscHandler, true), 0);
+  }
+
+  // ----- 월별 스케줄 이미지로 저장: 전체/주간/야간/유선/채팅 -----
+  // 유선·채팅은 주야간을 통합해서 한 장으로 캡처하되, 캡처 이미지 안에서는
+  // 주간/야간 구획을 나눠서 보여준다. (buildScheduleTableHtml·buildScheduleLogHtml 참고)
+  const SCHEDULE_CAPTURE_MODES = [
+    { key: "ALL", label: "전체 저장" },
+    { key: "ADMIN", label: "관리자 저장" },
+    { key: "DAY", label: "주간 저장" },
+    { key: "NIGHT", label: "야간 저장" },
+    { key: "VOICE", label: "유선 저장" },
+    { key: "CHAT", label: "채팅 저장" },
+  ];
+
+  function openScheduleCaptureMenu(anchorEl) {
+    closeScheduleMenu();
+    const rect = anchorEl.getBoundingClientRect();
+    const menu = document.createElement("div");
+    menu.id = "sch-menu";
+    menu.className = "sch-menu";
+    menu.innerHTML = SCHEDULE_CAPTURE_MODES.map((o) =>
+      `<button type="button" data-capture-mode="${o.key}">${ICON_CAMERA} ${o.label}</button>`
+    ).join("");
+    document.body.appendChild(menu);
+    const top = Math.min(rect.bottom + 4, window.innerHeight - menu.offsetHeight - 8);
+    const left = Math.min(rect.left, window.innerWidth - menu.offsetWidth - 8);
+    menu.style.top = `${Math.max(8, top)}px`;
+    menu.style.left = `${Math.max(8, left)}px`;
+    menu.querySelectorAll("button[data-capture-mode]").forEach((btn) => {
+      btn.onclick = () => {
+        const mode = btn.getAttribute("data-capture-mode");
+        closeScheduleMenu();
+        captureSchedulePage(mode);
+      };
+    });
+    setTimeout(() => document.addEventListener("mousedown", scheduleMenuOutsideHandler, true), 0);
+  }
+
+  // "이번 달 지각·결근 기록" 영역의 "되돌리기" 버튼에 클릭 이벤트를 연결한다.
+  // 이 영역은 되돌리기를 누를 때마다 통째로 다시 그려지므로, 매번 다시 호출해서
+  // 새로 그려진 버튼에도 이벤트가 붙도록 해야 한다.
+  function attachScheduleLogHandlers(root) {
+    root.querySelectorAll("[data-action='clear-sch-attendance']").forEach((btn) => {
+      btn.onclick = () => {
+        setScheduleRecord(btn.getAttribute("data-staff-id"), btn.getAttribute("data-date"), { attendance: null, status: "WORK" });
+        updateScheduleTableArea();
+      };
+    });
+  }
+
+  // "숨긴 열/행" 패널에 나열할 칩들의 HTML을 만든다. 연속 날짜는 범위로, 한 번에 같이
+  // 접은 정보 칸/인원/집계행 묶음(2개 이상)은 한 칩으로 묶어서 보여준다.
+  function scheduleHiddenItemsListHtml() {
+    const effectiveBatches = scheduleEffectiveHiddenBatches();
+    const coveredInfoCols = new Set();
+    const coveredStaffIds = new Set();
+    const coveredSummaryRows = new Set();
+    effectiveBatches.forEach((b) => {
+      b.infoCols.forEach((k) => coveredInfoCols.add(k));
+      b.staffIds.forEach((k) => coveredStaffIds.add(k));
+      b.summaryRows.forEach((k) => coveredSummaryRows.add(k));
+    });
+    const batchLabel = (b) => {
+      const parts = [];
+      b.infoCols.forEach((key) => {
+        const col = SCHEDULE_INFO_COLS.find((c) => c.key === key);
+        parts.push(esc(col ? col.label : key));
+      });
+      b.staffIds.forEach((id) => {
+        const staff = getStaffListForMonth(scheduleUi.year, scheduleUi.monthIndex).find((s) => s.id === id);
+        parts.push(esc(staff ? staff.nickname : "(알 수 없음)"));
+      });
+      b.summaryRows.forEach((key) => parts.push(esc(schedulePrettyRowKey(key))));
+      return parts.join(", ");
+    };
+    return `
+      ${scheduleGroupConsecutiveDays(scheduleUi.manualHiddenDays).map((r) => `
+        <span class="schedule-colgroup-chip">
+          ${pad2(scheduleUi.monthIndex + 1)}/${pad2(r.start)}${r.end > r.start ? `~${pad2(scheduleUi.monthIndex + 1)}/${pad2(r.end)}` : ""}
+          <button class="sch-colgroup-toggle-btn" data-unhide-day-range="${r.start}-${r.end}">펼치기</button>
+        </span>
+      `).join("")}
+      ${effectiveBatches.map((b) => `
+        <span class="schedule-colgroup-chip">
+          ${batchLabel(b)}
+          <button class="sch-colgroup-toggle-btn" data-unhide-batch="${b.id}">펼치기</button>
+        </span>
+      `).join("")}
+      ${Array.from(scheduleUi.manualHiddenInfoCols).filter((key) => !coveredInfoCols.has(key)).map((key) => {
+        const col = SCHEDULE_INFO_COLS.find((c) => c.key === key);
+        return `
+        <span class="schedule-colgroup-chip">
+          ${esc(col ? col.label : key)}
+          <button class="sch-colgroup-toggle-btn" data-unhide-infocol="${esc(key)}">펼치기</button>
+        </span>
+      `;
+      }).join("")}
+      ${Array.from(scheduleUi.manualHiddenStaffIds).filter((id) => !coveredStaffIds.has(id)).map((id) => {
+        const staff = getStaffListForMonth(scheduleUi.year, scheduleUi.monthIndex).find((s) => s.id === id);
+        return `
+        <span class="schedule-colgroup-chip">
+          ${esc(staff ? staff.nickname : "(알 수 없음)")}
+          <button class="sch-colgroup-toggle-btn" data-unhide-staff="${id}">펼치기</button>
+        </span>
+      `;
+      }).join("")}
+      ${Array.from(scheduleUi.manualHiddenSummaryRows).filter((key) => !coveredSummaryRows.has(key)).map((key) => `
+        <span class="schedule-colgroup-chip">
+          ${esc(schedulePrettyRowKey(key))}
+          <button class="sch-colgroup-toggle-btn" data-unhide-summaryrow="${esc(key)}">펼치기</button>
+        </span>
+      `).join("")}
+    `;
+  }
+
+  function renderSchedulePage(root) {
+    root.innerHTML = `
+      <div class="schedule-top">
+        <div class="schedule-title">월별 스케줄</div>
+        <div class="schedule-month-nav">
+          <button class="schedule-month-btn" id="sch-prev-month">‹</button>
+          <div class="schedule-month-label">${scheduleMonthLabel()}${scheduleIsMonthLocked(scheduleUi.year, scheduleUi.monthIndex) ? ` <span class="sch-locked-badge">${ICON_LOCK} 확정됨</span>` : ""}</div>
+          <button class="schedule-month-btn" id="sch-next-month">›</button>
+          <button class="ghost-btn sch-lock-toggle-btn ${scheduleIsMonthLocked(scheduleUi.year, scheduleUi.monthIndex) ? "locked" : ""}" id="sch-lock-btn" style="margin-left:8px;">${scheduleIsMonthLocked(scheduleUi.year, scheduleUi.monthIndex) ? `${ICON_UNLOCK} 잠금 해제` : `${ICON_LOCK} 이 달 잠그기`}</button>
+          <button class="ghost-btn ${scheduleBulkPasteOpen ? "active" : ""}" id="sch-bulk-btn" style="margin-left:8px;">${ICON_CLIPBOARD} 일괄 붙여넣기</button>
+          <button class="ghost-btn" id="sch-capture-btn">${ICON_CAMERA} 이미지로 저장 ▾</button>
+          <button class="ghost-btn" id="sch-excel-btn">${ICON_CHART} 엑셀로 다운로드</button>
+          <button class="ghost-btn" id="sch-holidaydoc-btn">${ICON_CLIPBOARD} 휴일대체 확인서</button>
+        </div>
+      </div>
+      <div class="status" id="schedule-status"></div>
+      ${scheduleBulkPasteOpen ? `
+        <div class="schedule-bulk-panel">
+          <div class="schedule-bulk-desc">
+            한 줄에 <b>이름</b>을 쓰고 이어서 <b>1일부터 말일까지의 값</b>을 공백(탭도 가능)으로 구분해서 붙여넣으세요. 공백이 나올 때마다 다음 날짜로 넘어가요. 인원 여러 명은 줄바꿈으로 구분해서 한 번에 붙여넣을 수 있어요.<br>
+            인식되는 값: <b>1</b>(근무), <b>휴일 / 오프 / 휴무</b>(오프), <b>연차</b>, <b>대휴</b>, <b>반차</b>, <b>공휴</b>, <b>공가</b>, <b>육휴</b>, <b>특휴</b>, <b>교육</b>, <b>지각</b>, <b>결근</b>, <b>퇴사</b>. 값 개수가 이번 달 일수보다 적으면 앞에서부터만 반영되고, 많으면 초과분은 무시돼요.
+          </div>
+          <textarea class="add-input schedule-bulk-textarea" id="sch-bulk-textarea" placeholder="이기욱	휴일	1	휴일	휴일	1	휴일	1	1	1	휴일	1	1	1	대휴	1	1	1	1	휴일	1	1	1	대휴	1	1	1	휴일	1	1	1"></textarea>
+          <div class="schedule-bulk-actions">
+            <button class="primary-btn" id="sch-bulk-apply-btn">적용</button>
+            <button class="ghost-btn" id="sch-bulk-clear-btn">지우기</button>
+          </div>
+          ${scheduleBulkPasteMsg ? `<div class="schedule-bulk-result">${esc(scheduleBulkPasteMsg)}</div>` : ""}
+        </div>
+      ` : ""}
+      <div class="schedule-legend">
+        <span class="item"><span class="swatch" style="background:var(--blue);"></span>오프</span>
+        <span class="item"><span class="swatch" style="background:var(--orange);"></span>연차</span>
+        <span class="item"><span class="swatch" style="background:var(--green);"></span>대휴</span>
+        <span class="item"><span class="swatch" style="background:var(--salmon);"></span>반차</span>
+        <span class="item"><span class="swatch" style="background:var(--teal);"></span>공휴</span>
+        <span class="item"><span class="swatch" style="background:var(--purple);"></span>공가</span>
+        <span class="item"><span class="swatch" style="background:var(--pink);"></span>육휴</span>
+        <span class="item"><span class="swatch" style="background:var(--indigo);"></span>특휴</span>
+        <span class="item"><span class="swatch" style="background:var(--edu);"></span>교육</span>
+        <span class="item"><span class="swatch" style="background:var(--yellow);"></span>지각</span>
+        <span class="item"><span class="swatch" style="background:var(--red);"></span>결근</span>
+        <span class="item"><span class="swatch" style="background:var(--text-faint);"></span>퇴사</span>
+      </div>
+      <div class="schedule-table-toolbar">
+        <div class="agent-search-input">
+          <input type="text" class="agent-search-input-field" id="sch-search-input" placeholder="이름 검색" title="상담사 검색 (이름/주간/야간/채팅/유선, 쉼표로 여러 개)" value="${esc(scheduleUi.searchQuery)}" autocomplete="off">
+          ${ICON_SEARCH_MINI}
+        </div>
+        <button class="ghost-btn" id="sch-adjust-summary-btn">${ICON_CLIPBOARD} 가감점 취합</button>
+        <button class="ghost-btn ${scheduleHiddenPanelOpen ? "active" : ""}" id="sch-hidden-btn">${ICON_CALENDAR} 숨긴 열/행${scheduleHiddenCount() > 0 ? ` (${scheduleHiddenCount()})` : ""} ▾</button>
+        <button class="ghost-btn sch-delete-btn-small" id="sch-delete-btn">${ICON_TRASH} 일정 삭제</button>
+      </div>
+      ${scheduleHiddenPanelOpen ? `
+        <div class="schedule-colgroup-panel">
+          <div class="schedule-colgroup-subtitle">날짜 범위로 열 그룹 만들기</div>
+          <div class="schedule-colgroup-desc">
+            엑셀처럼 원하는 날짜 범위를 골라 그 열들을 한 번에 접거나 펼 수 있어요. 시작일과 종료일을 입력하고 "그룹 추가"를 누르면 아래 목록에 추가돼요.
+          </div>
+          <div class="schedule-colgroup-form">
+            <input type="number" min="1" max="${scheduleDaysInMonth(scheduleUi.year, scheduleUi.monthIndex)}" class="add-input" id="sch-colgroup-start" placeholder="시작일">
+            <span>~</span>
+            <input type="number" min="1" max="${scheduleDaysInMonth(scheduleUi.year, scheduleUi.monthIndex)}" class="add-input" id="sch-colgroup-end" placeholder="종료일">
+            <button class="primary-btn" id="sch-colgroup-add-btn">그룹 추가</button>
+          </div>
+          ${scheduleUi.colGroups.length === 0 ? `
+            <div class="schedule-colgroup-empty">추가된 열 그룹이 없어요.</div>
+          ` : `
+            <div class="schedule-colgroup-list">
+              ${scheduleUi.colGroups.map((g) => `
+                <span class="schedule-colgroup-chip">
+                  ${pad2(scheduleUi.monthIndex + 1)}/${pad2(g.start)}~${pad2(scheduleUi.monthIndex + 1)}/${pad2(g.end)}
+                  <button class="sch-colgroup-toggle-btn" data-toggle-colgroup="${g.id}">${g.collapsed ? "펼치기" : "접기"}</button>
+                  <button class="sch-colgroup-remove-btn" data-remove-colgroup="${g.id}">✕</button>
+                </span>
+              `).join("")}
+            </div>
+          `}
+          <div class="schedule-colgroup-divider"></div>
+          <div class="schedule-colgroup-subtitle">개별로 숨긴 열·행</div>
+          <div class="schedule-colgroup-desc">
+            표에서 날짜 칸·인원 정보 칸(닉네임~결근)·인원 닉네임 칸·집계행(관리자 인원/필요인력/대비)·그룹 제목 행(관리자/아침조/채팅/유선 등)을 클릭해 선택한 뒤(여러 개 선택 가능), 오른쪽 마우스 버튼을 눌러 "접기"를 고르면 여기에 쌓여요. 데이터는 그대로 있고 화면에서만 숨겨져요.
+          </div>
+          ${(scheduleUi.manualHiddenDays.size === 0 && scheduleUi.manualHiddenInfoCols.size === 0 && scheduleUi.manualHiddenStaffIds.size === 0 && scheduleUi.manualHiddenSummaryRows.size === 0) ? `
+            <div class="schedule-colgroup-empty">접어둔 열·행이 없어요.</div>
+          ` : `
+            <div class="schedule-colgroup-list">
+              ${scheduleHiddenItemsListHtml()}
+            </div>
+            <div><button class="ghost-btn" id="sch-unhide-all-btn">모두 펼치기</button></div>
+          `}
+        </div>
+      ` : ""}
+      <div id="schedule-table-area"><div class="schedule-table-wrap"><div class="schedule-scale-inner">${buildScheduleTableHtml()}</div></div></div>
+      <div class="schedule-log-title">이번 달 지각·결근 기록</div>
+      <div id="schedule-log-area">${buildScheduleLogHtml()}</div>
+    `;
+
+    attachScheduleTableHandlers(document.getElementById("schedule-table-area"));
+
+    document.getElementById("sch-prev-month").onclick = () => scheduleShiftMonth(-1);
+    document.getElementById("sch-next-month").onclick = () => scheduleShiftMonth(1);
+    document.getElementById("sch-lock-btn").onclick = () => scheduleToggleMonthLock(scheduleUi.year, scheduleUi.monthIndex);
+    document.getElementById("sch-capture-btn").onclick = (e) => openScheduleCaptureMenu(e.currentTarget);
+    document.getElementById("sch-excel-btn").onclick = () => exportScheduleToExcel();
+    document.getElementById("sch-holidaydoc-btn").onclick = () => generateHolidayDocx();
+    document.getElementById("sch-delete-btn").onclick = (e) => openScheduleDeleteMenu(e.currentTarget);
+    document.getElementById("sch-hidden-btn").onclick = () => {
+      scheduleHiddenPanelOpen = !scheduleHiddenPanelOpen;
+      renderApp();
+    };
+    document.getElementById("sch-adjust-summary-btn").onclick = () => openScheduleAdjustModal();
+    const schSearchInput = document.getElementById("sch-search-input");
+    if (schSearchInput) {
+      // 표 영역만 다시 그려서(전체 renderApp() 대신) 검색창의 IME 조합·포커스가 끊기지 않게 한다.
+      schSearchInput.oninput = (e) => {
+        scheduleUi.searchQuery = e.target.value;
+        updateScheduleTableArea();
+      };
+    }
+    root.querySelectorAll("[data-unhide-day-range]").forEach((btn) => {
+      const [s, e] = btn.getAttribute("data-unhide-day-range").split("-").map(Number);
+      btn.onclick = () => scheduleUnhideDayRange(s, e);
+    });
+    root.querySelectorAll("[data-unhide-batch]").forEach((btn) => {
+      btn.onclick = () => scheduleUnhideBatch(btn.getAttribute("data-unhide-batch"));
+    });
+    root.querySelectorAll("[data-unhide-infocol]").forEach((btn) => {
+      btn.onclick = () => scheduleUnhideInfoCol(btn.getAttribute("data-unhide-infocol"));
+    });
+    root.querySelectorAll("[data-unhide-staff]").forEach((btn) => {
+      btn.onclick = () => scheduleUnhideStaff(btn.getAttribute("data-unhide-staff"));
+    });
+    root.querySelectorAll("[data-unhide-summaryrow]").forEach((btn) => {
+      btn.onclick = () => scheduleUnhideSummaryRow(btn.getAttribute("data-unhide-summaryrow"));
+    });
+    const unhideAllBtn = document.getElementById("sch-unhide-all-btn");
+    if (unhideAllBtn) unhideAllBtn.onclick = () => scheduleUnhideAll();
+    const colGroupAddBtn = document.getElementById("sch-colgroup-add-btn");
+    if (colGroupAddBtn) {
+      colGroupAddBtn.onclick = () => {
+        const maxDay = scheduleDaysInMonth(scheduleUi.year, scheduleUi.monthIndex);
+        const startInput = document.getElementById("sch-colgroup-start");
+        const endInput = document.getElementById("sch-colgroup-end");
+        const s = parseInt(startInput ? startInput.value : "", 10);
+        const e = parseInt(endInput ? endInput.value : "", 10);
+        if (!s || !e || s < 1 || e < 1 || s > maxDay || e > maxDay) {
+          flashScheduleStatus("올바른 날짜(1~" + maxDay + ")를 입력해주세요.");
+          return;
+        }
+        scheduleAddColGroup(s, e);
+      };
+    }
+    root.querySelectorAll("[data-toggle-colgroup]").forEach((btn) => {
+      btn.onclick = () => scheduleToggleColGroup(btn.getAttribute("data-toggle-colgroup"));
+    });
+    root.querySelectorAll("[data-remove-colgroup]").forEach((btn) => {
+      btn.onclick = () => scheduleRemoveColGroup(btn.getAttribute("data-remove-colgroup"));
+    });
+    document.getElementById("sch-bulk-btn").onclick = () => {
+      scheduleBulkPasteOpen = !scheduleBulkPasteOpen;
+      if (scheduleBulkPasteOpen) scheduleBulkPasteMsg = "";
+      renderApp();
+    };
+    const bulkTextarea = document.getElementById("sch-bulk-textarea");
+    const bulkApplyBtn = document.getElementById("sch-bulk-apply-btn");
+    const bulkClearBtn = document.getElementById("sch-bulk-clear-btn");
+    if (bulkApplyBtn) {
+      bulkApplyBtn.onclick = () => {
+        applyScheduleBulkPaste(bulkTextarea ? bulkTextarea.value : "");
+        renderApp();
+      };
+    }
+    if (bulkClearBtn) {
+      bulkClearBtn.onclick = () => {
+        if (bulkTextarea) bulkTextarea.value = "";
+        scheduleBulkPasteMsg = "";
+        renderApp();
+      };
+    }
+
+    attachScheduleLogHandlers(document.getElementById("schedule-log-area"));
+
+    fitScheduleTable();
+    syncScheduleLogWidth();
+    watchScheduleTableSize();
+    // renderSchedulePage()는 월 이동·잠금 토글·일괄 붙여넣기 등으로 화면을 다시 그릴 때마다
+    // 반복 호출된다. 매번 새 리스너를 쌓아두면 resize 이벤트마다 중복 계산이 계속 늘어나므로,
+    // 등록 전에 이전 리스너를 먼저 제거해서 항상 딱 1개씩만 걸려 있도록 한다.
+    window.removeEventListener("resize", fitScheduleTable);
+    window.removeEventListener("resize", syncScheduleLogWidth);
+    window.addEventListener("resize", fitScheduleTable);
+    window.addEventListener("resize", syncScheduleLogWidth);
+    // 웹폰트(KoPub Dotum)가 표를 처음 그릴 때 아직 로딩 중이면 실제 너비보다 좁게
+    // 측정되어 축소 비율이 맞지 않을 수 있다. 폰트 로딩이 끝난 뒤 한 번 더 재계산한다.
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(() => {
+        fitScheduleTable();
+        syncScheduleLogWidth();
+      });
+    }
+  }
+
+  /* ===================== 홈(메인) 페이지 모듈 ===================== */
+  // 그날의 근무 현황·일정·할 일·고정 메모를 한 화면에 요약해서 보여준다.
 
   // 07a1-schedule-data.js — 데이터 로드/저장/정규화, 월 잠금, 상담사 목록 동기화
   // (07-schedule.js를 기능 단위로 분할한 파일 중 하나. 실행 순서는 파일명 정렬로 유지됨)
