@@ -156,8 +156,7 @@
     const cPurple = themeColor("--purple");
     const cPink = themeColor("--pink");
     const cIndigo = themeColor("--indigo");
-    const cEdu = themeColor("--edu");
-    const cYellow = themeColor("--yellow");
+    const cAmber = themeColor("--amber");
     const cRed = themeColor("--red");
     const cFaint = themeColor("--text-faint");
 
@@ -186,9 +185,8 @@
         <span class="item"><span class="swatch" style="background:${cTeal};"></span>공휴</span>
         <span class="item"><span class="swatch" style="background:${cPurple};"></span>공가</span>
         <span class="item"><span class="swatch" style="background:${cPink};"></span>육휴</span>
-        <span class="item"><span class="swatch" style="background:${cIndigo};"></span>특휴</span>
-        <span class="item"><span class="swatch" style="background:${cEdu};"></span>교육</span>
-        <span class="item"><span class="swatch" style="background:${cYellow};"></span>지각</span>
+        <span class="item"><span class="swatch" style="background:${cIndigo};"></span>특휴 · 교육</span>
+        <span class="item"><span class="swatch" style="background:${cAmber};"></span>지각</span>
         <span class="item"><span class="swatch" style="background:${cRed};"></span>결근</span>
         <span class="item"><span class="swatch" style="background:${cFaint};"></span>퇴사</span>
       </div>

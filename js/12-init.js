@@ -1,7 +1,7 @@
   function renderApp() {
     renderNav();
     const root = document.getElementById("page-inner");
-    root.classList.toggle("wide", state.page === "schedule" || state.page === "home" || state.page === "calendar" || state.page === "qa");
+    root.classList.toggle("wide", state.page === "schedule" || state.page === "home" || state.page === "calendar");
     if (state.page === "notes") renderNotesPage(root);
     else if (state.page === "agents") renderAgentsPage(root);
     else if (state.page === "qa") renderQAPage(root);

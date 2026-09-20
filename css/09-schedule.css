@@ -232,8 +232,8 @@
   .sch-cell.st-gongga { background: var(--purple-dim); color: var(--purple); }
   .sch-cell.st-maternity { background: var(--pink-dim); color: var(--pink); }
   .sch-cell.st-special { background: var(--indigo-dim); color: var(--indigo); }
-  .sch-cell.st-education { background: var(--edu-dim); color: var(--edu); }
-  .sch-cell.st-late { background: var(--yellow-dim); color: var(--yellow); font-weight: 600; }
+  .sch-cell.st-education { background: var(--indigo-dim); color: var(--indigo); }
+  .sch-cell.st-late { background: var(--amber-dim); color: var(--amber); font-weight: 600; }
   .sch-cell.st-absent { background: var(--red-dim); color: var(--red); font-weight: 600; }
   .sch-cell.st-resigned { background: var(--hairline); color: var(--text-faint); }
   /* Ctrl+C로 복사해 둔 칸 표시(점선). 아래 선택(--selected)·포커스(:focus) 실선이 겹치면 그쪽이 이긴다. */
@@ -374,7 +374,7 @@
   .sch-log-item .sch-log-date { color: var(--text-dim); flex-shrink: 0; width: 76px; }
   .sch-log-item .sch-log-name { color: var(--text); flex-shrink: 0; }
   .sch-log-item .sch-log-tag { font-size: 11.5px; padding: 1px 8px; border-radius: 999px; }
-  .sch-log-item .sch-log-tag.late { color: var(--yellow); background: var(--yellow-dim); }
+  .sch-log-item .sch-log-tag.late { color: var(--amber); background: var(--amber-dim); }
   .sch-log-item .sch-log-tag.absent { color: var(--red); background: var(--red-dim); }
   .sch-log-item .sch-log-clear { margin-left: auto; }
   /* 캡처(이미지 저장) 시에는 "되돌리기" 버튼처럼 화면에서만 의미 있는 조작용 요소는 숨긴다. */

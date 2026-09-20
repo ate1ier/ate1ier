@@ -38,9 +38,8 @@
         <span class="item"><span class="swatch" style="background:var(--teal);"></span>공휴</span>
         <span class="item"><span class="swatch" style="background:var(--purple);"></span>공가</span>
         <span class="item"><span class="swatch" style="background:var(--pink);"></span>육휴</span>
-        <span class="item"><span class="swatch" style="background:var(--indigo);"></span>특휴</span>
-        <span class="item"><span class="swatch" style="background:var(--edu);"></span>교육</span>
-        <span class="item"><span class="swatch" style="background:var(--yellow);"></span>지각</span>
+        <span class="item"><span class="swatch" style="background:var(--indigo);"></span>특휴 · 교육</span>
+        <span class="item"><span class="swatch" style="background:var(--amber);"></span>지각</span>
         <span class="item"><span class="swatch" style="background:var(--red);"></span>결근</span>
         <span class="item"><span class="swatch" style="background:var(--text-faint);"></span>퇴사</span>
       </div>
