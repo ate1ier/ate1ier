@@ -640,6 +640,16 @@
   function scheduleCellKeydown(e, cell) {
     if (cell.classList.contains("sch-cell--editing")) return;
     const key = e.key;
+    // Ctrl/⌘+C: 선택한 칸(드래그로 고른 범위, 없으면 지금 포커스된 칸)을 메모까지 함께 복사한다.
+    // Ctrl/⌘+V는 여기서 막지 않고 그대로 통과시킨다 — 브라우저가 paste 이벤트를 띄워주면
+    // 07a9의 scheduleHandlePaste가 클립보드를 읽어 처리한다. (07a9-schedule-copy-paste.js 참고)
+    if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && scheduleKeyIsLetter(e, "c")) {
+      e.preventDefault();
+      scheduleCopySelection(cell);
+      return;
+    }
+    // Esc: 복사해 둔 범위의 점선 표시만 끈다.
+    if (key === "Escape") { scheduleClearCopiedOutline(); return; }
     if (key === "ArrowUp") { e.preventDefault(); scheduleMoveFocus(cell, "up"); return; }
     if (key === "ArrowDown") { e.preventDefault(); scheduleMoveFocus(cell, "down"); return; }
     if (key === "ArrowLeft") { e.preventDefault(); scheduleMoveFocus(cell, "left"); return; }
@@ -721,6 +731,8 @@
       if (!e.target.closest(".sch-col-th") && !e.target.closest(".sch-row-th")) scheduleClearHeaderSelection();
     };
     scheduleApplyHeaderSelectionHighlight();
+    // 표를 다시 그리면 클래스가 사라지므로, 복사해 둔 칸의 점선 표시를 다시 켠다(07a9).
+    scheduleApplyCopiedOutline();
   }
 
   // ----- 월별 스케줄 일괄 삭제 -----

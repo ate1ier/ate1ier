@@ -226,12 +226,13 @@
   }
 
   let scheduleStatusTimer = null;
-  function flashScheduleStatus(msg) {
+  // ms: 메시지를 보여줄 시간(생략하면 1.2초). 복사/붙여넣기 결과처럼 읽을 내용이 긴 안내만 더 길게 준다.
+  function flashScheduleStatus(msg, ms) {
     const el = document.getElementById("schedule-status");
     if (!el) return;
     el.textContent = msg;
     clearTimeout(scheduleStatusTimer);
-    scheduleStatusTimer = setTimeout(() => { el.textContent = ""; }, 1200);
+    scheduleStatusTimer = setTimeout(() => { el.textContent = ""; }, ms || 1200);
   }
 
   const scheduleUi = {

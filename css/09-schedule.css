@@ -236,6 +236,8 @@
   .sch-cell.st-late { background: var(--yellow-dim); color: var(--yellow); font-weight: 600; }
   .sch-cell.st-absent { background: var(--red-dim); color: var(--red); font-weight: 600; }
   .sch-cell.st-resigned { background: var(--hairline); color: var(--text-faint); }
+  /* Ctrl+C로 복사해 둔 칸 표시(점선). 아래 선택(--selected)·포커스(:focus) 실선이 겹치면 그쪽이 이긴다. */
+  .sch-cell--copied { outline: 2px dashed var(--accent); outline-offset: -2px; }
   .sch-cell--selected { outline: 2px solid var(--accent); outline-offset: -2px; }
   .sch-cell--selected::after {
     content: ""; position: absolute; inset: 0; background: var(--accent-dim-soft); pointer-events: none;
