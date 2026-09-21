@@ -240,6 +240,20 @@
   function scheduleHeaderDragJustEnded() { return scheduleHeaderDragSuppressClick; }
   document.addEventListener("mouseup", scheduleHeaderDragEnd);
 
+  // 드래그(또는 클릭)로 고른 열·행 선택은 머리글도, 접기 메뉴도 아닌 곳을 누르면 풀린다.
+  // 표 안의 다른 칸뿐 아니라 표 밖(빈 배경, 상단 버튼, 다른 영역 등)을 눌러도 마찬가지다.
+  // click이 아니라 pointerdown을 쓰는 이유: 마우스와 터치(태블릿·모바일)를 한 번에 받고,
+  // 터치에서는 빈 곳을 눌러도 click이 안 오는 경우가 있기 때문이다.
+  // 머리글(다시 클릭해서 선택을 바꾸거나 우클릭 메뉴를 여는 동작)과 접기 메뉴(#sch-menu) 위에서는
+  // 풀지 않는다 — 풀어버리면 "접기" 버튼을 누르기도 전에 선택이 사라진다.
+  document.addEventListener("pointerdown", (e) => {
+    if (scheduleHeaderSelCols.size + scheduleHeaderSelRows.size === 0) return;
+    const t = e.target;
+    if (!t || !t.closest) return;
+    if (t.closest(".sch-col-th, .sch-row-th, #sch-menu")) return;
+    scheduleClearHeaderSelection();
+  }, true);
+
   // 오른쪽 클릭으로 바로 접기 메뉴를 연다. 우클릭한 헤더가 지금 선택 목록에 없으면
   // (다른 걸 선택해둔 채 엉뚱한 헤더를 우클릭한 경우 등) 그 헤더 하나만 선택한 것으로
   // 다시 잡아준다. 이미 선택된 헤더를 우클릭하면 지금까지 골라둔 선택을 그대로 유지한다.
@@ -457,6 +471,42 @@
     return null;
   }
 
+  // ----- 일괄 붙여넣기의 "필요인력 줄" -----
+  // 인원 이름 대신 "주간 채팅 필요인력" 같은 이름표로 시작하는 줄은 인원 스케줄이 아니라 그 달의
+  // 필요인력(주간/야간 × 채팅/유선) 입력값으로 반영한다. 이름표는 화면의 필요인력 행 이름과 같은 형태를
+  // 쓰되, "필요인력" 글자는 생략해도 되고(주간 채팅), 띄어쓰기 여부(주간채팅)도 따지지 않는다.
+  // 뒤에 오는 값들은 1일부터 순서대로 각 날짜의 필요인력이 된다.
+  const SCHEDULE_REQUIRED_LINE_RE = /^(주간|야간)\s*(채팅|유선)(?:\s*필요\s*(?:인력|인원))?(?=\s|$)/;
+  // 줄이 필요인력 줄이면 { group: "DAY"|"NIGHT", type: "채팅"|"유선", label, tokens } 를, 아니면 null을 돌려준다.
+  // 값 구분: 줄에 탭이 있으면(엑셀에서 복사) 탭 단위로 나눠서 빈 칸도 "그 날짜는 건너뜀"으로 자리를
+  // 지키고, 탭이 없으면 공백 단위로 나눈다(인원 스케줄 줄과 같은 규칙).
+  function scheduleParseRequiredLine(line) {
+    const m = SCHEDULE_REQUIRED_LINE_RE.exec(line || "");
+    if (!m) return null;
+    const rest = line.slice(m[0].length);
+    let tokens;
+    if (rest.indexOf("\t") !== -1) {
+      tokens = rest.split("\t");
+      if (tokens[0].trim() === "") tokens.shift(); // 이름표 칸과 첫 값 사이의 탭
+    } else {
+      tokens = rest.split(/\s+/).filter((t) => t.length > 0);
+    }
+    return {
+      group: m[1] === "주간" ? "DAY" : "NIGHT",
+      type: m[2],
+      label: `${m[1]} ${m[2]}`,
+      tokens: tokens.map((t) => t.trim()),
+    };
+  }
+  // 필요인력 값 하나를 해석한다. "3"·"3명"·"2.5" → { value }, 빈 칸·"-" → { skip: true }
+  // (그 날짜의 기존 값을 건드리지 않는다), 그 밖의 글자는 null(인식 못함).
+  function scheduleParseRequiredToken(tokRaw) {
+    const t = (tokRaw || "").trim();
+    if (t === "" || t === "-") return { skip: true };
+    const m = /^(\d+(?:\.\d+)?)\s*명?$/.exec(t);
+    return m ? { value: Number(m[1]) } : null;
+  }
+
   function applyScheduleBulkPaste(text) {
     const { year, monthIndex } = scheduleUi;
     if (scheduleIsMonthLocked(year, monthIndex)) {
@@ -475,10 +525,27 @@
     recordUndo("스케줄 일괄 붙여넣기", SCHEDULE_KEY, reloadScheduleData);
     let matchedLines = 0;
     let filledCells = 0;
+    let requiredLines = 0; // 필요인력 줄 수
+    let filledRequired = 0; // 필요인력으로 실제 반영된 칸 수
     const unmatchedNames = [];
     const unknownTokens = [];
 
     lines.forEach((line) => {
+      const requiredLine = scheduleParseRequiredLine(line);
+      if (requiredLine) {
+        if (requiredLine.tokens.length === 0) return; // 이름표만 있고 값이 없는 줄
+        requiredLines += 1;
+        const count = Math.min(numDays, requiredLine.tokens.length);
+        for (let i = 0; i < count; i++) {
+          const day = i + 1;
+          const parsed = scheduleParseRequiredToken(requiredLine.tokens[i]);
+          if (!parsed) { unknownTokens.push(`${requiredLine.label} 필요인력 ${day}일 "${requiredLine.tokens[i]}"`); continue; }
+          if (parsed.skip) continue;
+          scheduleData.requiredHeadcount[scheduleRequiredKey(year, monthIndex, requiredLine.group, requiredLine.type, day)] = parsed.value;
+          filledRequired += 1;
+        }
+        return;
+      }
       const parts = line.split(/\s+/).filter((p) => p.length > 0);
       if (parts.length < 2) return;
       const name = parts[0];
@@ -504,7 +571,11 @@
 
     saveScheduleData();
 
-    const msgParts = [`${matchedLines}명 반영 완료 (총 ${filledCells}칸).`];
+    const msgParts = [];
+    // 필요인력 줄만 붙여넣었을 때 "0명 반영 완료"가 먼저 보이면 헷갈리므로, 인원 줄이 있거나
+    // 필요인력 줄이 아예 없을 때만 인원 결과를 보여준다.
+    if (matchedLines > 0 || requiredLines === 0) msgParts.push(`${matchedLines}명 반영 완료 (총 ${filledCells}칸).`);
+    if (requiredLines > 0) msgParts.push(`필요인력 ${requiredLines}줄 반영 완료 (총 ${filledRequired}칸).`);
     if (unmatchedNames.length > 0) msgParts.push(`이름을 찾지 못함: ${unmatchedNames.join(", ")}`);
     if (unknownTokens.length > 0) msgParts.push(`인식 못한 값: ${unknownTokens.join(", ")}`);
     scheduleBulkPasteMsg = msgParts.join("\n");

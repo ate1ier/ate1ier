@@ -8499,6 +8499,20 @@
   function scheduleHeaderDragJustEnded() { return scheduleHeaderDragSuppressClick; }
   document.addEventListener("mouseup", scheduleHeaderDragEnd);
 
+  // 드래그(또는 클릭)로 고른 열·행 선택은 머리글도, 접기 메뉴도 아닌 곳을 누르면 풀린다.
+  // 표 안의 다른 칸뿐 아니라 표 밖(빈 배경, 상단 버튼, 다른 영역 등)을 눌러도 마찬가지다.
+  // click이 아니라 pointerdown을 쓰는 이유: 마우스와 터치(태블릿·모바일)를 한 번에 받고,
+  // 터치에서는 빈 곳을 눌러도 click이 안 오는 경우가 있기 때문이다.
+  // 머리글(다시 클릭해서 선택을 바꾸거나 우클릭 메뉴를 여는 동작)과 접기 메뉴(#sch-menu) 위에서는
+  // 풀지 않는다 — 풀어버리면 "접기" 버튼을 누르기도 전에 선택이 사라진다.
+  document.addEventListener("pointerdown", (e) => {
+    if (scheduleHeaderSelCols.size + scheduleHeaderSelRows.size === 0) return;
+    const t = e.target;
+    if (!t || !t.closest) return;
+    if (t.closest(".sch-col-th, .sch-row-th, #sch-menu")) return;
+    scheduleClearHeaderSelection();
+  }, true);
+
   // 오른쪽 클릭으로 바로 접기 메뉴를 연다. 우클릭한 헤더가 지금 선택 목록에 없으면
   // (다른 걸 선택해둔 채 엉뚱한 헤더를 우클릭한 경우 등) 그 헤더 하나만 선택한 것으로
   // 다시 잡아준다. 이미 선택된 헤더를 우클릭하면 지금까지 골라둔 선택을 그대로 유지한다.
@@ -8716,6 +8730,42 @@
     return null;
   }
 
+  // ----- 일괄 붙여넣기의 "필요인력 줄" -----
+  // 인원 이름 대신 "주간 채팅 필요인력" 같은 이름표로 시작하는 줄은 인원 스케줄이 아니라 그 달의
+  // 필요인력(주간/야간 × 채팅/유선) 입력값으로 반영한다. 이름표는 화면의 필요인력 행 이름과 같은 형태를
+  // 쓰되, "필요인력" 글자는 생략해도 되고(주간 채팅), 띄어쓰기 여부(주간채팅)도 따지지 않는다.
+  // 뒤에 오는 값들은 1일부터 순서대로 각 날짜의 필요인력이 된다.
+  const SCHEDULE_REQUIRED_LINE_RE = /^(주간|야간)\s*(채팅|유선)(?:\s*필요\s*(?:인력|인원))?(?=\s|$)/;
+  // 줄이 필요인력 줄이면 { group: "DAY"|"NIGHT", type: "채팅"|"유선", label, tokens } 를, 아니면 null을 돌려준다.
+  // 값 구분: 줄에 탭이 있으면(엑셀에서 복사) 탭 단위로 나눠서 빈 칸도 "그 날짜는 건너뜀"으로 자리를
+  // 지키고, 탭이 없으면 공백 단위로 나눈다(인원 스케줄 줄과 같은 규칙).
+  function scheduleParseRequiredLine(line) {
+    const m = SCHEDULE_REQUIRED_LINE_RE.exec(line || "");
+    if (!m) return null;
+    const rest = line.slice(m[0].length);
+    let tokens;
+    if (rest.indexOf("\t") !== -1) {
+      tokens = rest.split("\t");
+      if (tokens[0].trim() === "") tokens.shift(); // 이름표 칸과 첫 값 사이의 탭
+    } else {
+      tokens = rest.split(/\s+/).filter((t) => t.length > 0);
+    }
+    return {
+      group: m[1] === "주간" ? "DAY" : "NIGHT",
+      type: m[2],
+      label: `${m[1]} ${m[2]}`,
+      tokens: tokens.map((t) => t.trim()),
+    };
+  }
+  // 필요인력 값 하나를 해석한다. "3"·"3명"·"2.5" → { value }, 빈 칸·"-" → { skip: true }
+  // (그 날짜의 기존 값을 건드리지 않는다), 그 밖의 글자는 null(인식 못함).
+  function scheduleParseRequiredToken(tokRaw) {
+    const t = (tokRaw || "").trim();
+    if (t === "" || t === "-") return { skip: true };
+    const m = /^(\d+(?:\.\d+)?)\s*명?$/.exec(t);
+    return m ? { value: Number(m[1]) } : null;
+  }
+
   function applyScheduleBulkPaste(text) {
     const { year, monthIndex } = scheduleUi;
     if (scheduleIsMonthLocked(year, monthIndex)) {
@@ -8734,10 +8784,27 @@
     recordUndo("스케줄 일괄 붙여넣기", SCHEDULE_KEY, reloadScheduleData);
     let matchedLines = 0;
     let filledCells = 0;
+    let requiredLines = 0; // 필요인력 줄 수
+    let filledRequired = 0; // 필요인력으로 실제 반영된 칸 수
     const unmatchedNames = [];
     const unknownTokens = [];
 
     lines.forEach((line) => {
+      const requiredLine = scheduleParseRequiredLine(line);
+      if (requiredLine) {
+        if (requiredLine.tokens.length === 0) return; // 이름표만 있고 값이 없는 줄
+        requiredLines += 1;
+        const count = Math.min(numDays, requiredLine.tokens.length);
+        for (let i = 0; i < count; i++) {
+          const day = i + 1;
+          const parsed = scheduleParseRequiredToken(requiredLine.tokens[i]);
+          if (!parsed) { unknownTokens.push(`${requiredLine.label} 필요인력 ${day}일 "${requiredLine.tokens[i]}"`); continue; }
+          if (parsed.skip) continue;
+          scheduleData.requiredHeadcount[scheduleRequiredKey(year, monthIndex, requiredLine.group, requiredLine.type, day)] = parsed.value;
+          filledRequired += 1;
+        }
+        return;
+      }
       const parts = line.split(/\s+/).filter((p) => p.length > 0);
       if (parts.length < 2) return;
       const name = parts[0];
@@ -8763,7 +8830,11 @@
 
     saveScheduleData();
 
-    const msgParts = [`${matchedLines}명 반영 완료 (총 ${filledCells}칸).`];
+    const msgParts = [];
+    // 필요인력 줄만 붙여넣었을 때 "0명 반영 완료"가 먼저 보이면 헷갈리므로, 인원 줄이 있거나
+    // 필요인력 줄이 아예 없을 때만 인원 결과를 보여준다.
+    if (matchedLines > 0 || requiredLines === 0) msgParts.push(`${matchedLines}명 반영 완료 (총 ${filledCells}칸).`);
+    if (requiredLines > 0) msgParts.push(`필요인력 ${requiredLines}줄 반영 완료 (총 ${filledRequired}칸).`);
     if (unmatchedNames.length > 0) msgParts.push(`이름을 찾지 못함: ${unmatchedNames.join(", ")}`);
     if (unknownTokens.length > 0) msgParts.push(`인식 못한 값: ${unknownTokens.join(", ")}`);
     scheduleBulkPasteMsg = msgParts.join("\n");
@@ -11154,7 +11225,8 @@
         <div class="schedule-bulk-panel">
           <div class="schedule-bulk-desc">
             한 줄에 <b>이름</b>을 쓰고 이어서 <b>1일부터 말일까지의 값</b>을 공백(탭도 가능)으로 구분해서 붙여넣으세요. 공백이 나올 때마다 다음 날짜로 넘어가요. 인원 여러 명은 줄바꿈으로 구분해서 한 번에 붙여넣을 수 있어요.<br>
-            인식되는 값: <b>1</b>(근무), <b>휴일 / 오프 / 휴무</b>(오프), <b>연차</b>, <b>대휴</b>, <b>반차</b>, <b>공휴</b>, <b>공가</b>, <b>육휴</b>, <b>특휴</b>, <b>교육</b>, <b>지각</b>, <b>결근</b>, <b>퇴사</b>. 값 개수가 이번 달 일수보다 적으면 앞에서부터만 반영되고, 많으면 초과분은 무시돼요.
+            인식되는 값: <b>1</b>(근무), <b>휴일 / 오프 / 휴무</b>(오프), <b>연차</b>, <b>대휴</b>, <b>반차</b>, <b>공휴</b>, <b>공가</b>, <b>육휴</b>, <b>특휴</b>, <b>교육</b>, <b>지각</b>, <b>결근</b>, <b>퇴사</b>. 값 개수가 이번 달 일수보다 적으면 앞에서부터만 반영되고, 많으면 초과분은 무시돼요.<br>
+            <b>필요인력</b>도 같은 칸에 붙여넣을 수 있어요. 이름 대신 줄 맨 앞에 <b>주간 채팅 필요인력</b>(또는 주간 유선 / 야간 채팅 / 야간 유선)을 쓰고, 이어서 1일부터의 숫자를 넣으세요. 엑셀에서 복사할 때 이름표 칸부터 같이 복사하면 돼요. 빈 칸이나 <b>-</b>는 건너뛰어서 그 날짜의 기존 값이 그대로 남아요.
           </div>
           <textarea class="add-input schedule-bulk-textarea" id="sch-bulk-textarea" placeholder="이기욱	휴일	1	휴일	휴일	1	휴일	1	1	1	휴일	1	1	1	대휴	1	1	1	1	휴일	1	1	1	대휴	1	1	1	휴일	1	1	1"></textarea>
           <div class="schedule-bulk-actions">
@@ -13109,13 +13181,14 @@
           "재직 중인 인원만 자동으로 표시되고, 퇴사 처리된 인원은 스케줄에서 빠져요. 관리자는 표 맨 위에 따로 표시돼요.",
           "월 이동 버튼으로 지난 달·다음 달 스케줄도 확인할 수 있어요.",
           "일괄 붙여넣기로 여러 인원의 스케줄을 한 번에 입력할 수 있어요. 근무·오프·연차·대휴·반차·공휴·공가·육휴·특휴·교육·지각·결근·퇴사 등 다양한 값을 인식해요.",
+          "일괄 붙여넣기에서 줄 맨 앞에 '주간 채팅 필요인력'(주간 유선 / 야간 채팅 / 야간 유선도 가능)을 쓰고 1일부터의 숫자를 이어 붙이면 필요인력도 한 번에 입력돼요. 인원 스케줄 줄과 함께 섞어서 붙여넣어도 돼요.",
           "셀을 드래그해서 여러 칸을 한 번에 선택한 뒤, 메뉴에서 상태를 골라 한 번에 적용할 수 있어요.",
           "칸(또는 드래그로 고른 범위)을 Ctrl+C로 복사하고, 붙여넣을 칸을 클릭한 뒤 Ctrl+V로 붙여넣을 수 있어요. 상태와 메모가 함께 복사되고, 붙여넣은 칸의 기존 메모는 복사한 메모로 바뀌어요(복사한 칸에 메모가 없으면 지워져요). Ctrl+Z로 한 번에 되돌릴 수 있고, 엑셀에서 복사한 근태 값(오프·연차 등)도 붙여넣을 수 있어요.",
           "셀을 클릭하면 근무/오프/연차 등 다양한 상태로 바로 바꿀 수 있고, 메모도 남길 수 있어요. 지각은 출근 인원에 포함, 결근은 제외돼요.",
           "이름 칸을 오른쪽 클릭하면 그 인원의 이번 달 메모를 남길 수 있어요. 메모가 있으면 이름 칸 모서리에 주황색 표시가 붙고, 마우스를 올리면 내용이 보여요. 엑셀로 다운로드하면 메모로 함께 들어가고(이미지 저장에는 표시되지 않아요), 지난 달은 잠겨서 그때 남긴 메모를 읽기만 할 수 있어요.",
           "날짜·조·업무 구분별로 필요 인원(헤드카운트)을 설정하면, 실제 근무 인원과의 차이를 자동으로 계산해서 보여줘요.",
           "필요 없는 열·행은 선택 후 오른쪽 클릭으로 접어서 숨길 수 있고, 날짜 범위를 묶어 그룹으로 한 번에 접었다 펼 수도 있어요.",
-          "날짜·정보 머리글이나 왼쪽 이름·사번 칸을 마우스로 끌면 그 범위의 열·행이 한꺼번에 선택되고, 손을 떼면 뜨는 메뉴에서 '접기'를 누르면 한 번에 접혀요. Ctrl(⌘) 또는 Shift를 누른 채 끌면 이미 고른 것에 더해져요.",
+          "날짜·정보 머리글이나 왼쪽 이름·사번 칸을 마우스로 끌면 그 범위의 열·행이 한꺼번에 선택되고, 손을 떼면 뜨는 메뉴에서 '접기'를 누르면 한 번에 접혀요. Ctrl(⌘) 또는 Shift를 누른 채 끌면 이미 고른 것에 더해져요. 고른 뒤 표 밖이나 머리글이 아닌 곳을 누르면 선택이 풀려요.",
           "이미지로 저장하거나 엑셀 파일로 다운로드할 수 있고, '휴일대체 확인서'도 회사 양식 그대로 자동으로 만들 수 있어요.",
           "이번 달 지각·결근 기록을 표 아래에서 바로 확인할 수 있어요.",
           "지난 달은 자동으로 '확정됨' 상태로 잠기고 그 시점 인원 구성이 고정돼요. '잠금 해제' 버튼으로 다시 열어 수정할 수 있어요.",

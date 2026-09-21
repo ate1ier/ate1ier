@@ -452,3 +452,119 @@ test("scheduleVisibleColKeys: 인원 정보 열은 접은 열을 빼고 표 순�
   m.scheduleUi.manualHiddenInfoCols.add("name");
   assert.deepEqual(toPlain(m.scheduleVisibleColKeys("i:")).slice(0, 3), ["i:nickname", "i:empno", "i:hiredate"]);
 });
+
+/* ===================== 일괄 붙여넣기: 필요인력 줄 ===================== */
+
+const vmRun = require("node:vm");
+function bulkMessage(m) { return vmRun.runInContext("scheduleBulkPasteMsg", m); }
+function requiredValue(m, group, type, day) { return m.scheduleData.requiredHeadcount[m.scheduleRequiredKey(2026, 8, group, type, day)]; }
+
+test("scheduleParseRequiredLine: 이름표 표기(필요인력 생략·띄어쓰기 없음)를 모두 알아본다", () => {
+  const m = loadSchedule();
+  for (const label of ["주간 채팅 필요인력", "주간채팅", "주간 채팅", "주간채팅필요인력", "주간 채팅 필요 인력"]) {
+    const r = toPlain(m.scheduleParseRequiredLine(`${label}\t3\t4`));
+    assert.equal(r.group, "DAY", label);
+    assert.equal(r.type, "채팅", label);
+    assert.deepEqual(r.tokens, ["3", "4"], label);
+  }
+  const night = toPlain(m.scheduleParseRequiredLine("야간 유선 필요인력 5 6 7"));
+  assert.equal(night.group, "NIGHT");
+  assert.equal(night.type, "유선");
+  assert.deepEqual(night.tokens, ["5", "6", "7"]); // 탭이 없으면 공백으로 나눈다
+});
+
+test("scheduleParseRequiredLine: 인원 이름 줄이나 비슷한 글자는 필요인력 줄로 착각하지 않는다", () => {
+  const m = loadSchedule();
+  assert.equal(m.scheduleParseRequiredLine("김주간 1 오프 1"), null);
+  assert.equal(m.scheduleParseRequiredLine("주간이 1 1 1"), null); // 닉네임이 '주간'으로 시작해도 이름표가 아님
+  assert.equal(m.scheduleParseRequiredLine("주간채팅이 1 1"), null);
+  assert.equal(m.scheduleParseRequiredLine("주간 관리 3 3"), null); // 채팅/유선이 아닌 구분
+});
+
+test("scheduleParseRequiredLine: 탭으로 구분하면 빈 칸이 자리를 지킨다", () => {
+  const m = loadSchedule();
+  const r = toPlain(m.scheduleParseRequiredLine("주간 채팅 필요인력\t3\t\t5\t-\t6"));
+  assert.deepEqual(r.tokens, ["3", "", "5", "-", "6"]);
+});
+
+test("scheduleParseRequiredToken: 숫자·'N명'은 값, 빈 칸·'-'는 건너뜀, 나머지는 인식 못함", () => {
+  const m = loadSchedule();
+  assert.deepEqual(toPlain(m.scheduleParseRequiredToken("12")), { value: 12 });
+  assert.deepEqual(toPlain(m.scheduleParseRequiredToken(" 3명 ")), { value: 3 });
+  assert.deepEqual(toPlain(m.scheduleParseRequiredToken("2.5")), { value: 2.5 });
+  assert.deepEqual(toPlain(m.scheduleParseRequiredToken("0")), { value: 0 }); // 0도 유효한 값
+  assert.deepEqual(toPlain(m.scheduleParseRequiredToken("")), { skip: true });
+  assert.deepEqual(toPlain(m.scheduleParseRequiredToken("-")), { skip: true });
+  assert.equal(m.scheduleParseRequiredToken("오프"), null);
+  assert.equal(m.scheduleParseRequiredToken("-3"), null); // 음수는 필요인력이 될 수 없다
+});
+
+test("applyScheduleBulkPaste: 필요인력 줄이 1일부터 순서대로 반영된다(탭 구분, 빈 칸·- 는 기존 값 유지)", () => {
+  const fx = buildFixture();
+  fx.requiredHeadcount = { "2026-09|DAY|채팅|2": 99, "2026-09|DAY|채팅|4": 77 };
+  const m = loadSchedule(fx);
+  m.applyScheduleBulkPaste("주간 채팅 필요인력\t5\t\t7\t-\t8");
+  assert.equal(requiredValue(m, "DAY", "채팅", 1), 5);
+  assert.equal(requiredValue(m, "DAY", "채팅", 2), 99); // 빈 칸 → 그대로
+  assert.equal(requiredValue(m, "DAY", "채팅", 3), 7);
+  assert.equal(requiredValue(m, "DAY", "채팅", 4), 77); // '-' → 그대로
+  assert.equal(requiredValue(m, "DAY", "채팅", 5), 8);
+  assert.equal(bulkMessage(m).includes("필요인력 1줄 반영 완료 (총 3칸)"), true);
+  assert.equal(bulkMessage(m).includes("0명"), false); // 필요인력만 붙였을 땐 '0명' 문구를 보여주지 않는다
+});
+
+test("applyScheduleBulkPaste: 네 가지 이름표가 각자 자기 행에만 들어간다", () => {
+  const m = loadSchedule();
+  m.applyScheduleBulkPaste("주간 채팅 필요인력 1 1\n주간 유선 필요인력 2 2\n야간 채팅 필요인력 3 3\n야간 유선 필요인력 4 4");
+  assert.equal(requiredValue(m, "DAY", "채팅", 2), 1);
+  assert.equal(requiredValue(m, "DAY", "유선", 2), 2);
+  assert.equal(requiredValue(m, "NIGHT", "채팅", 2), 3);
+  assert.equal(requiredValue(m, "NIGHT", "유선", 2), 4);
+});
+
+test("applyScheduleBulkPaste: 인원 줄과 필요인력 줄을 섞어 붙여넣어도 둘 다 반영된다", () => {
+  const m = loadSchedule();
+  m.applyScheduleBulkPaste("김주간\t오프\t연차\n주간 유선 필요인력\t3\t4");
+  assert.deepEqual(toPlain(m.getScheduleRecord("s1", "2026-09-01")), { status: "OFF", attendance: null });
+  assert.deepEqual(toPlain(m.getScheduleRecord("s1", "2026-09-02")), { status: "ANNUAL", attendance: null });
+  assert.equal(requiredValue(m, "DAY", "유선", 2), 4);
+  const msg = bulkMessage(m);
+  assert.equal(msg.includes("1명 반영 완료 (총 2칸)"), true);
+  assert.equal(msg.includes("필요인력 1줄 반영 완료 (총 2칸)"), true);
+});
+
+test("applyScheduleBulkPaste: 말일을 넘는 값은 무시하고, 인식 못한 값은 알려준다", () => {
+  const m = loadSchedule();
+  const values = Array.from({ length: 33 }, (_, i) => String(i + 1)); // 9월은 30일 → 31~33은 무시
+  values[1] = "많이"; // 2일 값이 이상함
+  m.applyScheduleBulkPaste(`야간 유선 필요인력\t${values.join("\t")}`);
+  assert.equal(requiredValue(m, "NIGHT", "유선", 30), 30);
+  assert.equal(requiredValue(m, "NIGHT", "유선", 31), undefined);
+  assert.equal(requiredValue(m, "NIGHT", "유선", 2), undefined);
+  assert.equal(bulkMessage(m).includes('야간 유선 필요인력 2일 "많이"'), true);
+  assert.equal(bulkMessage(m).includes("총 29칸"), true);
+});
+
+test("applyScheduleBulkPaste: 잠긴 달이면 필요인력도 바뀌지 않는다", () => {
+  const fx = buildFixture();
+  fx.monthLocks = { "2026-09": true };
+  const m = loadSchedule(fx);
+  m.applyScheduleBulkPaste("주간 채팅 필요인력 5 5 5");
+  assert.equal(requiredValue(m, "DAY", "채팅", 1), undefined);
+  assert.equal(bulkMessage(m).includes("잠겨"), true);
+});
+
+test("applyScheduleBulkPaste: 필요인력 줄은 되돌리기 한 번으로 통째로 취소할 수 있게 기록된다", () => {
+  let undoLabels = [];
+  const m = loadSchedule();
+  m.recordUndo = (label) => { undoLabels.push(label); };
+  m.applyScheduleBulkPaste("주간 채팅 필요인력 5 5 5\n주간 유선 필요인력 4 4 4");
+  assert.deepEqual(undoLabels, ["스케줄 일괄 붙여넣기"]); // 줄이 여러 개여도 한 번
+});
+
+test("applyScheduleBulkPaste: 필요인력 줄이 없는 기존 붙여넣기의 결과 문구는 그대로다", () => {
+  const m = loadSchedule();
+  m.applyScheduleBulkPaste("김주간 오프 1 1");
+  assert.equal(bulkMessage(m).startsWith("1명 반영 완료 (총 3칸)."), true);
+  assert.equal(bulkMessage(m).includes("필요인력"), false);
+});
