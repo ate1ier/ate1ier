@@ -50,6 +50,7 @@
           ${ICON_SEARCH_MINI}
         </div>
         <button class="ghost-btn" id="sch-adjust-summary-btn">${ICON_CLIPBOARD} 가감점 취합</button>
+        <button class="ghost-btn" id="sch-auto-btn">${ICON_SPARK} AI 자동 배치</button>
         <button class="ghost-btn ${scheduleHiddenPanelOpen ? "active" : ""}" id="sch-hidden-btn">${ICON_CALENDAR} 숨긴 열/행${scheduleHiddenCount() > 0 ? ` (${scheduleHiddenCount()})` : ""} ▾</button>
         <button class="ghost-btn sch-delete-btn-small" id="sch-delete-btn">${ICON_TRASH} 일정 삭제</button>
       </div>
@@ -112,6 +113,7 @@
       renderApp();
     };
     document.getElementById("sch-adjust-summary-btn").onclick = () => openScheduleAdjustModal();
+    document.getElementById("sch-auto-btn").onclick = () => openScheduleAutoModal();
     const schSearchInput = document.getElementById("sch-search-input");
     if (schSearchInput) {
       // 표 영역만 다시 그려서(전체 renderApp() 대신) 검색창의 IME 조합·포커스가 끊기지 않게 한다.
