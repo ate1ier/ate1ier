@@ -29,6 +29,10 @@
     // 달(월)마다 날짜 개수·인원 구성이 달라지므로 달 단위("YYYY-MM")로 따로 저장해서,
     // 그 달을 다시 열면(다른 사람이 열어도) 접어뒀던 그대로 보이게 한다.
     if (!d.collapseByMonth || typeof d.collapseByMonth !== "object") d.collapseByMonth = {};
+    // "AI 자동 배치"에서 쓰는 인원별 선호 오프 요일. { [staffId]: { dows: [0~6, ...] } } 형태(0=일 … 6=토).
+    // 달과 상관없이 그 사람에게 계속 적용되는 설정이고, 반드시 지켜야 하는 조건이 아니라
+    // "최대한 맞춰주는" 소프트 조건이다(필요인력·연속 근무 제한이 우선). 비어 있으면 키 자체를 두지 않는다.
+    if (!d.autoOffPrefs || typeof d.autoOffPrefs !== "object") d.autoOffPrefs = {};
     return d;
   }
   // 특정 달의 접기 상태 저장 칸을 가져온다(없으면 빈 상태로 만들어서 돌려준다).

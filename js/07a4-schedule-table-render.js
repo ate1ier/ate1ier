@@ -1,5 +1,9 @@
   // 07a4-schedule-table-render.js — 월별 스케줄 표 렌더링 (buildScheduleTableHtml)
   // (07-schedule.js를 기능 단위로 분할한 파일 중 하나. 실행 순서는 파일명 정렬로 유지됨)
+  // "AI 자동 배치" 미리보기 표에서만 쓴다. { "staffId|YYYY-MM-DD": 1 또는 2 } 형태로, 새로 배정될 오프 칸을
+  // 알려주면 그 칸에 강조 클래스를 붙인다(1 = 새로 배정될 오프, 2 = 그중 선호 요일과 맞은 칸).
+  // 평소에는 null이라 화면의 실제 월별 스케줄 표에는 아무 영향이 없다.
+  let schedulePreviewMarks = null;
   function buildScheduleTableHtml(filterMode, hideSummaryCols, hideRequiredRows, hideMemoMarks) {
     const { year, monthIndex } = scheduleUi;
     const numDays = scheduleDaysInMonth(year, monthIndex);
@@ -72,7 +76,9 @@
         const disp = scheduleCellDisplay(record);
         const memo = getScheduleMemo(s.id, dateKey);
         const memoDot = (memo && !hideMemoMarks) ? `<span class="sch-memo-dot" title="${esc(memo)}"></span>` : "";
-        return `<td class="sch-cell ${disp.cls}${colHiddenCls(d)}" data-staff-id="${s.id}" data-date="${dateKey}" data-row-idx="${rowIdx}" data-day="${d}" title="${esc(memo)}" tabindex="0"><span class="sch-cell-label">${disp.label}</span>${memoDot}</td>`;
+        const previewMark = schedulePreviewMarks ? schedulePreviewMarks[scheduleRecordKey(s.id, dateKey)] : 0;
+        const previewCls = previewMark ? (previewMark === 2 ? " sch-cell--auto sch-cell--auto-pref" : " sch-cell--auto") : "";
+        return `<td class="sch-cell ${disp.cls}${previewCls}${colHiddenCls(d)}" data-staff-id="${s.id}" data-date="${dateKey}" data-row-idx="${rowIdx}" data-day="${d}" title="${esc(memo)}" tabindex="0"><span class="sch-cell-label">${disp.label}</span>${memoDot}</td>`;
       }).join("");
       const counts = scheduleStaffMonthCounts(s.id, year, monthIndex);
       // 이름 칸 메모: 셀 메모와 같은 주황 삼각형 표시(이미지 저장 시엔 hideMemoMarks로 빠진다)를 붙이고,
