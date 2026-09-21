@@ -12725,7 +12725,12 @@
               const targetTol = scheduleAutoToleranceInfo(targetDow, targetDateKey);
               const targetAfter = total - 1;
               if (targetAfter < minWorking) continue;
-              if (targetReq !== null && targetReq !== undefined && targetReq - targetAfter > targetTol.max) continue;
+              // 전원 출근 상태를 해소하는 것이 이 보정 단계의 목적이다.
+              // 따라서 이 인원에게 OFF를 넣었을 때 생기는 -1 부족은 요일별 기본 허용범위와
+              // 무관하게 여기서만 예외적으로 허용한다. (최소 출근 인원은 절대 깨지 않는다.)
+              // 이는 위 후보 선정 단계의 `effectiveMax = max(tol.max, 1)`과 동일한 규칙이다.
+              const targetEffectiveMax = Math.max(Number(targetTol.max || 0), 1);
+              if (targetReq !== null && targetReq !== undefined && targetReq - targetAfter > targetEffectiveMax) continue;
 
               for (const st of groupStaff) {
                 const plan = perStaffPlan.find((x) => x.staffId === st.id);
@@ -12783,20 +12788,39 @@
       warnings.push(`모든 인원 출근 상태를 ${repairedAllWorkingDays}건 자동으로 해소했어요. 기존 입력 일정과 최소 출근 인원 조건은 유지했어요.`);
     }
 
-    // 최종 확인: 자동 배치 후에도 어떤 구분에서 모든 인원이 출근하는 날이 남아 있는지 확인한다.
-    // 기존 일정만으로 해소할 수 없는 경우에만 경고한다.
+    // 최종 확인: 보정 후의 실제 계획을 다시 계산한다.
+    // 위의 `working`은 최초 후보 생성 직후의 스냅샷이므로, 오프를 교환한 뒤에는 사용하면 안 된다.
+    // 따라서 최종 경고/검증은 records + 현재 자동배치 계획을 기준으로 다시 집계한다.
     const monthLabelNo = monthIndex + 1;
+    const finalWorking = {};
+    ["DAY", "NIGHT"].forEach((g) => {
+      finalWorking[g] = {};
+      TYPES.forEach((t) => {
+        finalWorking[g][t] = {};
+        const groupStaff = nonAdmin.filter((s) => (g === "NIGHT" ? s.group === "night" : s.group !== "night"));
+        for (let d = 1; d <= daysInMonth; d++) {
+          const dateKey = scheduleDateKey(year, monthIndex, d);
+          let w = scheduleActualCount(groupStaff, t, dateKey);
+          groupStaff.forEach((st) => {
+            if ((st.types || []).indexOf(t) === -1) return;
+            const set = planByIdForRepair.get(st.id);
+            if (set && set.has(d)) w -= 1;
+          });
+          finalWorking[g][t][d] = w;
+        }
+      });
+    });
     ["DAY", "NIGHT"].forEach((g) => {
       TYPES.forEach((t) => {
         const total = totalCount[g][t];
         if (total <= 0) return;
         const allWorkingDays = [];
         for (let d = 1; d <= daysInMonth; d++) {
-          if (working[g][t][d] === total) allWorkingDays.push(`${monthLabelNo}/${d}`);
+          if (finalWorking[g][t][d] === total) allWorkingDays.push(`${monthLabelNo}/${d}`);
         }
         if (allWorkingDays.length > 0) {
           const label = `${g === "NIGHT" ? "야간" : "주간"} ${t}`;
-          warnings.push(`${label} 구분에 모든 인원이 출근하는 날이 남아 있어요: ${allWorkingDays.join(", ")}. 기존 일정 또는 필요인력/출근 최소 인원 조건 때문에 자동으로 해소하지 못한 날입니다.`);
+          warnings.push(`${label} 구분에 모든 인원이 출근하는 날이 남아 있어요: ${allWorkingDays.join(", ")}. 기존 일정 또는 출근 최소 인원 조건 때문에 자동으로 해소할 수 없는 날입니다.`);
         }
       });
     });
