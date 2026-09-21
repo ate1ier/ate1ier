@@ -355,30 +355,74 @@
   .sch-cell--auto-pref::after {
     content: "★"; position: absolute; right: 2px; bottom: 0; font-size: 8px; line-height: 1; color: var(--amber);
   }
-  /* 인원별 선호 오프 요일 설정 영역 */
-  .sch-auto-prefs {
+  /* 배치 조건: 제외할 인원 + "인원별 설정" 버튼 */
+  .sch-auto-conds {
     border: 1px solid var(--hairline); border-radius: 10px; margin-bottom: 14px; background: var(--panel);
+    padding: 10px 12px; display: flex; flex-direction: column; gap: 8px;
   }
-  .sch-auto-prefs > summary {
-    cursor: pointer; padding: 9px 12px; font-size: 12.5px; font-weight: 600; color: var(--text); user-select: none;
-  }
+  .sch-auto-conds-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+  .sch-auto-conds-title { font-size: 12.5px; font-weight: 600; color: var(--text); }
+  .sch-auto-settings-btn { padding: 6px 12px; font-size: 12.5px; }
   .sch-auto-prefs-count { font-weight: 400; color: var(--text-faint); }
-  .sch-auto-prefs-desc { padding: 0 12px 8px; font-size: 12px; color: var(--text-faint); line-height: 1.6; }
-  .sch-auto-prefs-list { max-height: 220px; overflow: auto; padding: 0 12px 8px; }
-  .sch-auto-pref-row {
-    display: flex; align-items: center; justify-content: space-between; gap: 10px;
-    padding: 5px 0; border-top: 1px solid var(--hairline);
+  .sch-auto-cond-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .sch-auto-cond-label { font-size: 12.5px; color: var(--text-dim); flex-shrink: 0; }
+  .sch-auto-cond-body { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
+  .sch-auto-exclude-select { padding: 6px 10px; font-size: 12.5px; max-width: 100%; cursor: pointer; }
+  .sch-auto-cond-empty { font-size: 12px; color: var(--text-faint); }
+  .sch-auto-exclude-chips { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+  .sch-auto-exclude-chip {
+    display: inline-flex; align-items: center; gap: 2px; padding: 2px 3px 2px 10px; border-radius: 999px;
+    font-size: 12.5px; color: var(--accent); background: var(--accent-dim); border: 1px solid var(--accent);
   }
-  .sch-auto-pref-name {
-    font-size: 12.5px; color: var(--text); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  .sch-auto-exclude-remove {
+    background: none; border: none; color: inherit; cursor: pointer; font-size: 11px; line-height: 1;
+    padding: 4px 7px; border-radius: 999px;
   }
-  .sch-auto-pref-chips { display: inline-flex; gap: 3px; flex-shrink: 0; }
+  .sch-auto-exclude-remove:hover { background: var(--accent); color: var(--accent-text); }
+  .sch-auto-cond-hint { font-size: 12px; color: var(--text-faint); line-height: 1.6; }
+  .sch-auto-excluded-note { font-size: 12.5px; color: var(--text-dim); margin-bottom: 10px; line-height: 1.6; }
+  @media (max-width: 720px) { .sch-auto-exclude-select { font-size: 16px; } }
+
+  /* "인원별 설정" 팝업: 인원 × 요일(일~토) 표 하나에 선호 오프 요일이 한눈에 보인다 */
+  .sch-auto-set-overlay { z-index: 81; }
+  .sch-auto-set-box { width: min(560px, 94vw); }
+  .sch-auto-set-body { display: block; text-align: left; padding-top: 0; }
+  .sch-auto-set-desc { font-size: 12px; color: var(--text-faint); line-height: 1.6; padding: 14px 0 12px; }
+  .sch-auto-set-desc b { color: var(--text-dim); }
+  .sch-auto-set-table { width: 100%; border-collapse: separate; border-spacing: 0; }
+  .sch-auto-set-table th, .sch-auto-set-table td { padding: 4px 3px; text-align: center; }
+  .sch-auto-set-table thead th {
+    position: sticky; top: 0; z-index: 1; background: var(--bg); font-size: 12px; font-weight: 600;
+    color: var(--text-faint); padding: 8px 3px 6px; border-bottom: 1px solid var(--hairline);
+  }
+  .sch-auto-set-table thead th.sch-auto-set-name-th { text-align: left; }
+  .sch-auto-set-dow.is-sun { color: var(--red); }
+  .sch-auto-set-dow.is-sat { color: var(--blue); }
+  .sch-auto-set-table .sch-auto-set-name {
+    text-align: left; font-size: 12.5px; font-weight: 500; color: var(--text); white-space: nowrap;
+    padding-right: 8px; max-width: 200px; overflow: hidden; text-overflow: ellipsis;
+  }
+  .sch-auto-set-row th, .sch-auto-set-row td { border-bottom: 1px solid var(--hairline); }
+  .sch-auto-set-row:hover { background: var(--elevated); }
+  .sch-auto-set-row.is-excluded .sch-auto-set-name { color: var(--text-faint); }
+  .sch-auto-set-excluded-tag { font-size: 10.5px; font-weight: 400; color: var(--amber); margin-left: 4px; }
+  .sch-auto-set-group th { text-align: left; font-size: 11.5px; font-weight: 600; color: var(--text-dim); padding: 12px 2px 4px; }
+  .sch-auto-set-group-count { font-weight: 400; color: var(--text-faint); }
   .sch-auto-pref-chip {
-    width: 26px; height: 24px; padding: 0; line-height: 1; font-size: 11.5px; cursor: pointer;
+    width: 30px; height: 26px; padding: 0; line-height: 1; font-size: 12px; cursor: pointer;
     border: 1px solid var(--hairline); border-radius: 7px; background: transparent; color: var(--text-faint);
   }
   .sch-auto-pref-chip:hover { color: var(--text); background: var(--elevated); }
   .sch-auto-pref-chip.on { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+  /* 좁은 화면: 닉네임을 숨기고 칸을 조금 줄여서 일~토 7칸이 팝업 안에 다 들어오게 한다 */
+  @media (max-width: 720px) {
+    .sch-auto-set-overlay { padding: 12px; }
+    .sch-auto-set-table th, .sch-auto-set-table td { padding: 4px 1px; }
+    .sch-auto-pref-chip { width: 27px; height: 27px; font-size: 11.5px; }
+    .sch-auto-set-name .sch-adjust-nick { display: none; }
+    .sch-auto-set-table .sch-auto-set-name { max-width: 96px; padding-right: 4px; }
+    .sch-auto-set-excluded-tag { display: block; margin-left: 0; }
+  }
   .sch-memo-box { width: min(420px, 92vw); }
   .sch-memo-body { display: block; }
   .sch-memo-textarea { width: 100%; min-height: 110px; resize: vertical; box-sizing: border-box; }
