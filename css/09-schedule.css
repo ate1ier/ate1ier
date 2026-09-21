@@ -62,6 +62,8 @@
   .schedule-table tr.sch-row-hidden { display: none; }
   /* 열 머리글(날짜)·행 머리글(닉네임 칸) 클릭으로 선택 → 오른쪽 클릭으로 접기 */
   .schedule-table th.sch-col-th, .schedule-table td.sch-row-th { cursor: pointer; }
+  /* 머리글을 끌어서 범위 선택할 때 글자가 파랗게 드래그 선택되지 않게 한다 */
+  .schedule-table th.sch-col-th, .schedule-table td.sch-row-th { user-select: none; -webkit-user-select: none; }
   .schedule-table th.sch-col-th:hover, .schedule-table td.sch-row-th:hover { color: var(--accent); }
   .schedule-table th.sch-th--selected, .schedule-table td.sch-th--selected {
     background: var(--accent-dim) !important; color: var(--accent) !important;

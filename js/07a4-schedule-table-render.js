@@ -28,7 +28,8 @@
     // 인원 정보 열(닉네임~결근) 하나를 그려주는 헬퍼. asTh=true면 헤더 셀(선택 가능),
     // false면 각 인원 행의 값 칸(행 선택 가능)을 만든다. 개별로 접어둔 열은 아예 마크업에서
     // 빼버린다(위 infoColCount 주석 참고) — 그래야 요약행들의 colspan 너비도 같이 맞는다.
-    function infoColHtml(colDef, asTh, valueHtml, extraCls, staffId) {
+    // titleText: 값 칸(td)에 마우스를 올렸을 때 보여줄 툴팁. 이름 칸의 메모 내용을 보여주는 데 쓴다.
+    function infoColHtml(colDef, asTh, valueHtml, extraCls, staffId, titleText) {
       if (hideSummaryCols) {
         // 캡처용 마크업: 개별 열 숨김을 적용하지 않고 항상 그대로 그린다.
         if (colDef.summaryOnly) return "";
@@ -42,7 +43,7 @@
       const selCls = asTh ? " sch-col-th" : " sch-row-th";
       const dataAttrs = asTh
         ? ` data-col-key="i:${colDef.key}" title="클릭해서 선택, 선택 후 오른쪽 클릭으로 접기"`
-        : ` data-staff-id="${staffId || ""}" data-row-key="s:${staffId || ""}"`;
+        : ` data-staff-id="${staffId || ""}" data-row-key="s:${staffId || ""}"${titleText ? ` title="${esc(titleText)}"` : ""}`;
       return `<${tag} class="sch-info sch-col-${colDef.key}${stickyEndCls}${selCls}${extraCls ? ` ${extraCls}` : ""}"${leftStyle}${dataAttrs}>${asTh ? colDef.label : valueHtml}</${tag}>`;
     }
 
@@ -74,14 +75,18 @@
         return `<td class="sch-cell ${disp.cls}${colHiddenCls(d)}" data-staff-id="${s.id}" data-date="${dateKey}" data-row-idx="${rowIdx}" data-day="${d}" title="${esc(memo)}" tabindex="0"><span class="sch-cell-label">${disp.label}</span>${memoDot}</td>`;
       }).join("");
       const counts = scheduleStaffMonthCounts(s.id, year, monthIndex);
+      // 이름 칸 메모: 셀 메모와 같은 주황 삼각형 표시(이미지 저장 시엔 hideMemoMarks로 빠진다)를 붙이고,
+      // 마우스를 올리면 메모 내용이 툴팁으로 보인다. 이름 칸을 오른쪽 클릭하면 추가/수정/삭제할 수 있다.
+      const nameMemo = getScheduleNameMemo(s.id, year, monthIndex);
+      const nameMemoDot = (nameMemo && !hideMemoMarks) ? `<span class="sch-memo-dot sch-memo-dot--name"></span>` : "";
       const infoColValues = {
-        nickname: esc(s.nickname), name: esc(s.name), empno: esc(s.empNo),
+        nickname: esc(s.nickname), name: esc(s.name) + nameMemoDot, empno: esc(s.empNo),
         hiredate: esc(s.hireDate), workhours: esc(s.workHours),
         work: counts.WORK, off: counts.OFF, annual: counts.ANNUAL, daehyu: counts.DAEHYU, absent: counts.ABSENT,
       };
       const infoCells = SCHEDULE_INFO_COLS.map((c) => {
         const extraCls = c.key === "nickname" ? "sch-nickname" : (c.summaryOnly ? "sch-count" : "");
-        return infoColHtml(c, false, infoColValues[c.key], extraCls, s.id);
+        return infoColHtml(c, false, infoColValues[c.key], extraCls, s.id, c.key === "name" ? nameMemo : "");
       }).join("");
       return `
         <tr class="${rowHiddenCls.trim()}">
@@ -494,6 +499,11 @@
         row.getCell(1).font = { bold: true, color: { argb: COLOR.nickname } };
         row.getCell(1).alignment = { horizontal: "center", vertical: "middle" };
         for (let c = 2; c <= 5; c++) row.getCell(c).alignment = { horizontal: "left", vertical: "middle" };
+        // 이름 칸에 남긴 메모도 셀 메모처럼 엑셀 "메모(노트)"로 넣는다(이름은 2번째 열).
+        const nameMemo = getScheduleNameMemo(s.id, year, monthIndex);
+        if (nameMemo) {
+          row.getCell(2).note = { texts: [{ text: nameMemo }], margins: { insetmode: "auto" } };
+        }
         for (let c = 6; c <= 10; c++) row.getCell(c).alignment = { horizontal: "center", vertical: "middle" };
 
         labels.forEach((label, i) => {

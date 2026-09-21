@@ -292,3 +292,163 @@ test("buildScheduleTableHtml: 인원 행에 그 달 집계 숫자가 그대로 �
   const nums = extractAll(s1Row.slice(0, 2000), /class="sch-info sch-col-(?:work|off|annual|daehyu|absent)[^"]*"[^>]*>(\d+)</);
   assert.deepEqual(nums, ["28", "1", "1", "0", "0"]);
 });
+
+/* ===================== 이름 메모 ===================== */
+
+test("getScheduleNameMemo: 인원·달 단위로 저장되고, 없으면 빈 문자열이다", () => {
+  const fx = buildFixture();
+  fx.nameMemos = { "s1|2026-09": "9/15 퇴사 예정" };
+  const m = loadSchedule(fx);
+  assert.equal(m.getScheduleNameMemo("s1", 2026, 8), "9/15 퇴사 예정");
+  assert.equal(m.getScheduleNameMemo("s1", 2026, 9), ""); // 다른 달엔 이어지지 않는다
+  assert.equal(m.getScheduleNameMemo("s2", 2026, 8), ""); // 다른 인원 것도 아니다
+});
+
+test("getScheduleNameMemo: nameMemos 필드가 없는 예전 데이터도 에러 없이 빈 값이다", () => {
+  const m = loadSchedule(); // buildFixture()에는 nameMemos가 아예 없다
+  assert.equal(m.getScheduleNameMemo("s1", 2026, 8), "");
+});
+
+test("setScheduleNameMemo: 저장·수정·삭제(빈 문자열)가 되고 앞뒤 공백은 잘린다", () => {
+  const m = loadSchedule();
+  m.setScheduleNameMemo("s1", 2026, 8, "  수습 기간  ");
+  assert.equal(m.getScheduleNameMemo("s1", 2026, 8), "수습 기간");
+  m.setScheduleNameMemo("s1", 2026, 8, "수습 종료");
+  assert.equal(m.getScheduleNameMemo("s1", 2026, 8), "수습 종료");
+  m.setScheduleNameMemo("s1", 2026, 8, "   ");
+  assert.equal(m.getScheduleNameMemo("s1", 2026, 8), "");
+  assert.equal("s1|2026-09" in toPlain(m.scheduleData.nameMemos), false); // 빈 메모는 키째 지운다
+});
+
+test("setScheduleNameMemo: 이름 메모는 셀 메모(memos)와 섞이지 않는다", () => {
+  const m = loadSchedule();
+  const before = toPlain(m.scheduleData.memos);
+  m.setScheduleNameMemo("s1", 2026, 8, "이름 메모");
+  assert.deepEqual(toPlain(m.scheduleData.memos), before);
+  // 가감점 취합도 셀 메모만 본다(이름 메모에 라운딩이 들어 있어도 집계되지 않는다).
+  m.setScheduleNameMemo("s2", 2026, 8, "라운딩 담당");
+  const s2 = toPlain(m.scheduleBuildAdjustSummary(2026, 8)).find((x) => x.id === "s2");
+  assert.deepEqual(s2.entries, [{ day: 7, label: "역동석" }]);
+});
+
+test("setScheduleNameMemo: 잠긴 달에서는 저장도 삭제도 되지 않는다", () => {
+  const fx = buildFixture();
+  fx.nameMemos = { "s1|2026-09": "기존 메모" };
+  fx.monthLocks = { "2026-09": true };
+  const m = loadSchedule(fx);
+  m.setScheduleNameMemo("s1", 2026, 8, "바꾸려는 메모");
+  assert.equal(m.getScheduleNameMemo("s1", 2026, 8), "기존 메모");
+  m.setScheduleNameMemo("s1", 2026, 8, "");
+  assert.equal(m.getScheduleNameMemo("s1", 2026, 8), "기존 메모");
+});
+
+test("setScheduleNameMemo: 내용이 그대로면 되돌리기 기록을 남기지 않는다", () => {
+  let undoCalls = 0;
+  const m = loadSchedule();
+  m.recordUndo = () => { undoCalls += 1; };
+  m.setScheduleNameMemo("s1", 2026, 8, "메모");
+  assert.equal(undoCalls, 1);
+  m.setScheduleNameMemo("s1", 2026, 8, "메모"); // 똑같이 저장
+  m.setScheduleNameMemo("s2", 2026, 8, "  "); // 없던 메모를 빈 값으로 저장
+  assert.equal(undoCalls, 1);
+});
+
+test("normalizeScheduleData: nameMemos가 없거나 이상한 값이면 빈 객체로 채운다", () => {
+  const m = loadSchedule();
+  assert.deepEqual(toPlain(m.normalizeScheduleData({}).nameMemos), {});
+  assert.deepEqual(toPlain(m.normalizeScheduleData({ nameMemos: null }).nameMemos), {});
+  assert.deepEqual(toPlain(m.normalizeScheduleData({ nameMemos: { "s1|2026-09": "x" } }).nameMemos), { "s1|2026-09": "x" });
+});
+
+test("buildScheduleTableHtml: 이름 메모가 있는 인원의 이름 칸에만 표시와 툴팁이 붙는다", () => {
+  const fx = buildFixture();
+  fx.nameMemos = { "s2|2026-09": "수습 기간" };
+  const m = loadSchedule(fx);
+  const html = m.buildScheduleTableHtml();
+  assert.equal(countMatches(html, /sch-memo-dot--name/), 1);
+  // 표시는 s2(이채팅)의 이름 칸 안에 있고, 그 칸에 메모 툴팁이 달린다.
+  const nameTd = extractAll(html, /(<td class="sch-info sch-col-name[^>]*data-staff-id="s2"[^>]*>.*?<\/td>)/)[0];
+  assert.equal(nameTd.includes("sch-memo-dot--name"), true);
+  assert.equal(nameTd.includes('title="수습 기간"'), true);
+  assert.equal(nameTd.includes("이채팅"), true);
+  // 메모가 없는 인원(s1)의 이름 칸에는 표시도 툴팁도 없다.
+  const otherTd = extractAll(html, /(<td class="sch-info sch-col-name[^>]*data-staff-id="s1"[^>]*>.*?<\/td>)/)[0];
+  assert.equal(otherTd.includes("sch-memo-dot"), false);
+  assert.equal(otherTd.includes("title="), false);
+});
+
+test("buildScheduleTableHtml: 이름 메모 표시는 다른 달에 나타나지 않는다", () => {
+  const fx = buildFixture();
+  fx.nameMemos = { "s2|2026-09": "수습 기간" };
+  const m = loadSchedule(fx);
+  m.scheduleUi.monthIndex = 9; // 10월
+  assert.equal(countMatches(m.buildScheduleTableHtml(), /sch-memo-dot--name/), 0);
+});
+
+test("buildScheduleTableHtml: 이미지 저장용(hideMemoMarks)에서는 이름 메모 표시가 빠진다", () => {
+  const fx = buildFixture();
+  fx.nameMemos = { "s2|2026-09": "수습 기간" };
+  const m = loadSchedule(fx);
+  assert.equal(countMatches(m.buildScheduleTableHtml(undefined, false, false, true), /sch-memo-dot--name/), 0);
+  assert.equal(countMatches(m.buildScheduleTableHtml(undefined, true, true, true), /sch-memo-dot--name/), 0);
+  assert.equal(m.buildScheduleTableHtml(undefined, true, true, true).includes("수습 기간"), false); // 메모 내용도 안 찍힌다
+});
+
+test("buildScheduleTableHtml: 이름 메모의 특수문자는 이스케이프해서 넣는다", () => {
+  const fx = buildFixture();
+  fx.nameMemos = { "s1|2026-09": '"><script>alert(1)</script>' };
+  const m = loadSchedule(fx);
+  const html = m.buildScheduleTableHtml();
+  assert.equal(html.includes("<script>alert(1)</script>"), false);
+  assert.equal(html.includes("&lt;script&gt;"), true);
+});
+
+test("buildScheduleTableHtml: 이름 메모가 있어도 셀 메모 표시 개수는 그대로다", () => {
+  const fx = buildFixture();
+  fx.nameMemos = { "s1|2026-09": "a", "s2|2026-09": "b" };
+  const m = loadSchedule(fx);
+  const html = m.buildScheduleTableHtml();
+  // 이름 표시는 셀 표시와 같은 모양(sch-memo-dot)에 --name 수식어가 하나 더 붙은 형태다.
+  // 셀 표시(수식어 없음)는 여전히 셀 메모 3건 그대로이고, 이름 표시는 이름 메모 2건이다.
+  assert.equal(countMatches(html, /class="sch-memo-dot"/), 3);
+  assert.equal(countMatches(html, /class="sch-memo-dot sch-memo-dot--name"/), 2);
+});
+
+/* ===================== 머리글 드래그 범위 선택 ===================== */
+
+test("scheduleRangeBetween: 시작·끝을 포함한 범위를 돌려주고, 거꾸로 끌어도 같다", () => {
+  const m = loadSchedule();
+  const keys = ["d:1", "d:2", "d:3", "d:4", "d:5"];
+  assert.deepEqual(toPlain(m.scheduleRangeBetween(keys, "d:2", "d:4")), ["d:2", "d:3", "d:4"]);
+  assert.deepEqual(toPlain(m.scheduleRangeBetween(keys, "d:4", "d:2")), ["d:2", "d:3", "d:4"]); // 오른쪽에서 왼쪽으로
+  assert.deepEqual(toPlain(m.scheduleRangeBetween(keys, "d:3", "d:3")), ["d:3"]); // 제자리
+});
+
+test("scheduleRangeBetween: 목록에 없는 key(접힌 열, 종류가 다른 key)가 끼면 빈 범위다", () => {
+  const m = loadSchedule();
+  assert.deepEqual(toPlain(m.scheduleRangeBetween(["d:1", "d:2"], "d:1", "d:9")), []);
+  assert.deepEqual(toPlain(m.scheduleRangeBetween(["d:1", "d:2"], "d:1", "i:name")), []);
+});
+
+test("scheduleVisibleColKeys: 날짜 열은 그 달 일수만큼, 접은 날짜는 빠진다", () => {
+  const m = loadSchedule();
+  const all = toPlain(m.scheduleVisibleColKeys("d:"));
+  assert.equal(all.length, 30); // 9월
+  assert.equal(all[0], "d:1");
+  assert.equal(all[29], "d:30");
+  m.scheduleUi.manualHiddenDays.add(3);
+  m.scheduleUi.colGroups.push({ id: "g1", start: 10, end: 12, collapsed: true }); // 접힌 열 그룹
+  const now = toPlain(m.scheduleVisibleColKeys("d:"));
+  assert.equal(now.includes("d:3"), false);
+  assert.equal([10, 11, 12].some((d) => now.includes(`d:${d}`)), false);
+  assert.equal(now.length, 26);
+  // 범위는 접힌 열을 건너뛰고 보이는 열만 잡는다: 2~4 사이에서 3이 접혀 있으면 2, 4만.
+  assert.deepEqual(toPlain(m.scheduleRangeBetween(now, "d:2", "d:4")), ["d:2", "d:4"]);
+});
+
+test("scheduleVisibleColKeys: 인원 정보 열은 접은 열을 빼고 표 순서대로 준다", () => {
+  const m = loadSchedule();
+  assert.deepEqual(toPlain(m.scheduleVisibleColKeys("i:")).slice(0, 3), ["i:nickname", "i:name", "i:empno"]);
+  m.scheduleUi.manualHiddenInfoCols.add("name");
+  assert.deepEqual(toPlain(m.scheduleVisibleColKeys("i:")).slice(0, 3), ["i:nickname", "i:empno", "i:hiredate"]);
+});

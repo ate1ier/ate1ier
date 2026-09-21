@@ -393,6 +393,67 @@
     }, 0);
   }
 
+  // ----- 이름 메모 입력 모달 (이름 칸 오른쪽 클릭 → 메모 추가/수정) -----
+  // 셀 메모 모달과 같은 모양·스타일을 쓰고 닫는 함수(closeScheduleMemoModal)도 그대로 공유한다.
+  // 다른 점은 날짜가 아니라 "지금 보고 있는 달" 기준의 메모라는 것뿐이다.
+  // 잠긴 달은 수정이 막혀 있으므로, 이미 남겨둔 메모가 있을 때만 읽기 전용으로 열어서 보여준다.
+  function openScheduleNameMemoModal(staffId) {
+    const { year, monthIndex } = scheduleUi;
+    const locked = scheduleIsMonthLocked(year, monthIndex);
+    const current = getScheduleNameMemo(staffId, year, monthIndex);
+    if (locked && !current) {
+      flashScheduleStatus("잠긴 달이에요. 잠금을 해제한 뒤 수정해주세요.");
+      return;
+    }
+    closeScheduleMemoModal();
+    const staff = getStaffListForMonth(year, monthIndex).find((s) => s.id === staffId) || scheduleData.staff.find((s) => s.id === staffId);
+    const overlay = document.createElement("div");
+    overlay.id = "sch-memo-overlay";
+    overlay.className = "sch-preview-overlay";
+    overlay.innerHTML = `
+      <div class="sch-preview-box sch-memo-box">
+        <div class="sch-preview-head">
+          <span>${esc(staff ? staff.name : "")} · ${year}년 ${monthIndex + 1}월 메모${locked ? " (잠김)" : ""}</span>
+          <button type="button" class="sch-preview-close" id="sch-memo-close-x" aria-label="닫기">✕</button>
+        </div>
+        <div class="sch-preview-body sch-memo-body">
+          <textarea class="add-input sch-memo-textarea" id="sch-memo-textarea" placeholder="이번 달 이 인원에 대해 남길 메모를 입력하세요"${locked ? " readonly" : ""}>${esc(current)}</textarea>
+        </div>
+        <div class="sch-preview-actions">
+          ${(!locked && current) ? `<button type="button" class="ghost-btn danger" id="sch-memo-delete">삭제</button>` : ""}
+          <button type="button" class="ghost-btn" id="sch-memo-cancel">${locked ? "닫기" : "취소"}</button>
+          ${locked ? "" : `<button type="button" class="primary-btn" id="sch-memo-save">저장</button>`}
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    overlay.onclick = (e) => { if (e.target === overlay) closeScheduleMemoModal(); };
+    document.getElementById("sch-memo-close-x").onclick = () => closeScheduleMemoModal();
+    document.getElementById("sch-memo-cancel").onclick = () => closeScheduleMemoModal();
+    const deleteBtn = document.getElementById("sch-memo-delete");
+    if (deleteBtn) {
+      deleteBtn.onclick = () => {
+        setScheduleNameMemo(staffId, year, monthIndex, "");
+        closeScheduleMemoModal();
+        updateScheduleTableArea();
+      };
+    }
+    const saveBtn = document.getElementById("sch-memo-save");
+    if (saveBtn) {
+      saveBtn.onclick = () => {
+        const val = document.getElementById("sch-memo-textarea").value;
+        setScheduleNameMemo(staffId, year, monthIndex, val);
+        closeScheduleMemoModal();
+        updateScheduleTableArea();
+      };
+    }
+    setTimeout(() => {
+      document.addEventListener("keydown", scheduleMemoEscHandler, true);
+      const ta = document.getElementById("sch-memo-textarea");
+      if (ta && !locked) { ta.focus(); ta.select(); }
+    }, 0);
+  }
+
   // ----- "가감점 취합" 팝업: 메모에 선 투입/연장/초과/라운딩/동석/역동석 문구가 있는
   // 날짜를 상담사별로 모아서 보여준다. -----
   function closeScheduleAdjustModal() {
@@ -718,16 +779,33 @@
       };
     });
     // 열 머리글(날짜)·행 머리글(닉네임 칸) 클릭 = 선택 토글, 오른쪽 클릭 = 접기 메뉴 열기
+    // 머리글은 클릭(하나 선택/해제)에 더해 드래그(범위 선택)도 받는다. 드래그를 막 끝낸 직후에 따라오는
+    // click은 무시한다 — 안 그러면 방금 드래그로 고른 범위가 클릭 처리로 바로 취소되거나 뒤집힌다.
     root.querySelectorAll(".sch-col-th").forEach((th) => {
-      th.onclick = (e) => { e.stopPropagation(); scheduleToggleColSelection(th.getAttribute("data-col-key")); };
+      th.onclick = (e) => {
+        e.stopPropagation();
+        if (scheduleHeaderDragJustEnded()) return;
+        scheduleToggleColSelection(th.getAttribute("data-col-key"));
+      };
       th.oncontextmenu = (e) => scheduleHeaderRightClick(th, e);
+      th.onmousedown = (e) => scheduleHeaderDragStart("col", th.getAttribute("data-col-key"), e);
     });
     root.querySelectorAll(".sch-row-th").forEach((td) => {
-      td.onclick = (e) => { e.stopPropagation(); scheduleToggleRowSelection(td.getAttribute("data-row-key")); };
+      td.onclick = (e) => {
+        e.stopPropagation();
+        if (scheduleHeaderDragJustEnded()) return;
+        scheduleToggleRowSelection(td.getAttribute("data-row-key"));
+      };
       td.oncontextmenu = (e) => scheduleHeaderRightClick(td, e);
+      td.onmousedown = (e) => {
+        if (e.target.closest("[data-toggle-row-group]")) return; // 그룹 접기/펼치기 삼각형은 드래그 시작점이 아니다
+        scheduleHeaderDragStart("row", td.getAttribute("data-row-key"), e);
+      };
     });
+    root.onmouseover = scheduleHeaderDragOver;
     // 헤더가 아닌 다른 곳을 클릭하면 열/행 선택을 해제한다.
     root.onclick = (e) => {
+      if (scheduleHeaderDragJustEnded()) return;
       if (!e.target.closest(".sch-col-th") && !e.target.closest(".sch-row-th")) scheduleClearHeaderSelection();
     };
     scheduleApplyHeaderSelectionHighlight();

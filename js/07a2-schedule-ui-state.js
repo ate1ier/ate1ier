@@ -146,6 +146,100 @@
     else scheduleHeaderSelRows.add(rowKey);
     scheduleApplyHeaderSelectionHighlight();
   }
+  // ----- 머리글을 드래그해서 여러 열·행을 한 번에 선택 → 손을 떼면 접기 메뉴 -----
+  // 하나씩 클릭해서 고르던 것을 마우스로 쭉 끌어서 범위째 고를 수 있게 한다.
+  //  - 날짜 머리글(09/03 ~ 09/06)을 가로로 끌면 그 사이의 날짜 열이 전부 선택된다.
+  //  - 닉네임·이름 같은 인원 정보 머리글을 가로로 끌면 그 사이의 정보 열이 선택된다.
+  //  - 왼쪽 인원 정보 칸(이름 등)을 세로로 끌면 그 사이의 행(인원·집계행·그룹 제목 행)이 선택된다.
+  // 끌다가 손을 떼면 클릭·우클릭했을 때와 똑같은 "접기 / 선택 해제" 메뉴가 그 자리에 뜬다.
+  // 끌지 않고 그냥 클릭하면 예전처럼 그 머리글 하나만 선택/해제된다.
+  // 그냥 끌면 기존 선택을 새 범위로 바꾸고, Ctrl(⌘)/Shift를 누른 채 끌면 기존 선택에 더한다.
+  // 화면에 안 보이는(이미 접힌) 열·행은 범위에서 빠진다. 열은 날짜끼리, 정보 열끼리만 이어진다
+  // (날짜에서 시작해 정보 열로 넘어가는 식의 섞인 범위는 만들지 않는다).
+  let scheduleHeaderDrag = null; // { kind: "col"|"row", anchor, current, moved, baseCols, baseRows }
+  let scheduleHeaderDragSuppressClick = false; // 드래그를 끝낸 직후 따라오는 click이 선택을 되돌리지 않게 막는 표시
+
+  // orderedKeys(화면 순서대로 나열한 key 목록)에서 aKey~bKey 사이(양 끝 포함)를 돌려준다.
+  // 둘 중 하나라도 목록에 없으면(접혀 있거나 종류가 다르면) 빈 배열.
+  function scheduleRangeBetween(orderedKeys, aKey, bKey) {
+    const a = orderedKeys.indexOf(aKey);
+    const b = orderedKeys.indexOf(bKey);
+    if (a === -1 || b === -1) return [];
+    return orderedKeys.slice(Math.min(a, b), Math.max(a, b) + 1);
+  }
+  // 지금 화면에 보이는 열 key를 왼쪽부터 순서대로. prefix가 "d:"면 날짜 열, "i:"면 인원 정보 열.
+  function scheduleVisibleColKeys(prefix) {
+    if (prefix === "d:") {
+      const numDays = scheduleDaysInMonth(scheduleUi.year, scheduleUi.monthIndex);
+      const hidden = scheduleCollapsedDaySet();
+      const keys = [];
+      for (let d = 1; d <= numDays; d++) if (!hidden.has(d)) keys.push(`d:${d}`);
+      return keys;
+    }
+    return SCHEDULE_INFO_COLS.filter((c) => !scheduleUi.manualHiddenInfoCols.has(c.key)).map((c) => `i:${c.key}`);
+  }
+  // 지금 화면에 보이는 행 key("s:인원id" 또는 "r:행고유키")를 위에서부터 순서대로.
+  function scheduleVisibleRowKeys(root) {
+    const keys = [];
+    root.querySelectorAll("tr").forEach((tr) => {
+      if (tr.classList.contains("sch-row-hidden")) return;
+      const td = tr.querySelector("[data-row-key]");
+      if (td) keys.push(td.getAttribute("data-row-key"));
+    });
+    return keys;
+  }
+  function scheduleHeaderDragStart(kind, key, e) {
+    if (e.button !== 0 || !key) return;
+    const additive = e.ctrlKey || e.metaKey || e.shiftKey;
+    scheduleHeaderDrag = {
+      kind, anchor: key, current: key, moved: false,
+      baseCols: additive ? new Set(scheduleHeaderSelCols) : new Set(),
+      baseRows: additive ? new Set(scheduleHeaderSelRows) : new Set(),
+    };
+  }
+  // 표 위에서 마우스가 움직일 때마다 호출된다(드래그 중일 때만 동작). 열 드래그는 머리글이나 날짜 칸,
+  // 행 드래그는 어느 칸이든 그 칸이 속한 행 위에 있으면 그 위치까지 범위를 늘린다.
+  function scheduleHeaderDragOver(e) {
+    const d = scheduleHeaderDrag;
+    if (!d) return;
+    if (!(e.buttons & 1)) { scheduleHeaderDrag = null; return; } // 창 밖에서 버튼을 뗐다면 드래그 종료로 본다
+    const root = document.getElementById("schedule-table-area");
+    if (!root || !e.target || !e.target.closest) return;
+    let key = null;
+    if (d.kind === "row") {
+      const tr = e.target.closest("tr");
+      const td = tr && !tr.classList.contains("sch-row-hidden") ? tr.querySelector("[data-row-key]") : null;
+      key = td ? td.getAttribute("data-row-key") : null;
+    } else {
+      const el = e.target.closest("[data-col-key], td[data-day]");
+      if (el) key = el.getAttribute("data-col-key") || `d:${el.getAttribute("data-day")}`;
+      if (key && key.slice(0, 2) !== d.anchor.slice(0, 2)) key = null; // 날짜↔정보 열은 이어 붙이지 않음
+    }
+    if (!key || key === d.current) return;
+    d.current = key;
+    d.moved = true;
+    const range = d.kind === "row"
+      ? scheduleRangeBetween(scheduleVisibleRowKeys(root), d.anchor, d.current)
+      : scheduleRangeBetween(scheduleVisibleColKeys(d.anchor.slice(0, 2)), d.anchor, d.current);
+    scheduleHeaderSelCols = new Set(d.baseCols);
+    scheduleHeaderSelRows = new Set(d.baseRows);
+    range.forEach((k) => (d.kind === "row" ? scheduleHeaderSelRows : scheduleHeaderSelCols).add(k));
+    scheduleApplyHeaderSelectionHighlight(); // 끄는 동안 선택될 범위가 실시간으로 하이라이트된다
+  }
+  function scheduleHeaderDragEnd(e) {
+    const d = scheduleHeaderDrag;
+    scheduleHeaderDrag = null;
+    if (!d || !d.moved) return; // 안 끌었으면 기존 click 동작(그 머리글 하나 선택/해제)에 맡긴다
+    // 손을 뗀 직후 브라우저가 보내는 click이 "헤더가 아닌 곳 클릭 = 선택 해제"로 처리돼서
+    // 방금 고른 범위를 지워버리지 않도록, click이 지나갈 때까지만 표시를 켜둔다.
+    scheduleHeaderDragSuppressClick = true;
+    setTimeout(() => { scheduleHeaderDragSuppressClick = false; }, 0);
+    if (scheduleHeaderSelCols.size + scheduleHeaderSelRows.size === 0) return;
+    openScheduleHideMenu(e);
+  }
+  function scheduleHeaderDragJustEnded() { return scheduleHeaderDragSuppressClick; }
+  document.addEventListener("mouseup", scheduleHeaderDragEnd);
+
   // 오른쪽 클릭으로 바로 접기 메뉴를 연다. 우클릭한 헤더가 지금 선택 목록에 없으면
   // (다른 걸 선택해둔 채 엉뚱한 헤더를 우클릭한 경우 등) 그 헤더 하나만 선택한 것으로
   // 다시 잡아준다. 이미 선택된 헤더를 우클릭하면 지금까지 골라둔 선택을 그대로 유지한다.
@@ -167,7 +261,10 @@
       }
     }
     scheduleApplyHeaderSelectionHighlight();
-    openScheduleHideMenu(e);
+    // 인원 행의 "이름" 칸을 우클릭한 경우에는 접기 메뉴에 그 인원의 이름 메모 항목도 함께 보여준다.
+    // (열 머리글이나 그룹/집계 행 머리글에는 sch-col-name 클래스가 없으므로 해당 없음)
+    const nameMemoStaffId = (!isCol && el.classList.contains("sch-col-name")) ? (el.getAttribute("data-staff-id") || null) : null;
+    openScheduleHideMenu(e, nameMemoStaffId);
   }
   // 선택된 열·행을 실제로 접는다(=목록에 추가). 데이터 자체는 그대로 두고 화면에서만 숨긴다.
   // 행 key는 인원이면 "s:staffId", 집계행(관리자 인원/필요인력/대비 등)이면 "r:행고유키" 형태.
@@ -222,7 +319,10 @@
       }))
       .filter((b) => b.infoCols.length + b.staffIds.length + b.summaryRows.length > 1); // 1개짜리는 기존 개별 칩으로 표시
   }
-  function openScheduleHideMenu(e) {
+  // memoStaffId: 이름 칸을 우클릭해서 열었을 때 그 인원의 id. 있으면 "메모 추가/수정/삭제" 항목을 함께 보여준다.
+  // 다만 그 인원 행 하나만 선택된 상태일 때만 보여준다 — 여러 행·열을 골라 놓고 우클릭했다면
+  // 목적이 "한꺼번에 접기"이고, 메모는 어느 인원 것인지 애매해지기 때문이다.
+  function openScheduleHideMenu(e, memoStaffId) {
     closeScheduleMenu();
     const menu = document.createElement("div");
     menu.id = "sch-menu";
@@ -230,7 +330,23 @@
     const labelParts = [];
     if (scheduleHeaderSelCols.size > 0) labelParts.push(`열 ${scheduleHeaderSelCols.size}개`);
     if (scheduleHeaderSelRows.size > 0) labelParts.push(`행 ${scheduleHeaderSelRows.size}개`);
+    const showNameMemo = !!memoStaffId && scheduleHeaderSelCols.size === 0
+      && scheduleHeaderSelRows.size === 1 && scheduleHeaderSelRows.has(`s:${memoStaffId}`);
+    let memoHtml = "";
+    if (showNameMemo) {
+      const { year, monthIndex } = scheduleUi;
+      const hasMemo = !!getScheduleNameMemo(memoStaffId, year, monthIndex);
+      if (scheduleIsMonthLocked(year, monthIndex)) {
+        // 잠긴 달은 수정은 막되, 이미 남겨둔 메모는 읽을 수 있게 한다(모바일엔 마우스 툴팁이 없으므로).
+        if (hasMemo) memoHtml = `<button type="button" data-name-memo="1">${ICON_NOTE || ""} 메모 보기</button>`;
+      } else {
+        memoHtml = `<button type="button" data-name-memo="1">${ICON_NOTE || ""} ${hasMemo ? "메모 수정" : "메모 추가"}</button>`
+          + (hasMemo ? `<button type="button" class="sch-menu-danger" data-name-memo-delete="1">${ICON_TRASH || ""} 메모 삭제</button>` : "");
+      }
+      if (memoHtml) memoHtml += `<div class="sch-menu-divider"></div>`;
+    }
     menu.innerHTML = `<div class="sch-menu-title">${labelParts.join(" · ")} 선택됨</div>` +
+      memoHtml +
       `<button type="button" data-collapse-header-sel="1">접기</button>` +
       `<button type="button" class="sch-menu-reset" data-clear-header-sel="1">선택 해제</button>`;
     document.body.appendChild(menu);
@@ -241,6 +357,25 @@
     menu.style.top = `${Math.max(8, top)}px`;
     menu.style.left = `${Math.max(8, left)}px`;
     menu.querySelector("[data-collapse-header-sel]").onclick = () => scheduleCollapseHeaderSelection();
+    // 메모 항목을 고르면 우클릭하면서 잡혔던 행 선택은 풀어준다(메모를 다 남긴 뒤에도 그 행이
+    // 계속 선택된 채로 남아 있으면 헷갈리므로).
+    const nameMemoBtn = menu.querySelector("[data-name-memo]");
+    if (nameMemoBtn) {
+      nameMemoBtn.onclick = () => {
+        closeScheduleMenu();
+        scheduleClearHeaderSelection();
+        openScheduleNameMemoModal(memoStaffId);
+      };
+    }
+    const nameMemoDeleteBtn = menu.querySelector("[data-name-memo-delete]");
+    if (nameMemoDeleteBtn) {
+      nameMemoDeleteBtn.onclick = () => {
+        closeScheduleMenu();
+        scheduleClearHeaderSelection();
+        setScheduleNameMemo(memoStaffId, scheduleUi.year, scheduleUi.monthIndex, "");
+        updateScheduleTableArea();
+      };
+    }
     const clearBtn = menu.querySelector("[data-clear-header-sel]");
     clearBtn.onclick = () => { closeScheduleMenu(); scheduleClearHeaderSelection(); };
     setTimeout(() => document.addEventListener("mousedown", scheduleMenuOutsideHandler, true), 0);

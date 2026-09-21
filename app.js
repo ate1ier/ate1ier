@@ -8004,12 +8004,16 @@
         }
       }
     } catch (e) {}
-    return { staff: [], records: {}, staffHistory: {}, lastSyncMonthKey: null, requiredHeadcount: {}, monthLocks: {}, memos: {} };
+    return { staff: [], records: {}, staffHistory: {}, lastSyncMonthKey: null, requiredHeadcount: {}, monthLocks: {}, memos: {}, nameMemos: {} };
   }
   function normalizeScheduleData(d) {
     if (!d.requiredHeadcount) d.requiredHeadcount = {};
     // 셀(인원×날짜)마다 남길 수 있는 메모. key는 scheduleRecordKey와 같은 형식(staffId|dateKey).
     if (!d.memos || typeof d.memos !== "object") d.memos = {};
+    // 이름 칸에 남기는 메모. 셀 메모와 달리 "인원 × 달" 단위라서 key는 `staffId|YYYY-MM` 형식이다.
+    // (셀 메모와 같은 memos 안에 섞지 않는 이유: 셀 메모는 key 끝이 날짜(YYYY-MM-DD)라는 전제로
+    //  가감점 취합·복사/붙여넣기·수정 이력이 동작하는데, 여기에 다른 모양의 key가 끼면 헷갈리기 때문)
+    if (!d.nameMemos || typeof d.nameMemos !== "object") d.nameMemos = {};
     // 사용자가 직접 켜고 끄는 "월별 잠금". 잠긴 달은 셀 클릭·일괄 붙여넣기·삭제·필요인력 입력 등
     // 데이터를 바꾸는 조작이 전부 막혀서 실수로 수정되는 걸 막아준다. 다시 버튼을 눌러 풀면 그대로 수정 가능.
     if (!d.monthLocks || typeof d.monthLocks !== "object") d.monthLocks = {};
@@ -8155,6 +8159,10 @@
     Object.keys(scheduleData.memos).forEach((key) => {
       const staffId = key.split("|")[0];
       if (!validIds[staffId]) delete scheduleData.memos[key];
+    });
+    Object.keys(scheduleData.nameMemos || {}).forEach((key) => {
+      const staffId = key.split("|")[0];
+      if (!validIds[staffId]) delete scheduleData.nameMemos[key];
     });
   }
 
@@ -8397,6 +8405,100 @@
     else scheduleHeaderSelRows.add(rowKey);
     scheduleApplyHeaderSelectionHighlight();
   }
+  // ----- 머리글을 드래그해서 여러 열·행을 한 번에 선택 → 손을 떼면 접기 메뉴 -----
+  // 하나씩 클릭해서 고르던 것을 마우스로 쭉 끌어서 범위째 고를 수 있게 한다.
+  //  - 날짜 머리글(09/03 ~ 09/06)을 가로로 끌면 그 사이의 날짜 열이 전부 선택된다.
+  //  - 닉네임·이름 같은 인원 정보 머리글을 가로로 끌면 그 사이의 정보 열이 선택된다.
+  //  - 왼쪽 인원 정보 칸(이름 등)을 세로로 끌면 그 사이의 행(인원·집계행·그룹 제목 행)이 선택된다.
+  // 끌다가 손을 떼면 클릭·우클릭했을 때와 똑같은 "접기 / 선택 해제" 메뉴가 그 자리에 뜬다.
+  // 끌지 않고 그냥 클릭하면 예전처럼 그 머리글 하나만 선택/해제된다.
+  // 그냥 끌면 기존 선택을 새 범위로 바꾸고, Ctrl(⌘)/Shift를 누른 채 끌면 기존 선택에 더한다.
+  // 화면에 안 보이는(이미 접힌) 열·행은 범위에서 빠진다. 열은 날짜끼리, 정보 열끼리만 이어진다
+  // (날짜에서 시작해 정보 열로 넘어가는 식의 섞인 범위는 만들지 않는다).
+  let scheduleHeaderDrag = null; // { kind: "col"|"row", anchor, current, moved, baseCols, baseRows }
+  let scheduleHeaderDragSuppressClick = false; // 드래그를 끝낸 직후 따라오는 click이 선택을 되돌리지 않게 막는 표시
+
+  // orderedKeys(화면 순서대로 나열한 key 목록)에서 aKey~bKey 사이(양 끝 포함)를 돌려준다.
+  // 둘 중 하나라도 목록에 없으면(접혀 있거나 종류가 다르면) 빈 배열.
+  function scheduleRangeBetween(orderedKeys, aKey, bKey) {
+    const a = orderedKeys.indexOf(aKey);
+    const b = orderedKeys.indexOf(bKey);
+    if (a === -1 || b === -1) return [];
+    return orderedKeys.slice(Math.min(a, b), Math.max(a, b) + 1);
+  }
+  // 지금 화면에 보이는 열 key를 왼쪽부터 순서대로. prefix가 "d:"면 날짜 열, "i:"면 인원 정보 열.
+  function scheduleVisibleColKeys(prefix) {
+    if (prefix === "d:") {
+      const numDays = scheduleDaysInMonth(scheduleUi.year, scheduleUi.monthIndex);
+      const hidden = scheduleCollapsedDaySet();
+      const keys = [];
+      for (let d = 1; d <= numDays; d++) if (!hidden.has(d)) keys.push(`d:${d}`);
+      return keys;
+    }
+    return SCHEDULE_INFO_COLS.filter((c) => !scheduleUi.manualHiddenInfoCols.has(c.key)).map((c) => `i:${c.key}`);
+  }
+  // 지금 화면에 보이는 행 key("s:인원id" 또는 "r:행고유키")를 위에서부터 순서대로.
+  function scheduleVisibleRowKeys(root) {
+    const keys = [];
+    root.querySelectorAll("tr").forEach((tr) => {
+      if (tr.classList.contains("sch-row-hidden")) return;
+      const td = tr.querySelector("[data-row-key]");
+      if (td) keys.push(td.getAttribute("data-row-key"));
+    });
+    return keys;
+  }
+  function scheduleHeaderDragStart(kind, key, e) {
+    if (e.button !== 0 || !key) return;
+    const additive = e.ctrlKey || e.metaKey || e.shiftKey;
+    scheduleHeaderDrag = {
+      kind, anchor: key, current: key, moved: false,
+      baseCols: additive ? new Set(scheduleHeaderSelCols) : new Set(),
+      baseRows: additive ? new Set(scheduleHeaderSelRows) : new Set(),
+    };
+  }
+  // 표 위에서 마우스가 움직일 때마다 호출된다(드래그 중일 때만 동작). 열 드래그는 머리글이나 날짜 칸,
+  // 행 드래그는 어느 칸이든 그 칸이 속한 행 위에 있으면 그 위치까지 범위를 늘린다.
+  function scheduleHeaderDragOver(e) {
+    const d = scheduleHeaderDrag;
+    if (!d) return;
+    if (!(e.buttons & 1)) { scheduleHeaderDrag = null; return; } // 창 밖에서 버튼을 뗐다면 드래그 종료로 본다
+    const root = document.getElementById("schedule-table-area");
+    if (!root || !e.target || !e.target.closest) return;
+    let key = null;
+    if (d.kind === "row") {
+      const tr = e.target.closest("tr");
+      const td = tr && !tr.classList.contains("sch-row-hidden") ? tr.querySelector("[data-row-key]") : null;
+      key = td ? td.getAttribute("data-row-key") : null;
+    } else {
+      const el = e.target.closest("[data-col-key], td[data-day]");
+      if (el) key = el.getAttribute("data-col-key") || `d:${el.getAttribute("data-day")}`;
+      if (key && key.slice(0, 2) !== d.anchor.slice(0, 2)) key = null; // 날짜↔정보 열은 이어 붙이지 않음
+    }
+    if (!key || key === d.current) return;
+    d.current = key;
+    d.moved = true;
+    const range = d.kind === "row"
+      ? scheduleRangeBetween(scheduleVisibleRowKeys(root), d.anchor, d.current)
+      : scheduleRangeBetween(scheduleVisibleColKeys(d.anchor.slice(0, 2)), d.anchor, d.current);
+    scheduleHeaderSelCols = new Set(d.baseCols);
+    scheduleHeaderSelRows = new Set(d.baseRows);
+    range.forEach((k) => (d.kind === "row" ? scheduleHeaderSelRows : scheduleHeaderSelCols).add(k));
+    scheduleApplyHeaderSelectionHighlight(); // 끄는 동안 선택될 범위가 실시간으로 하이라이트된다
+  }
+  function scheduleHeaderDragEnd(e) {
+    const d = scheduleHeaderDrag;
+    scheduleHeaderDrag = null;
+    if (!d || !d.moved) return; // 안 끌었으면 기존 click 동작(그 머리글 하나 선택/해제)에 맡긴다
+    // 손을 뗀 직후 브라우저가 보내는 click이 "헤더가 아닌 곳 클릭 = 선택 해제"로 처리돼서
+    // 방금 고른 범위를 지워버리지 않도록, click이 지나갈 때까지만 표시를 켜둔다.
+    scheduleHeaderDragSuppressClick = true;
+    setTimeout(() => { scheduleHeaderDragSuppressClick = false; }, 0);
+    if (scheduleHeaderSelCols.size + scheduleHeaderSelRows.size === 0) return;
+    openScheduleHideMenu(e);
+  }
+  function scheduleHeaderDragJustEnded() { return scheduleHeaderDragSuppressClick; }
+  document.addEventListener("mouseup", scheduleHeaderDragEnd);
+
   // 오른쪽 클릭으로 바로 접기 메뉴를 연다. 우클릭한 헤더가 지금 선택 목록에 없으면
   // (다른 걸 선택해둔 채 엉뚱한 헤더를 우클릭한 경우 등) 그 헤더 하나만 선택한 것으로
   // 다시 잡아준다. 이미 선택된 헤더를 우클릭하면 지금까지 골라둔 선택을 그대로 유지한다.
@@ -8418,7 +8520,10 @@
       }
     }
     scheduleApplyHeaderSelectionHighlight();
-    openScheduleHideMenu(e);
+    // 인원 행의 "이름" 칸을 우클릭한 경우에는 접기 메뉴에 그 인원의 이름 메모 항목도 함께 보여준다.
+    // (열 머리글이나 그룹/집계 행 머리글에는 sch-col-name 클래스가 없으므로 해당 없음)
+    const nameMemoStaffId = (!isCol && el.classList.contains("sch-col-name")) ? (el.getAttribute("data-staff-id") || null) : null;
+    openScheduleHideMenu(e, nameMemoStaffId);
   }
   // 선택된 열·행을 실제로 접는다(=목록에 추가). 데이터 자체는 그대로 두고 화면에서만 숨긴다.
   // 행 key는 인원이면 "s:staffId", 집계행(관리자 인원/필요인력/대비 등)이면 "r:행고유키" 형태.
@@ -8473,7 +8578,10 @@
       }))
       .filter((b) => b.infoCols.length + b.staffIds.length + b.summaryRows.length > 1); // 1개짜리는 기존 개별 칩으로 표시
   }
-  function openScheduleHideMenu(e) {
+  // memoStaffId: 이름 칸을 우클릭해서 열었을 때 그 인원의 id. 있으면 "메모 추가/수정/삭제" 항목을 함께 보여준다.
+  // 다만 그 인원 행 하나만 선택된 상태일 때만 보여준다 — 여러 행·열을 골라 놓고 우클릭했다면
+  // 목적이 "한꺼번에 접기"이고, 메모는 어느 인원 것인지 애매해지기 때문이다.
+  function openScheduleHideMenu(e, memoStaffId) {
     closeScheduleMenu();
     const menu = document.createElement("div");
     menu.id = "sch-menu";
@@ -8481,7 +8589,23 @@
     const labelParts = [];
     if (scheduleHeaderSelCols.size > 0) labelParts.push(`열 ${scheduleHeaderSelCols.size}개`);
     if (scheduleHeaderSelRows.size > 0) labelParts.push(`행 ${scheduleHeaderSelRows.size}개`);
+    const showNameMemo = !!memoStaffId && scheduleHeaderSelCols.size === 0
+      && scheduleHeaderSelRows.size === 1 && scheduleHeaderSelRows.has(`s:${memoStaffId}`);
+    let memoHtml = "";
+    if (showNameMemo) {
+      const { year, monthIndex } = scheduleUi;
+      const hasMemo = !!getScheduleNameMemo(memoStaffId, year, monthIndex);
+      if (scheduleIsMonthLocked(year, monthIndex)) {
+        // 잠긴 달은 수정은 막되, 이미 남겨둔 메모는 읽을 수 있게 한다(모바일엔 마우스 툴팁이 없으므로).
+        if (hasMemo) memoHtml = `<button type="button" data-name-memo="1">${ICON_NOTE || ""} 메모 보기</button>`;
+      } else {
+        memoHtml = `<button type="button" data-name-memo="1">${ICON_NOTE || ""} ${hasMemo ? "메모 수정" : "메모 추가"}</button>`
+          + (hasMemo ? `<button type="button" class="sch-menu-danger" data-name-memo-delete="1">${ICON_TRASH || ""} 메모 삭제</button>` : "");
+      }
+      if (memoHtml) memoHtml += `<div class="sch-menu-divider"></div>`;
+    }
     menu.innerHTML = `<div class="sch-menu-title">${labelParts.join(" · ")} 선택됨</div>` +
+      memoHtml +
       `<button type="button" data-collapse-header-sel="1">접기</button>` +
       `<button type="button" class="sch-menu-reset" data-clear-header-sel="1">선택 해제</button>`;
     document.body.appendChild(menu);
@@ -8492,6 +8616,25 @@
     menu.style.top = `${Math.max(8, top)}px`;
     menu.style.left = `${Math.max(8, left)}px`;
     menu.querySelector("[data-collapse-header-sel]").onclick = () => scheduleCollapseHeaderSelection();
+    // 메모 항목을 고르면 우클릭하면서 잡혔던 행 선택은 풀어준다(메모를 다 남긴 뒤에도 그 행이
+    // 계속 선택된 채로 남아 있으면 헷갈리므로).
+    const nameMemoBtn = menu.querySelector("[data-name-memo]");
+    if (nameMemoBtn) {
+      nameMemoBtn.onclick = () => {
+        closeScheduleMenu();
+        scheduleClearHeaderSelection();
+        openScheduleNameMemoModal(memoStaffId);
+      };
+    }
+    const nameMemoDeleteBtn = menu.querySelector("[data-name-memo-delete]");
+    if (nameMemoDeleteBtn) {
+      nameMemoDeleteBtn.onclick = () => {
+        closeScheduleMenu();
+        scheduleClearHeaderSelection();
+        setScheduleNameMemo(memoStaffId, scheduleUi.year, scheduleUi.monthIndex, "");
+        updateScheduleTableArea();
+      };
+    }
     const clearBtn = menu.querySelector("[data-clear-header-sel]");
     clearBtn.onclick = () => { closeScheduleMenu(); scheduleClearHeaderSelection(); };
     setTimeout(() => document.addEventListener("mousedown", scheduleMenuOutsideHandler, true), 0);
@@ -8735,6 +8878,33 @@
     }
     saveScheduleData();
   }
+  // ----- 이름 메모 (이름 칸에 남기는 메모) -----
+  // 셀 메모가 "인원 × 날짜"라면, 이름 메모는 "인원 × 달"이다. 그 달 스케줄을 볼 때 그 사람에 대해
+  // 기억해 둘 내용(예: "9/15 퇴사 예정", "수습 기간")을 남기는 용도라서, 달이 바뀌면 새로 시작한다.
+  // 그래서 잠금(확정)된 달의 이름 메모도 셀 메모처럼 수정이 막히고, 지난 달을 열어보면 그때 남긴 그대로 보인다.
+  // key 형식: `staffId|YYYY-MM` (셀 메모의 `staffId|YYYY-MM-DD`와 섞이지 않도록 scheduleData.nameMemos에 따로 둔다)
+  function scheduleNameMemoKey(staffId, year, monthIndex) {
+    return `${staffId}|${scheduleMonthKey(year, monthIndex)}`;
+  }
+  function getScheduleNameMemo(staffId, year, monthIndex) {
+    const map = scheduleData.nameMemos || {};
+    return map[scheduleNameMemoKey(staffId, year, monthIndex)] || "";
+  }
+  function setScheduleNameMemo(staffId, year, monthIndex, text) {
+    if (scheduleIsMonthLocked(year, monthIndex)) { flashScheduleStatus("잠긴 달이에요. 잠금을 해제한 뒤 수정해주세요."); return; }
+    const trimmed = (text || "").trim();
+    // 바뀐 게 없으면 저장도, 되돌리기 기록도 남기지 않는다(같은 내용으로 저장 버튼을 눌렀을 때 등).
+    if (trimmed === getScheduleNameMemo(staffId, year, monthIndex)) return;
+    recordUndo("스케줄 이름 메모 변경", SCHEDULE_KEY, reloadScheduleData);
+    if (!scheduleData.nameMemos || typeof scheduleData.nameMemos !== "object") scheduleData.nameMemos = {};
+    const key = scheduleNameMemoKey(staffId, year, monthIndex);
+    if (trimmed === "") {
+      delete scheduleData.nameMemos[key];
+    } else {
+      scheduleData.nameMemos[key] = trimmed;
+    }
+    saveScheduleData();
+  }
   // ----- 메모 문구 기반 "가감점 취합" -----
   // 메모 안에 아래 문구들이 포함되어 있으면 해당 날짜를 카테고리별로 모아서 보여준다.
   // 표기가 다양해도(공백 유무 등) 같은 카테고리로 합쳐지도록 정리해뒀다.
@@ -8948,7 +9118,8 @@
     // 인원 정보 열(닉네임~결근) 하나를 그려주는 헬퍼. asTh=true면 헤더 셀(선택 가능),
     // false면 각 인원 행의 값 칸(행 선택 가능)을 만든다. 개별로 접어둔 열은 아예 마크업에서
     // 빼버린다(위 infoColCount 주석 참고) — 그래야 요약행들의 colspan 너비도 같이 맞는다.
-    function infoColHtml(colDef, asTh, valueHtml, extraCls, staffId) {
+    // titleText: 값 칸(td)에 마우스를 올렸을 때 보여줄 툴팁. 이름 칸의 메모 내용을 보여주는 데 쓴다.
+    function infoColHtml(colDef, asTh, valueHtml, extraCls, staffId, titleText) {
       if (hideSummaryCols) {
         // 캡처용 마크업: 개별 열 숨김을 적용하지 않고 항상 그대로 그린다.
         if (colDef.summaryOnly) return "";
@@ -8962,7 +9133,7 @@
       const selCls = asTh ? " sch-col-th" : " sch-row-th";
       const dataAttrs = asTh
         ? ` data-col-key="i:${colDef.key}" title="클릭해서 선택, 선택 후 오른쪽 클릭으로 접기"`
-        : ` data-staff-id="${staffId || ""}" data-row-key="s:${staffId || ""}"`;
+        : ` data-staff-id="${staffId || ""}" data-row-key="s:${staffId || ""}"${titleText ? ` title="${esc(titleText)}"` : ""}`;
       return `<${tag} class="sch-info sch-col-${colDef.key}${stickyEndCls}${selCls}${extraCls ? ` ${extraCls}` : ""}"${leftStyle}${dataAttrs}>${asTh ? colDef.label : valueHtml}</${tag}>`;
     }
 
@@ -8994,14 +9165,18 @@
         return `<td class="sch-cell ${disp.cls}${colHiddenCls(d)}" data-staff-id="${s.id}" data-date="${dateKey}" data-row-idx="${rowIdx}" data-day="${d}" title="${esc(memo)}" tabindex="0"><span class="sch-cell-label">${disp.label}</span>${memoDot}</td>`;
       }).join("");
       const counts = scheduleStaffMonthCounts(s.id, year, monthIndex);
+      // 이름 칸 메모: 셀 메모와 같은 주황 삼각형 표시(이미지 저장 시엔 hideMemoMarks로 빠진다)를 붙이고,
+      // 마우스를 올리면 메모 내용이 툴팁으로 보인다. 이름 칸을 오른쪽 클릭하면 추가/수정/삭제할 수 있다.
+      const nameMemo = getScheduleNameMemo(s.id, year, monthIndex);
+      const nameMemoDot = (nameMemo && !hideMemoMarks) ? `<span class="sch-memo-dot sch-memo-dot--name"></span>` : "";
       const infoColValues = {
-        nickname: esc(s.nickname), name: esc(s.name), empno: esc(s.empNo),
+        nickname: esc(s.nickname), name: esc(s.name) + nameMemoDot, empno: esc(s.empNo),
         hiredate: esc(s.hireDate), workhours: esc(s.workHours),
         work: counts.WORK, off: counts.OFF, annual: counts.ANNUAL, daehyu: counts.DAEHYU, absent: counts.ABSENT,
       };
       const infoCells = SCHEDULE_INFO_COLS.map((c) => {
         const extraCls = c.key === "nickname" ? "sch-nickname" : (c.summaryOnly ? "sch-count" : "");
-        return infoColHtml(c, false, infoColValues[c.key], extraCls, s.id);
+        return infoColHtml(c, false, infoColValues[c.key], extraCls, s.id, c.key === "name" ? nameMemo : "");
       }).join("");
       return `
         <tr class="${rowHiddenCls.trim()}">
@@ -9414,6 +9589,11 @@
         row.getCell(1).font = { bold: true, color: { argb: COLOR.nickname } };
         row.getCell(1).alignment = { horizontal: "center", vertical: "middle" };
         for (let c = 2; c <= 5; c++) row.getCell(c).alignment = { horizontal: "left", vertical: "middle" };
+        // 이름 칸에 남긴 메모도 셀 메모처럼 엑셀 "메모(노트)"로 넣는다(이름은 2번째 열).
+        const nameMemo = getScheduleNameMemo(s.id, year, monthIndex);
+        if (nameMemo) {
+          row.getCell(2).note = { texts: [{ text: nameMemo }], margins: { insetmode: "auto" } };
+        }
         for (let c = 6; c <= 10; c++) row.getCell(c).alignment = { horizontal: "center", vertical: "middle" };
 
         labels.forEach((label, i) => {
@@ -10278,6 +10458,67 @@
     }, 0);
   }
 
+  // ----- 이름 메모 입력 모달 (이름 칸 오른쪽 클릭 → 메모 추가/수정) -----
+  // 셀 메모 모달과 같은 모양·스타일을 쓰고 닫는 함수(closeScheduleMemoModal)도 그대로 공유한다.
+  // 다른 점은 날짜가 아니라 "지금 보고 있는 달" 기준의 메모라는 것뿐이다.
+  // 잠긴 달은 수정이 막혀 있으므로, 이미 남겨둔 메모가 있을 때만 읽기 전용으로 열어서 보여준다.
+  function openScheduleNameMemoModal(staffId) {
+    const { year, monthIndex } = scheduleUi;
+    const locked = scheduleIsMonthLocked(year, monthIndex);
+    const current = getScheduleNameMemo(staffId, year, monthIndex);
+    if (locked && !current) {
+      flashScheduleStatus("잠긴 달이에요. 잠금을 해제한 뒤 수정해주세요.");
+      return;
+    }
+    closeScheduleMemoModal();
+    const staff = getStaffListForMonth(year, monthIndex).find((s) => s.id === staffId) || scheduleData.staff.find((s) => s.id === staffId);
+    const overlay = document.createElement("div");
+    overlay.id = "sch-memo-overlay";
+    overlay.className = "sch-preview-overlay";
+    overlay.innerHTML = `
+      <div class="sch-preview-box sch-memo-box">
+        <div class="sch-preview-head">
+          <span>${esc(staff ? staff.name : "")} · ${year}년 ${monthIndex + 1}월 메모${locked ? " (잠김)" : ""}</span>
+          <button type="button" class="sch-preview-close" id="sch-memo-close-x" aria-label="닫기">✕</button>
+        </div>
+        <div class="sch-preview-body sch-memo-body">
+          <textarea class="add-input sch-memo-textarea" id="sch-memo-textarea" placeholder="이번 달 이 인원에 대해 남길 메모를 입력하세요"${locked ? " readonly" : ""}>${esc(current)}</textarea>
+        </div>
+        <div class="sch-preview-actions">
+          ${(!locked && current) ? `<button type="button" class="ghost-btn danger" id="sch-memo-delete">삭제</button>` : ""}
+          <button type="button" class="ghost-btn" id="sch-memo-cancel">${locked ? "닫기" : "취소"}</button>
+          ${locked ? "" : `<button type="button" class="primary-btn" id="sch-memo-save">저장</button>`}
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    overlay.onclick = (e) => { if (e.target === overlay) closeScheduleMemoModal(); };
+    document.getElementById("sch-memo-close-x").onclick = () => closeScheduleMemoModal();
+    document.getElementById("sch-memo-cancel").onclick = () => closeScheduleMemoModal();
+    const deleteBtn = document.getElementById("sch-memo-delete");
+    if (deleteBtn) {
+      deleteBtn.onclick = () => {
+        setScheduleNameMemo(staffId, year, monthIndex, "");
+        closeScheduleMemoModal();
+        updateScheduleTableArea();
+      };
+    }
+    const saveBtn = document.getElementById("sch-memo-save");
+    if (saveBtn) {
+      saveBtn.onclick = () => {
+        const val = document.getElementById("sch-memo-textarea").value;
+        setScheduleNameMemo(staffId, year, monthIndex, val);
+        closeScheduleMemoModal();
+        updateScheduleTableArea();
+      };
+    }
+    setTimeout(() => {
+      document.addEventListener("keydown", scheduleMemoEscHandler, true);
+      const ta = document.getElementById("sch-memo-textarea");
+      if (ta && !locked) { ta.focus(); ta.select(); }
+    }, 0);
+  }
+
   // ----- "가감점 취합" 팝업: 메모에 선 투입/연장/초과/라운딩/동석/역동석 문구가 있는
   // 날짜를 상담사별로 모아서 보여준다. -----
   function closeScheduleAdjustModal() {
@@ -10603,16 +10844,33 @@
       };
     });
     // 열 머리글(날짜)·행 머리글(닉네임 칸) 클릭 = 선택 토글, 오른쪽 클릭 = 접기 메뉴 열기
+    // 머리글은 클릭(하나 선택/해제)에 더해 드래그(범위 선택)도 받는다. 드래그를 막 끝낸 직후에 따라오는
+    // click은 무시한다 — 안 그러면 방금 드래그로 고른 범위가 클릭 처리로 바로 취소되거나 뒤집힌다.
     root.querySelectorAll(".sch-col-th").forEach((th) => {
-      th.onclick = (e) => { e.stopPropagation(); scheduleToggleColSelection(th.getAttribute("data-col-key")); };
+      th.onclick = (e) => {
+        e.stopPropagation();
+        if (scheduleHeaderDragJustEnded()) return;
+        scheduleToggleColSelection(th.getAttribute("data-col-key"));
+      };
       th.oncontextmenu = (e) => scheduleHeaderRightClick(th, e);
+      th.onmousedown = (e) => scheduleHeaderDragStart("col", th.getAttribute("data-col-key"), e);
     });
     root.querySelectorAll(".sch-row-th").forEach((td) => {
-      td.onclick = (e) => { e.stopPropagation(); scheduleToggleRowSelection(td.getAttribute("data-row-key")); };
+      td.onclick = (e) => {
+        e.stopPropagation();
+        if (scheduleHeaderDragJustEnded()) return;
+        scheduleToggleRowSelection(td.getAttribute("data-row-key"));
+      };
       td.oncontextmenu = (e) => scheduleHeaderRightClick(td, e);
+      td.onmousedown = (e) => {
+        if (e.target.closest("[data-toggle-row-group]")) return; // 그룹 접기/펼치기 삼각형은 드래그 시작점이 아니다
+        scheduleHeaderDragStart("row", td.getAttribute("data-row-key"), e);
+      };
     });
+    root.onmouseover = scheduleHeaderDragOver;
     // 헤더가 아닌 다른 곳을 클릭하면 열/행 선택을 해제한다.
     root.onclick = (e) => {
+      if (scheduleHeaderDragJustEnded()) return;
       if (!e.target.closest(".sch-col-th") && !e.target.closest(".sch-row-th")) scheduleClearHeaderSelection();
     };
     scheduleApplyHeaderSelectionHighlight();
@@ -12854,8 +13112,10 @@
           "셀을 드래그해서 여러 칸을 한 번에 선택한 뒤, 메뉴에서 상태를 골라 한 번에 적용할 수 있어요.",
           "칸(또는 드래그로 고른 범위)을 Ctrl+C로 복사하고, 붙여넣을 칸을 클릭한 뒤 Ctrl+V로 붙여넣을 수 있어요. 상태와 메모가 함께 복사되고, 붙여넣은 칸의 기존 메모는 복사한 메모로 바뀌어요(복사한 칸에 메모가 없으면 지워져요). Ctrl+Z로 한 번에 되돌릴 수 있고, 엑셀에서 복사한 근태 값(오프·연차 등)도 붙여넣을 수 있어요.",
           "셀을 클릭하면 근무/오프/연차 등 다양한 상태로 바로 바꿀 수 있고, 메모도 남길 수 있어요. 지각은 출근 인원에 포함, 결근은 제외돼요.",
+          "이름 칸을 오른쪽 클릭하면 그 인원의 이번 달 메모를 남길 수 있어요. 메모가 있으면 이름 칸 모서리에 주황색 표시가 붙고, 마우스를 올리면 내용이 보여요. 엑셀로 다운로드하면 메모로 함께 들어가고(이미지 저장에는 표시되지 않아요), 지난 달은 잠겨서 그때 남긴 메모를 읽기만 할 수 있어요.",
           "날짜·조·업무 구분별로 필요 인원(헤드카운트)을 설정하면, 실제 근무 인원과의 차이를 자동으로 계산해서 보여줘요.",
           "필요 없는 열·행은 선택 후 오른쪽 클릭으로 접어서 숨길 수 있고, 날짜 범위를 묶어 그룹으로 한 번에 접었다 펼 수도 있어요.",
+          "날짜·정보 머리글이나 왼쪽 이름·사번 칸을 마우스로 끌면 그 범위의 열·행이 한꺼번에 선택되고, 손을 떼면 뜨는 메뉴에서 '접기'를 누르면 한 번에 접혀요. Ctrl(⌘) 또는 Shift를 누른 채 끌면 이미 고른 것에 더해져요.",
           "이미지로 저장하거나 엑셀 파일로 다운로드할 수 있고, '휴일대체 확인서'도 회사 양식 그대로 자동으로 만들 수 있어요.",
           "이번 달 지각·결근 기록을 표 아래에서 바로 확인할 수 있어요.",
           "지난 달은 자동으로 '확정됨' 상태로 잠기고 그 시점 인원 구성이 고정돼요. '잠금 해제' 버튼으로 다시 열어 수정할 수 있어요.",

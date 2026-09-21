@@ -56,7 +56,7 @@ counseling-app/
     ├── 06-interviews.js 면담일지
     ├── 07a1-schedule-data.js        스케줄: 데이터 로드/저장/정규화, 월 잠금, 상담사 목록 동기화
     ├── 07a2-schedule-ui-state.js    스케줄: 접기 상태, 검색, 행/열 그룹, 헤더 선택, 숨김 메뉴, 일괄 붙여넣기
-    ├── 07a3-schedule-records.js     스케줄: 필요인원, 셀 기록/메모, 조정요약, 정렬 헬퍼
+    ├── 07a3-schedule-records.js     스케줄: 필요인원, 셀 기록/메모, 이름 메모, 조정요약, 정렬 헬퍼
     ├── 07a4-schedule-table-render.js 스케줄: 월별 표 렌더링(buildScheduleTableHtml)
     ├── 07a5-schedule-log-capture.js 스케줄: 변경 로그, 표 크기 맞춤, 이미지 캡처
     ├── 07a6-schedule-cell-edit.js   스케줄: 셀 선택/편집/키보드 핸들링

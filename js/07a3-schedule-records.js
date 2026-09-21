@@ -74,6 +74,33 @@
     }
     saveScheduleData();
   }
+  // ----- 이름 메모 (이름 칸에 남기는 메모) -----
+  // 셀 메모가 "인원 × 날짜"라면, 이름 메모는 "인원 × 달"이다. 그 달 스케줄을 볼 때 그 사람에 대해
+  // 기억해 둘 내용(예: "9/15 퇴사 예정", "수습 기간")을 남기는 용도라서, 달이 바뀌면 새로 시작한다.
+  // 그래서 잠금(확정)된 달의 이름 메모도 셀 메모처럼 수정이 막히고, 지난 달을 열어보면 그때 남긴 그대로 보인다.
+  // key 형식: `staffId|YYYY-MM` (셀 메모의 `staffId|YYYY-MM-DD`와 섞이지 않도록 scheduleData.nameMemos에 따로 둔다)
+  function scheduleNameMemoKey(staffId, year, monthIndex) {
+    return `${staffId}|${scheduleMonthKey(year, monthIndex)}`;
+  }
+  function getScheduleNameMemo(staffId, year, monthIndex) {
+    const map = scheduleData.nameMemos || {};
+    return map[scheduleNameMemoKey(staffId, year, monthIndex)] || "";
+  }
+  function setScheduleNameMemo(staffId, year, monthIndex, text) {
+    if (scheduleIsMonthLocked(year, monthIndex)) { flashScheduleStatus("잠긴 달이에요. 잠금을 해제한 뒤 수정해주세요."); return; }
+    const trimmed = (text || "").trim();
+    // 바뀐 게 없으면 저장도, 되돌리기 기록도 남기지 않는다(같은 내용으로 저장 버튼을 눌렀을 때 등).
+    if (trimmed === getScheduleNameMemo(staffId, year, monthIndex)) return;
+    recordUndo("스케줄 이름 메모 변경", SCHEDULE_KEY, reloadScheduleData);
+    if (!scheduleData.nameMemos || typeof scheduleData.nameMemos !== "object") scheduleData.nameMemos = {};
+    const key = scheduleNameMemoKey(staffId, year, monthIndex);
+    if (trimmed === "") {
+      delete scheduleData.nameMemos[key];
+    } else {
+      scheduleData.nameMemos[key] = trimmed;
+    }
+    saveScheduleData();
+  }
   // ----- 메모 문구 기반 "가감점 취합" -----
   // 메모 안에 아래 문구들이 포함되어 있으면 해당 날짜를 카테고리별로 모아서 보여준다.
   // 표기가 다양해도(공백 유무 등) 같은 카테고리로 합쳐지도록 정리해뒀다.

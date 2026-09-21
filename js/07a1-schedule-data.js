@@ -12,12 +12,16 @@
         }
       }
     } catch (e) {}
-    return { staff: [], records: {}, staffHistory: {}, lastSyncMonthKey: null, requiredHeadcount: {}, monthLocks: {}, memos: {} };
+    return { staff: [], records: {}, staffHistory: {}, lastSyncMonthKey: null, requiredHeadcount: {}, monthLocks: {}, memos: {}, nameMemos: {} };
   }
   function normalizeScheduleData(d) {
     if (!d.requiredHeadcount) d.requiredHeadcount = {};
     // 셀(인원×날짜)마다 남길 수 있는 메모. key는 scheduleRecordKey와 같은 형식(staffId|dateKey).
     if (!d.memos || typeof d.memos !== "object") d.memos = {};
+    // 이름 칸에 남기는 메모. 셀 메모와 달리 "인원 × 달" 단위라서 key는 `staffId|YYYY-MM` 형식이다.
+    // (셀 메모와 같은 memos 안에 섞지 않는 이유: 셀 메모는 key 끝이 날짜(YYYY-MM-DD)라는 전제로
+    //  가감점 취합·복사/붙여넣기·수정 이력이 동작하는데, 여기에 다른 모양의 key가 끼면 헷갈리기 때문)
+    if (!d.nameMemos || typeof d.nameMemos !== "object") d.nameMemos = {};
     // 사용자가 직접 켜고 끄는 "월별 잠금". 잠긴 달은 셀 클릭·일괄 붙여넣기·삭제·필요인력 입력 등
     // 데이터를 바꾸는 조작이 전부 막혀서 실수로 수정되는 걸 막아준다. 다시 버튼을 눌러 풀면 그대로 수정 가능.
     if (!d.monthLocks || typeof d.monthLocks !== "object") d.monthLocks = {};
@@ -163,6 +167,10 @@
     Object.keys(scheduleData.memos).forEach((key) => {
       const staffId = key.split("|")[0];
       if (!validIds[staffId]) delete scheduleData.memos[key];
+    });
+    Object.keys(scheduleData.nameMemos || {}).forEach((key) => {
+      const staffId = key.split("|")[0];
+      if (!validIds[staffId]) delete scheduleData.nameMemos[key];
     });
   }
 
