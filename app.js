@@ -9171,6 +9171,9 @@
   // 알려주면 그 칸에 강조 클래스를 붙인다(1 = 새로 배정될 오프, 2 = 그중 선호 요일과 맞은 칸).
   // 평소에는 null이라 화면의 실제 월별 스케줄 표에는 아무 영향이 없다.
   let schedulePreviewMarks = null;
+  // "AI 자동 배치" 미리보기 전용: 이번 배치에서 제외한 인원의 id 집합. 표(인원 행·집계·필요인력 대비)에서 이 인원을 뺀다.
+  // 평소에는 null이라 실제 월별 스케줄 표에는 아무 영향이 없다.
+  let schedulePreviewExcludedIds = null;
   function buildScheduleTableHtml(filterMode, hideSummaryCols, hideRequiredRows, hideMemoMarks) {
     const { year, monthIndex } = scheduleUi;
     const numDays = scheduleDaysInMonth(year, monthIndex);
@@ -9192,7 +9195,7 @@
       : SCHEDULE_INFO_COLS.filter((c) => !scheduleUi.manualHiddenInfoCols.has(c.key)).length;
     const { lefts: infoColLefts, lastVisibleKey: infoColLastVisible } = scheduleInfoColLeftOffsets();
 
-    const monthStaff = getStaffListForMonth(year, monthIndex);
+    const monthStaff = getStaffListForMonth(year, monthIndex).filter((s) => !schedulePreviewExcludedIds || !schedulePreviewExcludedIds.has(s.id));
     const adminStaff = monthStaff.filter((s) => s.isAdmin);
     const dayStaff = sortStaffByType(monthStaff.filter((s) => s.group !== "night" && !s.isAdmin));
     const nightStaff = sortStaffByType(monthStaff.filter((s) => s.group === "night" && !s.isAdmin));
@@ -11267,7 +11270,7 @@
           ${ICON_SEARCH_MINI}
         </div>
         <button class="ghost-btn" id="sch-adjust-summary-btn">${ICON_CLIPBOARD} 가감점 취합</button>
-        <button class="ghost-btn" id="sch-auto-btn">${ICON_SPARK} AI 자동 배치</button>
+        <button class="ghost-btn" id="sch-auto-btn">${ICON_SPARK} AI 자동 배치 ▾</button>
         <button class="ghost-btn ${scheduleHiddenPanelOpen ? "active" : ""}" id="sch-hidden-btn">${ICON_CALENDAR} 숨긴 열/행${scheduleHiddenCount() > 0 ? ` (${scheduleHiddenCount()})` : ""} ▾</button>
         <button class="ghost-btn sch-delete-btn-small" id="sch-delete-btn">${ICON_TRASH} 일정 삭제</button>
       </div>
@@ -11330,7 +11333,7 @@
       renderApp();
     };
     document.getElementById("sch-adjust-summary-btn").onclick = () => openScheduleAdjustModal();
-    document.getElementById("sch-auto-btn").onclick = () => openScheduleAutoModal();
+    document.getElementById("sch-auto-btn").onclick = (e) => openScheduleAutoMenu(e.currentTarget);
     const schSearchInput = document.getElementById("sch-search-input");
     if (schSearchInput) {
       // 표 영역만 다시 그려서(전체 renderApp() 대신) 검색창의 IME 조합·포커스가 끊기지 않게 한다.
@@ -11905,11 +11908,29 @@
   // 하는 일: 그 달의 "공휴일 + 토요일 + 일요일" 개수를 인원별 목표 오프(OFF) 개수로 잡고,
   // 이미 뭔가 입력된 칸(연차·공가·특휴·교육·기존 오프·대휴 등 무엇이든)은 절대 건드리지 않은 채
   // 기본값(근무)인 빈 칸에만 새로 "오프"를 채운다. 채울 때는 조(주간/야간)×업무구분(채팅/유선)별
-  // 필요인력 대비 ±1~2명(금·토·월은 ±1명) 범위 안에서 가장 안전한 날짜를 고른다.
-  // 목표 개수를 계산할 때, 이미 입력된 "오프류"(오프·공휴·대휴·육휴·특휴)는 빼주지만
-  // 연차·공가는 별도로 취급해서 목표 달성에 포함시키지 않는다(요청 사항).
+  // 필요인력 대비, 금·토·월은 되도록 ±0(정 안 되면 최후의 수단으로 ±1까지), 그 외 요일은 ±2 범위
+  // 안에서 가장 안전한 날짜를 고른다. 단, 그 날짜가 공휴일인 평일(월~금)이면 금·토·월이어도 ±2까지 허용한다.
+  // 목표 개수를 계산할 때, 이미 입력된 "오프류" 중 대휴·공휴·특휴는 그대로 빼주고, "오프"는 그 칸의
+  // 메모에 "필휴"라고 적혀 있을 때만 뺀다(필휴 표시가 없는 오프는 연차·공가·육휴와 같은 취급으로
+  // 목표 달성에 포함시키지 않는다). 연차·공가·육휴는 항상 별도로 취급해서 목표 달성에 포함시키지 않는다.
   // 실제로 저장하지 않고 "계획(plan)"만 만든 뒤, 미리보기 팝업에서 "이대로 입력"을 눌러야
   // 비로소 scheduleData에 반영된다.
+  //
+  // ---- 배치 조건: 제외할 인원 (이번 배치 한정, 저장 안 함) ----
+  //  미리보기 팝업의 "배치 조건"에서 인원을 고르면(여러 명 가능) 그 인원은 이번 계산에서 "그 달 재직 인원에
+  //  없는 것처럼" 취급한다. 그 인원에게는 오프를 새로 배정하지 않고, 조×업무구분 출근 인원수·필요인력 대비·
+  //  일요일 하드 캡의 재직 인원수를 셀 때도 빠진다(= 나머지 인원만으로 필요인력을 맞춘다). 미리보기 표에서도
+  //  그 인원을 빼고 그려서 집계·대비·O/X가 계획과 같은 기준으로 보인다. 실제 스케줄의 그 인원 칸은 건드리지 않는다.
+  //  팝업을 열 때마다 비워지므로 다음 배치에 남아서 조용히 빠지는 일은 없다.
+  //
+  // ---- 대전제: 구분별 하루 출근 인원 최소 3명 (예외 없음, 아래 모든 조건보다 우선) ----
+  //  주간 유선/주간 채팅/야간 유선/야간 채팅 각 구분에서, 어느 날이든 출근 인원이 3명 밑으로 떨어지지 않게 한다.
+  //  오프를 넣었을 때 그 날 그 구분의 출근 인원이 3명 미만이 되는 배치는 다른 조건(연속 근무·필요인력·선호 요일)과
+  //  상관없이 후보에서 아예 제외한다. 그래서 목표 오프 개수를 못 채우거나 연속 근무 5일 제한을 못 지켜도 이 조건이 먼저다
+  //  (그 경우는 경고로 알려준다). "출근 인원"은 월별 스케줄 표의 투입 인원과 같은 기준(근무·결근 제외)으로 센다.
+  //  - 이미 입력된 값(연차·공가 등) 때문에 원래부터 3명 미만인 날은 새 오프를 넣지 않고, 경고로 알려준다.
+  //  - 그 구분의 재직 인원이 3명 미만이면 애초에 지킬 수 없으므로 그 구분에는 적용하지 않고 경고로 알려준다.
+  //  - 이번 배치에서 제외한 인원은 재직 인원에서 빠진 것으로 세어 나머지 인원으로 이 조건을 지킨다.
   //
   // ---- 날짜를 고를 때 지키는 조건 (강한 순서) ----
   //  1) 연속 근무 5일 제한(SCHEDULE_AUTO_MAX_WORK_STREAK): 6일 연속 근무가 나오지 않게 한다.
@@ -11918,7 +11939,13 @@
   //     - 근무일로 세는 것: 근무(결근 제외)·반차·교육. 오프류·연차·공가·퇴사 등은 쉬는 날로 본다.
   //     - 오프 개수는 목표(공휴일+토+일)를 넘겨서 늘리지 않는다. 그 개수 안에서 못 막는 구간(빈 칸이
   //       없거나 이미 입력된 값 때문에)은 경고로 알려준다.
-  //  2) 필요인력 허용범위(±1~2명, 금·토·월은 ±1명)
+  //  2) 필요인력 허용범위: 금·토·월은 1순위로 ±0을 찾고, 그게 정말 불가능할 때만 최후의 수단으로
+  //     ±1까지 넓혀서 고른다. 그 외 요일(화·수·목·일)은 ±2. 다만 그 날짜가 평일 공휴일이면
+  //     금·토·월이어도 ±2까지 허용한다(토요일 자체는 "평일"이 아니므로 이 예외 대상이 아니다).
+  //     허용범위(금·토·월은 ±1, 그 외/공휴일은 ±2)를 넘겨서 배치될 때만 경고로 알려준다.
+  //  2-1) 일요일 하드 캡(예외 없음): 주간 유선/주간 채팅/야간 유선/야간 채팅 각 구분에서
+  //     출근 인원이 그 달 재직 인원의 -2명까지는 허용하되, -3명(그 이하)은 절대 안 된다.
+  //     목표를 못 채우더라도 이 조건은 항상 지키며, 후보에서 아예 제외한다.
   //  3) 인원별 "선호 오프 요일"(소프트 조건): 위 1)·2)를 해치지 않는 범위에서 최대한 맞춘다.
   //     못 맞추면 다른 날로 바뀔 수 있고, 미리보기에서 어떤 날이 선호와 맞았는지 표시해준다.
   //  4) 그 밖의 분산 기준(제약 없는 날 우선, 여유가 큰 날, 이미 몰린 날 회피, 빠른 날짜)
@@ -11930,15 +11957,58 @@
   const SCHEDULE_AUTO_MAX_WORK_STREAK = 5;
   const SCHEDULE_AUTO_DOW_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
 
-  // scheduleStaffMonthCounts()의 "오프" 합계와 같은 기준. 연차(ANNUAL)·공가(GONGGA)는
-  // 여기 포함시키지 않는다 — 목표 개수 계산에서 "별도로 계산"해달라는 요청 때문.
-  function scheduleAutoOffGroupStatuses() {
-    return ["OFF", "DAEHYU", "GONGHYU", "MATERNITY", "SPECIAL"];
+  // 대전제: 구분(조×업무구분)별 하루 최소 출근 인원.
+  const SCHEDULE_AUTO_MIN_WORKING = 3;
+
+  // 연차(ANNUAL)·공가(GONGGA)·육휴(MATERNITY)는 목표 개수 계산에 포함시키지 않는다(별도 취급 요청).
+  // 그 밖의 오프류 중 "오프"를 뺀 나머지(대휴·공휴·특휴)는 항상 목표 개수에서 뺀다.
+  const SCHEDULE_AUTO_ALWAYS_OFF_STATUSES = ["DAEHYU", "GONGHYU", "SPECIAL"];
+
+  // 이 칸이 인원별 목표 오프 개수에서 "이미 채운 것"으로 차감돼야 하는지.
+  //  - "오프"는 그 칸 메모에 "필휴"라는 문구가 있을 때만 차감한다(필휴 표시가 없는 오프는
+  //    연차·공가·육휴처럼 목표 달성에 포함시키지 않는다 — 다만 칸 자체는 그대로 유지된다).
+  //  - 대휴·공휴·특휴는 메모와 상관없이 항상 차감한다.
+  //  - 연차·공가·육휴는 항상 차감하지 않는다.
+  function scheduleAutoCountsTowardTarget(staffId, dateKey, rec) {
+    if (!rec) return false;
+    if (rec.status === "OFF") return getScheduleMemo(staffId, dateKey).indexOf("필휴") !== -1;
+    return SCHEDULE_AUTO_ALWAYS_OFF_STATUSES.indexOf(rec.status) !== -1;
   }
 
-  // 금(5)·토(6)·월(1)은 필요인력 허용범위를 ±1명으로 더 타이트하게, 그 외 요일은 ±1~2명까지 허용.
-  function scheduleAutoTolerance(dow) {
-    return (dow === 5 || dow === 6 || dow === 1) ? 1 : 2;
+  // 금(5)·토(6)·월(1)은 필요인력 허용범위를 1순위로 ±0으로 좁히되, 정 안 되면 최후의 수단으로
+  // ±1까지 넓혀서 고른다(ideal=0, max=1). 그 외 요일(화·수·목·일)은 ±2(ideal=max=2).
+  // 단, 그 날짜가 "평일"(월~금)이면서 공휴일이면 금·토·월이어도 ±2까지 허용한다.
+  // (토요일은 "평일"이 아니므로 이 예외 대상이 아니라 항상 ±0/최후의 수단 ±1로 남는다.)
+  function scheduleAutoToleranceInfo(dow, dateKey) {
+    const isWeekdayHoliday = dow !== 0 && dow !== 6 && !!getHoliday(dateKey);
+    if (isWeekdayHoliday) return { ideal: 2, max: 2 };
+    if (dow === 5 || dow === 6 || dow === 1) return { ideal: 0, max: 1 };
+    return { ideal: 2, max: 2 };
+  }
+
+  // 일요일 하드 캡: 주간 유선/주간 채팅/야간 유선/야간 채팅 네 구분 각각에서, 그 달 재직 인원 대비
+  // "출근" 인원이 -2명까지는 허용하되 -3명은 절대 안 된다. 즉 이 오프를 넣었을 때 남는 출근 인원이
+  // (재직 인원 - 3) 이하로 떨어지면 그 배치는 만들지 않는다(경고로 넘어가는 "최후의 수단"이 아니라,
+  // 목표를 못 채우더라도 예외 없이 애초에 후보에서 제외한다). 출근 인원이 재직 인원 -2명까지는 그대로 허용.
+  function scheduleAutoSundayBlocked(g, staffTypes, working, totalCount, d) {
+    return staffTypes.some((t) => {
+      const total = totalCount[g][t];
+      if (!total) return false;
+      const workingAfter = working[g][t][d] - 1; // 이 오프를 반영했다고 가정했을 때 남는 출근 인원
+      return workingAfter <= total - 3;
+    });
+  }
+
+  // 대전제(구분별 하루 출근 최소 3명): 이 오프를 넣으면 그 인원이 속한 구분(조×업무구분) 중 하나라도 그 날 출근
+  // 인원이 3명 미만이 되는지. 그러면 후보에서 제외한다(경고로 넘어가는 "최후의 수단"도 없다).
+  // 재직 인원이 3명 미만인 구분은 오프를 하나도 안 넣어도 3명이 안 되므로 적용하지 않는다(그 구분은 경고로 알려줌).
+  // minWorking는 기본값 SCHEDULE_AUTO_MIN_WORKING(3)이다(scheduleAutoBuildPlan의 options.minWorking으로만 바꿀 수 있고, 화면에서는 바꾸지 않는다).
+  function scheduleAutoMinWorkingBlocked(g, staffTypes, working, totalCount, d, minWorking) {
+    if (!(minWorking > 0)) return false;
+    return staffTypes.some((t) => {
+      if (totalCount[g][t] < minWorking) return false;
+      return working[g][t][d] - 1 < minWorking; // 이 오프를 반영했다고 가정했을 때 남는 출근 인원
+    });
   }
 
   // ----- 인원별 "선호 오프 요일" (소프트 조건) -----
@@ -11964,6 +12034,17 @@
   }
   function scheduleAutoPrefLabel(dows) {
     return dows.map((n) => SCHEDULE_AUTO_DOW_LABELS[n]).join("·");
+  }
+
+  // ----- 이번 배치에서 제외할 인원 (조건) -----
+  // 저장하지 않는 "이번 실행 한정" 조건. openScheduleAutoModal이 열 때마다 비운다.
+  let scheduleAutoExcludedIds = [];
+  function scheduleAutoGetExcluded() { return scheduleAutoExcludedIds.slice(); }
+  function scheduleAutoResetExcluded() { scheduleAutoExcludedIds = []; }
+  function scheduleAutoSetExcluded(staffId, on) {
+    const idx = scheduleAutoExcludedIds.indexOf(staffId);
+    if (on && idx === -1) scheduleAutoExcludedIds.push(staffId);
+    else if (!on && idx !== -1) scheduleAutoExcludedIds.splice(idx, 1);
   }
 
   // ----- 연속 근무 계산 -----
@@ -12120,14 +12201,14 @@
     return { target: holidayCount + saturdayCount + sundayCount, holidayCount, saturdayCount, sundayCount };
   }
 
-  // 이번 달 이미 채워진 "오프류" 칸 개수 (연차·공가는 제외).
+  // 이번 달 이미 목표에서 차감돼야 하는 칸 개수 (연차·공가·육휴 제외, 오프는 "필휴" 메모가 있을 때만 포함).
   function scheduleAutoAlreadyOffCount(staffId, year, monthIndex) {
-    const offGroup = scheduleAutoOffGroupStatuses();
     const daysInMonth = scheduleDaysInMonth(year, monthIndex);
     let n = 0;
     for (let d = 1; d <= daysInMonth; d++) {
-      const rec = scheduleData.records[scheduleRecordKey(staffId, scheduleDateKey(year, monthIndex, d))];
-      if (rec && offGroup.indexOf(rec.status) !== -1) n++;
+      const dateKey = scheduleDateKey(year, monthIndex, d);
+      const rec = scheduleData.records[scheduleRecordKey(staffId, dateKey)];
+      if (scheduleAutoCountsTowardTarget(staffId, dateKey, rec)) n++;
     }
     return n;
   }
@@ -12145,11 +12226,20 @@
 
   // ----- 계획 세우기 -----
   // 실제로 scheduleData를 바꾸지 않고, "누구를 며칠에 오프로 채울지"만 계산해서 돌려준다.
-  function scheduleAutoBuildPlan(year, monthIndex) {
+  // options.excludeStaffIds: 이번 계산에서 재직 인원에 넣지 않을 인원 id들(배치 조건). 그 인원은 오프를
+  // 배정받지 않고, 출근 인원수·필요인력 대비·일요일 하드 캡의 재직 인원수에서도 빠진다.
+  function scheduleAutoBuildPlan(year, monthIndex, options) {
     const daysInMonth = scheduleDaysInMonth(year, monthIndex);
     const targetInfo = scheduleAutoTargetInfo(year, monthIndex);
     const target = targetInfo.target;
-    const monthStaff = getStaffListForMonth(year, monthIndex);
+    const excludeIds = new Set(options && Array.isArray(options.excludeStaffIds) ? options.excludeStaffIds : []);
+    // 대전제: 구분별 하루 최소 출근 인원(기본 3). options.minWorking은 테스트·확장용 — 화면에서는 넘기지 않는다.
+    const minWorking = options && Number.isInteger(options.minWorking) && options.minWorking >= 0 ? options.minWorking : SCHEDULE_AUTO_MIN_WORKING;
+    const fullMonthStaff = getStaffListForMonth(year, monthIndex);
+    const excluded = fullMonthStaff
+      .filter((s) => excludeIds.has(s.id))
+      .map((s) => ({ id: s.id, name: s.name, nickname: s.nickname }));
+    const monthStaff = fullMonthStaff.filter((s) => !excludeIds.has(s.id));
     const TYPES = ["채팅", "유선"];
     const LIMIT = SCHEDULE_AUTO_MAX_WORK_STREAK;
     const nonAdmin = monthStaff.filter((s) => !s.isAdmin);
@@ -12158,11 +12248,13 @@
     // (관리자는 필요인력 집계 자체에서 빠지므로 여기 포함하지 않는다 — 표 렌더링과 동일한 기준)
     const working = {};
     const required = {};
+    const totalCount = {}; // 조×업무구분별 그 달 재직 인원수(일요일 하드 캡 계산용)
     ["DAY", "NIGHT"].forEach((g) => {
       const groupStaff = nonAdmin.filter((s) => (g === "NIGHT" ? s.group === "night" : s.group !== "night"));
-      working[g] = {}; required[g] = {};
+      working[g] = {}; required[g] = {}; totalCount[g] = {};
       TYPES.forEach((t) => {
         working[g][t] = {}; required[g][t] = {};
+        totalCount[g][t] = groupStaff.filter((s) => (s.types || []).indexOf(t) !== -1).length;
         for (let d = 1; d <= daysInMonth; d++) {
           const dateKey = scheduleDateKey(year, monthIndex, d);
           working[g][t][d] = scheduleActualCount(groupStaff, t, dateKey);
@@ -12203,25 +12295,34 @@
       const carry = scheduleAutoCarryStreak(s.id, year, monthIndex);
 
       // 연속 근무 계산용: 이미 입력된 값 중 "쉬는 날"인 칸, 그리고 비어 있어서 오프를 넣을 수 있는 칸.
+      // 대전제(구분별 출근 최소 3명)에 걸리는 날은 어떤 요일이든 빈 칸이어도 후보에서 제외한다.
+      // 일요일은 추가로 하드 캡(scheduleAutoSundayBlocked)에 걸려도 후보에서 제외한다.
       const baseRest = {}, isFreeDay = {};
+      let minBlockedDays = 0; // 대전제 때문에 오프를 못 넣는 (그 인원의) 빈 칸 수 — 목표를 못 채웠을 때 원인 안내용
       for (let d = 1; d <= daysInMonth; d++) {
         const key = scheduleRecordKey(s.id, scheduleDateKey(year, monthIndex, d));
         const has = Object.prototype.hasOwnProperty.call(scheduleData.records, key);
-        isFreeDay[d] = !has;
+        const dow = new Date(year, monthIndex, d).getDay();
+        const minBlocked = !has && scheduleAutoMinWorkingBlocked(g, staffTypes, working, totalCount, d, minWorking);
+        if (minBlocked) minBlockedDays++;
+        const sundayBlocked = dow === 0 && scheduleAutoSundayBlocked(g, staffTypes, working, totalCount, d);
+        isFreeDay[d] = !has && !minBlocked && !sundayBlocked;
         baseRest[d] = has && !scheduleAutoIsWorkRecord(scheduleData.records[key]);
       }
       const chosen = {};
 
       // 날짜별 점수(클수록 좋고, 앞 항목이 우선. 고른 날짜들의 합을 앞자리부터 비교한다):
-      // ① 그 인원의 조×업무구분 필요인력 허용범위(±1~2, 금/토/월은 ±1) 안에 들어오는지
-      // ② 선호 오프 요일인지(소프트 조건) ③ 필요인력이 아예 입력 안 된(제약 없는) 날짜인지
-      // ④ 여유(허용범위 - 오차)가 큰(가장 안전한) 날짜인지 ⑤ 이번 실행에서 이미 몰린 날짜는 피해서 분산
-      // ⑥ 그래도 같으면 빠른 날짜. 이 앞에 "5일 초과 연속 근무 최소화"가 항상 가장 먼저 적용된다.
+      // ① 그 인원의 조×업무구분 필요인력이 "1순위 범위"(금/토/월은 ±0, 그 외/공휴일은 ±2) 안인지
+      // ② 그 범위를 못 지켜도 "최후의 수단 범위"(금/토/월은 ±1) 안에는 들어오는지
+      // ③ 선호 오프 요일인지(소프트 조건) ④ 필요인력이 아예 입력 안 된(제약 없는) 날짜인지
+      // ⑤ 여유(최후의 수단 범위 - 오차)가 큰(가장 안전한) 날짜인지 ⑥ 이번 실행에서 이미 몰린 날짜는 피해서 분산
+      // ⑦ 그래도 같으면 빠른 날짜. 이 앞에 "5일 초과 연속 근무 최소화"가 항상 가장 먼저 적용된다.
       const dayFeasible = {}, dayVec = {};
       remainingFree.forEach((d) => {
         const dow = new Date(year, monthIndex, d).getDay();
-        const tol = scheduleAutoTolerance(dow);
-        let feasible = true;
+        const dateKey = scheduleDateKey(year, monthIndex, d);
+        const tolInfo = scheduleAutoToleranceInfo(dow, dateKey);
+        let idealOk = true, maxOk = true;
         let hasConstraint = false;
         let minSlack = Infinity;
         staffTypes.forEach((t) => {
@@ -12229,12 +12330,16 @@
           if (req === null) return;
           hasConstraint = true;
           const diff = (working[g][t][d] - 1) - req;
-          if (Math.abs(diff) > tol) feasible = false;
-          minSlack = Math.min(minSlack, tol - Math.abs(diff));
+          if (Math.abs(diff) > tolInfo.ideal) idealOk = false;
+          if (Math.abs(diff) > tolInfo.max) maxOk = false;
+          minSlack = Math.min(minSlack, tolInfo.max - Math.abs(diff));
         });
-        dayFeasible[d] = feasible;
+        // 경고("허용범위를 벗어나 배치됐어요")는 "최후의 수단 범위"까지 넘겼을 때만 띄운다.
+        // ±0을 못 맞춰 ±1(최후의 수단)로 배치된 건 정상 동작이라 경고 대상이 아니다.
+        dayFeasible[d] = maxOk;
         dayVec[d] = [
-          feasible ? 1 : 0,
+          idealOk ? 1 : 0,
+          maxOk ? 1 : 0,
           prefDows.indexOf(dow) !== -1 ? 1 : 0,
           hasConstraint ? 0 : 1,
           hasConstraint ? minSlack : 0,
@@ -12259,7 +12364,10 @@
       });
 
       if (assigned.length < needed) {
-        warnings.push(`${staffLabel}님은 빈 칸이 부족해 목표 ${needed}개 중 ${assigned.length}개만 배정됐어요.`);
+        const minNote = minBlockedDays > 0
+          ? ` 구분별 하루 출근 ${minWorking}명 이상을 지키느라 오프를 넣을 수 없는 날이 ${minBlockedDays}일 있어요.`
+          : "";
+        warnings.push(`${staffLabel}님은 빈 칸이 부족해 목표 ${needed}개 중 ${assigned.length}개만 배정됐어요.${minNote}`);
       }
 
       // 최종 확인: 배정을 끝낸 뒤에도 5일을 넘는 연속 근무가 남아 있으면 알려준다
@@ -12288,7 +12396,30 @@
       }
     });
 
-    return { year, monthIndex, target, targetInfo, perStaffPlan, warnings };
+    // 대전제 최종 확인: 배정을 끝낸 뒤에도 출근 인원이 3명 미만인 날이 있는지 구분별로 알려준다.
+    // 새 오프는 3명 미만이 되는 날에는 넣지 않으므로, 여기 걸리는 날은 이미 입력된 값(연차·공가·결근 등) 때문이다.
+    // 재직 인원이 3명 미만인 구분은 지킬 수 없어서(위 후보 제외 대상도 아님) 그 사실만 한 줄로 알려준다.
+    const monthLabelNo = monthIndex + 1;
+    if (minWorking > 0) ["DAY", "NIGHT"].forEach((g) => {
+      TYPES.forEach((t) => {
+        const label = `${g === "NIGHT" ? "야간" : "주간"} ${t}`;
+        const total = totalCount[g][t];
+        if (total === 0) return;
+        if (total < minWorking) {
+          warnings.push(`${label} 구분은 재직 인원이 ${total}명뿐이라 하루 출근 ${minWorking}명 이상 조건을 지킬 수 없어서 이 구분에는 적용하지 않았어요.`);
+          return;
+        }
+        const low = [];
+        for (let d = 1; d <= daysInMonth; d++) {
+          if (working[g][t][d] < minWorking) low.push(`${monthLabelNo}/${d}(${working[g][t][d]}명)`);
+        }
+        if (low.length > 0) {
+          warnings.push(`${label} 구분은 이미 입력된 일정 때문에 출근 인원이 ${minWorking}명 미만인 날이 있어요: ${low.join(", ")}. 이 구분 인원에게는 그 날 새 오프를 넣지 않았어요.`);
+        }
+      });
+    });
+
+    return { year, monthIndex, target, targetInfo, perStaffPlan, warnings, excluded };
   }
 
   // ----- 적용: 미리보기에서 "이대로 입력"을 눌렀을 때만 실제로 scheduleData에 반영한다. -----
@@ -12320,41 +12451,241 @@
     flashScheduleStatus(`AI 자동 배치 ${cellsToWrite.length}칸 적용 완료`, 2000);
   }
 
+  // ----- AI 자동 배치 버튼 드롭다운: "AI 자동 배치" / "필휴·연차 제외 스케줄 삭제" -----
+  const SCHEDULE_AUTO_MENU_ITEMS = [
+    { key: "OPEN", label: "AI 자동 배치" },
+    { key: "DELETE_EXCEPT_PROTECTED", label: "필휴·연차 제외 스케줄 삭제", danger: true },
+  ];
+
+  function openScheduleAutoMenu(anchorEl) {
+    closeScheduleMenu();
+    const rect = anchorEl.getBoundingClientRect();
+    const menu = document.createElement("div");
+    menu.id = "sch-menu";
+    menu.className = "sch-menu";
+    menu.innerHTML = SCHEDULE_AUTO_MENU_ITEMS.map((o, idx) => {
+      const divider = idx === 1 ? `<div class="sch-menu-divider"></div>` : "";
+      return `${divider}<button type="button" class="${o.danger ? "sch-menu-danger" : ""}" data-auto-menu="${o.key}">${o.danger ? ICON_TRASH + " " : ""}${esc(o.label)}</button>`;
+    }).join("");
+    document.body.appendChild(menu);
+    const top = Math.min(rect.bottom + 4, window.innerHeight - menu.offsetHeight - 8);
+    const left = Math.min(rect.left, window.innerWidth - menu.offsetWidth - 8);
+    menu.style.top = `${Math.max(8, top)}px`;
+    menu.style.left = `${Math.max(8, left)}px`;
+    menu.querySelectorAll("button[data-auto-menu]").forEach((btn) => {
+      btn.onclick = () => {
+        const key = btn.getAttribute("data-auto-menu");
+        closeScheduleMenu();
+        if (key === "OPEN") openScheduleAutoModal();
+        else if (key === "DELETE_EXCEPT_PROTECTED") scheduleAutoDeleteExceptProtected();
+      };
+    });
+    setTimeout(() => document.addEventListener("mousedown", scheduleMenuOutsideHandler, true), 0);
+  }
+
+  // 보호 대상: "필휴" 메모가 있는 오프, 그리고 연차(ANNUAL). 아래 일괄삭제에서 이 둘은 건드리지 않는다.
+  function scheduleAutoIsProtectedFromDelete(staffId, dateKey, rec) {
+    if (!rec) return false;
+    if (rec.status === "ANNUAL") return true;
+    if (rec.status === "OFF") return getScheduleMemo(staffId, dateKey).indexOf("필휴") !== -1;
+    return false;
+  }
+
+  // "필휴" 메모가 있는 오프와 연차만 남기고, 이 달에 실제로 등록된 나머지 일정을 전부 삭제한다.
+  // (미리보기 없이 바로 scheduleData.records에 반영되므로 실행 전 확인창을 띄운다. Ctrl+Z로 되돌리기 가능.)
+  function scheduleAutoDeleteExceptProtected() {
+    const { year, monthIndex } = scheduleUi;
+    if (scheduleIsMonthLocked(year, monthIndex)) {
+      flashScheduleStatus("잠긴 달이에요. 잠금을 해제한 뒤 다시 시도해주세요.");
+      return;
+    }
+    const monthStaff = getStaffListForMonth(year, monthIndex);
+    const numDays = scheduleDaysInMonth(year, monthIndex);
+    const ok = window.confirm(
+      `${scheduleMonthLabel()} 일정을 "필휴" 메모가 있는 오프와 연차만 남기고 모두 삭제할까요?\n그 외 날짜는 전부 기본값(근무)으로 되돌아가요. (Ctrl+Z로 되돌리기 가능)`
+    );
+    if (!ok) return;
+
+    recordUndo("필휴·연차 제외 스케줄 삭제", SCHEDULE_KEY, reloadScheduleData);
+    let cleared = 0;
+    monthStaff.forEach((s) => {
+      for (let d = 1; d <= numDays; d++) {
+        const dateKey = scheduleDateKey(year, monthIndex, d);
+        const key = scheduleRecordKey(s.id, dateKey);
+        const rec = scheduleData.records[key];
+        if (!rec) continue;
+        if (scheduleAutoIsProtectedFromDelete(s.id, dateKey, rec)) continue;
+        delete scheduleData.records[key];
+        cleared += 1;
+      }
+    });
+    saveScheduleData();
+    updateScheduleTableArea();
+    flashScheduleStatus(cleared > 0 ? `필휴·연차 제외 스케줄 삭제됨 (${cleared}칸)` : "삭제할 일정이 없었어요.");
+  }
+
   // ----- 미리보기 팝업 -----
   function closeScheduleAutoModal() {
+    closeScheduleAutoSettingsPopup();
     const existing = document.getElementById("sch-auto-overlay");
     if (existing) existing.remove();
     document.removeEventListener("keydown", scheduleAutoEscHandler, true);
     if (scheduleAutoFitObserver) { scheduleAutoFitObserver.disconnect(); scheduleAutoFitObserver = null; }
   }
+  // ESC: "인원별 설정" 팝업이 위에 떠 있으면 그것만 닫고, 아니면 미리보기 팝업을 닫는다.
   function scheduleAutoEscHandler(e) {
-    if (e.key === "Escape") closeScheduleAutoModal();
+    if (e.key !== "Escape") return;
+    if (document.getElementById("sch-auto-settings-overlay")) {
+      e.stopPropagation();
+      closeScheduleAutoSettingsPopup();
+      return;
+    }
+    closeScheduleAutoModal();
   }
 
-  // 인원별 선호 오프 요일 설정 영역(접었다 펼 수 있음). 칸을 누르면 바로 저장되고 미리보기가 다시 계산된다.
-  function scheduleAutoPrefsHtml(staffList) {
+  // 인원 이름 표기(이름 → 닉네임 → "이름 없음")
+  function scheduleAutoStaffLabel(s) { return s.name || s.nickname || "이름 없음"; }
+
+  // 주간 → 야간 → 관리자 순서로 묶는다(월별 스케줄 표와 같은 정렬). 비어 있는 묶음은 뺀다.
+  function scheduleAutoStaffGroups(staffList) {
+    const list = staffList.filter((s) => s);
+    return [
+      { key: "DAY", label: "주간", list: sortStaffByType(list.filter((s) => s.group !== "night" && !s.isAdmin)) },
+      { key: "NIGHT", label: "야간", list: sortStaffByType(list.filter((s) => s.group === "night" && !s.isAdmin)) },
+      { key: "ADMIN", label: "관리자", list: list.filter((s) => s.isAdmin) },
+    ].filter((g) => g.list.length > 0);
+  }
+
+  // "인원별 설정" 버튼 옆에 붙는 요약 문구
+  function scheduleAutoPrefsCountText(staffList) {
     const setCount = staffList.filter((s) => scheduleAutoGetPrefDows(s.id).length > 0).length;
-    const rows = staffList.map((s) => {
-      const on = scheduleAutoGetPrefDows(s.id);
-      const chips = SCHEDULE_AUTO_DOW_LABELS.map((label, dow) => {
-        const isOn = on.indexOf(dow) !== -1;
-        return `<button type="button" class="sch-auto-pref-chip${isOn ? " on" : ""}" data-auto-pref-staff="${esc(s.id)}" data-auto-pref-dow="${dow}" aria-pressed="${isOn ? "true" : "false"}">${label}</button>`;
+    return setCount > 0 ? `(${setCount}명 설정됨)` : "(설정 없음)";
+  }
+
+  // 배치 조건 중 "제외할 인원" 영역: 아직 제외하지 않은 인원을 고르는 드롭다운 + 제외된 인원 칩(✕로 해제).
+  // 드롭다운은 팝업(오버레이) 위에서 z-index 문제가 없도록 브라우저 기본 select를 그대로 쓴다.
+  function scheduleAutoExcludeAreaHtml(staffList, excludedIds) {
+    const excludedSet = new Set(excludedIds);
+    const chips = excludedIds
+      .map((id) => staffList.find((s) => s.id === id))
+      .filter(Boolean)
+      .map((s) => `<span class="sch-auto-exclude-chip">${esc(scheduleAutoStaffLabel(s))}<button type="button" class="sch-auto-exclude-remove" data-auto-exclude-remove="${esc(s.id)}" aria-label="${esc(scheduleAutoStaffLabel(s))} 제외 해제">✕</button></span>`)
+      .join("");
+    const groups = scheduleAutoStaffGroups(staffList.filter((s) => !excludedSet.has(s.id)));
+    const selectHtml = groups.length === 0
+      ? `<span class="sch-auto-cond-empty">제외할 수 있는 인원이 없어요.</span>`
+      : `<select class="add-input sch-auto-exclude-select" data-auto-exclude-select aria-label="제외할 인원 선택"><option value="">인원 선택…</option>${groups.map((g) => `<optgroup label="${g.label}">${g.list.map((s) => `<option value="${esc(s.id)}">${esc(scheduleAutoStaffLabel(s))}${s.name && s.nickname ? ` (${esc(s.nickname)})` : ""}</option>`).join("")}</optgroup>`).join("")}</select>`;
+    return `${selectHtml}<span class="sch-auto-exclude-chips">${chips}</span>`;
+  }
+
+  // 미리보기 팝업 위쪽의 "배치 조건" 영역(제외할 인원 + "인원별 설정" 버튼).
+  function scheduleAutoConditionsHtml(staffList) {
+    return `
+      <div class="sch-auto-conds">
+        <div class="sch-auto-conds-head">
+          <span class="sch-auto-conds-title">배치 조건</span>
+          <button type="button" class="ghost-btn sch-auto-settings-btn" id="sch-auto-settings-btn">인원별 설정 <span class="sch-auto-prefs-count" id="sch-auto-prefs-count">${esc(scheduleAutoPrefsCountText(staffList))}</span></button>
+        </div>
+        <div class="sch-auto-cond-row">
+          <span class="sch-auto-cond-label">제외할 인원</span>
+          <div class="sch-auto-cond-body" id="sch-auto-exclude-area">${scheduleAutoExcludeAreaHtml(staffList, scheduleAutoExcludedIds)}</div>
+        </div>
+        <div class="sch-auto-cond-hint">
+          이번 배치에서만 적용돼요(저장되지 않아요). 제외한 인원은 재직 인원에서 빠진 것처럼 필요인력을 계산하고, 오프도 새로 배정하지 않아요.
+          미리보기 표에서도 빠지지만 실제 스케줄 표의 그 인원 칸은 그대로예요.
+        </div>
+      </div>`;
+  }
+
+  // "인원별 설정" 팝업: 인원 × 요일(일~토) 표 하나에 모든 인원의 선호 오프 요일이 한눈에 보인다.
+  // 칸을 누르면 바로 저장되고 뒤의 미리보기가 다시 계산된다. 이번 배치에서 제외 중인 인원은 표시만 해둔다.
+  function scheduleAutoSettingsPopupHtml(staffList, excludedIds) {
+    const excludedSet = new Set(excludedIds || []);
+    const head = SCHEDULE_AUTO_DOW_LABELS.map((label, dow) => `<th class="sch-auto-set-dow${dow === 0 ? " is-sun" : dow === 6 ? " is-sat" : ""}">${label}</th>`).join("");
+    const groups = scheduleAutoStaffGroups(staffList);
+    const body = groups.map((g) => {
+      const rows = g.list.map((s) => {
+        const on = scheduleAutoGetPrefDows(s.id);
+        const cells = SCHEDULE_AUTO_DOW_LABELS.map((label, dow) => {
+          const isOn = on.indexOf(dow) !== -1;
+          return `<td><button type="button" class="sch-auto-pref-chip${isOn ? " on" : ""}" data-auto-pref-staff="${esc(s.id)}" data-auto-pref-dow="${dow}" aria-pressed="${isOn ? "true" : "false"}" aria-label="${esc(scheduleAutoStaffLabel(s))} ${label}요일">${label}</button></td>`;
+        }).join("");
+        const isEx = excludedSet.has(s.id);
+        return `
+          <tr class="sch-auto-set-row${isEx ? " is-excluded" : ""}">
+            <th scope="row" class="sch-auto-set-name">${esc(s.name || "")}${s.nickname ? ` <span class="sch-adjust-nick">${esc(s.nickname)}</span>` : ""}${isEx ? ` <span class="sch-auto-set-excluded-tag">이번 배치 제외 중</span>` : ""}</th>
+            ${cells}
+          </tr>`;
       }).join("");
-      return `
-        <div class="sch-auto-pref-row">
-          <span class="sch-auto-pref-name">${esc(s.name || "")}${s.nickname ? ` <span class="sch-adjust-nick">${esc(s.nickname)}</span>` : ""}</span>
-          <span class="sch-auto-pref-chips">${chips}</span>
-        </div>`;
+      return `<tr class="sch-auto-set-group"><th colspan="8">${g.label} <span class="sch-auto-set-group-count">${g.list.length}명</span></th></tr>${rows}`;
     }).join("");
     return `
-      <details class="sch-auto-prefs">
-        <summary>인원별 선호 오프 요일 <span class="sch-auto-prefs-count" id="sch-auto-prefs-count">${setCount > 0 ? `(${setCount}명 설정됨)` : "(설정 없음)"}</span></summary>
-        <div class="sch-auto-prefs-desc">
-          오프를 넣고 싶은 요일을 눌러 두면(여러 개 가능) 자동 배치가 그 요일을 우선해서 골라요. 반드시 지키는 조건은 아니라서,
-          필요인력 허용범위나 연속 근무 5일 제한 때문에 조정이 필요하면 다른 날로 바뀔 수 있어요. 설정은 달이 바뀌어도 그 사람에게 계속 적용돼요.
+      <div class="sch-preview-box sch-auto-set-box">
+        <div class="sch-preview-head">
+          <span>인원별 설정 <span class="sch-auto-prefs-count" id="sch-auto-set-count">${esc(scheduleAutoPrefsCountText(staffList))}</span></span>
+          <button type="button" class="sch-preview-close" id="sch-auto-set-close-x" aria-label="닫기">✕</button>
         </div>
-        <div class="sch-auto-prefs-list">${rows || `<div class="sch-adjust-empty">이번 달 인원이 없어요.</div>`}</div>
-      </details>`;
+        <div class="sch-preview-body sch-auto-set-body">
+          <div class="sch-auto-set-desc">
+            <b>선호 오프 요일</b> — 오프를 넣고 싶은 요일을 눌러 두면(여러 개 가능) 자동 배치가 그 요일을 우선해서 골라요.
+            반드시 지키는 조건은 아니라서, 필요인력 허용범위나 연속 근무 5일 제한 때문에 조정이 필요하면 다른 날로 바뀔 수 있어요.
+            설정은 달이 바뀌어도 그 사람에게 계속 적용돼요.
+          </div>
+          ${groups.length === 0 ? `<div class="sch-adjust-empty">이번 달 인원이 없어요.</div>` : `
+          <table class="sch-auto-set-table">
+            <thead><tr><th class="sch-auto-set-name-th">인원</th>${head}</tr></thead>
+            <tbody>${body}</tbody>
+          </table>`}
+        </div>
+        <div class="sch-preview-actions">
+          <button type="button" class="primary-btn" id="sch-auto-set-done-btn">닫기</button>
+        </div>
+      </div>`;
+  }
+
+  function closeScheduleAutoSettingsPopup() {
+    const existing = document.getElementById("sch-auto-settings-overlay");
+    if (existing) existing.remove();
+  }
+
+  // 선호 요일 칸을 눌렀을 때: 저장 → 칸 모양·요약 문구 갱신 → 미리보기 다시 계산
+  // (목록 전체를 다시 그리지 않아서 스크롤 위치가 유지된다).
+  function scheduleAutoHandlePrefChipClick(chip) {
+    const staffId = chip.getAttribute("data-auto-pref-staff");
+    const dow = Number(chip.getAttribute("data-auto-pref-dow"));
+    scheduleAutoTogglePrefDow(staffId, dow);
+    const isOn = scheduleAutoGetPrefDows(staffId).indexOf(dow) !== -1;
+    chip.classList.toggle("on", isOn);
+    chip.setAttribute("aria-pressed", isOn ? "true" : "false");
+    const text = scheduleAutoPrefsCountText(getStaffListForMonth(scheduleUi.year, scheduleUi.monthIndex));
+    ["sch-auto-prefs-count", "sch-auto-set-count"].forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = text;
+    });
+    scheduleAutoRefreshPreview();
+  }
+
+  function openScheduleAutoSettingsPopup() {
+    closeScheduleAutoSettingsPopup();
+    const staffList = getStaffListForMonth(scheduleUi.year, scheduleUi.monthIndex);
+    const overlay = document.createElement("div");
+    overlay.id = "sch-auto-settings-overlay";
+    overlay.className = "sch-preview-overlay sch-auto-set-overlay";
+    overlay.innerHTML = scheduleAutoSettingsPopupHtml(staffList, scheduleAutoExcludedIds);
+    document.body.appendChild(overlay);
+    overlay.onclick = (e) => { if (e.target === overlay) closeScheduleAutoSettingsPopup(); };
+    document.getElementById("sch-auto-set-close-x").onclick = () => closeScheduleAutoSettingsPopup();
+    document.getElementById("sch-auto-set-done-btn").onclick = () => closeScheduleAutoSettingsPopup();
+    overlay.addEventListener("click", (e) => {
+      const chip = e.target && e.target.closest ? e.target.closest("[data-auto-pref-staff]") : null;
+      if (chip) scheduleAutoHandlePrefChipClick(chip);
+    });
+  }
+
+  // 제외 인원을 바꿨을 때: 조건 영역을 다시 그리고 계획·미리보기를 다시 계산한다.
+  function scheduleAutoRefreshExcludeArea() {
+    const area = document.getElementById("sch-auto-exclude-area");
+    if (area) area.innerHTML = scheduleAutoExcludeAreaHtml(getStaffListForMonth(scheduleUi.year, scheduleUi.monthIndex), scheduleAutoExcludedIds);
   }
 
   // 미리보기 표: 화면의 월별 스케줄 표(buildScheduleTableHtml)를 그대로 그리되, 계획에 있는 "새로 배정될 오프"를
@@ -12373,6 +12704,8 @@
     const marks = {};
     let html = "";
     try {
+      // 이번 배치에서 제외한 인원은 표(집계·필요인력 대비 포함)에서도 뺀다 — 계획을 세운 기준과 같아야 한다.
+      schedulePreviewExcludedIds = new Set((plan.excluded || []).map((x) => x.id));
       ui.searchQuery = "";
       ui.collapsedRowGroups = new Set();
       ui.colGroups = [];
@@ -12392,6 +12725,7 @@
       html = buildScheduleTableHtml();
     } finally {
       schedulePreviewMarks = null;
+      schedulePreviewExcludedIds = null;
       injected.forEach((key) => { delete scheduleData.records[key]; });
       Object.assign(ui, saved);
     }
@@ -12414,11 +12748,15 @@
         ${plan.warnings.map((w) => `<div class="sch-auto-warning-item">${esc(w)}</div>`).join("")}
       </div>
     `;
+    const excludedHtml = plan.excluded && plan.excluded.length > 0
+      ? `<div class="sch-auto-excluded-note">제외한 인원: <b>${plan.excluded.map((x) => esc(scheduleAutoStaffLabel(x))).join(", ")}</b> — 재직 인원에서 뺀 채로 계산했고 아래 표에서도 빠져 있어요. 실제 스케줄 표의 이 인원 칸은 바뀌지 않아요.</div>`
+      : "";
     const emptyHtml = totalAssigned === 0
       ? `<div class="sch-auto-none">이번 달은 새로 배정할 칸이 없어요(이미 목표 개수를 채웠거나 대상 인원이 없어요).</div>`
       : "";
     return `
       <div class="sch-auto-total">총 <b>${totalAssigned}칸</b>이 새로 채워질 예정이에요.${prefTotal > 0 ? ` 선호 요일 반영 <b>${prefHits}/${prefTotal}칸</b>.` : ""}</div>
+      ${excludedHtml}
       ${warningsHtml}
       ${emptyHtml}
       <div class="sch-auto-legend">
@@ -12459,7 +12797,7 @@
 
   // 계획을 다시 계산해서 미리보기 영역과 "이대로 입력" 버튼 상태를 갱신한다.
   function scheduleAutoRefreshPreview() {
-    scheduleAutoPlan = scheduleAutoBuildPlan(scheduleUi.year, scheduleUi.monthIndex);
+    scheduleAutoPlan = scheduleAutoBuildPlan(scheduleUi.year, scheduleUi.monthIndex, { excludeStaffIds: scheduleAutoExcludedIds });
     const area = document.getElementById("sch-auto-preview-area");
     if (area) area.innerHTML = scheduleAutoPreviewHtml(scheduleAutoPlan);
     scheduleAutoFitPreview();
@@ -12475,7 +12813,8 @@
       return;
     }
     closeScheduleAutoModal();
-    scheduleAutoPlan = scheduleAutoBuildPlan(year, monthIndex);
+    scheduleAutoResetExcluded(); // 제외 조건은 이번 실행 한정이라 열 때마다 비운다
+    scheduleAutoPlan = scheduleAutoBuildPlan(year, monthIndex, { excludeStaffIds: scheduleAutoExcludedIds });
     const plan = scheduleAutoPlan;
     const monthStaff = getStaffListForMonth(year, monthIndex);
     const totalAssigned = plan.perStaffPlan.reduce((sum, p) => sum + p.assigned.length, 0);
@@ -12492,12 +12831,14 @@
         <div class="sch-preview-body sch-auto-body">
           <div class="sch-auto-desc">
             이번 달 공휴일 ${plan.targetInfo.holidayCount}일 + 토요일 ${plan.targetInfo.saturdayCount}일 + 일요일 ${plan.targetInfo.sundayCount}일 = 인원별 목표 <b>${plan.target}개</b>.
-            이미 입력된 오프류(오프·공휴·대휴·육휴·특휴)는 목표에서 빼고, 연차·공가는 별도로 두고(목표 달성에 포함 안 함) 계산했어요.
-            이미 뭔가 입력된 칸은 손대지 않고 기본값(근무)인 빈 칸에만, 조×업무구분 필요인력 대비 ±1~2명(금·토·월은 ±1명) 범위 안에서 골라 채워요.
+            이미 입력된 대휴·공휴·특휴는 목표에서 빼고, 오프는 메모에 "필휴"라고 적혀 있을 때만 빼요. 연차·공가·육휴와 "필휴" 표시 없는 오프는 별도로 두고(목표 달성에 포함 안 함) 계산했어요.
+            이미 뭔가 입력된 칸은 손대지 않고 기본값(근무)인 빈 칸에만, 조×업무구분 필요인력 대비 금·토·월은 되도록 ±0(정 안 되면 최후의 수단으로 ±1), 그 외 요일은 ±2 범위 안에서 골라 채워요. 다만 그 날짜가 평일 공휴일이면 금·토·월이어도 ±2까지 허용해요.
+            <br><b>대전제:</b> 주간 유선/주간 채팅/야간 유선/야간 채팅 각 구분은 어느 날이든 출근 인원이 <b>최소 ${SCHEDULE_AUTO_MIN_WORKING}명 이상</b>이어야 해요. 오프를 넣으면 ${SCHEDULE_AUTO_MIN_WORKING}명 밑으로 떨어지는 날은 아래 모든 조건보다 우선해서 절대 배정하지 않아요(그래서 목표 개수를 못 채우면 경고로 알려줘요). 재직 인원이 ${SCHEDULE_AUTO_MIN_WORKING}명 미만인 구분은 지킬 수 없어서 적용하지 않아요.
+            <br>일요일은 주간 유선/주간 채팅/야간 유선/야간 채팅 각 구분에서 출근 인원이 그 달 재직 인원의 -2명까지만 허용되고, -3명은 목표를 못 채우더라도 절대 만들지 않아요.
             <br>연속 근무는 <b>최대 ${SCHEDULE_AUTO_MAX_WORK_STREAK}일</b>까지만 나오게 배치해요. 지난달에도 있던 인원은 지난달 말일부터 이어진 연속 근무일수를 월 초에 포함해서 세요(근무·반차·교육은 근무일, 오프류·연차·공가 등은 쉬는 날로 셈).
             <br>아래 미리보기는 월별 스케줄 표와 같은 모양이고, 새로 배정될 오프는 파란 테두리로 표시돼요. 아직 아무것도 저장되지 않았고, "이대로 입력"을 눌러야 반영돼요.
           </div>
-          ${scheduleAutoPrefsHtml(monthStaff)}
+          ${scheduleAutoConditionsHtml(monthStaff)}
           <div id="sch-auto-preview-area">${scheduleAutoPreviewHtml(plan)}</div>
         </div>
         <div class="sch-preview-actions">
@@ -12512,20 +12853,20 @@
     document.getElementById("sch-auto-cancel-btn").onclick = () => closeScheduleAutoModal();
     const applyBtn = document.getElementById("sch-auto-apply-btn");
     if (applyBtn) applyBtn.onclick = () => scheduleAutoApplyPlan(scheduleAutoPlan);
-    // 선호 요일 칸: 누르면 바로 저장하고, 칸 모양만 바꾼 뒤 미리보기를 다시 계산한다
-    // (목록 전체를 다시 그리지 않아서 스크롤·펼침 상태가 유지된다).
+    // 배치 조건: "인원별 설정" 팝업 열기 / 제외할 인원 추가·해제(바로 계획과 미리보기를 다시 계산한다)
+    document.getElementById("sch-auto-settings-btn").onclick = () => openScheduleAutoSettingsPopup();
+    overlay.addEventListener("change", (e) => {
+      const sel = e.target && e.target.closest ? e.target.closest("[data-auto-exclude-select]") : null;
+      if (!sel || !sel.value) return;
+      scheduleAutoSetExcluded(sel.value, true);
+      scheduleAutoRefreshExcludeArea();
+      scheduleAutoRefreshPreview();
+    });
     overlay.addEventListener("click", (e) => {
-      const chip = e.target && e.target.closest ? e.target.closest("[data-auto-pref-staff]") : null;
-      if (!chip) return;
-      const staffId = chip.getAttribute("data-auto-pref-staff");
-      const dow = Number(chip.getAttribute("data-auto-pref-dow"));
-      scheduleAutoTogglePrefDow(staffId, dow);
-      const isOn = scheduleAutoGetPrefDows(staffId).indexOf(dow) !== -1;
-      chip.classList.toggle("on", isOn);
-      chip.setAttribute("aria-pressed", isOn ? "true" : "false");
-      const setCount = monthStaff.filter((s) => scheduleAutoGetPrefDows(s.id).length > 0).length;
-      const countEl = document.getElementById("sch-auto-prefs-count");
-      if (countEl) countEl.textContent = setCount > 0 ? `(${setCount}명 설정됨)` : "(설정 없음)";
+      const rm = e.target && e.target.closest ? e.target.closest("[data-auto-exclude-remove]") : null;
+      if (!rm) return;
+      scheduleAutoSetExcluded(rm.getAttribute("data-auto-exclude-remove"), false);
+      scheduleAutoRefreshExcludeArea();
       scheduleAutoRefreshPreview();
     });
     // 미리보기 표를 팝업 폭에 맞추고, 스크롤바가 생기거나 창 크기가 바뀌어 폭이 달라져도 다시 맞춘다.

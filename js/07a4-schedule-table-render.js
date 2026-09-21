@@ -4,6 +4,9 @@
   // 알려주면 그 칸에 강조 클래스를 붙인다(1 = 새로 배정될 오프, 2 = 그중 선호 요일과 맞은 칸).
   // 평소에는 null이라 화면의 실제 월별 스케줄 표에는 아무 영향이 없다.
   let schedulePreviewMarks = null;
+  // "AI 자동 배치" 미리보기 전용: 이번 배치에서 제외한 인원의 id 집합. 표(인원 행·집계·필요인력 대비)에서 이 인원을 뺀다.
+  // 평소에는 null이라 실제 월별 스케줄 표에는 아무 영향이 없다.
+  let schedulePreviewExcludedIds = null;
   function buildScheduleTableHtml(filterMode, hideSummaryCols, hideRequiredRows, hideMemoMarks) {
     const { year, monthIndex } = scheduleUi;
     const numDays = scheduleDaysInMonth(year, monthIndex);
@@ -25,7 +28,7 @@
       : SCHEDULE_INFO_COLS.filter((c) => !scheduleUi.manualHiddenInfoCols.has(c.key)).length;
     const { lefts: infoColLefts, lastVisibleKey: infoColLastVisible } = scheduleInfoColLeftOffsets();
 
-    const monthStaff = getStaffListForMonth(year, monthIndex);
+    const monthStaff = getStaffListForMonth(year, monthIndex).filter((s) => !schedulePreviewExcludedIds || !schedulePreviewExcludedIds.has(s.id));
     const adminStaff = monthStaff.filter((s) => s.isAdmin);
     const dayStaff = sortStaffByType(monthStaff.filter((s) => s.group !== "night" && !s.isAdmin));
     const nightStaff = sortStaffByType(monthStaff.filter((s) => s.group === "night" && !s.isAdmin));
