@@ -241,7 +241,7 @@ test("선호 요일은 소프트 조건: 후보가 모자라면 다른 요일로
   assert.deepEqual(toPlain(plan.warnings), []);
 });
 
-test("선호 요일은 필요인력 허용범위에 양보한다(월요일은 ±1명)", () => {
+test("선호 요일은 필요인력 허용범위에 양보한다(월요일은 부족 -1명까지)", () => {
   const requiredHeadcount = {};
   [7, 14, 21, 28].forEach((d) => { requiredHeadcount[`2026-09|DAY|채팅|${d}`] = 2; }); // 월요일마다 2명 필요, 투입 가능은 2명
   const { m } = setup({
@@ -252,7 +252,7 @@ test("선호 요일은 필요인력 허용범위에 양보한다(월요일은 ±
   const plan = m.scheduleAutoBuildPlan(YEAR, MI);
   [7, 14, 21, 28].forEach((d) => {
     const offCount = ["s1", "s2"].filter((id) => planOf(plan, id).assigned.includes(d)).length;
-    assert.ok(offCount <= 1, `9/${d}: 둘 다 쉬면 0명이라 허용범위(±1)를 벗어남`);
+    assert.ok(offCount <= 1, `9/${d}: 둘 다 쉬면 0명(-2)이라 허용범위(-1)를 벗어남`);
   });
   // 선호가 같은 날에 겹치면 먼저 고른 사람(등록 순서상 s1)이 우선한다.
   assert.equal(planOf(plan, "s1").prefHits, 4);
@@ -370,23 +370,23 @@ test("제외 조건이 없거나 비어 있거나 없는 id면 기존 결과와 
 test("제외한 인원은 출근 인원수·필요인력 계산에서도 빠진다(나머지 인원만으로 필요인력을 맞춘다)", () => {
   const fridays = [4, 11, 18, 25];
   const requiredHeadcount = {};
-  fridays.forEach((d) => { requiredHeadcount[`2026-09|DAY|채팅|${d}`] = 1; }); // 금요일마다 1명 필요
+  fridays.forEach((d) => { requiredHeadcount[`2026-09|DAY|채팅|${d}`] = 2; }); // 금요일마다 2명 필요
   const build = (opts) => setup({
     staff: [staff("s1"), staff("s2"), staff("s3")],
     requiredHeadcount,
     autoOffPrefs: { s1: { dows: [5] } }, // s1은 금요일 선호
   }).m.scheduleAutoBuildPlan(YEAR, MI, opts);
 
-  // 셋 다 재직: s1이 금요일에 쉬면 2명이 남아 필요인력(1명)보다 +1 → 금요일은 ±0 범위를 벗어나므로 다른 날을 고른다
+  // 셋 다 재직: s1이 금요일에 쉬면 2명이 남아 필요인력(2명)과 대비 0(부족 없음) → 선호대로 금요일 4번이 모두 오프가 된다
   const all = planOf(build(), "s1");
-  assert.equal(all.prefHits, 0);
-  assert.ok(fridays.every((d) => !all.assigned.includes(d)));
+  assert.equal(all.prefHits, 4);
+  assert.ok(fridays.every((d) => all.assigned.includes(d)));
 
-  // s3 제외: 재직 2명 → s1이 금요일에 쉬면 정확히 1명(±0)이라 선호대로 금요일 4번이 모두 오프가 된다
+  // s3 제외: 재직 2명 → s1이 금요일에 쉬면 1명만 남아 대비 -1(금요일은 0이 1순위, -1은 최후의 수단)이라 다른 날을 고른다
   const plan = build({ excludeStaffIds: ["s3"] });
   const p1 = planOf(plan, "s1");
-  assert.equal(p1.prefHits, 4);
-  assert.ok(fridays.every((d) => p1.assigned.includes(d)));
+  assert.equal(p1.prefHits, 0);
+  assert.ok(fridays.every((d) => !p1.assigned.includes(d)));
   assert.equal(planOf(plan, "s3"), undefined);
   assert.deepEqual(toPlain(plan.warnings), []);
 });
@@ -847,7 +847,7 @@ test("대전제: options.minWorking를 0으로 주면 예전처럼 제한 없이
   for (let d = 1; d <= 30; d++) assert.ok(headcount(withPlan(m.scheduleData.records, two), list, false, "채팅", d) >= 2, `9/${d}`);
 });
 
-/* ===================== 목표 차감: 특휴는 미차감 / 필요인력 허용범위: 그 외 요일 ±1(최후 ±2) ===================== */
+/* ===================== 목표 차감: 특휴는 미차감 / 필요인력 허용범위: 부족(-) 기준 — 그 외 요일 -1(최후 -2) ===================== */
 
 test("목표 차감: 대휴·공휴는 항상 차감, 특휴·연차·공가·육휴는 차감하지 않는다", () => {
   const { m } = setup({});
@@ -873,7 +873,7 @@ test("특휴가 입력돼 있어도 목표 오프 개수는 줄지 않는다(대
   assert.equal(planOf(plan, "dh").assigned.length, 6, "대휴 2개는 목표에서 차감");
 });
 
-test("필요인력 허용범위: 금·토·월 ±0(최후 ±1) / 그 외 요일 ±1(최후 ±2) / 평일 공휴일 금·월은 ±2", () => {
+test("필요인력 허용범위(부족 기준): 금·토·월 0(최후 -1) / 그 외 요일 -1(최후 -2) / 평일 공휴일 금·월은 -2", () => {
   const { m } = setup({});
   const tol = (dow) => toPlain(m.scheduleAutoToleranceInfo(dow, "2026-09-01")); // getHoliday는 항상 null
   [5, 6, 1].forEach((d) => assert.deepEqual(tol(d), { ideal: 0, max: 1 }, `dow ${d}`));
@@ -884,8 +884,8 @@ test("필요인력 허용범위: 금·토·월 ±0(최후 ±1) / 그 외 요일 
   assert.deepEqual(toPlain(m.scheduleAutoToleranceInfo(0, "2026-09-06")), { ideal: 1, max: 2 });
 });
 
-test("그 외 요일(수요일)은 ±1 범위를 먼저 지키고, 다른 날이 남아 있으면 ±2로 넓히지 않는다", () => {
-  // 수요일(2·9·16·23·30)마다 2명 필요 / 재직 4명. 3명이 쉬면 남는 1명(오차 -1)까지가 ±1, 4명이 다 쉬면 0명(오차 -2)이라 최후의 수단.
+test("그 외 요일(수요일)은 -1 범위를 먼저 지키고, 다른 날이 남아 있으면 -2로 넓히지 않는다", () => {
+  // 수요일(2·9·16·23·30)마다 2명 필요 / 재직 4명. 3명이 쉬면 남는 1명(대비 -1)까지가 1순위, 4명이 다 쉬면 0명(대비 -2)이라 최후의 수단.
   const requiredHeadcount = {};
   [2, 9, 16, 23, 30].forEach((d) => { requiredHeadcount[`2026-09|DAY|채팅|${d}`] = 2; });
   const ids = ["w1", "w2", "w3", "w4"];
@@ -897,7 +897,24 @@ test("그 외 요일(수요일)은 ±1 범위를 먼저 지키고, 다른 날이
   const plan = m.scheduleAutoBuildPlan(YEAR, MI);
   [2, 9, 16, 23, 30].forEach((d) => {
     const off = ids.filter((id) => planOf(plan, id).assigned.includes(d)).length;
-    assert.ok(off <= 3, `9/${d}: ${off}명이 쉬면 ±2(최후의 수단)까지 가는데, 다른 날이 남아 있어 ±1 안에서 끝내야 함`);
+    assert.ok(off <= 3, `9/${d}: ${off}명이 쉬면 -2(최후의 수단)까지 가는데, 다른 날이 남아 있어 -1 안에서 끝내야 함`);
   });
+  assert.deepEqual(toPlain(plan.warnings), []);
+});
+
+test("대비가 +(인원이 남는 날)는 항상 허용하고, 부족(-)만 제한한다", () => {
+  // 금요일마다 1명 필요 / 재직 3명: s1이 쉬어도 2명이 남아 대비 +1 → 허용이라 선호대로 금요일 4번이 모두 오프가 된다
+  const fridays = [4, 11, 18, 25];
+  const requiredHeadcount = {};
+  fridays.forEach((d) => { requiredHeadcount[`2026-09|DAY|채팅|${d}`] = 1; });
+  const { m } = setup({
+    staff: [staff("s1"), staff("s2"), staff("s3")],
+    requiredHeadcount,
+    autoOffPrefs: { s1: { dows: [5] } },
+  });
+  const plan = m.scheduleAutoBuildPlan(YEAR, MI);
+  const p1 = planOf(plan, "s1");
+  assert.equal(p1.prefHits, 4);
+  assert.ok(fridays.every((d) => p1.assigned.includes(d)));
   assert.deepEqual(toPlain(plan.warnings), []);
 });
