@@ -667,10 +667,6 @@
           <span class="sch-auto-cond-label">제외할 인원</span>
           <div class="sch-auto-cond-body" id="sch-auto-exclude-area">${scheduleAutoExcludeAreaHtml(staffList, scheduleAutoExcludedIds)}</div>
         </div>
-        <div class="sch-auto-cond-hint">
-          이번 배치에서만 적용돼요(저장되지 않아요). 제외한 인원은 재직 인원에서 빠진 것처럼 필요인력을 계산하고, 오프도 새로 배정하지 않아요.
-          미리보기 표에서도 빠지지만 실제 스케줄 표의 그 인원 칸은 그대로예요.
-        </div>
       </div>`;
   }
 
@@ -916,6 +912,8 @@
             <li>필요인력 허용범위: 금·토·월 ±0(최후의 수단 ±1) / 그 외 요일 ±2 / 평일 공휴일은 금·토·월도 ±2까지 허용</li>
             <li>대전제(최우선, 예외 없음): 주간 유선·주간 채팅·야간 유선·야간 채팅 각 구분, 하루 출근 최소 <b>${SCHEDULE_AUTO_MIN_WORKING}명</b></li>
             <li>연속 근무 제한: 최대 <b>${SCHEDULE_AUTO_MAX_WORK_STREAK}일</b> (전월 말일부터 이어진 연속 근무일수 포함)</li>
+            <li>선호 오프 요일: \"인원별 설정\" 기준으로 최대한 반영 (필수 아님, 위 조건과 충돌 시 다른 날로 변경)</li>
+            <li>제외할 인원: 이번 배치에만 적용 (저장 안 됨) / 재직 인원에서 빠진 것으로 필요인력 계산 / 오프 신규 배정 없음 / 미리보기 표에서 제외 (실제 스케줄 표의 해당 인원 칸은 변경 없음)</li>
             <li>저장 방식: 미리보기 단계에서는 저장되지 않음, "이대로 입력" 클릭 시에만 반영</li>
           </ul>
         </div>
