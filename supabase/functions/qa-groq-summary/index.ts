@@ -100,7 +100,18 @@ Deno.serve(async (req: Request) => {
     }
     const text = (data?.choices?.[0]?.message?.content || "").trim();
     if (!text) return new Response(JSON.stringify({ error: "응답에서 요약 내용을 찾지 못했어요." }), { status: 502, headers });
-    return new Response(JSON.stringify({ text }), { status: 200, headers });
+    // 스케줄 자동배치에서는 클라이언트가 "실제 Groq 호출" 여부를 확인할 수 있도록
+    // 모델/토큰 사용량/요청 ID를 함께 반환한다. API 키 자체는 절대 반환하지 않는다.
+    const usage = data?.usage || null;
+    const groqRequestId = resp.headers.get("x-groq-request-id") || resp.headers.get("x-request-id") || null;
+    const isScheduleSelection = String(body?.mode || "") === "schedule-auto-candidate-selection";
+    return new Response(JSON.stringify({
+      text,
+      model: GROQ_MODEL,
+      usage,
+      groq_request_id: groqRequestId,
+      groq_verified: isScheduleSelection,
+    }), { status: 200, headers });
   } catch (err) {
     return new Response(JSON.stringify({ error: String((err as Error)?.message || err) }), { status: 500, headers });
   }
