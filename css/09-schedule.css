@@ -328,7 +328,24 @@
   /* "AI 자동 배치" 미리보기 팝업 */
   .sch-auto-box { width: min(1500px, 96vw); max-width: 96vw; }
   .sch-auto-body { display: block; text-align: left; }
-  .sch-auto-desc { font-size: 12.5px; color: var(--text-faint); margin-bottom: 14px; line-height: 1.6; }
+  .sch-auto-head-title { display: flex; align-items: center; gap: 6px; }
+  .sch-auto-info-btn {
+    width: 18px; height: 18px; border-radius: 50%; flex-shrink: 0;
+    background: none; border: 1px solid var(--text-faint); color: var(--text-faint);
+    font-size: 11px; line-height: 1; cursor: pointer; padding: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .sch-auto-info-btn:hover { color: var(--text); border-color: var(--text); background: var(--elevated); }
+  .sch-auto-info-card {
+    padding: 14px 18px; border-bottom: 1px solid var(--hairline); background: var(--elevated);
+    flex-shrink: 0;
+  }
+  .sch-auto-info-card ul { margin: 0; padding-left: 18px; list-style: disc; }
+  .sch-auto-info-card li {
+    font-size: 12.5px; color: var(--text-faint); line-height: 1.6;
+  }
+  .sch-auto-info-card li + li { margin-top: 6px; }
+  .sch-auto-info-card b { color: var(--text); }
   .sch-auto-warnings {
     background: var(--amber-dim, var(--elevated)); border: 1px solid var(--amber); border-radius: 10px;
     padding: 10px 12px; margin-bottom: 14px;

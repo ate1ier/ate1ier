@@ -15,7 +15,7 @@
   // ---- 배치 조건: 제외할 인원 (이번 배치 한정, 저장 안 함) ----
   //  미리보기 팝업의 "배치 조건"에서 인원을 고르면(여러 명 가능) 그 인원은 이번 계산에서 "그 달 재직 인원에
   //  없는 것처럼" 취급한다. 그 인원에게는 오프를 새로 배정하지 않고, 조×업무구분 출근 인원수·필요인력 대비·
-  //  일요일 하드 캡의 재직 인원수를 셀 때도 빠진다(= 나머지 인원만으로 필요인력을 맞춘다). 미리보기 표에서도
+  //  출근 인원수·필요인력 대비 재직 인원수를 셀 때도 빠진다(= 나머지 인원만으로 필요인력을 맞춘다). 미리보기 표에서도
   //  그 인원을 빼고 그려서 집계·대비·O/X가 계획과 같은 기준으로 보인다. 실제 스케줄의 그 인원 칸은 건드리지 않는다.
   //  팝업을 열 때마다 비워지므로 다음 배치에 남아서 조용히 빠지는 일은 없다.
   //
@@ -39,9 +39,6 @@
   //     ±1까지 넓혀서 고른다. 그 외 요일(화·수·목·일)은 ±2. 다만 그 날짜가 평일 공휴일이면
   //     금·토·월이어도 ±2까지 허용한다(토요일 자체는 "평일"이 아니므로 이 예외 대상이 아니다).
   //     허용범위(금·토·월은 ±1, 그 외/공휴일은 ±2)를 넘겨서 배치될 때만 경고로 알려준다.
-  //  2-1) 일요일 하드 캡(예외 없음): 주간 유선/주간 채팅/야간 유선/야간 채팅 각 구분에서
-  //     출근 인원이 그 달 재직 인원의 -2명까지는 허용하되, -3명(그 이하)은 절대 안 된다.
-  //     목표를 못 채우더라도 이 조건은 항상 지키며, 후보에서 아예 제외한다.
   //  3) 인원별 "선호 오프 요일"(소프트 조건): 위 1)·2)를 해치지 않는 범위에서 최대한 맞춘다.
   //     못 맞추면 다른 날로 바뀔 수 있고, 미리보기에서 어떤 날이 선호와 맞았는지 표시해준다.
   //  4) 그 밖의 분산 기준(제약 없는 날 우선, 여유가 큰 날, 이미 몰린 날 회피, 빠른 날짜)
@@ -80,19 +77,6 @@
     if (isWeekdayHoliday) return { ideal: 2, max: 2 };
     if (dow === 5 || dow === 6 || dow === 1) return { ideal: 0, max: 1 };
     return { ideal: 2, max: 2 };
-  }
-
-  // 일요일 하드 캡: 주간 유선/주간 채팅/야간 유선/야간 채팅 네 구분 각각에서, 그 달 재직 인원 대비
-  // "출근" 인원이 -2명까지는 허용하되 -3명은 절대 안 된다. 즉 이 오프를 넣었을 때 남는 출근 인원이
-  // (재직 인원 - 3) 이하로 떨어지면 그 배치는 만들지 않는다(경고로 넘어가는 "최후의 수단"이 아니라,
-  // 목표를 못 채우더라도 예외 없이 애초에 후보에서 제외한다). 출근 인원이 재직 인원 -2명까지는 그대로 허용.
-  function scheduleAutoSundayBlocked(g, staffTypes, working, totalCount, d) {
-    return staffTypes.some((t) => {
-      const total = totalCount[g][t];
-      if (!total) return false;
-      const workingAfter = working[g][t][d] - 1; // 이 오프를 반영했다고 가정했을 때 남는 출근 인원
-      return workingAfter <= total - 3;
-    });
   }
 
   // 대전제(구분별 하루 출근 최소 3명): 이 오프를 넣으면 그 인원이 속한 구분(조×업무구분) 중 하나라도 그 날 출근
@@ -323,7 +307,7 @@
   // ----- 계획 세우기 -----
   // 실제로 scheduleData를 바꾸지 않고, "누구를 며칠에 오프로 채울지"만 계산해서 돌려준다.
   // options.excludeStaffIds: 이번 계산에서 재직 인원에 넣지 않을 인원 id들(배치 조건). 그 인원은 오프를
-  // 배정받지 않고, 출근 인원수·필요인력 대비·일요일 하드 캡의 재직 인원수에서도 빠진다.
+  // 배정받지 않고, 출근 인원수·필요인력 대비의 재직 인원수에서도 빠진다.
   function scheduleAutoBuildPlan(year, monthIndex, options) {
     const daysInMonth = scheduleDaysInMonth(year, monthIndex);
     const targetInfo = scheduleAutoTargetInfo(year, monthIndex);
@@ -344,7 +328,7 @@
     // (관리자는 필요인력 집계 자체에서 빠지므로 여기 포함하지 않는다 — 표 렌더링과 동일한 기준)
     const working = {};
     const required = {};
-    const totalCount = {}; // 조×업무구분별 그 달 재직 인원수(일요일 하드 캡 계산용)
+    const totalCount = {}; // 조×업무구분별 그 달 재직 인원수(최소 출근 인원 조건 계산용)
     ["DAY", "NIGHT"].forEach((g) => {
       const groupStaff = nonAdmin.filter((s) => (g === "NIGHT" ? s.group === "night" : s.group !== "night"));
       working[g] = {}; required[g] = {}; totalCount[g] = {};
@@ -392,17 +376,14 @@
 
       // 연속 근무 계산용: 이미 입력된 값 중 "쉬는 날"인 칸, 그리고 비어 있어서 오프를 넣을 수 있는 칸.
       // 대전제(구분별 출근 최소 3명)에 걸리는 날은 어떤 요일이든 빈 칸이어도 후보에서 제외한다.
-      // 일요일은 추가로 하드 캡(scheduleAutoSundayBlocked)에 걸려도 후보에서 제외한다.
       const baseRest = {}, isFreeDay = {};
       let minBlockedDays = 0; // 대전제 때문에 오프를 못 넣는 (그 인원의) 빈 칸 수 — 목표를 못 채웠을 때 원인 안내용
       for (let d = 1; d <= daysInMonth; d++) {
         const key = scheduleRecordKey(s.id, scheduleDateKey(year, monthIndex, d));
         const has = Object.prototype.hasOwnProperty.call(scheduleData.records, key);
-        const dow = new Date(year, monthIndex, d).getDay();
         const minBlocked = !has && scheduleAutoMinWorkingBlocked(g, staffTypes, working, totalCount, d, minWorking);
         if (minBlocked) minBlockedDays++;
-        const sundayBlocked = dow === 0 && scheduleAutoSundayBlocked(g, staffTypes, working, totalCount, d);
-        isFreeDay[d] = !has && !minBlocked && !sundayBlocked;
+        isFreeDay[d] = !has && !minBlocked;
         baseRest[d] = has && !scheduleAutoIsWorkRecord(scheduleData.records[key]);
       }
       const chosen = {};
@@ -921,19 +902,24 @@
     overlay.innerHTML = `
       <div class="sch-preview-box sch-auto-box">
         <div class="sch-preview-head">
-          <span>${ICON_SPARK} AI 자동 배치 미리보기 · ${esc(scheduleMonthLabel())}</span>
+          <span class="sch-auto-head-title">
+            ${ICON_SPARK} AI 자동 배치 미리보기 · ${esc(scheduleMonthLabel())}
+            <button type="button" class="sch-auto-info-btn" id="sch-auto-info-btn" aria-label="배치 조건 안내" title="배치 조건 안내">?</button>
+          </span>
           <button type="button" class="sch-preview-close" id="sch-auto-close-x" aria-label="닫기">✕</button>
         </div>
+        <div class="sch-auto-info-card" id="sch-auto-info-card" hidden>
+          <ul>
+            <li>목표 오프 개수 = 공휴일 ${plan.targetInfo.holidayCount}일 + 토요일 ${plan.targetInfo.saturdayCount}일 + 일요일 ${plan.targetInfo.sundayCount}일 = 인원별 <b>${plan.target}개</b></li>
+            <li>목표 차감: 대휴·공휴·특휴는 항상 차감 / 오프는 메모에 "필휴" 표시가 있을 때만 차감 / 연차·공가·육휴는 차감 안 함</li>
+            <li>배치 범위: 이미 값이 입력된 칸은 그대로 유지, 기본값(근무)인 빈 칸에만 새 오프 배정</li>
+            <li>필요인력 허용범위: 금·토·월 ±0(최후의 수단 ±1) / 그 외 요일 ±2 / 평일 공휴일은 금·토·월도 ±2까지 허용</li>
+            <li>대전제(최우선, 예외 없음): 주간 유선·주간 채팅·야간 유선·야간 채팅 각 구분, 하루 출근 최소 <b>${SCHEDULE_AUTO_MIN_WORKING}명</b></li>
+            <li>연속 근무 제한: 최대 <b>${SCHEDULE_AUTO_MAX_WORK_STREAK}일</b> (전월 말일부터 이어진 연속 근무일수 포함)</li>
+            <li>저장 방식: 미리보기 단계에서는 저장되지 않음, "이대로 입력" 클릭 시에만 반영</li>
+          </ul>
+        </div>
         <div class="sch-preview-body sch-auto-body">
-          <div class="sch-auto-desc">
-            이번 달 공휴일 ${plan.targetInfo.holidayCount}일 + 토요일 ${plan.targetInfo.saturdayCount}일 + 일요일 ${plan.targetInfo.sundayCount}일 = 인원별 목표 <b>${plan.target}개</b>.
-            이미 입력된 대휴·공휴·특휴는 목표에서 빼고, 오프는 메모에 "필휴"라고 적혀 있을 때만 빼요. 연차·공가·육휴와 "필휴" 표시 없는 오프는 별도로 두고(목표 달성에 포함 안 함) 계산했어요.
-            이미 뭔가 입력된 칸은 손대지 않고 기본값(근무)인 빈 칸에만, 조×업무구분 필요인력 대비 금·토·월은 되도록 ±0(정 안 되면 최후의 수단으로 ±1), 그 외 요일은 ±2 범위 안에서 골라 채워요. 다만 그 날짜가 평일 공휴일이면 금·토·월이어도 ±2까지 허용해요.
-            <br><b>대전제:</b> 주간 유선/주간 채팅/야간 유선/야간 채팅 각 구분은 어느 날이든 출근 인원이 <b>최소 ${SCHEDULE_AUTO_MIN_WORKING}명 이상</b>이어야 해요. 오프를 넣으면 ${SCHEDULE_AUTO_MIN_WORKING}명 밑으로 떨어지는 날은 아래 모든 조건보다 우선해서 절대 배정하지 않아요(그래서 목표 개수를 못 채우면 경고로 알려줘요). 재직 인원이 ${SCHEDULE_AUTO_MIN_WORKING}명 미만인 구분은 지킬 수 없어서 적용하지 않아요.
-            <br>일요일은 주간 유선/주간 채팅/야간 유선/야간 채팅 각 구분에서 출근 인원이 그 달 재직 인원의 -2명까지만 허용되고, -3명은 목표를 못 채우더라도 절대 만들지 않아요.
-            <br>연속 근무는 <b>최대 ${SCHEDULE_AUTO_MAX_WORK_STREAK}일</b>까지만 나오게 배치해요. 지난달에도 있던 인원은 지난달 말일부터 이어진 연속 근무일수를 월 초에 포함해서 세요(근무·반차·교육은 근무일, 오프류·연차·공가 등은 쉬는 날로 셈).
-            <br>아래 미리보기는 월별 스케줄 표와 같은 모양이고, 새로 배정될 오프는 파란 테두리로 표시돼요. 아직 아무것도 저장되지 않았고, "이대로 입력"을 눌러야 반영돼요.
-          </div>
           ${scheduleAutoConditionsHtml(monthStaff)}
           <div id="sch-auto-preview-area">${scheduleAutoPreviewHtml(plan)}</div>
         </div>
@@ -947,6 +933,20 @@
     overlay.onclick = (e) => { if (e.target === overlay) closeScheduleAutoModal(); };
     document.getElementById("sch-auto-close-x").onclick = () => closeScheduleAutoModal();
     document.getElementById("sch-auto-cancel-btn").onclick = () => closeScheduleAutoModal();
+    // 조건 안내(물음표 아이콘): 누르면 카드를 열고 닫고, 카드 밖을 클릭하면 닫힌다.
+    const infoBtn = document.getElementById("sch-auto-info-btn");
+    const infoCard = document.getElementById("sch-auto-info-card");
+    if (infoBtn && infoCard) {
+      infoBtn.onclick = (e) => {
+        e.stopPropagation();
+        infoCard.hidden = !infoCard.hidden;
+      };
+      overlay.addEventListener("click", (e) => {
+        if (infoCard.hidden) return;
+        if (e.target === infoBtn || infoCard.contains(e.target)) return;
+        infoCard.hidden = true;
+      });
+    }
     const applyBtn = document.getElementById("sch-auto-apply-btn");
     if (applyBtn) applyBtn.onclick = () => scheduleAutoApplyPlan(scheduleAutoPlan);
     // 배치 조건: "인원별 설정" 팝업 열기 / 제외할 인원 추가·해제(바로 계획과 미리보기를 다시 계산한다)
