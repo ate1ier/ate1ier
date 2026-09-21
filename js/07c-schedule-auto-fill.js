@@ -807,64 +807,84 @@
         let fixedOne = false;
         for (const g of ["DAY", "NIGHT"]) {
           if (fixedOne) break;
-          for (const t of TYPES) {
-            const groupStaff = nonAdmin.filter((st) => (g === "NIGHT" ? st.group === "night" : st.group !== "night") && (st.types || []).indexOf(t) !== -1);
-            const total = groupStaff.length;
-            if (total <= 0) continue;
-            for (let d = 1; d <= daysInMonth; d++) {
-              if (currentWorking[g][t][d] !== total) continue;
-              const targetDateKey = scheduleDateKey(year, monthIndex, d);
-              const minWorking = Number(minWorkingByGroup[scheduleAutoMinWorkingKey(g, t)] ?? SCHEDULE_AUTO_MIN_WORKING);
-              const targetReq = required[g][t][d];
-              const targetDow = new Date(year, monthIndex, d).getDay();
-              const targetTol = scheduleAutoToleranceInfo(targetDow, targetDateKey);
-              const targetAfter = total - 1;
-              if (targetAfter < minWorking) continue;
-              // 전원 출근 상태를 해소하는 것이 이 보정 단계의 목적이다.
-              // 따라서 이 인원에게 OFF를 넣었을 때 생기는 -1 부족은 요일별 기본 허용범위와
-              // 무관하게 여기서만 예외적으로 허용한다. (최소 출근 인원은 절대 깨지 않는다.)
-              // 이는 위 후보 선정 단계의 `effectiveMax = max(tol.max, 1)`과 동일한 규칙이다.
-              const targetEffectiveMax = Math.max(Number(targetTol.max || 0), 1);
-              if (targetReq !== null && targetReq !== undefined && targetReq - targetAfter > targetEffectiveMax) continue;
+          // 전원 출근의 기준은 조(DAY/NIGHT) 전체 인원이다. 채팅/유선 중 한 업무의
+          // 일부 인원만 전원 출근인 것은 '구분 전체 전원 출근'으로 보지 않는다.
+          const groupStaff = nonAdmin.filter((st) => g === "NIGHT" ? st.group === "night" : st.group !== "night");
+          const total = groupStaff.length;
+          if (total <= 0) continue;
 
-              for (const st of groupStaff) {
-                const plan = perStaffPlan.find((x) => x.staffId === st.id);
-                if (!plan) continue;
-                const assigned = new Set(plan.assigned);
-                const targetKey = scheduleRecordKey(st.id, targetDateKey);
-                if (assigned.has(d) || Object.prototype.hasOwnProperty.call(scheduleData.records, targetKey)) continue;
+          for (let d = 1; d <= daysInMonth; d++) {
+            const targetDateKey = scheduleDateKey(year, monthIndex, d);
+            let groupWorking = 0;
+            for (const st of groupStaff) {
+              const rec = scheduleData.records[scheduleRecordKey(st.id, targetDateKey)];
+              const set = planByIdForRepair.get(st.id);
+              const isOff = (set && set.has(d)) || (rec && !scheduleAutoIsWorkRecord(rec));
+              if (!isOff) groupWorking++;
+            }
+            if (groupWorking !== total) continue;
 
-                for (const sourceDay of plan.assigned.slice()) {
-                  if (sourceDay === d) continue;
-                  const sourceDateKey = scheduleDateKey(year, monthIndex, sourceDay);
-                  const sourceKey = scheduleRecordKey(st.id, sourceDateKey);
-                  if (Object.prototype.hasOwnProperty.call(scheduleData.records, sourceKey)) continue;
+            const targetDow = new Date(year, monthIndex, d).getDay();
+            // 이 조의 전원 출근을 해소할 사람을 찾되, 그 사람의 모든 업무구분에서
+            // 최소 출근 인원과 전원 출근 해소용 허용범위를 함께 확인한다.
+            for (const st of groupStaff) {
+              const plan = perStaffPlan.find((x) => x.staffId === st.id);
+              if (!plan) continue;
+              const assigned = new Set(plan.assigned);
+              const targetKey = scheduleRecordKey(st.id, targetDateKey);
+              if (assigned.has(d) || Object.prototype.hasOwnProperty.call(scheduleData.records, targetKey)) continue;
 
-                  // OFF를 옮기면 원래 OFF 날짜는 출근으로 바뀐다. 그 날짜가 모두 출근이
-                  // 되는 교환은 허용하지 않는다.
-                  if (currentWorking[g][t][sourceDay] + 1 >= total) continue;
-
-                  const next = new Set(assigned);
-                  next.delete(sourceDay);
-                  next.add(d);
-                  if (!autoPlanValidSet(st.id, next)) continue;
-
-                  plan.assigned = Array.from(next).sort((a, b) => a - b);
-                  planByIdForRepair.set(st.id, new Set(plan.assigned));
-                  if (plan.prefDows) {
-                    const pref = new Set(plan.prefDows);
-                    plan.prefHits = plan.assigned.filter((x) => pref.has(new Date(year, monthIndex, x).getDay())).length;
-                  }
-                  if (plan.workPrefDows) {
-                    const wp = new Set(plan.workPrefDows);
-                    plan.workPrefHits = plan.assigned.filter((x) => !wp.has(new Date(year, monthIndex, x).getDay())).length;
-                  }
-                  repaired++;
-                  fixedOne = true;
-                  changed = true;
-                  break;
+              let targetSafe = true;
+              for (const t of TYPES) {
+                if ((st.types || []).indexOf(t) === -1) continue;
+                const typeWorking = currentWorking[g][t][d];
+                const minWorking = Number(minWorkingByGroup[scheduleAutoMinWorkingKey(g, t)] ?? SCHEDULE_AUTO_MIN_WORKING);
+                if (typeWorking - 1 < minWorking) { targetSafe = false; break; }
+                const targetReq = required[g][t][d];
+                if (targetReq !== null && targetReq !== undefined) {
+                  const tol = scheduleAutoToleranceInfo(targetDow, targetDateKey);
+                  const effectiveMax = Math.max(Number(tol.max || 0), 1);
+                  if (targetReq - (typeWorking - 1) > effectiveMax) { targetSafe = false; break; }
                 }
-                if (fixedOne) break;
+              }
+              if (!targetSafe) continue;
+
+              for (const sourceDay of plan.assigned.slice()) {
+                if (sourceDay === d) continue;
+                const sourceDateKey = scheduleDateKey(year, monthIndex, sourceDay);
+                const sourceKey = scheduleRecordKey(st.id, sourceDateKey);
+                if (Object.prototype.hasOwnProperty.call(scheduleData.records, sourceKey)) continue;
+
+                // OFF를 원래 날짜에서 빼면 그 날짜에 전원 출근이 생기는 교환은 금지한다.
+                let sourceWouldBeAllWorking = true;
+                for (const sourceStaff of groupStaff) {
+                  const sourceRec = scheduleData.records[scheduleRecordKey(sourceStaff.id, sourceDateKey)];
+                  const sourceSet = planByIdForRepair.get(sourceStaff.id);
+                  const sourceIsOff = (sourceSet && sourceSet.has(sourceDay)) || (sourceRec && !scheduleAutoIsWorkRecord(sourceRec));
+                  if (sourceStaff.id === st.id) continue;
+                  if (sourceIsOff) { sourceWouldBeAllWorking = false; break; }
+                }
+                if (sourceWouldBeAllWorking) continue;
+
+                const next = new Set(assigned);
+                next.delete(sourceDay);
+                next.add(d);
+                if (!autoPlanValidSet(st.id, next)) continue;
+
+                plan.assigned = Array.from(next).sort((x, y) => x - y);
+                planByIdForRepair.set(st.id, new Set(plan.assigned));
+                if (plan.prefDows) {
+                  const pref = new Set(plan.prefDows);
+                  plan.prefHits = plan.assigned.filter((x) => pref.has(new Date(year, monthIndex, x).getDay())).length;
+                }
+                if (plan.workPrefDows) {
+                  const wp = new Set(plan.workPrefDows);
+                  plan.workPrefHits = plan.assigned.filter((x) => !wp.has(new Date(year, monthIndex, x).getDay())).length;
+                }
+                repaired++;
+                fixedOne = true;
+                changed = true;
+                break;
               }
               if (fixedOne) break;
             }
@@ -918,6 +938,26 @@
           warnings.push(`${label} 구분에 모든 인원이 출근하는 날이 남아 있어요: ${allWorkingDays.join(", ")}. 기존 일정 또는 출근 최소 인원 조건 때문에 자동으로 해소할 수 없는 날입니다.`);
         }
       });
+    });
+
+    // 조 전체 기준 최종 전원 출근 확인. Groq가 성공했든 fallback이든 동일한 기준으로 검사한다.
+    ["DAY", "NIGHT"].forEach((g) => {
+      const groupStaff = nonAdmin.filter((st) => g === "NIGHT" ? st.group === "night" : st.group !== "night");
+      const totalGroup = groupStaff.length;
+      if (totalGroup <= 0) return;
+      const allWorkingDays = [];
+      for (let d = 1; d <= daysInMonth; d++) {
+        let workingCount = 0;
+        groupStaff.forEach((st) => {
+          const dateKey = scheduleDateKey(year, monthIndex, d);
+          const rec = scheduleData.records[scheduleRecordKey(st.id, dateKey)];
+          const set = planByIdForRepair.get(st.id);
+          const isOff = (set && set.has(d)) || (rec && !scheduleAutoIsWorkRecord(rec));
+          if (!isOff) workingCount++;
+        });
+        if (workingCount === totalGroup) allWorkingDays.push(`${monthLabelNo}/${d}`);
+      }
+      if (allWorkingDays.length) warnings.push(`${g === "NIGHT" ? "야간" : "주간"} 구분에 모든 인원이 출근하는 날이 남아 있어요: ${allWorkingDays.join(", ")}. 기존 입력 일정 또는 최소 출근 인원 조건 때문에 자동 해소할 수 없는 날입니다.`);
     });
 
     // 대전제 최종 확인: 배정을 끝낸 뒤에도 출근 인원이 3명 미만인 날이 있는지 구분별로 알려준다.
@@ -1480,6 +1520,25 @@
       }
     }));
 
+    // 조(DAY/NIGHT) 전체 인원의 전원 출근을 별도 하드 조건으로 집계한다.
+    // 기존 allWorkingDays는 채팅/유선별 집계였기 때문에, 한 조 전체의 전원 출근을 놓칠 수 있었다.
+    let groupAllWorkingDays = 0;
+    ["DAY", "NIGHT"].forEach((g) => {
+      const groupStaff = nonAdmin.filter((st) => g === "NIGHT" ? st.group === "night" : st.group !== "night");
+      const totalGroup = groupStaff.length;
+      for (let d = 1; d <= daysInMonth; d++) {
+        let workingCount = 0;
+        groupStaff.forEach((st) => {
+          const dateKey = scheduleDateKey(year, monthIndex, d);
+          const rec = scheduleData.records[scheduleRecordKey(st.id, dateKey)];
+          const set = assignedByStaff.get(st.id);
+          const isOff = (set && set.has(d)) || (rec && !scheduleAutoIsWorkRecord(rec));
+          if (!isOff) workingCount++;
+        });
+        if (totalGroup > 0 && workingCount === totalGroup) groupAllWorkingDays++;
+      }
+    });
+
     const offByDay = new Array(daysInMonth + 1).fill(0);
     plan.perStaffPlan.forEach((p) => p.assigned.forEach((d) => { offByDay[d] += 1; }));
     const offMean = daysInMonth ? offByDay.slice(1).reduce((a, b) => a + b, 0) / daysInMonth : 0;
@@ -1488,7 +1547,7 @@
     return {
       totalAssigned: plan.perStaffPlan.reduce((sum, p) => sum + p.assigned.length, 0),
       protectedOverlap, targetShortage, workViolationRuns, offViolationRuns, offViolationExcess,
-      minWorkingViolations, toleranceViolations, allWorkingDays, prefHits, prefTotal,
+      minWorkingViolations, toleranceViolations, allWorkingDays, groupAllWorkingDays, prefHits, prefTotal,
       workPrefAvoided, workPrefTotal, offVariance, totalSlack,
       warningCount: Array.isArray(plan.warnings) ? plan.warnings.length : 0,
     };
@@ -1497,7 +1556,7 @@
   function scheduleAutoMetricsNotWorseThanBase(candidate, base) {
     const hardKeys = [
       "protectedOverlap", "workViolationRuns", "offViolationRuns", "offViolationExcess",
-      "minWorkingViolations", "toleranceViolations", "allWorkingDays", "targetShortage",
+      "minWorkingViolations", "toleranceViolations", "allWorkingDays", "groupAllWorkingDays", "targetShortage",
     ];
     return hardKeys.every((key) => Number(candidate[key] || 0) <= Number(base[key] || 0));
   }
@@ -1511,11 +1570,13 @@
       preferenceTotal: m.prefTotal,
       workPreferenceConflicts: m.workPrefAvoided,
       workPreferenceTotal: m.workPrefTotal,
+      allWorkingDays: m.allWorkingDays,
       offVariance: Number(m.offVariance.toFixed(4)),
       staffingSlack: m.totalSlack,
       warnings: m.warningCount,
+      groupAllWorkingDays: m.groupAllWorkingDays,
     }));
-    return `당신은 월별 직원 스케줄의 후보 선택기입니다. 이미 프로그램이 기존 배치 규칙을 적용해 만든 후보들 중 하나만 선택합니다. 새 일정을 만들거나 기존 일정을 수정하지 마세요.\n\n절대 조건: candidate 번호 외에는 어떤 값도 변경하지 않습니다. 필휴, 연차, 기존 입력 일정, 최소 출근 인원, 필요인력 허용범위, 연속근무/연속오프 제한, 모든 인원 출근 방지 조건을 완화하거나 예외 처리할 수 없습니다. 후보 자체가 이 조건을 깨는 정도가 기준 후보보다 나쁘면 선택하지 마세요.\n\n선택 우선순위: 1) 위 절대 조건이 기준 후보보다 나쁘지 않을 것 2) 선호 오프는 많이, 선호 출근 충돌은 적게 3) 목표 오프 충족 4) 오프 분산 5) 필요인력 여유와 경고 수. 동률이면 candidate 번호가 작은 것을 선택하세요.\n\n후보 데이터:\n${JSON.stringify(compact)}\n\n반드시 JSON 한 줄만 반환하세요. 형식: {"candidate": 0}`;
+    return `당신은 월별 직원 스케줄의 후보 선택기입니다. 이미 프로그램이 기존 배치 규칙을 적용해 만든 후보들 중 하나만 선택합니다. 새 일정을 만들거나 기존 일정을 수정하지 마세요.\n\n절대 조건: candidate 번호 외에는 어떤 값도 변경하지 않습니다. 특히 groupAllWorkingDays가 기준 후보에서 0이면 반드시 0인 후보만 선택하고, 0보다 큰 후보는 절대 선택하지 마세요. 업무구분별 allWorkingDays도 기준 후보보다 나쁘게 만들지 마세요. 필휴, 연차, 기존 입력 일정, 최소 출근 인원, 필요인력 허용범위, 연속근무/연속오프 제한, 모든 인원 출근 방지 조건을 완화하거나 예외 처리할 수 없습니다. 후보 자체가 이 조건을 깨는 정도가 기준 후보보다 나쁘면 선택하지 마세요.\n\n선택 우선순위: 1) 위 절대 조건이 기준 후보보다 나쁘지 않을 것 2) 선호 오프는 많이, 선호 출근 충돌은 적게 3) 목표 오프 충족 4) 오프 분산 5) 필요인력 여유와 경고 수. 동률이면 candidate 번호가 작은 것을 선택하세요.\n\n후보 데이터:\n${JSON.stringify(compact)}\n\n반드시 JSON 한 줄만 반환하세요. 형식: {"candidate": 0}`;
   }
 
   function scheduleAutoParseCandidateChoice(data, count) {

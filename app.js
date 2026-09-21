@@ -12712,64 +12712,84 @@
         let fixedOne = false;
         for (const g of ["DAY", "NIGHT"]) {
           if (fixedOne) break;
-          for (const t of TYPES) {
-            const groupStaff = nonAdmin.filter((st) => (g === "NIGHT" ? st.group === "night" : st.group !== "night") && (st.types || []).indexOf(t) !== -1);
-            const total = groupStaff.length;
-            if (total <= 0) continue;
-            for (let d = 1; d <= daysInMonth; d++) {
-              if (currentWorking[g][t][d] !== total) continue;
-              const targetDateKey = scheduleDateKey(year, monthIndex, d);
-              const minWorking = Number(minWorkingByGroup[scheduleAutoMinWorkingKey(g, t)] ?? SCHEDULE_AUTO_MIN_WORKING);
-              const targetReq = required[g][t][d];
-              const targetDow = new Date(year, monthIndex, d).getDay();
-              const targetTol = scheduleAutoToleranceInfo(targetDow, targetDateKey);
-              const targetAfter = total - 1;
-              if (targetAfter < minWorking) continue;
-              // 전원 출근 상태를 해소하는 것이 이 보정 단계의 목적이다.
-              // 따라서 이 인원에게 OFF를 넣었을 때 생기는 -1 부족은 요일별 기본 허용범위와
-              // 무관하게 여기서만 예외적으로 허용한다. (최소 출근 인원은 절대 깨지 않는다.)
-              // 이는 위 후보 선정 단계의 `effectiveMax = max(tol.max, 1)`과 동일한 규칙이다.
-              const targetEffectiveMax = Math.max(Number(targetTol.max || 0), 1);
-              if (targetReq !== null && targetReq !== undefined && targetReq - targetAfter > targetEffectiveMax) continue;
+          // 전원 출근의 기준은 조(DAY/NIGHT) 전체 인원이다. 채팅/유선 중 한 업무의
+          // 일부 인원만 전원 출근인 것은 '구분 전체 전원 출근'으로 보지 않는다.
+          const groupStaff = nonAdmin.filter((st) => g === "NIGHT" ? st.group === "night" : st.group !== "night");
+          const total = groupStaff.length;
+          if (total <= 0) continue;
 
-              for (const st of groupStaff) {
-                const plan = perStaffPlan.find((x) => x.staffId === st.id);
-                if (!plan) continue;
-                const assigned = new Set(plan.assigned);
-                const targetKey = scheduleRecordKey(st.id, targetDateKey);
-                if (assigned.has(d) || Object.prototype.hasOwnProperty.call(scheduleData.records, targetKey)) continue;
+          for (let d = 1; d <= daysInMonth; d++) {
+            const targetDateKey = scheduleDateKey(year, monthIndex, d);
+            let groupWorking = 0;
+            for (const st of groupStaff) {
+              const rec = scheduleData.records[scheduleRecordKey(st.id, targetDateKey)];
+              const set = planByIdForRepair.get(st.id);
+              const isOff = (set && set.has(d)) || (rec && !scheduleAutoIsWorkRecord(rec));
+              if (!isOff) groupWorking++;
+            }
+            if (groupWorking !== total) continue;
 
-                for (const sourceDay of plan.assigned.slice()) {
-                  if (sourceDay === d) continue;
-                  const sourceDateKey = scheduleDateKey(year, monthIndex, sourceDay);
-                  const sourceKey = scheduleRecordKey(st.id, sourceDateKey);
-                  if (Object.prototype.hasOwnProperty.call(scheduleData.records, sourceKey)) continue;
+            const targetDow = new Date(year, monthIndex, d).getDay();
+            // 이 조의 전원 출근을 해소할 사람을 찾되, 그 사람의 모든 업무구분에서
+            // 최소 출근 인원과 전원 출근 해소용 허용범위를 함께 확인한다.
+            for (const st of groupStaff) {
+              const plan = perStaffPlan.find((x) => x.staffId === st.id);
+              if (!plan) continue;
+              const assigned = new Set(plan.assigned);
+              const targetKey = scheduleRecordKey(st.id, targetDateKey);
+              if (assigned.has(d) || Object.prototype.hasOwnProperty.call(scheduleData.records, targetKey)) continue;
 
-                  // OFF를 옮기면 원래 OFF 날짜는 출근으로 바뀐다. 그 날짜가 모두 출근이
-                  // 되는 교환은 허용하지 않는다.
-                  if (currentWorking[g][t][sourceDay] + 1 >= total) continue;
-
-                  const next = new Set(assigned);
-                  next.delete(sourceDay);
-                  next.add(d);
-                  if (!autoPlanValidSet(st.id, next)) continue;
-
-                  plan.assigned = Array.from(next).sort((a, b) => a - b);
-                  planByIdForRepair.set(st.id, new Set(plan.assigned));
-                  if (plan.prefDows) {
-                    const pref = new Set(plan.prefDows);
-                    plan.prefHits = plan.assigned.filter((x) => pref.has(new Date(year, monthIndex, x).getDay())).length;
-                  }
-                  if (plan.workPrefDows) {
-                    const wp = new Set(plan.workPrefDows);
-                    plan.workPrefHits = plan.assigned.filter((x) => !wp.has(new Date(year, monthIndex, x).getDay())).length;
-                  }
-                  repaired++;
-                  fixedOne = true;
-                  changed = true;
-                  break;
+              let targetSafe = true;
+              for (const t of TYPES) {
+                if ((st.types || []).indexOf(t) === -1) continue;
+                const typeWorking = currentWorking[g][t][d];
+                const minWorking = Number(minWorkingByGroup[scheduleAutoMinWorkingKey(g, t)] ?? SCHEDULE_AUTO_MIN_WORKING);
+                if (typeWorking - 1 < minWorking) { targetSafe = false; break; }
+                const targetReq = required[g][t][d];
+                if (targetReq !== null && targetReq !== undefined) {
+                  const tol = scheduleAutoToleranceInfo(targetDow, targetDateKey);
+                  const effectiveMax = Math.max(Number(tol.max || 0), 1);
+                  if (targetReq - (typeWorking - 1) > effectiveMax) { targetSafe = false; break; }
                 }
-                if (fixedOne) break;
+              }
+              if (!targetSafe) continue;
+
+              for (const sourceDay of plan.assigned.slice()) {
+                if (sourceDay === d) continue;
+                const sourceDateKey = scheduleDateKey(year, monthIndex, sourceDay);
+                const sourceKey = scheduleRecordKey(st.id, sourceDateKey);
+                if (Object.prototype.hasOwnProperty.call(scheduleData.records, sourceKey)) continue;
+
+                // OFF를 원래 날짜에서 빼면 그 날짜에 전원 출근이 생기는 교환은 금지한다.
+                let sourceWouldBeAllWorking = true;
+                for (const sourceStaff of groupStaff) {
+                  const sourceRec = scheduleData.records[scheduleRecordKey(sourceStaff.id, sourceDateKey)];
+                  const sourceSet = planByIdForRepair.get(sourceStaff.id);
+                  const sourceIsOff = (sourceSet && sourceSet.has(sourceDay)) || (sourceRec && !scheduleAutoIsWorkRecord(sourceRec));
+                  if (sourceStaff.id === st.id) continue;
+                  if (sourceIsOff) { sourceWouldBeAllWorking = false; break; }
+                }
+                if (sourceWouldBeAllWorking) continue;
+
+                const next = new Set(assigned);
+                next.delete(sourceDay);
+                next.add(d);
+                if (!autoPlanValidSet(st.id, next)) continue;
+
+                plan.assigned = Array.from(next).sort((x, y) => x - y);
+                planByIdForRepair.set(st.id, new Set(plan.assigned));
+                if (plan.prefDows) {
+                  const pref = new Set(plan.prefDows);
+                  plan.prefHits = plan.assigned.filter((x) => pref.has(new Date(year, monthIndex, x).getDay())).length;
+                }
+                if (plan.workPrefDows) {
+                  const wp = new Set(plan.workPrefDows);
+                  plan.workPrefHits = plan.assigned.filter((x) => !wp.has(new Date(year, monthIndex, x).getDay())).length;
+                }
+                repaired++;
+                fixedOne = true;
+                changed = true;
+                break;
               }
               if (fixedOne) break;
             }
@@ -12823,6 +12843,26 @@
           warnings.push(`${label} 구분에 모든 인원이 출근하는 날이 남아 있어요: ${allWorkingDays.join(", ")}. 기존 일정 또는 출근 최소 인원 조건 때문에 자동으로 해소할 수 없는 날입니다.`);
         }
       });
+    });
+
+    // 조 전체 기준 최종 전원 출근 확인. Groq가 성공했든 fallback이든 동일한 기준으로 검사한다.
+    ["DAY", "NIGHT"].forEach((g) => {
+      const groupStaff = nonAdmin.filter((st) => g === "NIGHT" ? st.group === "night" : st.group !== "night");
+      const totalGroup = groupStaff.length;
+      if (totalGroup <= 0) return;
+      const allWorkingDays = [];
+      for (let d = 1; d <= daysInMonth; d++) {
+        let workingCount = 0;
+        groupStaff.forEach((st) => {
+          const dateKey = scheduleDateKey(year, monthIndex, d);
+          const rec = scheduleData.records[scheduleRecordKey(st.id, dateKey)];
+          const set = planByIdForRepair.get(st.id);
+          const isOff = (set && set.has(d)) || (rec && !scheduleAutoIsWorkRecord(rec));
+          if (!isOff) workingCount++;
+        });
+        if (workingCount === totalGroup) allWorkingDays.push(`${monthLabelNo}/${d}`);
+      }
+      if (allWorkingDays.length) warnings.push(`${g === "NIGHT" ? "야간" : "주간"} 구분에 모든 인원이 출근하는 날이 남아 있어요: ${allWorkingDays.join(", ")}. 기존 입력 일정 또는 최소 출근 인원 조건 때문에 자동 해소할 수 없는 날입니다.`);
     });
 
     // 대전제 최종 확인: 배정을 끝낸 뒤에도 출근 인원이 3명 미만인 날이 있는지 구분별로 알려준다.
@@ -13385,6 +13425,25 @@
       }
     }));
 
+    // 조(DAY/NIGHT) 전체 인원의 전원 출근을 별도 하드 조건으로 집계한다.
+    // 기존 allWorkingDays는 채팅/유선별 집계였기 때문에, 한 조 전체의 전원 출근을 놓칠 수 있었다.
+    let groupAllWorkingDays = 0;
+    ["DAY", "NIGHT"].forEach((g) => {
+      const groupStaff = nonAdmin.filter((st) => g === "NIGHT" ? st.group === "night" : st.group !== "night");
+      const totalGroup = groupStaff.length;
+      for (let d = 1; d <= daysInMonth; d++) {
+        let workingCount = 0;
+        groupStaff.forEach((st) => {
+          const dateKey = scheduleDateKey(year, monthIndex, d);
+          const rec = scheduleData.records[scheduleRecordKey(st.id, dateKey)];
+          const set = assignedByStaff.get(st.id);
+          const isOff = (set && set.has(d)) || (rec && !scheduleAutoIsWorkRecord(rec));
+          if (!isOff) workingCount++;
+        });
+        if (totalGroup > 0 && workingCount === totalGroup) groupAllWorkingDays++;
+      }
+    });
+
     const offByDay = new Array(daysInMonth + 1).fill(0);
     plan.perStaffPlan.forEach((p) => p.assigned.forEach((d) => { offByDay[d] += 1; }));
     const offMean = daysInMonth ? offByDay.slice(1).reduce((a, b) => a + b, 0) / daysInMonth : 0;
@@ -13393,7 +13452,7 @@
     return {
       totalAssigned: plan.perStaffPlan.reduce((sum, p) => sum + p.assigned.length, 0),
       protectedOverlap, targetShortage, workViolationRuns, offViolationRuns, offViolationExcess,
-      minWorkingViolations, toleranceViolations, allWorkingDays, prefHits, prefTotal,
+      minWorkingViolations, toleranceViolations, allWorkingDays, groupAllWorkingDays, prefHits, prefTotal,
       workPrefAvoided, workPrefTotal, offVariance, totalSlack,
       warningCount: Array.isArray(plan.warnings) ? plan.warnings.length : 0,
     };
@@ -13402,7 +13461,7 @@
   function scheduleAutoMetricsNotWorseThanBase(candidate, base) {
     const hardKeys = [
       "protectedOverlap", "workViolationRuns", "offViolationRuns", "offViolationExcess",
-      "minWorkingViolations", "toleranceViolations", "allWorkingDays", "targetShortage",
+      "minWorkingViolations", "toleranceViolations", "allWorkingDays", "groupAllWorkingDays", "targetShortage",
     ];
     return hardKeys.every((key) => Number(candidate[key] || 0) <= Number(base[key] || 0));
   }
@@ -13416,11 +13475,13 @@
       preferenceTotal: m.prefTotal,
       workPreferenceConflicts: m.workPrefAvoided,
       workPreferenceTotal: m.workPrefTotal,
+      allWorkingDays: m.allWorkingDays,
       offVariance: Number(m.offVariance.toFixed(4)),
       staffingSlack: m.totalSlack,
       warnings: m.warningCount,
+      groupAllWorkingDays: m.groupAllWorkingDays,
     }));
-    return `당신은 월별 직원 스케줄의 후보 선택기입니다. 이미 프로그램이 기존 배치 규칙을 적용해 만든 후보들 중 하나만 선택합니다. 새 일정을 만들거나 기존 일정을 수정하지 마세요.\n\n절대 조건: candidate 번호 외에는 어떤 값도 변경하지 않습니다. 필휴, 연차, 기존 입력 일정, 최소 출근 인원, 필요인력 허용범위, 연속근무/연속오프 제한, 모든 인원 출근 방지 조건을 완화하거나 예외 처리할 수 없습니다. 후보 자체가 이 조건을 깨는 정도가 기준 후보보다 나쁘면 선택하지 마세요.\n\n선택 우선순위: 1) 위 절대 조건이 기준 후보보다 나쁘지 않을 것 2) 선호 오프는 많이, 선호 출근 충돌은 적게 3) 목표 오프 충족 4) 오프 분산 5) 필요인력 여유와 경고 수. 동률이면 candidate 번호가 작은 것을 선택하세요.\n\n후보 데이터:\n${JSON.stringify(compact)}\n\n반드시 JSON 한 줄만 반환하세요. 형식: {"candidate": 0}`;
+    return `당신은 월별 직원 스케줄의 후보 선택기입니다. 이미 프로그램이 기존 배치 규칙을 적용해 만든 후보들 중 하나만 선택합니다. 새 일정을 만들거나 기존 일정을 수정하지 마세요.\n\n절대 조건: candidate 번호 외에는 어떤 값도 변경하지 않습니다. 특히 groupAllWorkingDays가 기준 후보에서 0이면 반드시 0인 후보만 선택하고, 0보다 큰 후보는 절대 선택하지 마세요. 업무구분별 allWorkingDays도 기준 후보보다 나쁘게 만들지 마세요. 필휴, 연차, 기존 입력 일정, 최소 출근 인원, 필요인력 허용범위, 연속근무/연속오프 제한, 모든 인원 출근 방지 조건을 완화하거나 예외 처리할 수 없습니다. 후보 자체가 이 조건을 깨는 정도가 기준 후보보다 나쁘면 선택하지 마세요.\n\n선택 우선순위: 1) 위 절대 조건이 기준 후보보다 나쁘지 않을 것 2) 선호 오프는 많이, 선호 출근 충돌은 적게 3) 목표 오프 충족 4) 오프 분산 5) 필요인력 여유와 경고 수. 동률이면 candidate 번호가 작은 것을 선택하세요.\n\n후보 데이터:\n${JSON.stringify(compact)}\n\n반드시 JSON 한 줄만 반환하세요. 형식: {"candidate": 0}`;
   }
 
   function scheduleAutoParseCandidateChoice(data, count) {
@@ -13697,1485 +13758,6 @@
     setTimeout(() => document.addEventListener("keydown", scheduleAutoEscHandler, true), 0);
   }
 
-  /* ===================== 홈 카드 배치(드래그로 순서 변경) =====================
-     사용자가 카드를 원하는 위치로 옮기면 그 배치를 계정별로 저장해서 다음에
-     들어와도 유지되게 한다. 계정 데이터라 클라우드 동기화 대상에도 자동으로
-     포함된다(CLOUD_EXCLUDED_KEYS에 없는 키라서). */
-  const HOME_LAYOUT_KEY = acctKey("home:card-layout");
-  const HOME_CARD_IDS = ["status", "calendar", "interviews", "todos", "notes", "qa"];
-  function defaultHomeLayout() {
-    return [["status", "qa"], ["calendar", "interviews"], ["todos", "notes"]];
-  }
-  function loadHomeLayout() {
-    try {
-      const raw = localStorage.getItem(HOME_LAYOUT_KEY);
-      if (!raw) return defaultHomeLayout();
-      const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed) || parsed.length === 0) return defaultHomeLayout();
-      const cleaned = parsed.map((col) => (Array.isArray(col) ? col.filter((id) => HOME_CARD_IDS.includes(id)) : []));
-      const flat = cleaned.flat();
-      const missing = HOME_CARD_IDS.filter((id) => !flat.includes(id));
-      if (missing.length) cleaned[0] = (cleaned[0] || []).concat(missing); // 새로 생긴 카드 종류는 첫 칸에 추가
-      while (cleaned.length < 3) cleaned.push([]);
-      return cleaned;
-    } catch (e) { return defaultHomeLayout(); }
-  }
-  function saveHomeLayout(layout) {
-    try { localStorage.setItem(HOME_LAYOUT_KEY, JSON.stringify(layout)); } catch (e) {}
-  }
-  function bindHomeCardDrag(grid) {
-    if (!grid) return;
-    grid.querySelectorAll("[data-drag-handle]").forEach((handle) => {
-      handle.addEventListener("pointerdown", (e) => {
-        if (e.button !== undefined && e.button !== 0) return;
-        const card = handle.closest(".card[data-home-card]");
-        if (!card) return;
-        e.preventDefault();
-        const rect = card.getBoundingClientRect();
-        const offsetX = e.clientX - rect.left, offsetY = e.clientY - rect.top;
-        // 진입 애니메이션(opacity 0→1, forwards)을 끄면 카드가 애니메이션 시작 전 값인
-        // opacity:0으로 되돌아가버려서 드래그 중 안 보이게 된다. 애니메이션은 끄되
-        // opacity는 명시적으로 1로 고정해서 카드가 계속 보이게 한다.
-        card.style.animation = "none";
-        card.style.opacity = "1";
-        const placeholder = document.createElement("div");
-        placeholder.className = "home-card-placeholder";
-        placeholder.style.height = rect.height + "px";
-        card.parentNode.insertBefore(placeholder, card.nextSibling);
-        card.classList.add("dragging");
-        Object.assign(card.style, {
-          position: "fixed", width: rect.width + "px", left: rect.left + "px", top: rect.top + "px", zIndex: 500,
-        });
-        document.body.classList.add("home-card-drag-active");
-
-        function onMove(ev) {
-          card.style.left = (ev.clientX - offsetX) + "px";
-          card.style.top = (ev.clientY - offsetY) + "px";
-          card.style.pointerEvents = "none";
-          const elUnder = document.elementFromPoint(ev.clientX, ev.clientY);
-          card.style.pointerEvents = "";
-          if (!elUnder) return;
-          const overCard = elUnder.closest(".card[data-home-card]");
-          const overCol = elUnder.closest(".home-col");
-          if (overCard && overCard !== card) {
-            const rectOver = overCard.getBoundingClientRect();
-            const before = (ev.clientY - rectOver.top) < rectOver.height / 2;
-            overCard.parentNode.insertBefore(placeholder, before ? overCard : overCard.nextSibling);
-          } else if (overCol && !overCard) {
-            overCol.appendChild(placeholder);
-          }
-        }
-        function onUp() {
-          document.removeEventListener("pointermove", onMove);
-          document.removeEventListener("pointerup", onUp);
-          document.body.classList.remove("home-card-drag-active");
-          placeholder.parentNode.insertBefore(card, placeholder);
-          placeholder.remove();
-          card.classList.remove("dragging");
-          Object.assign(card.style, { position: "", width: "", left: "", top: "", zIndex: "" });
-          const newLayout = Array.from(grid.querySelectorAll(".home-col")).map((col) =>
-            Array.from(col.querySelectorAll(".card[data-home-card]")).map((c) => c.getAttribute("data-home-card"))
-          );
-          saveHomeLayout(newLayout);
-        }
-        document.addEventListener("pointermove", onMove);
-        document.addEventListener("pointerup", onUp, { once: true });
-      });
-    });
-  }
-
-  function renderHomePage(root) {
-    const y = today.getFullYear(), m = today.getMonth(), d = today.getDate();
-    const iso = todayISO();
-    const holiday = getHoliday(iso);
-    const wd = WEEKDAYS[today.getDay()];
-
-    /* ---- 오늘 근무 현황 (월별 스케줄 데이터 기준) ---- */
-    const staffList = getStaffListForMonth(y, m).filter((s) => !s.isAdmin);
-    const dateKey = scheduleDateKey(y, m, d);
-    const staffToday = staffList.map((s) => {
-      const record = getScheduleRecord(s.id, dateKey);
-      return Object.assign({}, s, { record });
-    });
-    const working = staffToday.filter((s) => scheduleCountsAsWorked(s.record));
-    const lateList = working.filter((s) => s.record.attendance === "LATE");
-    const absentList = staffToday.filter((s) => s.record.status === "WORK" && s.record.attendance === "ABSENT");
-    const offList = staffToday.filter((s) => s.record.status !== "WORK");
-    const dayWorking = sortStaffByType(working.filter((s) => s.group !== "night"));
-    const nightWorking = sortStaffByType(working.filter((s) => s.group === "night"));
-
-    function staffRowHtml(s) {
-      const flags = [];
-      if (s.record.attendance === "LATE") flags.push('<span class="flag late">지각</span>');
-      if (s.record.attendance === "ABSENT") flags.push('<span class="flag absent">결근</span>');
-      if (s.record.status !== "WORK") {
-        const meta = SCHEDULE_STATUS_META[s.record.status];
-        flags.push(`<span class="flag off">${esc(meta ? meta.label : "휴무")}</span>`);
-      }
-      const typeBadges = (s.types || []).map((t) => `<span class="badge sm ${t === "유선" ? "voice" : "chat"}">${esc(t)}</span>`).join("");
-      const ldapText = s.nickname && s.nickname !== s.name ? s.nickname : "";
-      return `
-        <div class="home-staff-row ${s.record.status !== "WORK" ? "is-off" : ""}">
-          <span class="name">${esc(s.name)}</span>
-          ${ldapText ? `<span class="ldap">${esc(ldapText)}</span>` : ""}
-          ${typeBadges}
-          <span class="spacer"></span>
-          ${flags.join("")}
-        </div>`;
-    }
-
-    let scheduleSectionHtml;
-    if (staffList.length === 0) {
-      scheduleSectionHtml = `<div class="home-empty">등록된 상담사가 없어요.<br>"상담사 관리"에서 추가해보세요.</div>`;
-    } else {
-      const parts = [];
-      if (dayWorking.length) parts.push(`<div class="staff-group-label">${ICON_SUN} 주간 근무 (${dayWorking.length}명)</div><div class="home-staff-list">${dayWorking.map(staffRowHtml).join("")}</div>`);
-      if (nightWorking.length) parts.push(`<div class="staff-group-label">${ICON_MOON} 야간 근무 (${nightWorking.length}명)</div><div class="home-staff-list">${nightWorking.map(staffRowHtml).join("")}</div>`);
-      if (absentList.length) parts.push(`<div class="staff-group-label">결근</div><div class="home-staff-list">${absentList.map(staffRowHtml).join("")}</div>`);
-      if (parts.length === 0) parts.push(`<div class="home-empty">오늘 근무 인원이 없어요.</div>`);
-      scheduleSectionHtml = parts.join("");
-    }
-
-    /* ---- 오늘 일정 (캘린더) ---- */
-    const todayEntries = sortEntries(readMonthRaw(y, m)[pad2(d)] || []);
-    const entriesHtml = todayEntries.length === 0
-      ? `<div class="home-empty">오늘 등록된 일정이 없어요.</div>`
-      : `<div class="home-entry-list">${todayEntries.map((e) => `
-        <div class="home-entry-row ${e.type === "event" ? "event" : ""}">
-          ${e.priority && !e.done ? '<span class="star">★</span>' : ""}
-          ${e.time ? `<span class="time">${esc(e.time)}</span>` : ""}
-          <span class="text" style="${e.done ? "text-decoration:line-through;color:var(--text-faint);" : ""}">${esc(e.text)}</span>
-        </div>`).join("")}</div>`;
-
-    /* ---- 할 일: 오늘 마감이거나 이미 지난 할 일 ---- */
-    const todoRelevant = todos
-      .filter((t) => !t.done && (!t.due || t.due <= iso))
-      .sort((a, b) => (a.due || "").localeCompare(b.due || ""));
-    const remainingCount = todos.filter((t) => !t.done).length;
-    const todoHtml = todoRelevant.length === 0
-      ? `<div class="home-empty">오늘까지 마감인 할 일이 없어요.</div>`
-      : `<div class="home-todo-list">${todoRelevant.slice(0, 6).map((t) => {
-          const isOver = t.due && t.due < iso;
-          return `<div class="home-todo-row">
-            <button type="button" class="check-btn" data-home-todo-toggle="${t.id}" aria-label="완료 표시"></button>
-            <span>${esc(t.text)}</span>
-            ${t.due ? `<span class="due ${isOver ? "over" : ""}">${formatTodoDue(t.due)}${isOver ? " · 지남" : " · 오늘"}</span>` : ""}
-          </div>`;
-        }).join("")}</div>`;
-
-    /* ---- 고정 메모 ---- */
-    const pinnedNotes = notesData.pinnedOrder.map((id) => notesData.notes[id]).filter(Boolean);
-    const notesHtml = pinnedNotes.length === 0
-      ? `<div class="home-empty">고정된 메모가 없어요.</div>`
-      : `<div class="home-note-list">${pinnedNotes.slice(0, 5).map((n) => `
-          <div class="home-note-row" data-note-nav="notes">
-            <div>${esc(n.title)}</div>
-            ${n.content ? `<div class="snippet">${esc(n.content)}</div>` : ""}
-          </div>`).join("")}</div>`;
-
-    const totalAgents = agentsData.filter((a) => a.status !== "RESIGNED").length;
-
-    /* ---- 장기 미면담 상담사 (최근 3주 = 21일 이내 면담 기록이 없는 경우) ---- */
-    const NO_INTERVIEW_DAYS = 21;
-    const activeAgents = agentsData.filter((a) => a.status !== "RESIGNED" && !a.isAdmin);
-    const staleInterviewAgents = activeAgents.map((a) => {
-      const records = interviewsData.filter((r) => r.agentId === a.id && r.date);
-      const lastDate = records.length ? records.map((r) => r.date).sort().slice(-1)[0] : null;
-      return { agent: a, lastDate };
-    }).filter((x) => !x.lastDate || x.lastDate < addDaysISO(iso, -NO_INTERVIEW_DAYS))
-      .sort((x, y) => (x.lastDate || "").localeCompare(y.lastDate || ""));
-    const INTERVIEW_ALERT_VISIBLE = 5;
-    const interviewAlertHasMore = staleInterviewAgents.length > INTERVIEW_ALERT_VISIBLE;
-    const interviewAlertShown = homeUi.interviewAlertExpanded
-      ? staleInterviewAgents
-      : staleInterviewAgents.slice(0, INTERVIEW_ALERT_VISIBLE);
-    const staleInterviewHtml = staleInterviewAgents.length === 0
-      ? `<div class="home-empty">최근 ${NO_INTERVIEW_DAYS}일 내 면담 기록이 없는 상담사가 없어요.</div>`
-      : `<div class="home-staff-list">${interviewAlertShown.map((x) => `
-          <div class="home-staff-row">
-            <span class="name">${esc(x.agent.name)}</span>
-            <span class="spacer"></span>
-            <span class="flag late">${x.lastDate ? `마지막 면담 ${x.lastDate}` : "면담 기록 없음"}</span>
-          </div>`).join("")}</div>${interviewAlertHasMore ? `
-          <button class="home-more-btn" id="btn-interview-alert-toggle" type="button">
-            ${homeUi.interviewAlertExpanded ? "접기 ▲" : `전체 ${staleInterviewAgents.length}명 보기 ▾`}
-          </button>` : ""}`;
-
-    /* ---- QA(품질 관리) 전체 평균 점수 ----
-       이번 달 점수가 아직 입력 안 된 경우가 많으므로(달이 막 바뀐 시점 등),
-       이번 달부터 거꾸로 훑어서 점수가 입력된 가장 최근 달을 찾아 보여준다. */
-    const qaAgentsList = qaWorkingAgents(y, m);
-    const qaLatest = qaHomeFindLatestMonthWithData(qaAgentsList, y, m);
-    let qaSummaryHtml;
-    if (!qaLatest) {
-      qaSummaryHtml = `<div class="home-empty">최근 QA 점수가 아직 없어요.</div>`;
-    } else {
-      const qaPrevYm = qaPrevMonth(qaLatest.year, qaLatest.monthIndex);
-      const qaStatsPrev = qaComputeStats(qaAgentsList, qaPrevYm.year, qaPrevYm.monthIndex);
-      const qaHomeDiff = qaStatDiff(qaLatest.stats.total, qaStatsPrev.total);
-      const qaHomeDiffHtml = qaHomeDiff ? ` <span class="qa-stat-diff ${qaHomeDiff.cls}">${qaHomeDiff.sign} ${qaHomeDiff.abs.toFixed(1)}</span>` : "";
-      const qaIsCurrentMonth = qaLatest.year === y && qaLatest.monthIndex === m;
-      qaSummaryHtml = `<div class="home-qa-summary">
-          <div class="home-qa-score">${qaLatest.stats.total.toFixed(1)}<span class="home-qa-score-unit">점</span></div>
-          <div class="home-qa-sub">${qaIsCurrentMonth ? "" : `${qaLatest.year}년 `}${qaLatest.monthIndex + 1}월 전체 평균${qaHomeDiffHtml}</div>
-        </div>`;
-    }
-    const qaHomeTrendHtml = qaHomeTrendSvgHtml(qaAgentsList, y, m);
-    if (qaHomeTrendHtml) qaSummaryHtml += qaHomeTrendHtml;
-
-    /* ---- 카드별 제목/링크/내용 정의 → 저장된 배치 순서대로 조립 ---- */
-    const cardMeta = {
-      status: { icon: ICON_USERS, label: "오늘 근무 현황", link: { nav: "schedule", label: "스케줄 보기 ›" }, content: scheduleSectionHtml },
-      calendar: { icon: ICON_CALENDAR, label: "오늘 일정", link: { nav: "calendar", label: "캘린더 보기 ›" }, content: entriesHtml },
-      interviews: { icon: ICON_BELL, label: "면담 필요 알림", link: { nav: "interviews", label: "면담일지 보기 ›" }, content: staleInterviewHtml },
-      todos: { icon: ICON_CHECK, label: "할 일", link: null, content: todoHtml },
-      notes: { icon: ICON_PIN, label: "고정 메모", link: { nav: "notes", label: "업무 정리 보기 ›" }, content: notesHtml },
-      qa: { icon: ICON_QA, label: "QA 평균 점수", link: { nav: "qa", label: "품질 관리 보기 ›" }, content: qaSummaryHtml },
-    };
-    function cardHtml(id) {
-      const meta = cardMeta[id];
-      if (!meta) return "";
-      const linkHtml = meta.link ? `<button class="home-section-link" data-nav="${meta.link.nav}">${meta.link.label}</button>` : "";
-      return `
-        <div class="card" data-home-card="${id}">
-          <button type="button" class="home-card-draghandle" data-drag-handle title="드래그해서 순서 바꾸기" aria-label="카드 위치 이동">${ICON_DRAG_HANDLE}</button>
-          <div class="home-section-title"><h3>${meta.icon} ${meta.label}</h3>${linkHtml}</div>
-          ${meta.content}
-        </div>`;
-    }
-    const homeLayout = loadHomeLayout();
-    const homeColumnsHtml = homeLayout.map((colIds, i) => `<div class="home-col" data-home-col="${i}">${colIds.map(cardHtml).join("")}</div>`).join("");
-
-    root.innerHTML = `
-      <div class="card home-hero">
-        <div class="home-hero-top">
-          <div>
-            <div class="home-hero-date">${m + 1}월 ${d}일 <span class="wd">${wd}요일</span></div>
-            <div class="home-hero-sub">오늘 하루를 한눈에 확인해보세요</div>
-          </div>
-          ${holiday ? `<span class="home-holiday-tag">${esc(holiday)}</span>` : ""}
-        </div>
-        <div class="stat-grid">
-          <div class="stat-item ok"><div class="stat-num">${working.length}</div><div class="stat-label">오늘 근무</div></div>
-          <div class="stat-item warn"><div class="stat-num">${lateList.length + absentList.length}</div><div class="stat-label">지각·결근</div></div>
-          <div class="stat-item"><div class="stat-num">${offList.length}</div><div class="stat-label">휴무·연차 등</div></div>
-          <div class="stat-item accent"><div class="stat-num">${remainingCount}</div><div class="stat-label">남은 할 일</div></div>
-          <div class="stat-item"><div class="stat-num">${totalAgents}</div><div class="stat-label">전체 상담사</div></div>
-        </div>
-      </div>
-
-      <div class="home-grid" id="home-card-grid" style="margin-top:20px;">${homeColumnsHtml}</div>
-    `;
-
-    root.querySelectorAll("[data-nav]").forEach((btn) => {
-      btn.onclick = () => setPage(btn.getAttribute("data-nav"));
-    });
-    root.querySelectorAll("[data-note-nav]").forEach((el) => {
-      el.onclick = () => setPage(el.getAttribute("data-note-nav"));
-    });
-    const interviewAlertToggleBtn = document.getElementById("btn-interview-alert-toggle");
-    if (interviewAlertToggleBtn) {
-      interviewAlertToggleBtn.onclick = () => {
-        homeUi.interviewAlertExpanded = !homeUi.interviewAlertExpanded;
-        renderHomePage(root);
-      };
-    }
-    root.querySelectorAll("[data-home-todo-toggle]").forEach((btn) => {
-      btn.onclick = () => {
-        toggleTodoDone(btn.getAttribute("data-home-todo-toggle"));
-        renderHomePage(root);
-      };
-    });
-    bindHomeCardDrag(document.getElementById("home-card-grid"));
-  }
-
-  /* ===================== 오늘의 브리핑 히어로 팝업 =====================
-     로그인 직후 한 번, 홈 화면 위에 "오늘 확인해야 할 것들"을 요약한 카드가
-     애니메이션과 함께 떠오른다. 항목을 누르면 해당 페이지로 이동하면서 닫힌다. */
-  function computeTodayBrief() {
-    const y = today.getFullYear(), m = today.getMonth(), d = today.getDate();
-    const iso = todayISO();
-    const holiday = getHoliday(iso);
-    const wd = WEEKDAYS[today.getDay()];
-
-    const staffList = getStaffListForMonth(y, m).filter((s) => !s.isAdmin);
-    const dateKey = scheduleDateKey(y, m, d);
-    const staffToday = staffList.map((s) => Object.assign({}, s, { record: getScheduleRecord(s.id, dateKey) }));
-    const working = staffToday.filter((s) => scheduleCountsAsWorked(s.record));
-    const lateList = working.filter((s) => s.record.attendance === "LATE");
-    const absentList = staffToday.filter((s) => s.record.status === "WORK" && s.record.attendance === "ABSENT");
-
-    const todayEntries = sortEntries(readMonthRaw(y, m)[pad2(d)] || []);
-
-    const todoRelevant = todos
-      .filter((t) => !t.done && (!t.due || t.due <= iso))
-      .sort((a, b) => (a.due || "").localeCompare(b.due || ""));
-
-    const NO_INTERVIEW_DAYS = 21;
-    const activeAgents = agentsData.filter((a) => a.status !== "RESIGNED" && !a.isAdmin);
-    const staleInterviewAgents = activeAgents
-      .map((a) => {
-        const records = interviewsData.filter((r) => r.agentId === a.id && r.date);
-        const lastDate = records.length ? records.map((r) => r.date).sort().slice(-1)[0] : null;
-        return { agent: a, lastDate };
-      })
-      .filter((x) => !x.lastDate || x.lastDate < addDaysISO(iso, -NO_INTERVIEW_DAYS));
-
-    const pinnedNotes = notesData.pinnedOrder.map((id) => notesData.notes[id]).filter(Boolean);
-
-    return { y, m, d, wd, holiday, staffList, working, lateList, absentList, todayEntries, todoRelevant, staleInterviewAgents, pinnedNotes };
-  }
-
-  function todayBriefRowsHtml(brief) {
-    const rows = [];
-    if (brief.staffList.length > 0) {
-      const troubleCount = brief.lateList.length + brief.absentList.length;
-      rows.push({
-        nav: "schedule",
-        warn: troubleCount > 0,
-        icon: ICON_USERS,
-        title: `오늘 근무 ${brief.working.length}명`,
-        sub: troubleCount > 0 ? `지각 ${brief.lateList.length}명 · 결근 ${brief.absentList.length}명 확인해주세요` : "지각·결근 없이 순조로워요",
-      });
-    }
-    if (brief.todayEntries.length > 0) {
-      const first = brief.todayEntries[0];
-      rows.push({
-        nav: "calendar",
-        warn: false,
-        icon: ICON_CALENDAR,
-        title: `오늘 일정 ${brief.todayEntries.length}건`,
-        sub: first.text ? esc(first.text) : "캘린더에서 자세히 확인해보세요",
-      });
-    }
-    if (brief.staleInterviewAgents.length > 0) {
-      rows.push({
-        nav: "interviews",
-        warn: true,
-        icon: ICON_BELL,
-        title: `면담 필요 상담사 ${brief.staleInterviewAgents.length}명`,
-        sub: "최근 21일간 면담 기록이 없어요",
-      });
-    }
-    if (brief.pinnedNotes.length > 0) {
-      rows.push({
-        nav: "notes",
-        warn: false,
-        icon: ICON_PIN,
-        title: `고정 메모 ${brief.pinnedNotes.length}개`,
-        sub: esc(brief.pinnedNotes[0].title || ""),
-      });
-    }
-    return rows;
-  }
-
-  const TODAY_BRIEF_TODO_VISIBLE = 5;
-  function todayBriefTodoHtml(brief) {
-    const iso = todayISO();
-    const list = brief.todoRelevant;
-    if (list.length === 0) return "";
-    const shown = list.slice(0, TODAY_BRIEF_TODO_VISIBLE);
-    const moreCount = list.length - shown.length;
-    return `
-      <div class="today-brief-section">
-        <div class="today-brief-section-title">${ICON_CHECK} 오늘 할 일 <span>${list.length}개</span></div>
-        <div class="today-brief-todo-list">
-          ${shown.map((t) => {
-            const isOver = !!t.due && t.due < iso;
-            return `
-              <div class="today-brief-todo-item" data-brief-todo-id="${t.id}">
-                <button type="button" class="check-btn" data-brief-todo-toggle="${t.id}" aria-label="완료 표시"></button>
-                <span class="todo-text">${esc(t.text)}</span>
-                ${t.due ? `<span class="todo-due ${isOver ? "over" : "today"}">${formatTodoDue(t.due)}${isOver ? " · 지남" : ""}</span>` : ""}
-              </div>`;
-          }).join("")}
-        </div>
-        ${moreCount > 0 ? `<button type="button" class="today-brief-more" data-brief-nav="calendar">외 ${moreCount}개 더보기 ›</button>` : ""}
-      </div>
-    `;
-  }
-
-  let todayBriefKeyHandler = null;
-  function closeTodayBriefPopup() {
-    const overlay = document.getElementById("today-brief-overlay");
-    if (!overlay) return;
-    if (todayBriefKeyHandler) { document.removeEventListener("keydown", todayBriefKeyHandler); todayBriefKeyHandler = null; }
-    overlay.classList.add("closing");
-    setTimeout(() => overlay.remove(), 200);
-  }
-  function todayBriefCardHtml(brief, rows) {
-    const hasTodo = brief.todoRelevant.length > 0;
-    return `
-      <div class="today-brief-card" role="dialog" aria-modal="true" aria-label="오늘의 브리핑">
-        <button type="button" class="today-brief-close" id="today-brief-close" aria-label="닫기">${ICON_CLOSE_SM}</button>
-        <div class="today-brief-head">
-          <div class="today-brief-badge">${ICON_SUN} 오늘의 브리핑</div>
-          <div class="today-brief-date">${brief.y}년 ${brief.m + 1}월 ${brief.d}일 <span class="wd">${brief.wd}요일</span></div>
-          ${brief.holiday ? `<span class="today-brief-holiday">${esc(brief.holiday)}</span>` : ""}
-        </div>
-        ${(rows.length === 0 && !hasTodo) ? `
-          <div class="today-brief-empty">${ICON_CHECK} 오늘은 특별히 챙길 일이 없어요.<br>편하게 하루를 시작해보세요.</div>
-        ` : `
-          ${hasTodo ? todayBriefTodoHtml(brief) : ""}
-          ${rows.length > 0 ? `
-            <div class="today-brief-rows">
-              ${rows.map((r, i) => `
-                <button type="button" class="today-brief-row ${r.warn ? "warn" : ""}" data-brief-nav="${r.nav}" style="animation-delay:${80 + i * 55}ms">
-                  <span class="today-brief-row-icon">${r.icon}</span>
-                  <span class="today-brief-row-text">
-                    <b>${esc(r.title)}</b>
-                    <span>${r.sub}</span>
-                  </span>
-                  ${ICON_CHEVRON_RIGHT}
-                </button>
-              `).join("")}
-            </div>
-          ` : ""}
-        `}
-        <button type="button" class="today-brief-cta" id="today-brief-cta">확인했어요, 시작할게요</button>
-      </div>
-    `;
-  }
-  function bindTodayBriefEvents(overlay) {
-    document.getElementById("today-brief-close").onclick = () => closeTodayBriefPopup();
-    document.getElementById("today-brief-cta").onclick = () => closeTodayBriefPopup();
-    overlay.querySelectorAll("[data-brief-nav]").forEach((btn) => {
-      btn.onclick = () => { closeTodayBriefPopup(); setPage(btn.getAttribute("data-brief-nav")); };
-    });
-    overlay.querySelectorAll("[data-brief-todo-toggle]").forEach((btn) => {
-      btn.onclick = () => {
-        toggleTodoDone(btn.getAttribute("data-brief-todo-toggle"));
-        refreshTodayBriefPopup();
-        if (state.page === "home" || state.page === "calendar") renderApp();
-      };
-    });
-  }
-  function refreshTodayBriefPopup() {
-    const overlay = document.getElementById("today-brief-overlay");
-    if (!overlay) return;
-    const brief = computeTodayBrief();
-    const rows = todayBriefRowsHtml(brief);
-    overlay.innerHTML = todayBriefCardHtml(brief, rows);
-    bindTodayBriefEvents(overlay);
-  }
-  function showTodayBriefPopup() {
-    if (document.getElementById("today-brief-overlay")) return;
-    const overlay = document.createElement("div");
-    overlay.id = "today-brief-overlay";
-    overlay.className = "today-brief-overlay";
-    document.body.appendChild(overlay);
-    refreshTodayBriefPopup();
-    overlay.onclick = (e) => { if (e.target === overlay) closeTodayBriefPopup(); };
-    todayBriefKeyHandler = (e) => { if (e.key === "Escape") closeTodayBriefPopup(); };
-    document.addEventListener("keydown", todayBriefKeyHandler);
-  }
-
-  /* ===================== 월마감 확인 팝업 =====================
-     달이 바뀌면(예: 9월이 지나 10월이 되면), 방금 지나간 달(9월)의 "최종 스케줄 확정 /
-     품질 관리 확정"을 마쳤는지 로그인할 때마다 확인시켜주는 팝업.
-     - 최종 스케줄 확정 = 월별 스케줄에서 그 달을 잠금(scheduleIsMonthLocked)
-     - 품질 관리 확정  = 품질 관리(QA)에서 그 달을 잠금(qaIsMonthLocked)
-     두 항목 모두 매번 그 자리에서 실시간으로(잠금 여부를 직접) 확인하기 때문에,
-     확정했다가 수정하려고 다시 풀고 나중에 또 잠그면 자연스럽게 다시 "완료" 상태가
-     되어 팝업이 뜨지 않는다 — 별도로 "한 번 확정한 적 있음" 같은 상태를 저장해두지
-     않는다. "앞으로 뜨지 않음"만 그 달 단위로 저장해서, 체크해두면 다시 풀었다
-     잠가도(또는 아예 안 잠가도) 그 달에 대해서는 로그인해도 더 이상 뜨지 않는다. */
-  const MONTH_CLOSE_KEY = acctKey("personal-monthclose:data");
-  function loadMonthCloseData() {
-    try {
-      const raw = localStorage.getItem(MONTH_CLOSE_KEY);
-      const parsed = raw ? JSON.parse(raw) : null;
-      if (parsed && typeof parsed === "object") {
-        if (!parsed.dismissed || typeof parsed.dismissed !== "object") parsed.dismissed = {};
-        return parsed;
-      }
-    } catch (e) {}
-    return { dismissed: {} };
-  }
-  let monthCloseData = loadMonthCloseData();
-  function saveMonthCloseData() {
-    try { localStorage.setItem(MONTH_CLOSE_KEY, JSON.stringify(monthCloseData)); } catch (e) {}
-  }
-  // "마감 확인"의 대상이 되는 달 = 오늘이 속한 달의 바로 전 달(=방금 지나간 달).
-  function monthCloseTargetMonth() {
-    const d = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-    return { year: d.getFullYear(), monthIndex: d.getMonth() };
-  }
-  function monthCloseKeyStr(year, monthIndex) { return `${year}-${pad2(monthIndex + 1)}`; }
-  function monthCloseStatus() {
-    const { year, monthIndex } = monthCloseTargetMonth();
-    const key = monthCloseKeyStr(year, monthIndex);
-    const scheduleDone = scheduleIsMonthLocked(year, monthIndex);
-    const qaDone = qaIsMonthLocked(year, monthIndex);
-    return {
-      year, monthIndex, key, scheduleDone, qaDone,
-      allDone: scheduleDone && qaDone,
-      dismissed: !!monthCloseData.dismissed[key],
-    };
-  }
-  function shouldShowMonthClosePopup() {
-    const s = monthCloseStatus();
-    return !s.allDone && !s.dismissed;
-  }
-  function setMonthCloseDismissed(flag) {
-    const s = monthCloseStatus();
-    if (flag) monthCloseData.dismissed[s.key] = true;
-    else delete monthCloseData.dismissed[s.key];
-    saveMonthCloseData();
-  }
-
-  let monthCloseKeyHandler = null;
-  function closeMonthClosePopup() {
-    const overlay = document.getElementById("month-close-overlay");
-    if (!overlay) return;
-    if (monthCloseKeyHandler) { document.removeEventListener("keydown", monthCloseKeyHandler); monthCloseKeyHandler = null; }
-    overlay.classList.add("closing");
-    setTimeout(() => overlay.remove(), 200);
-  }
-  function monthCloseRowsHtml(s) {
-    const rows = [
-      {
-        done: s.scheduleDone, icon: ICON_CLIPBOARD, nav: "schedule",
-        title: "최종 스케줄 확정",
-        sub: s.scheduleDone ? "확정(잠금) 완료" : "이 달 스케줄을 확정(잠금)해주세요",
-      },
-      {
-        done: s.qaDone, icon: ICON_QA, nav: "qa",
-        title: "품질 관리 확정",
-        sub: s.qaDone ? "확정(잠금) 완료" : "이 달 QA 점수를 확정(잠금)해주세요",
-      },
-    ];
-    return rows.map((r, i) => `
-      <button type="button" class="today-brief-row month-close-row ${r.done ? "done" : ""}" data-monthclose-nav="${r.nav}" style="animation-delay:${80 + i * 55}ms">
-        <span class="today-brief-row-icon">${r.done ? ICON_CHECK : r.icon}</span>
-        <span class="today-brief-row-text">
-          <b>${esc(r.title)}</b>
-          <span>${esc(r.sub)}</span>
-        </span>
-        ${ICON_CHEVRON_RIGHT}
-      </button>
-    `).join("");
-  }
-  function monthCloseCardHtml(s) {
-    return `
-      <div class="today-brief-card month-close-card" role="dialog" aria-modal="true" aria-label="월마감 확인">
-        <button type="button" class="today-brief-close" id="month-close-close" aria-label="닫기">${ICON_CLOSE_SM}</button>
-        <div class="today-brief-head">
-          <div class="today-brief-badge">${ICON_CLIPBOARD} 월마감 확인</div>
-          <div class="today-brief-date">${s.year}년 ${s.monthIndex + 1}월 마감</div>
-        </div>
-        <div class="today-brief-rows month-close-rows">
-          ${monthCloseRowsHtml(s)}
-        </div>
-        <label class="month-close-dismiss-row" for="month-close-dismiss-checkbox">
-          <input type="checkbox" id="month-close-dismiss-checkbox" ${s.dismissed ? "checked" : ""}>
-          <span>앞으로 뜨지 않음</span>
-        </label>
-        <button type="button" class="today-brief-cta" id="month-close-cta">확인했어요</button>
-      </div>
-    `;
-  }
-  function bindMonthCloseEvents(overlay) {
-    document.getElementById("month-close-close").onclick = () => closeMonthClosePopup();
-    document.getElementById("month-close-cta").onclick = () => closeMonthClosePopup();
-    document.getElementById("month-close-dismiss-checkbox").onchange = (e) => {
-      setMonthCloseDismissed(e.target.checked);
-    };
-    overlay.querySelectorAll("[data-monthclose-nav]").forEach((btn) => {
-      btn.onclick = () => {
-        const nav = btn.getAttribute("data-monthclose-nav");
-        const s = monthCloseStatus();
-        closeMonthClosePopup();
-        if (nav === "schedule" || nav === "qa") setPage(nav, { year: s.year, monthIndex: s.monthIndex });
-        else setPage(nav);
-      };
-    });
-  }
-  function showMonthClosePopup() {
-    if (document.getElementById("month-close-overlay")) return;
-    const overlay = document.createElement("div");
-    overlay.id = "month-close-overlay";
-    overlay.className = "today-brief-overlay month-close-overlay";
-    document.body.appendChild(overlay);
-    overlay.innerHTML = monthCloseCardHtml(monthCloseStatus());
-    bindMonthCloseEvents(overlay);
-    overlay.onclick = (e) => { if (e.target === overlay) closeMonthClosePopup(); };
-    monthCloseKeyHandler = (e) => { if (e.key === "Escape") closeMonthClosePopup(); };
-    document.addEventListener("keydown", monthCloseKeyHandler);
-  }
-
-  function renderNav() {
-    const nav = document.getElementById("nav");
-    nav.innerHTML = `
-      ${!CURRENT_ACCOUNT_IS_MASTER ? `<div class="nav-label-top">메뉴</div>` : ""}
-      <div class="nav-account">
-        <span class="nav-account-name">${ICON_USER} <span class="nav-text">${esc(CURRENT_ACCOUNT_DISPLAY_NAME)}${CURRENT_ACCOUNT_IS_MASTER ? ' <span class="badge sm master">마스터</span>' : ""}</span></span>
-        <div class="nav-logout-wrap">
-          <button class="nav-logout-btn" id="nav-logout-btn" title="로그아웃">${ICON_LOGOUT}<span class="nav-text"> 로그아웃</span></button>
-        </div>
-      </div>
-      <div class="nav-divider"></div>
-      ${MASTER_ORIGIN_ACCOUNT ? `
-        <div class="nav-master-banner">
-          <span>${ICON_SHIELD} 마스터 계정</span>
-          <button class="nav-master-return-btn" id="nav-master-return-btn" type="button">마스터로 복귀</button>
-        </div>
-      ` : ""}
-      ${CURRENT_ACCOUNT_IS_MASTER ? `
-        <div class="nav-master-mode">
-          <span class="nav-master-mode-title">${ICON_SHIELD} 관리자 모드</span>
-          <span class="nav-master-mode-sub">계정 관리 전용</span>
-        </div>
-      ` : `
-        <button class="nav-btn ${state.page === "home" ? "active" : ""}" data-nav="home" title="홈">${NAV_ICON_HOME} <span class="nav-text">홈</span></button>
-        <button class="nav-btn ${state.page === "calendar" ? "active" : ""}" data-nav="calendar" title="캘린더">${NAV_ICON_CALENDAR} <span class="nav-text">캘린더</span></button>
-        <button class="nav-btn ${state.page === "agents" ? "active" : ""}" data-nav="agents" title="상담사 관리">${NAV_ICON_AGENTS} <span class="nav-text">상담사 관리</span></button>
-        <button class="nav-btn ${state.page === "notes" ? "active" : ""}" data-nav="notes" title="업무 정리">${NAV_ICON_NOTES} <span class="nav-text">업무 정리</span></button>
-        <button class="nav-btn ${state.page === "interviews" ? "active" : ""}" data-nav="interviews" title="면담일지">${NAV_ICON_INTERVIEWS} <span class="nav-text">면담일지</span></button>
-        <button class="nav-btn ${state.page === "qa" ? "active" : ""}" data-nav="qa" title="품질 관리">${NAV_ICON_QA} <span class="nav-text">품질 관리</span></button>
-        <button class="nav-btn ${state.page === "schedule" ? "active" : ""}" data-nav="schedule" title="월별 스케줄">${NAV_ICON_SCHEDULE} <span class="nav-text">월별 스케줄</span></button>
-      `}
-      <div class="nav-spacer"></div>
-    `;
-    renderSettingsToggle();
-    renderUndoToggle();
-    renderRefreshToggle();
-    nav.querySelectorAll("[data-nav]").forEach((btn) => {
-      btn.onclick = () => { setPage(btn.getAttribute("data-nav")); closeDock(); };
-    });
-    const logoutBtn = document.getElementById("nav-logout-btn");
-    if (logoutBtn) {
-      logoutBtn.onclick = () => {
-        if (window.confirm("로그아웃할까요?")) logout();
-      };
-    }
-    const masterReturnBtn = document.getElementById("nav-master-return-btn");
-    if (masterReturnBtn) {
-      masterReturnBtn.onclick = () => masterReturnToOrigin();
-    }
-  }
-
-  /* ===================== 마스터 계정: 계정 관리 페이지 ===================== */
-
-  function renderMasterPage(root) {
-    if (!CURRENT_ACCOUNT_IS_MASTER) { setPage("home"); return; }
-    const uiState = {
-      tab: "accounts", resettingId: null, renamingId: null, error: "", renameError: "",
-      logAccountFilter: "all", expandedLogIds: new Set(),
-      manageMembersId: null, memberError: "",
-    };
-
-    function draw() {
-      root.innerHTML = `
-        <div class="agent-list-header">
-          <div class="agent-list-title">마스터 계정 관리</div>
-        </div>
-        <div class="login-tabs" style="max-width:420px; margin-bottom:16px;">
-          <button type="button" class="login-tab ${uiState.tab === "accounts" ? "active" : ""}" data-master-tab="accounts">계정 관리</button>
-          <button type="button" class="login-tab ${uiState.tab === "activity" ? "active" : ""}" data-master-tab="activity">활동 로그</button>
-          <button type="button" class="login-tab ${uiState.tab === "notify" ? "active" : ""}" data-master-tab="notify">디스코드 알림</button>
-        </div>
-        <div id="master-tab-body"></div>
-      `;
-      root.querySelectorAll("[data-master-tab]").forEach((btn) => {
-        btn.onclick = () => { uiState.tab = btn.getAttribute("data-master-tab"); draw(); };
-      });
-      const body = document.getElementById("master-tab-body");
-      if (uiState.tab === "activity") drawActivityLog(body);
-      else if (uiState.tab === "notify") drawNotifySettings(body);
-      else drawAccounts(body);
-    }
-
-    // ----- 디스코드 알림 탭: 계정별로 디스코드 알림을 받을지 토글로 켜고 끈다 -----
-    // 기본은 전부 "제한"이고, 허용으로 켠 계정에만 알림이 간다(여러 계정 동시 허용 가능).
-    function drawNotifySettings(root) {
-      const accounts = loadAccounts().slice().sort((a, b) => (a.createdAt || "").localeCompare(b.createdAt || ""));
-      const settings = loadDiscordNotifySettings();
-      const rows = accounts.map((a) => {
-        const allowed = settings[a.id] === true;
-        return `
-          <div class="agent-row master-account-row">
-            <div class="agent-row-main" style="cursor:default;">
-              <span class="agent-row-name">${esc(a.username)}${a.isMaster ? ' <span class="badge sm master">마스터</span>' : ""}</span>
-              <span class="agent-row-ldap">${allowed ? "이 계정의 일정·할일 알림이 디스코드로 전송돼요." : "디스코드 알림이 제한되어 있어요."}</span>
-            </div>
-            <div class="agent-row-badges">
-              <label class="notify-toggle">
-                <input type="checkbox" data-notify-toggle="${a.id}" ${allowed ? "checked" : ""}>
-                <span class="notify-toggle-track"><span class="notify-toggle-thumb"></span></span>
-                <span class="notify-toggle-label">${allowed ? "허용" : "제한"}</span>
-              </label>
-            </div>
-          </div>
-        `;
-      }).join("");
-      const allowedCount = accounts.filter((a) => settings[a.id] === true).length;
-      root.innerHTML = `
-        <div class="agent-summary">
-          디스코드 알림 웹훅은 이제 계정별로 켜고 끌 수 있어요. 기본값은 전부 "제한"이고, 여기서 "허용"으로 켠 계정의
-          일정·할일만 디스코드로 알림이 가요(여러 계정을 동시에 허용해도 돼요). 지금 ${accounts.length}개 계정 중 ${allowedCount}개 허용 중.
-        </div>
-        <div class="status" id="notify-status"></div>
-        <div class="agent-list">${rows || `<div class="agent-list-empty">등록된 계정이 없어요.</div>`}</div>
-      `;
-      const statusEl = document.getElementById("notify-status");
-      function flash(msg) {
-        if (!statusEl) return;
-        statusEl.textContent = msg;
-        setTimeout(() => { if (statusEl.textContent === msg) statusEl.textContent = ""; }, 2200);
-      }
-      root.querySelectorAll("[data-notify-toggle]").forEach((input) => {
-        input.onchange = () => {
-          const id = input.getAttribute("data-notify-toggle");
-          const target = accounts.find((a) => a.id === id);
-          const nextAllowed = input.checked;
-          setDiscordNotifyAllowed(id, nextAllowed);
-          draw();
-          flash(`"${target ? target.username : ""}" 계정 알림을 ${nextAllowed ? "허용" : "제한"}으로 바꿨어요.`);
-        };
-      });
-    }
-
-    function drawAccounts(root) {
-      const accounts = loadAccounts().slice().sort((a, b) => (a.createdAt || "").localeCompare(b.createdAt || ""));
-      const rows = accounts.map((a) => {
-        const isSelf = a.id === CURRENT_ACCOUNT_ID;
-        const created = a.createdAt ? esc(a.createdAt.slice(0, 10)) : "-";
-        const isResetting = uiState.resettingId === a.id;
-        const isRenaming = uiState.renamingId === a.id;
-        const isTeam = a.accountType === "team";
-        const isManagingMembers = uiState.manageMembersId === a.id;
-        const members = isTeam && Array.isArray(a.teamMembers) ? a.teamMembers : [];
-        return `
-          <div class="agent-row master-account-row">
-            <div class="agent-row-main" style="cursor:default;">
-              <span class="agent-row-name">${esc(a.username)}${a.isMaster ? ' <span class="badge sm master">마스터</span>' : ""} <span class="badge sm type">${isTeam ? "팀용" : "개인용"}</span>${isSelf ? ' <span class="badge sm working">현재 로그인 중</span>' : ""}</span>
-              <span class="agent-row-ldap">가입일 ${created}${isTeam ? ` · 로그인 인원 ${members.length}명` : ""}</span>
-            </div>
-            <div class="agent-row-badges">
-              <button class="ghost-btn" data-action="master-type" data-id="${a.id}">${isTeam ? "개인용으로 전환" : "팀용으로 전환"}</button>
-              ${isTeam ? `<button class="ghost-btn ${isManagingMembers ? "active" : ""}" data-action="master-members" data-id="${a.id}">${isManagingMembers ? "닫기" : "로그인 인원 관리"}</button>` : ""}
-              <button class="ghost-btn ${isRenaming ? "active" : ""}" data-action="master-rename" data-id="${a.id}">${isRenaming ? "취소" : "이름 수정"}</button>
-              <button class="ghost-btn ${isResetting ? "active" : ""}" data-action="master-reset" data-id="${a.id}">${isResetting ? "취소" : "비밀번호 초기화"}</button>
-              <button class="ghost-btn" data-action="master-enter" data-id="${a.id}" ${isSelf ? "disabled" : ""}>이 계정으로 들어가기</button>
-              <button class="ghost-btn danger" data-action="master-delete" data-id="${a.id}" ${isSelf ? "disabled" : ""}>삭제</button>
-            </div>
-            ${isRenaming ? `
-              <form class="login-form master-rename-form" data-rename-form="${a.id}" style="width:100%; margin-top:10px;">
-                <label class="login-field"><span>새 계정 이름</span>
-                  <input class="add-input" id="rename-username-${a.id}" type="text" autocomplete="off" placeholder="계정 이름" value="${esc(a.username)}">
-                </label>
-                ${uiState.renameError ? `<div class="login-error">${esc(uiState.renameError)}</div>` : ""}
-                <button type="submit" class="primary-btn login-submit">이름 저장</button>
-              </form>
-            ` : ""}
-            ${isResetting ? `
-              <form class="login-form master-reset-form" data-reset-form="${a.id}" style="width:100%; margin-top:10px;">
-                <label class="login-field"><span>새 비밀번호</span>
-                  <input class="add-input" id="reset-password-${a.id}" type="password" autocomplete="new-password" placeholder="비밀번호 (6자 이상)">
-                </label>
-                <label class="login-field"><span>새 비밀번호 확인</span>
-                  <input class="add-input" id="reset-password2-${a.id}" type="password" autocomplete="new-password" placeholder="비밀번호 확인">
-                </label>
-                ${uiState.error ? `<div class="login-error">${esc(uiState.error)}</div>` : ""}
-                <button type="submit" class="primary-btn login-submit">비밀번호 저장</button>
-              </form>
-            ` : ""}
-            ${isTeam && isManagingMembers ? `
-              <div class="master-members-panel">
-                <div class="agent-row-ldap" style="margin-bottom:8px;">"${esc(a.username)}" 계정으로 로그인할 때 고를 수 있는 인원 목록이에요. 비밀번호는 계정 하나로 공통이고, 여기 인원은 이름표 용도예요.</div>
-                <div class="master-members-list">
-                  ${members.length ? members.map((m) => `
-                    <span class="master-member-chip">${esc(m.name)}<button type="button" class="chip-remove" data-remove-member="${a.id}:${m.id}" title="삭제">×</button></span>
-                  `).join("") : `<div class="agent-list-empty" style="padding:6px 0;">아직 등록된 인원이 없어요.</div>`}
-                </div>
-                <form class="master-member-form" data-member-form="${a.id}">
-                  <input class="add-input" id="member-name-${a.id}" type="text" autocomplete="off" placeholder="추가할 인원 이름">
-                  <button type="submit" class="primary-btn login-submit">추가</button>
-                </form>
-                ${uiState.memberError ? `<div class="login-error">${esc(uiState.memberError)}</div>` : ""}
-              </div>
-            ` : ""}
-          </div>
-        `;
-      }).join("");
-      root.innerHTML = `
-        <div class="agent-summary">마스터 계정으로 다른 계정을 선택해서 들어가보거나, 비밀번호를 초기화하거나, 필요 없는 계정을 삭제할 수 있어요. 총 ${accounts.length}개 계정.</div>
-        <div class="status" id="master-status"></div>
-        <div class="agent-list">${rows || `<div class="agent-list-empty">등록된 계정이 없어요.</div>`}</div>
-      `;
-      const statusEl = document.getElementById("master-status");
-      function flash(msg) {
-        if (!statusEl) return;
-        statusEl.textContent = msg;
-        setTimeout(() => { if (statusEl.textContent === msg) statusEl.textContent = ""; }, 2200);
-      }
-      root.querySelectorAll("[data-action='master-enter']").forEach((btn) => {
-        btn.onclick = () => masterEnterAccount(btn.getAttribute("data-id"));
-      });
-      root.querySelectorAll("[data-action='master-delete']").forEach((btn) => {
-        btn.onclick = () => {
-          const id = btn.getAttribute("data-id");
-          const target = accounts.find((a) => a.id === id);
-          if (!target) return;
-          if (!window.confirm(`"${target.username}" 계정을 정말 삭제할까요? 이 계정의 데이터도 함께 지워지고, 되돌릴 수 없어요.`)) return;
-          const result = deleteAccount(id);
-          if (!result.ok) { flash(result.reason || "삭제하지 못했어요."); return; }
-          draw();
-        };
-      });
-      root.querySelectorAll("[data-action='master-reset']").forEach((btn) => {
-        btn.onclick = () => {
-          const id = btn.getAttribute("data-id");
-          uiState.error = "";
-          uiState.resettingId = uiState.resettingId === id ? null : id;
-          draw();
-        };
-      });
-      root.querySelectorAll("[data-action='master-rename']").forEach((btn) => {
-        btn.onclick = () => {
-          const id = btn.getAttribute("data-id");
-          uiState.renameError = "";
-          uiState.renamingId = uiState.renamingId === id ? null : id;
-          draw();
-        };
-      });
-      root.querySelectorAll("[data-action='master-type']").forEach((btn) => {
-        btn.onclick = () => {
-          const id = btn.getAttribute("data-id");
-          const target = accounts.find((a) => a.id === id);
-          if (!target) return;
-          const isTeamNow = target.accountType === "team";
-          const nextType = isTeamNow ? "personal" : "team";
-          const nextLabel = isTeamNow ? "개인용" : "팀용";
-          const confirmMsg = isTeamNow
-            ? `"${target.username}" 계정을 개인용으로 바꿀까요? (등록해둔 로그인 인원 목록은 지워지지 않고 남아있어요)`
-            : `"${target.username}" 계정을 팀용으로 바꿀까요? 팀용으로 바꾸면 "로그인 인원 관리"에서 로그인할 인원을 추가할 수 있어요.`;
-          if (!window.confirm(confirmMsg)) return;
-          const result = setAccountType(id, nextType);
-          if (!result.ok) { flash(result.reason || "유형을 바꾸지 못했어요."); return; }
-          if (uiState.manageMembersId === id && nextType !== "team") uiState.manageMembersId = null;
-          draw();
-          flash(`"${target.username}" 계정을 ${nextLabel}으로 바꿨어요.`);
-        };
-      });
-      root.querySelectorAll("[data-action='master-members']").forEach((btn) => {
-        btn.onclick = () => {
-          const id = btn.getAttribute("data-id");
-          uiState.memberError = "";
-          uiState.manageMembersId = uiState.manageMembersId === id ? null : id;
-          draw();
-        };
-      });
-      root.querySelectorAll("[data-member-form]").forEach((form) => {
-        form.onsubmit = (e) => {
-          e.preventDefault();
-          const id = form.getAttribute("data-member-form");
-          const input = document.getElementById(`member-name-${id}`);
-          const result = addTeamMember(id, input ? input.value : "");
-          if (!result.ok) { uiState.memberError = result.reason || "추가하지 못했어요."; draw(); return; }
-          uiState.memberError = "";
-          draw();
-          flash(`로그인 인원 "${(input.value || "").trim()}"을(를) 추가했어요.`);
-        };
-      });
-      root.querySelectorAll("[data-remove-member]").forEach((btn) => {
-        btn.onclick = () => {
-          const [accId, memberId] = btn.getAttribute("data-remove-member").split(":");
-          const acc = accounts.find((x) => x.id === accId);
-          const member = acc && Array.isArray(acc.teamMembers) ? acc.teamMembers.find((m) => m.id === memberId) : null;
-          if (!window.confirm(`"${member ? member.name : "이 인원"}"을(를) 로그인 인원에서 삭제할까요?`)) return;
-          const result = removeTeamMember(accId, memberId);
-          if (!result.ok) { flash(result.reason || "삭제하지 못했어요."); return; }
-          draw();
-          flash("로그인 인원을 삭제했어요.");
-        };
-      });
-      root.querySelectorAll("[data-rename-form]").forEach((form) => {
-        form.onsubmit = (e) => {
-          e.preventDefault();
-          const id = form.getAttribute("data-rename-form");
-          const newUsername = document.getElementById(`rename-username-${id}`).value;
-          const result = renameAccount(id, newUsername);
-          if (!result.ok) { uiState.renameError = result.reason || "이름을 바꾸지 못했어요."; draw(); return; }
-          uiState.renamingId = null;
-          uiState.renameError = "";
-          if (id === CURRENT_ACCOUNT_ID) { location.reload(); return; }
-          draw();
-          flash(`계정 이름을 "${newUsername.trim()}"(으)로 바꿨어요.`);
-        };
-      });
-      root.querySelectorAll("[data-reset-form]").forEach((form) => {
-        form.onsubmit = async (e) => {
-          e.preventDefault();
-          const id = form.getAttribute("data-reset-form");
-          const target = accounts.find((a) => a.id === id);
-          const pw1 = document.getElementById(`reset-password-${id}`).value;
-          const pw2 = document.getElementById(`reset-password2-${id}`).value;
-          if (pw1 !== pw2) { uiState.error = "비밀번호 확인이 일치하지 않아요."; draw(); return; }
-          const result = await resetAccountPassword(id, pw1);
-          if (!result.ok) { uiState.error = result.reason || "비밀번호를 초기화하지 못했어요."; draw(); return; }
-          uiState.resettingId = null;
-          uiState.error = "";
-          draw();
-          flash(`"${target ? target.username : ""}" 계정의 비밀번호를 초기화했어요.`);
-        };
-      });
-    }
-
-    // 실제 저장(activity-log:entries)은 변경이 생기자마자 한 건씩 즉시 기록된다.
-    // 다만 마스터 계정에서 이 목록을 볼 때, 같은 계정이 짧은 시간(3분) 안에 여러
-    // 번 고친 건 한 줄로 묶어서 보여주는 게 더 읽기 편하므로, 화면에 그릴 때만
-    // (표시 전용) 묶는다. 실제 데이터를 건드리지 않으므로 스케줄 셀 "수정 이력
-    // 보기" 등 다른 화면에는 영향이 없다.
-    function groupActivityEntriesForDisplay(entries) {
-      const byAccount = {};
-      entries.forEach((e) => {
-        if (!byAccount[e.accountId]) byAccount[e.accountId] = [];
-        byAccount[e.accountId].push(e);
-      });
-      const groups = [];
-      Object.keys(byAccount).forEach((accountId) => {
-        const list = byAccount[accountId].slice().sort((a, b) => Date.parse(a.at || 0) - Date.parse(b.at || 0));
-        let current = null;
-        list.forEach((e) => {
-          const ts = Date.parse(e.at || "");
-          const lastTs = current ? Date.parse(current.lastAt || "") : NaN;
-          const sameBurst = current
-            && (current.viaMasterName || null) === (e.viaMasterName || null)
-            && !isNaN(ts) && !isNaN(lastTs)
-            && (ts - lastTs) <= ACTIVITY_DISPLAY_GROUP_MS;
-          if (sameBurst) {
-            current.items.push(e);
-            current.lastAt = e.at || current.lastAt;
-          } else {
-            current = { accountId, accountName: e.accountName, viaMasterName: e.viaMasterName, startAt: e.at, lastAt: e.at, items: [e] };
-            groups.push(current);
-          }
-        });
-      });
-      groups.sort((a, b) => Date.parse(b.lastAt || 0) - Date.parse(a.lastAt || 0));
-      return groups.map((g) => {
-        const whereLabels = [];
-        g.items.forEach((e) => {
-          const w = e.subLabel ? `${e.categoryLabel} · ${e.subLabel}` : e.categoryLabel;
-          if (whereLabels.indexOf(w) === -1) whereLabels.push(w);
-        });
-        const categoryLabel = whereLabels.length <= 2 ? whereLabels.join(", ") : `${whereLabels.slice(0, 2).join(", ")} 외 ${whereLabels.length - 2}곳`;
-        const diffLines = [];
-        g.items.forEach((e) => { (e.diff || []).forEach((line) => diffLines.push(line)); });
-        return {
-          id: g.items[0].id,
-          at: g.startAt,
-          endedAt: g.items.length > 1 ? g.lastAt : null,
-          accountId: g.accountId,
-          accountName: g.accountName,
-          viaMasterName: g.viaMasterName,
-          categoryLabel,
-          subLabel: g.items.length > 1 ? `${g.items.length}건` : g.items[0].subLabel,
-          diff: diffLines,
-        };
-      });
-    }
-    // ----- 활동 로그 탭: 계정별 데이터 변경 이력을 간단한 목록으로 보여준다 -----
-    function drawActivityLog(root) {
-      const entries = groupActivityEntriesForDisplay(loadActivityLog());
-      const accounts = loadAccounts();
-      const accountNameOf = (id) => { const a = accounts.find((x) => x.id === id); return a ? a.username : null; };
-
-      const accountOptionsMap = {};
-      entries.forEach((e) => {
-        if (!accountOptionsMap[e.accountId]) accountOptionsMap[e.accountId] = accountNameOf(e.accountId) || e.accountName || e.accountId;
-      });
-      const accountOptions = Object.keys(accountOptionsMap)
-        .map((id) => ({ id, name: accountOptionsMap[id] }))
-        .sort((a, b) => a.name.localeCompare(b.name, "ko"));
-
-      const filtered = uiState.logAccountFilter === "all"
-        ? entries
-        : entries.filter((e) => e.accountId === uiState.logAccountFilter);
-
-      const shown = filtered.slice(0, 200);
-      const rows = shown.map((e) => {
-        const isExpanded = uiState.expandedLogIds.has(e.id);
-        const startLabel = e.at ? esc(formatKSTDateTime(e.at)) : "-";
-        const endLabel = e.endedAt ? esc(formatKSTTime(e.endedAt)) : "";
-        const dt = endLabel && endLabel !== startLabel.slice(-5) ? `${startLabel} ~ ${endLabel}` : startLabel;
-        const whereLabel = esc(e.subLabel ? `${e.categoryLabel} · ${e.subLabel}` : (e.categoryLabel || "기타"));
-        return `
-          <div class="interview-row ${isExpanded ? "expanded" : ""}">
-            <div class="interview-row-top" data-action="toggle-log-row" data-id="${e.id}">
-              <span class="interview-row-chevron">${ICON_CHEVRON_RIGHT}</span>
-              <span class="interview-date">${dt}</span>
-              <span class="agent-row-name">${esc(e.accountName || "(삭제된 계정)")}</span>
-              ${e.viaMasterName ? `<span class="badge sm master">마스터: ${esc(e.viaMasterName)}</span>` : ""}
-              <span class="badge sm working">${whereLabel}</span>
-            </div>
-            ${isExpanded ? `
-              <div class="interview-row-body">
-                ${(e.diff && e.diff.length) ? e.diff.map((d) => `<div class="interview-content">${esc(d)}</div>`).join("") : `<div class="interview-content">세부 내용이 없어요.</div>`}
-              </div>
-            ` : ""}
-          </div>
-        `;
-      }).join("");
-
-      root.innerHTML = `
-        <div class="agent-summary">
-          각 계정에서 데이터가 바뀔 때마다 자동으로 기록돼요(시각은 한국 표준시 기준). 목록을 누르면 자세한 변경 내용을 볼 수 있어요.
-          ${ACTIVITY_LOG_RETENTION_DAYS}일 지난 로그는 자동으로 정리돼요. 총 ${filtered.length}건${filtered.length > shown.length ? ` (최근 ${shown.length}건만 표시)` : ""}.
-        </div>
-        <div style="display:flex; gap:8px; align-items:center; margin-bottom:14px; flex-wrap:wrap;">
-          <select class="agent-sort-select" id="log-account-filter" data-trigger-class="agent-sort-select">
-            <option value="all" ${uiState.logAccountFilter === "all" ? "selected" : ""}>전체 계정</option>
-            ${accountOptions.map((a) => `<option value="${esc(a.id)}" ${uiState.logAccountFilter === a.id ? "selected" : ""}>${esc(a.name)}</option>`).join("")}
-          </select>
-          ${entries.length ? `<button type="button" class="ghost-btn danger" id="log-clear-btn">로그 전체 지우기</button>` : ""}
-        </div>
-        <div class="interview-list">${rows || `<div class="agent-list-empty">${entries.length ? "이 계정에는 아직 활동 기록이 없어요." : "아직 쌓인 활동 기록이 없어요."}</div>`}</div>
-      `;
-
-      const filterEl = document.getElementById("log-account-filter");
-      if (filterEl) {
-        enhanceSelect(filterEl);
-        filterEl.onchange = () => { uiState.logAccountFilter = filterEl.value; draw(); };
-      }
-
-      const clearBtn = document.getElementById("log-clear-btn");
-      if (clearBtn) {
-        clearBtn.onclick = () => {
-          if (!window.confirm("모든 계정의 활동 로그를 전부 지울까요? 되돌릴 수 없어요.")) return;
-          clearActivityLog();
-          uiState.expandedLogIds.clear();
-          draw();
-        };
-      }
-
-      root.querySelectorAll("[data-action='toggle-log-row']").forEach((row) => {
-        row.onclick = () => {
-          const id = row.getAttribute("data-id");
-          if (uiState.expandedLogIds.has(id)) uiState.expandedLogIds.delete(id);
-          else uiState.expandedLogIds.add(id);
-          draw();
-        };
-      });
-    }
-
-    // 자동 백업 탭은 제거되었습니다 — 이제 자정 백업은 서버(discord-backup-upload
-    // 엣지펑션)가 만들어서 디스코드로 올리고, 업로드 성공 즉시 서버에는 남겨두지
-    // 않도록 바뀌었습니다. 여기서 조회/다운로드할 서버 보관본이 더 이상 없습니다.
-
-    draw();
-  }
-
-  /* ===================== 사용설명서 팝업 (PPT처럼 옆으로 넘겨보기) ===================== */
-  const manualUi = { index: 0, dir: "next" };
-  let manualKeyHandler = null;
-
-  function closeManualModal() {
-    const existing = document.getElementById("manual-modal-overlay");
-    if (existing) existing.remove();
-    if (manualKeyHandler) { document.removeEventListener("keydown", manualKeyHandler); manualKeyHandler = null; }
-  }
-
-  function openManualModal() {
-    closeManualModal();
-    manualUi.index = 0;
-    manualUi.dir = "next";
-
-    const overlay = document.createElement("div");
-    overlay.id = "manual-modal-overlay";
-    overlay.className = "manual-modal-overlay";
-    overlay.innerHTML = `
-      <div class="manual-modal-box" role="dialog" aria-modal="true" aria-label="사용설명서">
-        <div class="manual-modal-head">
-          <span>${ICON_BOOK} 사용설명서</span>
-          <button type="button" class="manual-modal-close" id="manual-modal-close-x" aria-label="닫기">✕</button>
-        </div>
-        <div class="manual-modal-body" id="manual-modal-body"></div>
-      </div>
-    `;
-    document.body.appendChild(overlay);
-    overlay.onclick = (e) => { if (e.target === overlay) closeManualModal(); };
-    document.getElementById("manual-modal-close-x").onclick = () => closeManualModal();
-
-    const root = document.getElementById("manual-modal-body");
-    renderManualSlides(root);
-  }
-
-  // 사용설명서 각 슬라이드에 곁들일 "간단한 캡처" — 실제 화면을 그대로 찍는 대신,
-  // 해당 페이지의 생김새를 알아볼 수 있을 정도로 단순화한 목업 그림을 그려준다.
-  function manualPageShot(key) {
-    const w = 440, h = 150;
-    const frame = `<rect width="${w}" height="${h}" rx="16" fill="var(--elevated)"/>`;
-    let inner = "";
-    if (key === "home") {
-      const cards = [[16, 16, false], [224, 16, true], [16, 80, false], [224, 80, false]];
-      inner = cards.map(([x, y, dot]) => `
-        <rect x="${x}" y="${y}" width="200" height="54" rx="10" fill="var(--panel)" stroke="var(--hairline)"/>
-        <rect x="${x + 12}" y="${y + 14}" width="70" height="7" rx="3.5" fill="var(--text-faint)"/>
-        ${dot ? `<circle cx="${x + 16}" cy="${y + 34}" r="4" fill="var(--accent)"/>` : ""}
-        <rect x="${x + (dot ? 28 : 12)}" y="${y + 30}" width="${dot ? 134 : 150}" height="7" rx="3.5" fill="var(--text-dim)"/>
-      `).join("");
-    } else if (key === "calendar") {
-      const cols = 7, rows = 4, cw = (w - 32) / cols, ch = (h - 32) / rows, ox = 16, oy = 16;
-      let cells = "";
-      for (let r = 0; r < rows; r++) {
-        for (let c = 0; c < cols; c++) {
-          const x = ox + c * cw, y = oy + r * ch;
-          const hi = (r === 1 && c === 3) || (r === 2 && c === 5);
-          cells += `<rect x="${x + 2}" y="${y + 2}" width="${cw - 4}" height="${ch - 4}" rx="6" fill="${hi ? "var(--accent-dim)" : "var(--panel)"}" stroke="var(--hairline)"/>`;
-          if (hi) cells += `<circle cx="${x + cw / 2}" cy="${y + ch - 9}" r="3" fill="var(--accent)"/>`;
-        }
-      }
-      inner = cells;
-    } else if (key === "notes") {
-      inner = [16, 58, 100].map((y, idx) => `
-        <rect x="16" y="${y}" width="408" height="32" rx="9" fill="var(--panel)" stroke="var(--hairline)"/>
-        ${idx === 0 ? `<circle cx="404" cy="${y + 16}" r="5" fill="var(--orange)"/>` : ""}
-        <rect x="28" y="${y + 11}" width="${idx === 0 ? 120 : 90}" height="8" rx="4" fill="var(--text)"/>
-        <rect x="${idx === 0 ? 156 : 126}" y="${y + 12}" width="190" height="7" rx="3.5" fill="var(--text-faint)"/>
-      `).join("");
-    } else if (key === "agents") {
-      inner = [16, 58, 100].map((y) => `
-        <rect x="16" y="${y}" width="408" height="32" rx="9" fill="var(--panel)" stroke="var(--hairline)"/>
-        <circle cx="35" cy="${y + 16}" r="11" fill="var(--accent-dim)"/>
-        <rect x="54" y="${y + 9}" width="92" height="7" rx="3.5" fill="var(--text)"/>
-        <rect x="54" y="${y + 20}" width="60" height="6" rx="3" fill="var(--text-faint)"/>
-        <rect x="360" y="${y + 10}" width="36" height="12" rx="6" fill="var(--green-dim)"/>
-      `).join("");
-    } else if (key === "qa") {
-      const cols = 5, colW = (w - 32) / cols;
-      let header = "";
-      for (let c = 0; c < cols; c++) header += `<rect x="${16 + c * colW}" y="16" width="${colW - 4}" height="20" rx="6" fill="var(--elevated)" stroke="var(--hairline)"/>`;
-      let rows = "";
-      for (let r = 0; r < 3; r++) {
-        const y = 44 + r * 28;
-        for (let c = 0; c < cols; c++) {
-          rows += `<rect x="${16 + c * colW}" y="${y}" width="${colW - 4}" height="20" rx="6" fill="var(--panel)" stroke="var(--hairline)"/>`;
-        }
-        rows += `<rect x="${16 + 3 * colW + 6}" y="${y + 5}" width="${colW - 16}" height="10" rx="5" fill="var(--accent-dim)"/>`;
-      }
-      inner = header + rows;
-    } else if (key === "interviews") {
-      inner = [16, 62, 108].map((y, idx) => `
-        <rect x="16" y="${y}" width="408" height="38" rx="10" fill="var(--panel)" stroke="var(--hairline)"/>
-        <rect x="28" y="${y + 11}" width="70" height="8" rx="4" fill="var(--text)"/>
-        <rect x="106" y="${y + 10}" width="42" height="16" rx="8" fill="${idx === 0 ? "var(--purple-dim)" : "var(--blue-dim)"}"/>
-        <rect x="28" y="${y + 24}" width="220" height="7" rx="3.5" fill="var(--text-faint)"/>
-      `).join("");
-    } else if (key === "schedule") {
-      const cols = 10, rows = 4, cw = (w - 90) / cols, ch = (h - 32) / rows, ox = 90, oy = 16;
-      let cells = `<rect x="16" y="16" width="66" height="${h - 32}" rx="8" fill="var(--elevated)"/>`;
-      for (let r = 0; r < rows; r++) {
-        for (let c = 0; c < cols; c++) {
-          const x = ox + c * cw, y = oy + r * ch;
-          const idx = r * cols + c;
-          const fill = idx % 9 === 0 ? "var(--blue-dim)" : idx % 11 === 0 ? "var(--orange-dim)" : "var(--panel)";
-          cells += `<rect x="${x + 2}" y="${y + 2}" width="${cw - 4}" height="${ch - 4}" rx="5" fill="${fill}" stroke="var(--hairline)"/>`;
-        }
-      }
-      inner = cells;
-    }
-    return `<div class="manual-slide-shot"><svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">${frame}${inner}</svg></div>`;
-  }
-
-  function renderManualSlides(root) {
-    const slides = [
-      {
-        key: "intro",
-        icon: ICON_BOOK,
-        title: "사용설명서",
-        subtitle: "업무 종합 관리, 이렇게 사용하세요",
-        desc: "왼쪽 메뉴에는 7가지 기능이 있어요. 이 사용설명서는 PPT처럼 옆으로 넘겨보면서 기능 하나하나를 확인할 수 있게 만들었어요. 위쪽 탭을 클릭하거나, 양옆 화살표 버튼, 키보드 ← → 방향키, 화면 스와이프로도 넘길 수 있어요. 메뉴 아래쪽에는 화면 테마 변경, 되돌리기(Ctrl+Z), 데이터 백업/복원, 새로고침 버튼도 있으니 참고하세요.",
-        intro: true,
-        chips: [
-          { icon: ICON_HOME, label: "홈" },
-          { icon: ICON_CALENDAR, label: "캘린더" },
-          { icon: ICON_USERS, label: "상담사 관리" },
-          { icon: ICON_NOTE, label: "업무 정리" },
-          { icon: ICON_CLIPBOARD, label: "면담일지" },
-          { icon: ICON_QA, label: "품질 관리" },
-          { icon: ICON_CHART, label: "월별 스케줄" },
-        ],
-      },
-      {
-        key: "home",
-        icon: ICON_HOME,
-        title: "홈",
-        subtitle: "로그인 후 가장 먼저 보이는 대시보드",
-        desc: "오늘 하루를 시작할 때 필요한 정보를 한 화면에 모아서 보여줘요.",
-        features: [
-          "로그인하면 '오늘의 브리핑' 팝업이 한 번 떠서, 오늘 근무 현황·일정·면담 필요 알림·할 일·고정 메모를 요약해서 보여줘요.",
-          "오늘 근무 현황 — 월별 스케줄을 기준으로 오늘 근무 중인 인원과 지각·결근 여부를 바로 확인해요.",
-          "오늘 일정 — 캘린더에 등록된 오늘 일정을 미리 보여줘요.",
-          "면담 필요 알림 — 최근 21일 내 면담 기록이 없는 상담사를 놓치지 않도록 알려줘요.",
-          "할 일 / 고정 메모 — 자주 확인할 항목을 홈 화면에 바로 띄워둘 수 있어요.",
-          "각 섹션 오른쪽의 '바로가기' 버튼을 누르면 해당 메뉴로 곧장 이동해요.",
-        ],
-      },
-      {
-        key: "calendar",
-        icon: ICON_CALENDAR,
-        title: "캘린더",
-        subtitle: "일정을 등록하고 한 달 흐름을 확인",
-        desc: "월 단위로 일정을 관리하고, 다가오는 일정을 놓치지 않게 도와줘요.",
-        features: [
-          "날짜를 클릭하면 그날의 일정을 확인하고 새로 추가할 수 있어요.",
-          "'메모'와 '일정' 두 유형으로 구분해서 등록하고, 시간과 우선순위(★ 중요)도 지정할 수 있어요.",
-          "시작일~종료일을 지정해서 여러 날에 걸친 일정도 만들 수 있고, 상세 내용도 함께 적어둘 수 있어요.",
-          "완료한 일정은 체크 표시하고, '완료 항목 숨기기'로 화면에서 가려볼 수 있어요.",
-          "공휴일은 자동으로 표시돼요.",
-          "다가오는 일정 목록을 한눈에 확인할 수 있어요.",
-          "캘린더 화면 안에 할 일(Todo) 카드도 있어서, 마감일을 정해 할 일을 등록하고 완료 체크할 수 있어요.",
-        ],
-      },
-      {
-        key: "agents",
-        icon: ICON_USERS,
-        title: "상담사 관리",
-        subtitle: "인원 정보를 등록하고 관리",
-        desc: "여기에 등록한 인원 정보가 월별 스케줄과 면담일지에도 함께 반영돼요.",
-        features: [
-          "상담사 정보를 등록하고 검색·필터링할 수 있어요 (재직 상태 · 업무 구분 · 조 등). 이름은 초성만 입력해도 검색돼요.",
-          "정렬 기준을 바꾸거나, '사용자 지정' 정렬에서는 직접 드래그해서 순서를 바꿀 수 있어요.",
-          "상담사를 클릭하면 상세 정보, QA 점수 미리보기, 면담 이력을 함께 확인할 수 있어요.",
-          "자주 확인하는 상담사는 즐겨찾기로 고정해둘 수 있어요.",
-        ],
-      },
-      {
-        key: "notes",
-        icon: ICON_NOTE,
-        title: "업무 정리",
-        subtitle: "메모를 남기고 폴더로 정리",
-        desc: "업무 중 떠오르는 내용을 바로 기록하고 체계적으로 정리할 수 있어요.",
-        features: [
-          "새 메모를 작성하고 폴더별로 분류해서 관리해요. 폴더는 접었다 펼 수 있어요.",
-          "중요한 메모는 최대 5개까지 화면 상단에 고정할 수 있어요.",
-          "제목 수정, 삭제가 자유롭고, 드래그로 순서를 바꾸거나 다른 폴더로 옮길 수 있어요.",
-        ],
-      },
-      {
-        key: "interviews",
-        icon: ICON_CLIPBOARD,
-        title: "면담일지",
-        subtitle: "상담사별 면담 기록 관리",
-        desc: "면담 내용과 후속조치를 기록해서 다음 면담 때 이어서 참고할 수 있어요.",
-        features: [
-          "상담사별 면담 기록을 추가·수정·삭제할 수 있어요. 상담사는 이름·LDAP·초성으로 검색해서 바로 선택할 수 있어요.",
-          "면담 유형(정기·비정기·경고·퇴사)이나 검색어로 필요한 기록만 걸러볼 수 있어요.",
-          "후속조치 내용을 함께 남겨서 다음 면담 때 참고할 수 있어요.",
-        ],
-      },
-      {
-        key: "qa",
-        icon: ICON_QA,
-        title: "품질 관리",
-        subtitle: "상담사별 월간 QA 점수 관리",
-        desc: "상담사 관리에서 근무중인 인원을 자동으로 불러와서, 월별로 QA 점수를 입력하고 통계를 확인할 수 있어요.",
-        features: [
-          "월 이동 버튼으로 원하는 달의 QA 점수를 입력·확인할 수 있어요.",
-          "인원마다 유선 점수·채팅 점수를 따로 입력하면, 종합 점수와 전월 대비 점수 차이가 자동으로 계산돼요.",
-          "당월 전체/유선/채팅/주간/야간/주간 채팅/주간 유선/야간 채팅/야간 유선 평균을 상단에서 한눈에 확인할 수 있어요.",
-          "'상담사 관리'에서 재직 상태가 '근무중'인 인원만 자동으로 표시돼요 (관리자는 제외).",
-          "표를 전체·주간·야간·유선·채팅 기준으로 나눠서 이미지로 저장할 수 있어요.",
-          "지난 달은 자동으로 '확정됨' 상태로 잠겨요. '잠금 해제' 버튼으로 다시 열어 수정한 뒤 '이 달 잠그기'로 다시 잠글 수 있어요.",
-        ],
-      },
-      {
-        key: "schedule",
-        icon: ICON_CHART,
-        title: "월별 스케줄",
-        subtitle: "상담사들의 월간 근무표",
-        desc: "상담사 관리에 등록한 인원이 자동으로 반영되는 월별 근무표예요.",
-        features: [
-          "이름·사번·조·업무 구분 등 인원 정보는 '상담사 관리'에서 수정하면 자동으로 반영돼요.",
-          "재직 중인 인원만 자동으로 표시되고, 퇴사 처리된 인원은 스케줄에서 빠져요. 관리자는 표 맨 위에 따로 표시돼요.",
-          "월 이동 버튼으로 지난 달·다음 달 스케줄도 확인할 수 있어요.",
-          "일괄 붙여넣기로 여러 인원의 스케줄을 한 번에 입력할 수 있어요. 근무·오프·연차·대휴·반차·공휴·공가·육휴·특휴·교육·지각·결근·퇴사 등 다양한 값을 인식해요.",
-          "일괄 붙여넣기에서 줄 맨 앞에 '주간 채팅 필요인력'(주간 유선 / 야간 채팅 / 야간 유선도 가능)을 쓰고 1일부터의 숫자를 이어 붙이면 필요인력도 한 번에 입력돼요. 인원 스케줄 줄과 함께 섞어서 붙여넣어도 돼요.",
-          "셀을 드래그해서 여러 칸을 한 번에 선택한 뒤, 메뉴에서 상태를 골라 한 번에 적용할 수 있어요.",
-          "칸(또는 드래그로 고른 범위)을 Ctrl+C로 복사하고, 붙여넣을 칸을 클릭한 뒤 Ctrl+V로 붙여넣을 수 있어요. 상태와 메모가 함께 복사되고, 붙여넣은 칸의 기존 메모는 복사한 메모로 바뀌어요(복사한 칸에 메모가 없으면 지워져요). Ctrl+Z로 한 번에 되돌릴 수 있고, 엑셀에서 복사한 근태 값(오프·연차 등)도 붙여넣을 수 있어요.",
-          "셀을 클릭하면 근무/오프/연차 등 다양한 상태로 바로 바꿀 수 있고, 메모도 남길 수 있어요. 지각은 출근 인원에 포함, 결근은 제외돼요.",
-          "이름 칸을 오른쪽 클릭하면 그 인원의 이번 달 메모를 남길 수 있어요. 메모가 있으면 이름 칸 모서리에 주황색 표시가 붙고, 마우스를 올리면 내용이 보여요. 엑셀로 다운로드하면 메모로 함께 들어가고(이미지 저장에는 표시되지 않아요), 지난 달은 잠겨서 그때 남긴 메모를 읽기만 할 수 있어요.",
-          "날짜·조·업무 구분별로 필요 인원(헤드카운트)을 설정하면, 실제 근무 인원과의 차이를 자동으로 계산해서 보여줘요.",
-          "필요 없는 열·행은 선택 후 오른쪽 클릭으로 접어서 숨길 수 있고, 날짜 범위를 묶어 그룹으로 한 번에 접었다 펼 수도 있어요.",
-          "날짜·정보 머리글이나 왼쪽 이름·사번 칸을 마우스로 끌면 그 범위의 열·행이 한꺼번에 선택되고, 손을 떼면 뜨는 메뉴에서 '접기'를 누르면 한 번에 접혀요. Ctrl(⌘) 또는 Shift를 누른 채 끌면 이미 고른 것에 더해져요. 고른 뒤 표 밖이나 머리글이 아닌 곳을 누르면 선택이 풀려요.",
-          "이미지로 저장하거나 엑셀 파일로 다운로드할 수 있고, '휴일대체 확인서'도 회사 양식 그대로 자동으로 만들 수 있어요.",
-          "이번 달 지각·결근 기록을 표 아래에서 바로 확인할 수 있어요.",
-          "지난 달은 자동으로 '확정됨' 상태로 잠기고 그 시점 인원 구성이 고정돼요. '잠금 해제' 버튼으로 다시 열어 수정할 수 있어요.",
-        ],
-      },
-    ];
-
-    if (manualUi.index >= slides.length) manualUi.index = 0;
-
-    function goTo(nextIndex) {
-      const clamped = Math.max(0, Math.min(slides.length - 1, nextIndex));
-      if (clamped === manualUi.index) return;
-      manualUi.dir = clamped > manualUi.index ? "next" : "prev";
-      manualUi.index = clamped;
-      draw();
-    }
-
-    function draw() {
-      const i = manualUi.index;
-      const s = slides[i];
-      const animClass = manualUi.dir === "prev" ? "manual-anim-prev" : "manual-anim-next";
-
-      const tabsHtml = slides.map((sl, idx) => `
-        <button class="manual-tab ${idx === i ? "active" : ""}" data-goto="${idx}">
-          <span class="manual-tab-icon">${sl.icon}</span><span>${sl.title}</span>
-        </button>
-      `).join("");
-
-      const dotsHtml = slides.map((sl, idx) => `
-        <button class="manual-dot ${idx === i ? "active" : ""}" data-goto="${idx}" title="${esc(sl.title)}"></button>
-      `).join("");
-
-      const bodyHtml = s.intro
-        ? `<div class="manual-chip-grid">${s.chips.map((c, ci) => `
-            <button class="manual-chip" data-goto="${ci + 1}">
-              <span class="manual-chip-icon">${c.icon}</span><span>${c.label}</span>
-            </button>
-          `).join("")}</div>`
-        : `<ul class="manual-feature-list">${s.features.map((f) => `<li>${f}</li>`).join("")}</ul>`;
-
-      root.innerHTML = `
-        <div class="manual-shell">
-          <div class="manual-tabs">${tabsHtml}</div>
-          <div class="manual-viewport">
-            <button class="manual-arrow" id="manual-prev" ${i === 0 ? "disabled" : ""} title="이전">‹</button>
-            <div class="manual-slide ${animClass}">
-              <div class="manual-slide-head">
-                <div class="manual-slide-icon">${s.icon}</div>
-                <div>
-                  <div class="manual-slide-title">${s.title}</div>
-                  <div class="manual-slide-subtitle">${s.subtitle}</div>
-                </div>
-              </div>
-              <p class="manual-slide-desc">${s.desc}</p>
-              ${s.intro ? "" : manualPageShot(s.key)}
-              ${bodyHtml}
-            </div>
-            <button class="manual-arrow" id="manual-next" ${i === slides.length - 1 ? "disabled" : ""} title="다음">›</button>
-          </div>
-          <div class="manual-footer">
-            <div class="manual-dots">${dotsHtml}</div>
-            <div class="manual-counter">${i + 1} / ${slides.length}</div>
-          </div>
-        </div>
-      `;
-
-      root.querySelectorAll("[data-goto]").forEach((btn) => {
-        btn.onclick = () => goTo(parseInt(btn.getAttribute("data-goto"), 10));
-      });
-      const prevBtn = document.getElementById("manual-prev");
-      const nextBtn = document.getElementById("manual-next");
-      if (prevBtn) prevBtn.onclick = () => goTo(i - 1);
-      if (nextBtn) nextBtn.onclick = () => goTo(i + 1);
-
-      // 터치 스와이프로도 슬라이드를 넘길 수 있게 지원
-      const viewport = root.querySelector(".manual-viewport");
-      if (viewport) {
-        let touchStartX = null;
-        viewport.ontouchstart = (e) => { touchStartX = e.touches[0].clientX; };
-        viewport.ontouchend = (e) => {
-          if (touchStartX === null) return;
-          const dx = e.changedTouches[0].clientX - touchStartX;
-          if (Math.abs(dx) > 40) goTo(dx < 0 ? i + 1 : i - 1);
-          touchStartX = null;
-        };
-      }
-    }
-
-    // 사용설명서 팝업이 열려 있을 때만 좌우 방향키(Esc 포함)로 조작할 수 있게 한다.
-    if (manualKeyHandler) document.removeEventListener("keydown", manualKeyHandler);
-    manualKeyHandler = (e) => {
-      if (!document.getElementById("manual-modal-overlay")) return;
-      const tag = (document.activeElement && document.activeElement.tagName) || "";
-      if (tag === "INPUT" || tag === "TEXTAREA") return;
-      if (e.key === "ArrowRight") goTo(manualUi.index + 1);
-      else if (e.key === "ArrowLeft") goTo(manualUi.index - 1);
-      else if (e.key === "Escape") closeManualModal();
-    };
-    document.addEventListener("keydown", manualKeyHandler);
-
-    draw();
-  }
-
-  function renderApp() {
-    renderNav();
-    const root = document.getElementById("page-inner");
-    root.classList.toggle("wide", state.page === "schedule" || state.page === "home" || state.page === "calendar");
-    if (state.page === "notes") renderNotesPage(root);
-    else if (state.page === "agents") renderAgentsPage(root);
-    else if (state.page === "qa") renderQAPage(root);
-    else if (state.page === "interviews") renderInterviewsPage(root);
-    else if (state.page === "schedule") renderSchedulePage(root);
-    else if (state.page === "calendar") renderCalendarPage(root);
-    else if (state.page === "master") renderMasterPage(root);
-    else renderHomePage(root);
-  }
-
-  // 앱을 처음 열 때도 월별 스케줄 인원 목록을 상담사 관리 목록과 맞춰준다.
-  syncScheduleStaffFromAgents();
-  saveScheduleData();
-
-  renderApp();
-
-  // 로그인/계정 생성 직후 딱 한 번, 홈 화면 위에 팝업을 살짝 늦게(화면이 먼저 자리
-  // 잡은 뒤) 애니메이션과 함께 띄워준다. 지난달 마감(최종 스케줄/품질 관리 확정)이
-  // 아직 안 끝났고 "앞으로 뜨지 않음"을 체크해두지 않았다면 그 확인 팝업을 먼저
-  // 띄우고, 그렇지 않으면 평소처럼 "오늘의 브리핑"을 띄운다(로그인할 때마다 매번
-  // 확인해서, 마감이 끝나거나 체크박스를 누르기 전까지는 계속 다시 뜬다).
-  if (_justLoggedIn && !CURRENT_ACCOUNT_IS_MASTER) {
-    setTimeout(() => {
-      if (shouldShowMonthClosePopup()) showMonthClosePopup();
-      else showTodayBriefPopup();
-    }, 450);
-  }
-
-  // 로그인 유지 하트비트: 이 탭이 열려 있는 동안 "마지막으로 살아있던 시각"을 계속
-  // 갱신해서, 탭만 잠깐 닫았다 다시 열었을 때는 로그인이 유지되고 컴퓨터를 껐다
-  // 켤 정도로 오래 닫혀 있었을 때만 자동 로그아웃되게 한다 (판단 자체는 01-common.js의
-  // 세션 확인 부분에서 다음에 열릴 때 이뤄진다).
-  touchLastActive();
-  setInterval(touchLastActive, 15000);
-  window.addEventListener("pagehide", touchLastActive);
-  window.addEventListener("beforeunload", touchLastActive);
-
-  /* ===================== 전역 검색 (상담사 · 메모 · 면담일지 통합) =====================
-     상담사 관리 / 업무 정리 / 면담일지 페이지에 각각 따로 있는 검색을 한 곳에서
-     "이 사람과 관련된 것 다 보여줘" 식으로 통합해서 찾아주는 기능.
-     - 위치: 하단 내비게이션 독의 카테고리 아이콘들 바로 위 (#nav-dock 안, #nav 앞)
-     - 결과: 새 페이지로 이동하지 않고, 검색 바로 위에 카드 목록(드롭다운)으로 떠서 보여줌
-     - 카드를 클릭하면 해당 페이지로 이동해서 그 항목을 바로 펼쳐서 보여줌
-
-     주의: 이 검색창은 renderNav()처럼 매번 innerHTML을 새로 그리지 않는다(앱 전체에서
-     renderApp()이 호출될 때마다 통째로 다시 그려지면, 타이핑 중 입력창이 사라져서
-     포커스/커서가 끊길 수 있기 때문). 그래서 앱이 처음 뜰 때 딱 한 번만 껍데기를
-     그리고, 이후에는 결과 패널(#gs-results-panel)만 갱신한다. */
-
-  const ICON_SEARCH = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="7" r="4.2"/><path d="M13 13l-2.9-2.9"/></svg>`;
-
-  const globalSearchState = { query: "" };
-
-  function gsTruncateText(str, max) {
-    const s = (str || "").replace(/\s+/g, " ").trim();
-    if (!s) return "";
-    if (s.length <= max) return s;
-    return s.slice(0, max) + "…";
-  }
-
-  // 일반 텍스트 포함 검색 + 초성 검색(상담사 이름 검색과 동일한 방식)을 함께 지원.
-  function gsTextMatches(text, needle) {
-    if (!needle) return false;
-    const t = (text || "").toLowerCase();
-    if (t.indexOf(needle) !== -1) return true;
-    if (getChosungString(text || "").indexOf(needle) !== -1) return true;
-    return false;
-  }
 
   function computeGlobalSearchResults(rawQuery) {
     const needle = (rawQuery || "").trim().toLowerCase();
