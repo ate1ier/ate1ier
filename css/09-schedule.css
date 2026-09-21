@@ -352,6 +352,13 @@
   }
   .sch-auto-warnings-title { font-size: 12.5px; font-weight: 600; color: var(--amber); margin-bottom: 4px; }
   .sch-auto-warning-item { font-size: 12px; color: var(--text-dim); line-height: 1.6; }
+  .sch-auto-hybrid-note {
+    font-size: 12px; color: var(--text-dim); line-height: 1.5; margin: -2px 0 10px;
+    padding: 8px 10px; border: 1px solid var(--hairline); border-radius: 9px; background: var(--elevated);
+  }
+  .sch-auto-hybrid-note--ok { color: var(--green); border-color: var(--green); background: var(--green-dim); }
+  .sch-auto-hybrid-note--fallback { color: var(--amber); border-color: var(--amber); background: var(--amber-dim); }
+  .sch-auto-hybrid-note span { color: var(--text-faint); }
   .sch-auto-total { font-size: 12.5px; color: var(--text-dim); margin-bottom: 10px; }
   .sch-auto-none { color: var(--text-faint); font-size: 12.5px; margin-bottom: 10px; }
   /* 미리보기 표(월별 스케줄 표와 같은 모양) 위의 범례 */
@@ -377,14 +384,16 @@
     border: 1px solid var(--hairline); border-radius: 10px; margin-bottom: 14px; background: var(--panel);
     padding: 10px 12px; display: flex; flex-direction: column; gap: 8px;
   }
-  .sch-auto-conds-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+  .sch-auto-conds-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: nowrap; min-width: 0; }
   .sch-auto-conds-title { font-size: 12.5px; font-weight: 600; color: var(--text); }
-  .sch-auto-settings-btn { padding: 6px 12px; font-size: 12.5px; }
+  .sch-auto-conds-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: nowrap; margin-left: auto; min-width: max-content; }
+  .sch-auto-exclude-inline { display: inline-flex; align-items: center; gap: 8px; min-width: max-content; flex: 0 0 auto; white-space: nowrap; }
+  .sch-auto-settings-btn { padding: 6px 12px; font-size: 12.5px; white-space: nowrap; }
   .sch-auto-prefs-count { font-weight: 400; color: var(--text-faint); }
   .sch-auto-cond-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
   .sch-auto-cond-label { font-size: 12.5px; color: var(--text-dim); flex-shrink: 0; }
-  .sch-auto-cond-body { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
-  .sch-auto-exclude-select { padding: 6px 10px; font-size: 12.5px; max-width: 100%; cursor: pointer; }
+  .sch-auto-cond-body { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; min-width: max-content; width: auto; flex: 0 0 auto; }
+  .sch-auto-exclude-select { padding: 6px 10px; font-size: 12.5px; width: 180px; min-width: 180px; max-width: 180px; flex: 0 0 180px; cursor: pointer; }
   .sch-auto-cond-empty { font-size: 12px; color: var(--text-faint); }
   .sch-auto-exclude-chips { display: inline-flex; flex-wrap: wrap; gap: 6px; }
   .sch-auto-exclude-chip {
@@ -397,48 +406,70 @@
   }
   .sch-auto-exclude-remove:hover { background: var(--accent); color: var(--accent-text); }
   .sch-auto-excluded-note { font-size: 12.5px; color: var(--text-dim); margin-bottom: 10px; line-height: 1.6; }
-  @media (max-width: 720px) { .sch-auto-exclude-select { font-size: 16px; } }
+  @media (max-width: 720px) {
+    .sch-auto-conds { overflow-x: auto; }
+    .sch-auto-conds-head { min-width: max-content; }
+    .sch-auto-conds-actions { width: auto; justify-content: flex-end; }
+    .sch-auto-exclude-select { font-size: 16px; }
+  }
 
-  /* "인원별 설정" 팝업: 인원 × 요일(일~토) 표 하나에 선호 오프 요일이 한눈에 보인다 */
+  /* 인원별 선호 출근/오프 요일: 한 화면에서 월~일과 두 선호를 함께 편집 */
   .sch-auto-set-overlay { z-index: 81; }
-  .sch-auto-set-box { width: min(560px, 94vw); }
-  .sch-auto-set-body { display: block; text-align: left; padding-top: 0; }
-  .sch-auto-set-desc { font-size: 12px; color: var(--text-faint); line-height: 1.6; padding: 14px 0 12px; }
+  .sch-auto-set-box { width: min(760px, 96vw); }
+  .sch-auto-set-body { display: block; text-align: left; padding-top: 0; overflow-x: hidden; }
+  .sch-auto-set-desc { font-size: 12px; color: var(--text-faint); line-height: 1.6; padding: 14px 0 8px; }
   .sch-auto-set-desc b { color: var(--text-dim); }
-  .sch-auto-set-table { width: 100%; border-collapse: separate; border-spacing: 0; }
-  .sch-auto-set-table th, .sch-auto-set-table td { padding: 4px 3px; text-align: center; }
+  .sch-auto-pref-legend { display: flex; align-items: center; gap: 12px; padding: 0 0 8px; font-size: 11.5px; color: var(--text-faint); }
+  .sch-auto-pref-legend b { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 20px; margin-right: 3px; border-radius: 5px; font-size: 10.5px; }
+  .sch-auto-pref-legend-off { background: var(--accent); color: var(--accent-text); }
+  .sch-auto-pref-legend-work { background: var(--blue); color: #fff; }
+  .sch-auto-set-table { width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 0; }
+  .sch-auto-set-table th, .sch-auto-set-table td { padding: 3px 2px; text-align: center; }
   .sch-auto-set-table thead th {
     position: sticky; top: 0; z-index: 1; background: var(--bg); font-size: 12px; font-weight: 600;
-    color: var(--text-faint); padding: 8px 3px 6px; border-bottom: 1px solid var(--hairline);
+    color: var(--text-faint); padding: 7px 2px 6px; border-bottom: 1px solid var(--hairline);
   }
-  .sch-auto-set-table thead th.sch-auto-set-name-th { text-align: left; }
+  .sch-auto-set-table thead th.sch-auto-set-name-th { width: 190px; text-align: left; }
   .sch-auto-set-dow.is-sun { color: var(--red); }
   .sch-auto-set-dow.is-sat { color: var(--blue); }
   .sch-auto-set-table .sch-auto-set-name {
-    text-align: left; font-size: 12.5px; font-weight: 500; color: var(--text); white-space: nowrap;
-    padding-right: 8px; max-width: 200px; overflow: hidden; text-overflow: ellipsis;
+    width: 190px; text-align: left; font-size: 12.5px; font-weight: 500; color: var(--text); white-space: nowrap;
+    padding-right: 8px; overflow: hidden; text-overflow: ellipsis;
   }
   .sch-auto-set-row th, .sch-auto-set-row td { border-bottom: 1px solid var(--hairline); }
   .sch-auto-set-row:hover { background: var(--elevated); }
   .sch-auto-set-row.is-excluded .sch-auto-set-name { color: var(--text-faint); }
   .sch-auto-set-excluded-tag { font-size: 10.5px; font-weight: 400; color: var(--amber); margin-left: 4px; }
-  .sch-auto-set-group th { text-align: left; font-size: 11.5px; font-weight: 600; color: var(--text-dim); padding: 12px 2px 4px; }
+  .sch-auto-set-group th { text-align: left; font-size: 11.5px; font-weight: 600; color: var(--text-dim); padding: 10px 2px 4px; }
   .sch-auto-set-group-count { font-weight: 400; color: var(--text-faint); }
-  .sch-auto-pref-chip {
-    width: 30px; height: 26px; padding: 0; line-height: 1; font-size: 12px; cursor: pointer;
-    border: 1px solid var(--hairline); border-radius: 7px; background: transparent; color: var(--text-faint);
+  .sch-auto-set-pref-cell { min-width: 0; }
+  .sch-auto-pref-pair { display: flex; align-items: center; justify-content: center; gap: 3px; }
+  .sch-auto-pref-choice-btn {
+    width: 28px; height: 26px; padding: 0; line-height: 1; font-size: 10.5px; font-weight: 600;
+    cursor: pointer; border: 1px solid var(--hairline); border-radius: 6px;
+    background: transparent; color: var(--text-faint); transition: background .12s ease, border-color .12s ease, color .12s ease;
   }
-  .sch-auto-pref-chip:hover { color: var(--text); background: var(--elevated); }
-  .sch-auto-pref-chip.on { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
-  /* 좁은 화면: 닉네임을 숨기고 칸을 조금 줄여서 일~토 7칸이 팝업 안에 다 들어오게 한다 */
+  .sch-auto-pref-choice-btn:hover { color: var(--text); background: var(--elevated); }
+  .sch-auto-pref-choice-btn--work.on { background: var(--blue); border-color: var(--blue); color: #fff; }
+  .sch-auto-pref-choice-btn--off.on { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
   @media (max-width: 720px) {
-    .sch-auto-set-overlay { padding: 12px; }
-    .sch-auto-set-table th, .sch-auto-set-table td { padding: 4px 1px; }
-    .sch-auto-pref-chip { width: 27px; height: 27px; font-size: 11.5px; }
+    .sch-auto-set-overlay { padding: 10px; }
+    .sch-auto-set-box { width: 100%; }
+    .sch-auto-set-table thead th.sch-auto-set-name-th,
+    .sch-auto-set-table .sch-auto-set-name { width: 120px; }
+    .sch-auto-set-table th, .sch-auto-set-table td { padding: 3px 1px; }
+    .sch-auto-pref-pair { gap: 2px; }
+    .sch-auto-pref-choice-btn { width: 24px; height: 25px; font-size: 10px; }
     .sch-auto-set-name .sch-adjust-nick { display: none; }
-    .sch-auto-set-table .sch-auto-set-name { max-width: 96px; padding-right: 4px; }
     .sch-auto-set-excluded-tag { display: block; margin-left: 0; }
   }
+  @media (max-width: 430px) {
+    .sch-auto-set-table thead th.sch-auto-set-name-th,
+    .sch-auto-set-table .sch-auto-set-name { width: 94px; }
+    .sch-auto-pref-choice-btn { width: 21px; height: 24px; font-size: 9px; }
+    .sch-auto-pref-pair { gap: 1px; }
+  }
+
   .sch-memo-box { width: min(420px, 92vw); }
   .sch-memo-body { display: block; }
   .sch-memo-textarea { width: 100%; min-height: 110px; resize: vertical; box-sizing: border-box; }
@@ -519,3 +550,104 @@
 
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 
+
+/* AI 자동 배치: 구분별 최소 출근 인원 입력
+   기존 임시 스타일의 --surface/--border가 이 앱의 테마 변수와 달라 다크모드에서
+   입력 카드가 흰색으로 뜨고 숫자 입력도 브라우저 기본 UI처럼 보이던 문제를 수정한다. */
+.sch-auto-min-working-grid{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(110px,1fr));
+  gap:8px;
+  width:100%;
+}
+.sch-auto-min-working-item{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  min-width:0;
+  padding:9px 10px 9px 12px;
+  border:1px solid var(--hairline);
+  border-radius:12px;
+  background:var(--elevated);
+  color:var(--text-dim);
+  font-size:12.5px;
+  line-height:1.2;
+  transition:border-color .15s ease,background .15s ease,box-shadow .15s ease;
+}
+.sch-auto-min-working-item:focus-within{
+  border-color:var(--accent);
+  background:var(--panel);
+  box-shadow:0 0 0 3px var(--accent-dim);
+}
+.sch-auto-min-working-item > span{
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.sch-auto-min-working-item input{
+  width:54px;
+  height:32px;
+  flex:0 0 54px;
+  padding:4px 7px;
+  text-align:center;
+  font:inherit;
+  font-size:14px;
+  font-weight:600;
+  font-variant-numeric:tabular-nums;
+  color:var(--text);
+  background:var(--bg);
+  border:1px solid var(--hairline-strong);
+  border-radius:9px;
+  outline:none;
+  color-scheme:var(--native-color-scheme,dark);
+}
+.sch-auto-min-working-item input:hover{border-color:var(--text-faint)}
+.sch-auto-min-working-item input:focus{
+  border-color:var(--accent);
+  box-shadow:0 0 0 2px var(--accent-dim);
+}
+.sch-auto-min-working-item input::-webkit-inner-spin-button,
+.sch-auto-min-working-item input::-webkit-outer-spin-button{
+  opacity:.65;
+}
+html[data-theme="light"] .sch-auto-min-working-item input{background:var(--panel)}
+@media (max-width:720px){
+  .sch-auto-min-working-grid{grid-template-columns:repeat(2,minmax(120px,1fr))}
+}
+@media (max-width:420px){
+  .sch-auto-min-working-grid{grid-template-columns:1fr}
+}
+
+  /* 인원별 선호 출근/오프 요일: 오프와 출근을 별도 화면에서 선택 */
+  .sch-auto-settings-buttons { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .sch-auto-set-pref-cell { min-width: 76px; text-align: center; }
+  .sch-auto-pref-choice { display: inline-flex; align-items: center; justify-content: center; }
+  .sch-auto-pref-choice-btn {
+    min-width: 56px; height: 30px; padding: 0 8px; line-height: 1; font-size: 11px; font-weight: 600;
+    cursor: pointer; border: 1px solid var(--hairline); border-radius: 7px;
+    background: transparent; color: var(--text-faint); transition: background .12s ease, border-color .12s ease, color .12s ease;
+  }
+  .sch-auto-pref-choice-btn:hover { color: var(--text); background: var(--elevated); }
+  .sch-auto-pref-choice-btn--work.on { background: var(--blue); border-color: var(--blue); color: #fff; }
+  .sch-auto-pref-choice-btn--off.on { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+  @media (max-width: 720px) {
+    .sch-auto-set-pref-cell { min-width: 62px; }
+    .sch-auto-pref-choice-btn { min-width: 48px; height: 28px; padding: 0 5px; font-size: 10px; }
+  }
+
+/* 인원별 설정 선택 메뉴: 오프 설정과 선호 설정을 각각 별도 팝업으로 연다. */
+.sch-auto-settings-buttons { position: relative; }
+.sch-auto-settings-menu {
+  position: absolute; right: 0; top: calc(100% + 6px); z-index: 90; min-width: 150px;
+  display: flex; flex-direction: column; gap: 3px; padding: 5px;
+  background: var(--elevated); border: 1px solid var(--hairline-strong); border-radius: 10px;
+  box-shadow: var(--mac-shadow-float);
+}
+.sch-auto-settings-menu[hidden] { display: none; }
+.sch-auto-settings-menu-btn {
+  width: 100%; padding: 8px 10px; border: 0; border-radius: 7px; background: transparent;
+  color: var(--text-dim); text-align: left; font: inherit; font-size: 12px; cursor: pointer; white-space: nowrap;
+}
+.sch-auto-settings-menu-btn:hover { background: var(--accent-dim); color: var(--text); }

@@ -33,6 +33,7 @@
     // 달과 상관없이 그 사람에게 계속 적용되는 설정이고, 반드시 지켜야 하는 조건이 아니라
     // "최대한 맞춰주는" 소프트 조건이다(필요인력·연속 근무 제한이 우선). 비어 있으면 키 자체를 두지 않는다.
     if (!d.autoOffPrefs || typeof d.autoOffPrefs !== "object") d.autoOffPrefs = {};
+    if (!d.autoWorkPrefs || typeof d.autoWorkPrefs !== "object") d.autoWorkPrefs = {};
     return d;
   }
   // 특정 달의 접기 상태 저장 칸을 가져온다(없으면 빈 상태로 만들어서 돌려준다).

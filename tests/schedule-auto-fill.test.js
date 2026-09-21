@@ -211,7 +211,50 @@ test("지난달에서 이어진 5일 뒤 1일이 이미 근무 기록(교육)이
   assert.ok(maxAfter <= 5);
 });
 
+/* ===================== 연속 오프: 자동 배치 ===================== */
+
+test("자동 배치는 필휴가 아닌 기존 휴무 3일 연속 뒤에 4번째 새 오프를 붙이지 않는다", () => {
+  const records = {
+    [`s1|${sep(10)}`]: OFF,
+    [`s1|${sep(11)}`]: OFF,
+    [`s1|${sep(12)}`]: OFF,
+  };
+  const { m } = setup({ staff: [staff("s1")], records });
+  const plan = m.scheduleAutoBuildPlan(YEAR, MI);
+  const p = planOf(plan, "s1");
+  assert.ok(p, "나머지 목표 오프는 계속 계산되어야 한다");
+  assert.ok(!p.assigned.includes(9) && !p.assigned.includes(13), "3일 연속 기존 휴무의 양쪽에 4일째 새 오프를 만들지 않는다");
+});
+
+test("메모의 필휴도 연속 오프에 포함되어 새 OFF가 3일을 초과하는 연결을 만들지 않는다", () => {
+  const records = {
+    [`s1|${sep(10)}`]: OFF,
+    [`s1|${sep(11)}`]: OFF,
+    [`s1|${sep(12)}`]: OFF,
+  };
+  const memos = {
+    [`s1|${sep(12)}`]: "필휴",
+  };
+  const { m } = setup({ staff: [staff("s1")], records, memos });
+  const plan = m.scheduleAutoBuildPlan(YEAR, MI);
+  const p = planOf(plan, "s1");
+  assert.ok(p);
+  // 10~12가 기존 휴무이고 12일 메모가 필휴이므로, 9일/13일에 OFF를 붙이면
+  // 4일 연속이 된다. 따라서 양쪽 모두 새 OFF 후보에서 제외되어야 한다.
+  assert.ok(!p.assigned.includes(9), "필휴를 포함한 기존 3일 휴무 앞에 4일째 OFF를 붙이지 않는다");
+  assert.ok(!p.assigned.includes(13), "필휴를 포함한 기존 3일 휴무 뒤에 4일째 OFF를 붙이지 않는다");
+});
+
+
 /* ===================== 선호 오프 요일 ===================== */
+test("선호 오프는 강한 조건을 크게 해치지 않는 범위에서 주말 선택을 실제로 밀어준다", () => {
+  const people = [staff("s1"), staff("s2"), staff("s3"), staff("s4"), staff("s5", { name: "김보배" })];
+  const { m } = setup({ staff: people, autoOffPrefs: { s5: { dows: [0, 6] } } }, { premise: true });
+  const p = planOf(m.scheduleAutoBuildPlan(YEAR, MI), "s5");
+  const weekend = p.assigned.filter(d => [0, 6].includes(new Date(YEAR, MI, d).getDay()));
+  assert.ok(weekend.length >= 2, `주말 선호가 전혀 반영되지 않음: ${p.assigned.join(",")}`);
+  assert.ok(p.prefHits >= 2, `선호 오프 적중 수가 낮음: ${p.prefHits}`);
+});
 
 test("선호 요일(화·수)을 지정하면, 다른 조건이 방해하지 않는 한 그 요일에 오프가 배정된다", () => {
   const { m } = setup({
@@ -239,6 +282,22 @@ test("선호 요일은 소프트 조건: 후보가 모자라면 다른 요일로
   assert.equal(p.prefHits, 4, "5일 제한을 지키는 범위에서 최대한 반영");
   assert.ok(maxRun(withPlan(m.scheduleData.records, plan), "s1", 0) <= 5);
   assert.deepEqual(toPlain(plan.warnings), []);
+});
+
+test("선호 요일은 최후 허용범위를 지키는 후보 안에서 필요인력 1순위보다 우선한다", () => {
+  const requiredHeadcount = {};
+  // 9/8(화): 2명 필요, 2명 투입이라 오프를 넣으면 -1이지만 최후 허용범위 안이다.
+  // 9/9(수): 1명 필요, 2명 투입이라 오프를 넣어도 부족이 없다.
+  requiredHeadcount[`2026-09|DAY|채팅|8`] = 2;
+  requiredHeadcount[`2026-09|DAY|채팅|9`] = 1;
+  const { m } = setup({
+    staff: [staff("s1"), staff("s2")],
+    requiredHeadcount,
+    autoOffPrefs: { s1: { dows: [2] } },
+  });
+  const plan = m.scheduleAutoBuildPlan(YEAR, MI);
+  const s1 = planOf(plan, "s1");
+  assert.ok(s1.assigned.some((d) => d === 8), `선호 화요일(9/8)을 우선하지 않음: ${s1.assigned.join(",")}`);
 });
 
 test("선호 요일은 필요인력 허용범위에 양보한다(월요일은 부족 -1명까지)", () => {
@@ -288,10 +347,37 @@ test("선호 요일 토글: 저장되고, 모두 해제하면 항목이 사라�
   assert.deepEqual(toPlain(m.scheduleAutoGetPrefDows("nobody")), []);
 });
 
+
+
+test("선호 출근 요일: 저장되고 같은 요일의 선호 오프와 상호 배타적이다", () => {
+  const { m, saved } = setup();
+  m.scheduleAutoToggleWorkPrefDow("s1", 6);
+  m.scheduleAutoToggleWorkPrefDow("s1", 0);
+  assert.deepEqual(toPlain(saved().autoWorkPrefs), { s1: { dows: [0, 6] } });
+  m.scheduleAutoTogglePrefDow("s1", 6);
+  assert.deepEqual(toPlain(saved().autoWorkPrefs), { s1: { dows: [0] } });
+  assert.deepEqual(toPlain(saved().autoOffPrefs), { s1: { dows: [6] } });
+  m.scheduleAutoToggleWorkPrefDow("s1", 0);
+  assert.deepEqual(toPlain(saved().autoWorkPrefs), {});
+});
+
+test("선호 출근 요일이 지정된 날에는 새 오프 배정을 우선 피한다", () => {
+  const { m } = setup({
+    staff: [staff("s1")],
+    autoWorkPrefs: { s1: { dows: [0, 6] } },
+  });
+  const plan = m.scheduleAutoBuildPlan(YEAR, MI);
+  const assigned = planOf(plan, "s1").assigned;
+  assert.equal(assigned.length, 8);
+  assert.ok(assigned.every((d) => ![0, 6].includes(dowOf(d))), `선호 출근일에 오프가 배정됨: ${assigned}`);
+});
+
 test("normalizeScheduleData: autoOffPrefs가 없던 예전 데이터에도 빈 객체를 채워준다", () => {
   const { m } = setup();
   assert.deepEqual(toPlain(m.normalizeScheduleData({ staff: [], records: {} }).autoOffPrefs), {});
-  assert.deepEqual(toPlain(m.normalizeScheduleData({ staff: [], records: {}, autoOffPrefs: null }).autoOffPrefs), {});
+  assert.deepEqual(toPlain(m.normalizeScheduleData({ staff: [], records: {} }).autoWorkPrefs), {});
+  assert.deepEqual(toPlain(m.normalizeScheduleData({ staff: [], records: {}, autoOffPrefs: null, autoWorkPrefs: null }).autoOffPrefs), {});
+  assert.deepEqual(toPlain(m.normalizeScheduleData({ staff: [], records: {}, autoOffPrefs: null, autoWorkPrefs: null }).autoWorkPrefs), {});
 });
 
 test("계획을 세우는 동안 scheduleData(지난달 스냅샷 포함)를 바꾸거나 저장하지 않는다", () => {
@@ -304,28 +390,32 @@ test("계획을 세우는 동안 scheduleData(지난달 스냅샷 포함)를 바
   assert.equal(m.scheduleData.staffHistory["2026-08"], undefined, "지난 달 스냅샷을 새로 만들지 않는다");
 });
 
-test("인원별 설정 팝업: 인원 × 요일 표에 선택된 칸이 표시되고, 이름은 이스케이프된다", () => {
+test("인원별 설정은 오프/선호 출근을 별도 팝업으로 열고 월~일 순서다", () => {
   const { m } = setup({
     staff: [staff("s1", { name: "<b>홍</b>" }), staff("s2")],
     autoOffPrefs: { s1: { dows: [2, 3] } },
+    autoWorkPrefs: { s1: { dows: [5] } },
   });
   const list = m.getStaffListForMonth(YEAR, MI);
-  assert.equal(m.scheduleAutoPrefsCountText(list), "(1명 설정됨)");
-  const html = m.scheduleAutoSettingsPopupHtml(list, []);
-  assert.ok(html.includes("인원별 설정") && html.includes("(1명 설정됨)"));
-  assert.ok(html.includes('<table class="sch-auto-set-table">'), "한눈에 보이는 표");
-  assert.ok(!html.includes("<details"), "접었다 펴는 영역이 아니라 팝업 안의 표");
-  assert.ok(html.includes(`data-auto-pref-staff="s1" data-auto-pref-dow="2" aria-pressed="true"`));
-  assert.ok(html.includes(`data-auto-pref-staff="s1" data-auto-pref-dow="0" aria-pressed="false"`));
-  assert.equal(count(html, /data-auto-pref-staff="s1"/g), 7, "인원 한 명당 일~토 7칸");
-  assert.equal(count(html, /data-auto-pref-staff="s2"/g), 7);
-  assert.ok(!html.includes("<b>홍</b>"), "이름은 이스케이프되어야 함");
-  assert.ok(html.includes("&lt;b&gt;홍&lt;/b&gt;"));
-  assert.ok(!html.includes("이번 배치 제외 중"));
-  assert.equal(m.scheduleAutoPrefsCountText([]), "(설정 없음)");
+  const offHtml = m.scheduleAutoSettingsPopupHtml(list, [], "off");
+  const workHtml = m.scheduleAutoSettingsPopupHtml(list, [], "work");
+  assert.ok(offHtml.includes("인원별 오프 설정"));
+  assert.ok(workHtml.includes("인원별 선호 설정"));
+  assert.equal(count(offHtml, /data-auto-pref-kind="off"/g), 14);
+  assert.equal(count(offHtml, /data-auto-pref-kind="work"/g), 0);
+  assert.equal(count(workHtml, /data-auto-pref-kind="work"/g), 14);
+  assert.equal(count(workHtml, /data-auto-pref-kind="off"/g), 0);
+  assert.ok(offHtml.includes('data-auto-pref-kind="off" aria-pressed="true"'));
+  assert.ok(workHtml.includes('data-auto-pref-kind="work" aria-pressed="true"'));
+  for (const html of [offHtml, workHtml]) {
+    const header = html.match(/<thead><tr><th[^>]*>인원<\/th>([\s\S]*?)<\/tr><\/thead>/)[1];
+    assert.deepEqual([...header.matchAll(/<th[^>]*>([일월화수목금토])<\/th>/g)].map((m) => m[1]), ["월", "화", "수", "목", "금", "토", "일"]);
+    assert.ok(!html.includes("<b>홍</b>"));
+    assert.ok(html.includes("&lt;b&gt;홍&lt;/b&gt;"));
+  }
 });
 
-test("인원별 설정 팝업: 주간·야간·관리자로 묶어 보여주고, 이번 배치에서 제외 중인 인원은 표시만 한다", () => {
+test("인원별 설정 팝업: 주간·야간·관리자로 묶고 제외 중인 인원은 표시한다", () => {
   const { m } = setup({
     staff: [
       staff("d1", { name: "김주간" }),
@@ -340,7 +430,6 @@ test("인원별 설정 팝업: 주간·야간·관리자로 묶어 보여주고,
   assert.ok(html.includes("sch-auto-set-group") && /주간 <span[^>]*>1명/.test(html) && html.includes("야간 <span") && html.includes("관리자 <span"));
   assert.equal(count(html, /이번 배치 제외 중/g), 1);
   assert.ok(/is-excluded[\s\S]*박야간[\s\S]*이번 배치 제외 중/.test(html));
-  // 제외 중이어도 선호 요일 칸은 그대로 눌러서 설정할 수 있다
   assert.equal(count(html, /data-auto-pref-staff="n1"/g), 7);
   assert.equal(m.scheduleAutoStaffGroups([]).length, 0);
   assert.ok(m.scheduleAutoSettingsPopupHtml([], []).includes("이번 달 인원이 없어요"));
@@ -382,11 +471,12 @@ test("제외한 인원은 출근 인원수·필요인력 계산에서도 빠진�
   assert.equal(all.prefHits, 4);
   assert.ok(fridays.every((d) => all.assigned.includes(d)));
 
-  // s3 제외: 재직 2명 → s1이 금요일에 쉬면 1명만 남아 대비 -1(금요일은 0이 1순위, -1은 최후의 수단)이라 다른 날을 고른다
+  // s3 제외: 재직 2명 → s1이 금요일에 쉬면 1명만 남아 대비 -1이지만,
+  // 이제 1순위가 0~-1 범위이므로 금요일도 선호대로 선택할 수 있다.
   const plan = build({ excludeStaffIds: ["s3"] });
   const p1 = planOf(plan, "s1");
-  assert.equal(p1.prefHits, 0);
-  assert.ok(fridays.every((d) => !p1.assigned.includes(d)));
+  assert.equal(p1.prefHits, 4);
+  assert.ok(fridays.every((d) => p1.assigned.includes(d)));
   assert.equal(planOf(plan, "s3"), undefined);
   assert.deepEqual(toPlain(plan.warnings), []);
 });
@@ -428,6 +518,27 @@ test("제외 조건은 저장되지 않는다(scheduleData·저장소에 남지 
   assert.equal(Object.prototype.hasOwnProperty.call(m.scheduleData, "autoExcluded"), false);
 });
 
+
+test("미리보기 생성 후 제외 인원을 추가하면 기존 계획이 제외 조건으로 다시 계산된다", () => {
+  const { m } = setup({
+    staff: [
+      staff("s1", { name: "김주간" }),
+      staff("s2", { name: "이주간" }),
+      staff("s3", { name: "박주간" }),
+      staff("s4", { name: "최주간" }),
+    ],
+  });
+  const before = m.scheduleAutoBuildPlan(YEAR, MI);
+  assert.ok(assignedTotal(before) > 0, "제외 전에는 배정 계획이 있어야 한다");
+
+  // UI 이벤트에서 호출하는 것과 동일한 순서로 제외를 추가하고 미리보기를 다시 계산한다.
+  m.scheduleAutoSetExcluded("s1", true);
+  const after = m.scheduleAutoBuildPlan(YEAR, MI, { excludeStaffIds: m.scheduleAutoGetExcluded() });
+
+  assert.ok(after.excluded.some((x) => x.id === "s1"));
+  assert.equal(planOf(after, "s1"), undefined, "제외된 인원은 새 계획에 포함되면 안 된다");
+});
+
 test("제외 영역 HTML: 아직 제외하지 않은 인원만 선택지에 나오고, 제외된 인원은 해제(✕) 칩으로 나온다", () => {
   const { m } = setup({ staff: [staff("s1", { name: "김주간" }), staff("s2", { name: "<i>이</i>", nickname: "닉" }), staff("s3", { name: "박야간", group: "night" })] });
   const list = m.getStaffListForMonth(YEAR, MI);
@@ -448,12 +559,15 @@ test("제외 영역 HTML: 아직 제외하지 않은 인원만 선택지에 나�
   assert.equal(count(all, /data-auto-exclude-remove=/g), 3);
 });
 
-test("배치 조건 영역: '인원별 설정' 버튼(요약 문구 포함)과 '제외할 인원'이 함께 있고, 예전 '선호 오프 요일' 접이식 영역은 없다", () => {
+test("배치 조건 영역: 인원별 설정 버튼을 누르면 오프/선호 설정을 각각 선택할 수 있다", () => {
   const { m } = setup({ staff: [staff("s1"), staff("s2")], autoOffPrefs: { s1: { dows: [1] } } });
   const html = m.scheduleAutoConditionsHtml(m.getStaffListForMonth(YEAR, MI));
   assert.ok(html.includes("배치 조건") && html.includes("제외할 인원"));
-  assert.ok(html.includes('id="sch-auto-settings-btn"') && html.includes("인원별 설정") && html.includes("(1명 설정됨)"));
-  assert.ok(!html.includes("선호 오프 요일") && !html.includes("<details"));
+  assert.ok(html.includes('id="sch-auto-settings-btn"') && html.includes("인원별 설정"));
+  assert.ok(html.includes('id="sch-auto-off-settings-btn"') && html.includes("인원별 오프 설정"));
+  assert.ok(html.includes('id="sch-auto-work-settings-btn"') && html.includes("인원별 선호 설정"));
+  assert.ok(html.includes('id="sch-auto-settings-menu"') && html.includes('hidden'));
+  assert.ok(!html.includes("<details"));
 });
 
 /* ===================== 미리보기: 월별 스케줄 표 모양 ===================== */
@@ -605,6 +719,27 @@ function combos(arr, k) {
   return combos(t, k - 1).map((c) => [h, ...c]).concat(combos(t, k));
 }
 
+test("scheduleAutoSolveDays: 6일 연속 근무까지만 허용하고 7일째는 오프로 끊을 수 있으면 끊는다", () => {
+  const { m } = setup();
+  const scores = {};
+  for (let d = 1; d <= 7; d++) scores[d] = [0, 0, -d];
+  const res = toPlain(m.scheduleAutoSolveDays({
+    daysInMonth: 7,
+    carry: 0,
+    offCarry: 0,
+    offLimit: 10,
+    limit: 5,
+    maxWorkStreak: 6,
+    needed: 1,
+    isRest: () => false,
+    isFree: (d) => d === 7,
+    isProtectedRest: () => false,
+    dayScore: (d) => scores[d],
+  }));
+  assert.deepEqual(res.picked, [7]);
+  assert.equal(res.violations, 1, "1~6일은 근무, 7일은 오프로 끊어 6일 연속까지만 허용");
+});
+
 test("scheduleAutoSolveDays: 무작위 작은 경우 300개에서 브루트포스 최적값과 항상 같다", () => {
   const { m } = setup();
   const rnd = mulberry32(20260921);
@@ -619,7 +754,7 @@ test("scheduleAutoSolveDays: 무작위 작은 경우 300개에서 브루트포�
     for (let d = 1; d <= days; d++) scores[d] = [Math.floor(rnd() * 2), Math.floor(rnd() * 3), -d];
     const isRest = (d) => restSet.has(d), isFree = (d) => freeSet.has(d), dayScore = (d) => scores[d];
 
-    const res = toPlain(m.scheduleAutoSolveDays({ daysInMonth: days, carry, limit, needed, isRest, isFree, dayScore }));
+    const res = toPlain(m.scheduleAutoSolveDays({ daysInMonth: days, carry, offCarry: 0, offLimit: days + 1, limit, needed, isRest, isFree, isProtectedRest: () => false, dayScore }));
     const freeDays = [...freeSet];
     const K = Math.min(needed, freeDays.length);
     assert.equal(res.picked.length, K, `iter ${iter}: 개수`);
@@ -801,7 +936,7 @@ test("대전제: 관리자는 구분별 출근 인원에 들어가지 않고 이
   const list = [...mkStaff("m", 3), staff("boss", { isAdmin: true, types: ["채팅"] })];
   const { m } = premise({ staff: list });
   const plan = m.scheduleAutoBuildPlan(YEAR, MI);
-  assert.equal(planOf(plan, "boss").assigned.length, 8, "관리자는 필요인력 집계 밖이라 그대로 배정");
+  assert.equal(planOf(plan, "boss"), undefined, "관리자는 자동 배치 대상에서 완전히 제외");
   list.slice(0, 3).forEach((s) => assert.equal(assignedOf(plan, s.id), 0, "관리자를 빼면 채팅은 딱 3명이라 배정 불가"));
 });
 
@@ -873,18 +1008,18 @@ test("특휴가 입력돼 있어도 목표 오프 개수는 줄지 않는다(대
   assert.equal(planOf(plan, "dh").assigned.length, 6, "대휴 2개는 목표에서 차감");
 });
 
-test("필요인력 허용범위(부족 기준): 금·토·월 0(최후 -1) / 그 외 요일 -1(최후 -2) / 평일 공휴일 금·월은 -2", () => {
+test("필요인력 허용범위: 금·토·월은 0만 허용 / 그 외 요일은 -1(최후 -2) / 평일 공휴일은 -2까지", () => {
   const { m } = setup({});
   const tol = (dow) => toPlain(m.scheduleAutoToleranceInfo(dow, "2026-09-01")); // getHoliday는 항상 null
-  [5, 6, 1].forEach((d) => assert.deepEqual(tol(d), { ideal: 0, max: 1 }, `dow ${d}`));
+  [5, 6, 1].forEach((d) => assert.deepEqual(tol(d), { ideal: 0, max: 0 }, `dow ${d}`));
   [0, 2, 3, 4].forEach((d) => assert.deepEqual(tol(d), { ideal: 1, max: 2 }, `dow ${d}`));
   m.getHoliday = () => ({ name: "공휴일" });
   [5, 1].forEach((d) => assert.deepEqual(toPlain(m.scheduleAutoToleranceInfo(d, "2026-09-01")), { ideal: 2, max: 2 }, `평일 공휴일 dow ${d}`));
-  assert.deepEqual(toPlain(m.scheduleAutoToleranceInfo(6, "2026-09-05")), { ideal: 0, max: 1 }, "토요일은 평일이 아니라 예외 아님");
+  assert.deepEqual(toPlain(m.scheduleAutoToleranceInfo(6, "2026-09-05")), { ideal: 0, max: 0 }, "토요일은 일반일 0만 허용");
   assert.deepEqual(toPlain(m.scheduleAutoToleranceInfo(0, "2026-09-06")), { ideal: 1, max: 2 });
 });
 
-test("그 외 요일(수요일)은 -1 범위를 먼저 지키고, 다른 날이 남아 있으면 -2로 넓히지 않는다", () => {
+test("수요일은 0~-1 범위를 먼저 지키고, 다른 날이 남아 있으면 -2로 넓히지 않는다", () => {
   // 수요일(2·9·16·23·30)마다 2명 필요 / 재직 4명. 3명이 쉬면 남는 1명(대비 -1)까지가 1순위, 4명이 다 쉬면 0명(대비 -2)이라 최후의 수단.
   const requiredHeadcount = {};
   [2, 9, 16, 23, 30].forEach((d) => { requiredHeadcount[`2026-09|DAY|채팅|${d}`] = 2; });
@@ -917,4 +1052,28 @@ test("대비가 +(인원이 남는 날)는 항상 허용하고, 부족(-)만 제
   assert.equal(p1.prefHits, 4);
   assert.ok(fridays.every((d) => p1.assigned.includes(d)));
   assert.deepEqual(toPlain(plan.warnings), []);
+});
+
+test("각 구분별 모든 인원 출근일을 우선 해소하고, 필요하면 그 날짜만 부족 -1까지 허용한다", () => {
+  const six = Array.from({ length: 6 }, (_, i) => staff(`aw${i + 1}`));
+  const { m } = setup({ staff: six, requiredHeadcount: {} }, { premise: true });
+  const plan = m.scheduleAutoBuildPlan(YEAR, MI);
+  const assigned = withPlan({}, plan);
+  for (let d = 1; d <= 30; d++) {
+    const key = sep(d);
+    const working = six.filter((s) => !assigned[`${s.id}|${key}`]).length;
+    assert.ok(working < 6, `9/${d}에 6명 전원 출근하면 안 됨`);
+  }
+});
+
+test("모두 출근하는 날을 없애기 위해 필요한 경우에만 -1 부족을 허용한다", () => {
+  const six = Array.from({ length: 6 }, (_, i) => staff(`fb${i + 1}`));
+  const requiredHeadcount = { "2026-09|DAY|채팅|7": 6 };
+  const { m } = setup({ staff: six, requiredHeadcount }, { premise: true });
+  const plan = m.scheduleAutoBuildPlan(YEAR, MI);
+  const assigned = withPlan({}, plan);
+  const offOn7 = six.filter((s) => !!assigned[`${s.id}|2026-09-07`]).length;
+  assert.ok(offOn7 >= 1, "9/7(월) 전원 출근을 피하기 위해 최소 1명은 쉬어야 함");
+  assert.ok(offOn7 <= 1, "9/7에는 불필요하게 여러 명을 쉬게 하지 않아야 함");
+  assert.ok(!plan.warnings.some((w) => w.includes("9/7") && w.includes("필요인력 허용범위를 벗어나")), "전원 출근 해소를 위한 -1 허용은 범위 이탈 경고 대상이 아님");
 });

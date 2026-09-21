@@ -50,7 +50,7 @@
           ${ICON_SEARCH_MINI}
         </div>
         <button class="ghost-btn" id="sch-adjust-summary-btn">${ICON_CLIPBOARD} 가감점 취합</button>
-        <button class="ghost-btn" id="sch-auto-btn">${ICON_SPARK} AI 자동 배치 ▾</button>
+        <button class="ghost-btn" id="sch-auto-btn">자동 배치 ▾</button>
         <button class="ghost-btn ${scheduleHiddenPanelOpen ? "active" : ""}" id="sch-hidden-btn">${ICON_CALENDAR} 숨긴 열/행${scheduleHiddenCount() > 0 ? ` (${scheduleHiddenCount()})` : ""} ▾</button>
         <button class="ghost-btn sch-delete-btn-small" id="sch-delete-btn">${ICON_TRASH} 일정 삭제</button>
       </div>
