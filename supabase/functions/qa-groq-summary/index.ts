@@ -104,7 +104,10 @@ Deno.serve(async (req: Request) => {
     // 모델/토큰 사용량/요청 ID를 함께 반환한다. API 키 자체는 절대 반환하지 않는다.
     const usage = data?.usage || null;
     const groqRequestId = resp.headers.get("x-groq-request-id") || resp.headers.get("x-request-id") || null;
-    const isScheduleSelection = String(body?.mode || "") === "schedule-auto-candidate-selection";
+    // "실제 Groq가 응답했다"는 표시일 뿐, 내용이 옳다는 보장은 아니다. 클라이언트는 이 값과 무관하게
+    // 스케줄 자동배치 쪽 응답(후보 선택·이동 제안)을 자체 검증 로직으로 다시 확인한 뒤에만 반영한다.
+    const scheduleAutoModes = ["schedule-auto-candidate-selection", "schedule-auto-improvement"];
+    const isScheduleSelection = scheduleAutoModes.includes(String(body?.mode || ""));
     return new Response(JSON.stringify({
       text,
       model: GROQ_MODEL,
