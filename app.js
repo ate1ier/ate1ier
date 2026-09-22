@@ -12520,7 +12520,12 @@
       const solved = scheduleAutoSolveDays({
         daysInMonth, carry, limit: LIMIT, maxWorkStreak: 6, needed,
         isRest: (d) => !!baseRest[d],
-        isFree: (d) => !!isFreeDay[d],
+        // 필요인력 허용범위(최후 기준, dayFeasible)를 넘기는 날은 애초에 후보에서 제외한다.
+        // 이전에는 dayFeasible이 dayScore(점수)에만 반영돼서, 연속근무 5일 제한을 지키려고
+        // 오히려 필요인력 허용범위를 넘는 날을 골라버리는 경우가 있었다(그 반대가 맞다:
+        // 필요인력 허용범위는 -2/0에서 더 물러설 수단이 없는 절대 기준이고, 연속근무는
+        // 6일까지 예외가 있는 쪽이라 필요인력 쪽이 먼저 지켜져야 한다).
+        isFree: (d) => !!isFreeDay[d] && !!dayFeasible[d],
         isProtectedRest: (d) => {
           const dateKey = scheduleDateKey(year, monthIndex, d);
           const rec = scheduleData.records[scheduleRecordKey(s.id, dateKey)];
