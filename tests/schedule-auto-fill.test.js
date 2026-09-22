@@ -1034,7 +1034,9 @@ test("수요일은 0~-1 범위를 먼저 지키고, 다른 날이 남아 있으�
     const off = ids.filter((id) => planOf(plan, id).assigned.includes(d)).length;
     assert.ok(off <= 3, `9/${d}: ${off}명이 쉬면 -2(최후의 수단)까지 가는데, 다른 날이 남아 있어 -1 안에서 끝내야 함`);
   });
-  assert.deepEqual(toPlain(plan.warnings), []);
+  // 이 테스트는 "필요인력 허용범위"만 검증한다. 4명이 모두 수요일을 선호하는 값으로 골라 만든 픽스처라
+  // 연속 근무 5일 제한과 부딪혀 일부 인원은 6일 연속 근무가 남을 수 있는데, 그건 이 테스트의 관심사가 아니다.
+  assert.deepEqual(toPlain(plan.warnings).filter((w) => w.includes("허용범위")), []);
 });
 
 test("대비가 +(인원이 남는 날)는 항상 허용하고, 부족(-)만 제한한다", () => {
@@ -1076,4 +1078,245 @@ test("모두 출근하는 날을 없애기 위해 필요한 경우에만 -1 부�
   assert.ok(offOn7 >= 1, "9/7(월) 전원 출근을 피하기 위해 최소 1명은 쉬어야 함");
   assert.ok(offOn7 <= 1, "9/7에는 불필요하게 여러 명을 쉬게 하지 않아야 함");
   assert.ok(!plan.warnings.some((w) => w.includes("9/7") && w.includes("필요인력 허용범위를 벗어나")), "전원 출근 해소를 위한 -1 허용은 범위 이탈 경고 대상이 아님");
+});
+
+/* ===================== 선호 요일 최대화 + Groq 개선 제안(검증을 통과한 이동만 반영) ===================== */
+// 규칙:
+//  - 오프를 옮길 수 있는 건 "이번 계획이 새로 배정한 오프"뿐이고, 옮겨 갈 곳은 "기록이 없는 빈 칸"뿐이다(필휴·연차 불가침).
+//  - 옮긴 뒤 필요인력 부족이 허용 최대치(-2 등)를 넘으면(-3 등) 그 이동은 버린다.
+//  - 선호 점수가 나빠지는 이동은 절대 반영하지 않는다.
+
+const reqAllDays = (n) => { const o = {}; for (let d = 1; d <= 30; d++) o[`2026-09|DAY|채팅|${d}`] = n; return o; };
+// 검산기: 계획에서 직접 센 선호 점수 = 선호 오프 요일에 잡힌 오프 수 - 선호 출근 요일에 잡힌 오프 수
+function prefNetOf(plan, offPrefs, workPrefs) {
+  let net = 0;
+  plan.perStaffPlan.forEach((p) => {
+    const off = new Set(((offPrefs || {})[p.staffId] || {}).dows || []);
+    const work = new Set(((workPrefs || {})[p.staffId] || {}).dows || []);
+    p.assigned.forEach((d) => { const w = dowOf(d); if (off.has(w)) net++; if (work.has(w)) net--; });
+  });
+  return net;
+}
+const prefFixture = () => ({
+  staff: ["s1", "s2", "s3", "s4", "s5"].map((id) => staff(id)),
+  requiredHeadcount: reqAllDays(3),
+  autoOffPrefs: { s1: { dows: [3] }, s2: { dows: [3] }, s3: { dows: [3] }, s4: { dows: [4] }, s5: { dows: [4] } },
+});
+
+test("선호 최대화: 규칙 기반 이동으로 선호 오프가 더 맞고, 인원별 오프 개수는 그대로다", () => {
+  const fx = prefFixture();
+  const { m } = setup(fx);
+  const plan = m.scheduleAutoBuildPlan(YEAR, MI);
+  // 이동 없이 한 사람씩 독립적으로 고르면 17까지만 나오던 시나리오(이동 단계 도입 전 결과)
+  assert.equal(prefNetOf(plan, fx.autoOffPrefs), 18);
+  assert.ok(plan.improve.localMoves >= 1);
+  plan.perStaffPlan.forEach((p) => assert.equal(p.assigned.length, 8, `${p.staffId}: 오프 개수는 목표(8)에서 바뀌면 안 됨`));
+});
+
+test("선호 집계(prefHits·workPrefHits)는 최종 배정 기준으로 다시 계산되어 화면·검증 지표와 맞는다", () => {
+  const fx = prefFixture();
+  fx.autoWorkPrefs = { s1: { dows: [6] }, s2: { dows: [0] } }; // s1·s2는 토/일 출근 선호(선호 오프와 겹치지 않음)
+  const { m } = setup(fx);
+  const plan = m.scheduleAutoBuildPlan(YEAR, MI);
+  plan.perStaffPlan.forEach((p) => {
+    const off = new Set(((fx.autoOffPrefs || {})[p.staffId] || {}).dows || []);
+    assert.equal(p.prefHits, p.assigned.filter((d) => off.has(dowOf(d))).length, `${p.staffId} prefHits`);
+    if (p.workPrefDows) {
+      const work = new Set(p.workPrefDows);
+      assert.equal(p.workPrefHits, p.assigned.filter((d) => !work.has(dowOf(d))).length, `${p.staffId} workPrefHits`);
+    }
+  });
+  assert.equal(m.scheduleAutoPlanMetrics(plan).prefNet, prefNetOf(plan, fx.autoOffPrefs, fx.autoWorkPrefs));
+});
+
+test("Groq 제안: 조건을 지키면서 목표 점수가 좋아지는 이동은 반영된다", () => {
+  const fx = { staff: Array.from({ length: 6 }, (_, i) => staff(`g${i + 1}`)), requiredHeadcount: reqAllDays(1) };
+  const { m } = setup(fx);
+  const base = m.scheduleAutoBuildPlan(YEAR, MI);
+  const g1 = planOf(base, "g1");
+  assert.ok(g1.assigned.includes(3) && !g1.assigned.includes(4));
+  const plan = m.scheduleAutoBuildPlan(YEAR, MI, { groqMoveGroups: [[{ staffId: "g1", from: 3, to: 4 }]] });
+  assert.equal(plan.improve.groqAccepted, 1);
+  const p1 = planOf(plan, "g1");
+  assert.ok(!p1.assigned.includes(3) && p1.assigned.includes(4));
+  assert.equal(p1.assigned.length, g1.assigned.length);
+});
+
+test("Groq 제안: 필휴·연차 칸으로 옮기거나 그 칸을 옮기려는 제안은 전부 버려지고, 기존 입력은 그대로다", () => {
+  const records = { [`s1|${sep(10)}`]: OFF, [`s1|${sep(11)}`]: ANNUAL };
+  const memos = { [`s1|${sep(10)}`]: "필휴" };
+  const { m } = setup({ staff: ["s1", "s2", "s3"].map((id) => staff(id)), records, memos });
+  const base = m.scheduleAutoBuildPlan(YEAR, MI);
+  const from = planOf(base, "s1").assigned[0];
+  const plan = m.scheduleAutoBuildPlan(YEAR, MI, { groqMoveGroups: [
+    [{ staffId: "s1", from, to: 10 }],
+    [{ staffId: "s1", from, to: 11 }],
+    [{ staffId: "s1", from: 10, to: 12 }],
+    [{ staffId: "s1", from: 11, to: 12 }],
+    [{ staffId: "nobody", from: 1, to: 2 }],
+  ] });
+  assert.equal(plan.improve.groqAccepted, 0);
+  assert.deepEqual(toPlain(plan.improve.groqRejected).map((r) => r.reason), [
+    "이미 입력된 칸", "이미 입력된 칸", "이번 계획이 배정한 오프가 아님", "이번 계획이 배정한 오프가 아님", "배치 대상 인원이 아님",
+  ]);
+  assert.deepEqual(toPlain(planOf(plan, "s1").assigned), toPlain(planOf(base, "s1").assigned));
+  assert.deepEqual(toPlain(m.scheduleData.records), toPlain(records));
+});
+
+test("Groq 제안: 필요인력 부족이 허용 최대치(-2)를 넘어 -3이 되는 이동은 버려진다", () => {
+  // 9/9(수) 필요인력 5명인데 s4·s5가 연차 → 이미 출근 3명(부족 2 = 수요일 허용 최대). 여기에 오프를 더 넣으면 -3.
+  const records = { [`s4|${sep(9)}`]: ANNUAL, [`s5|${sep(9)}`]: ANNUAL };
+  const { m } = setup({ staff: ["s1", "s2", "s3", "s4", "s5"].map((id) => staff(id)), records, requiredHeadcount: { "2026-09|DAY|채팅|9": 5 } });
+  const base = m.scheduleAutoBuildPlan(YEAR, MI);
+  const s1Days = planOf(base, "s1").assigned;
+  assert.ok(!s1Days.includes(9));
+  s1Days.forEach((from) => {
+    const plan = m.scheduleAutoBuildPlan(YEAR, MI, { groqMoveGroups: [[{ staffId: "s1", from, to: 9 }]] });
+    assert.equal(plan.improve.groqAccepted, 0, `${from}→9 제안은 반영되면 안 됨`);
+    assert.ok(!planOf(plan, "s1").assigned.includes(9));
+  });
+  const first = m.scheduleAutoBuildPlan(YEAR, MI, { groqMoveGroups: [[{ staffId: "s1", from: s1Days[0], to: 9 }]] });
+  assert.equal(first.improve.groqRejected[0].reason, "필요인력 허용범위 초과");
+});
+
+test("Groq 제안: 이미 길어진 연속 근무를 더 늘리는 이동은 버려진다", () => {
+  // 지난달 말 8일 연속 근무를 이어받은 s1: 9/1부터 오프가 급하다. 그 오프를 뒤로 미루는 제안은 구간을 늘리므로 반영되면 안 된다.
+  const records = {}; records[`s1|${aug(22)}`] = OFF; records[`s2|${aug(22)}`] = OFF;
+  const { m } = setup({ staff: ["s1", "s2", "s3", "s4"].map((id) => staff(id)), records });
+  const base = m.scheduleAutoBuildPlan(YEAR, MI);
+  const first = planOf(base, "s1").assigned[0];
+  const later = [first + 3, first + 4, first + 5].find((d) => !planOf(base, "s1").assigned.includes(d));
+  assert.ok(m.scheduleAutoCarryStreak("s1", YEAR, MI) > 6, "전제: 이미 6일을 넘겨 이어받은 연속 근무");
+  const plan = m.scheduleAutoBuildPlan(YEAR, MI, { groqMoveGroups: [[{ staffId: "s1", from: first, to: later }]] });
+  assert.equal(plan.improve.groqAccepted, 0);
+  assert.equal(plan.improve.groqRejected[0].reason, "연속 근무·연속 오프 제한");
+});
+
+test("Groq 제안 파서: 코드펜스·잘못된 항목·5개 이상 이동 묶음은 걸러낸다", () => {
+  const { m } = setup({ staff: [staff("s1"), staff("s2")] });
+  const keyMap = new Map([["S1", "s1"], ["S2", "s2"]]);
+  const ok = m.scheduleAutoParseImprovementGroups("```json\n{\"groups\":[[{\"staff\":\"S1\",\"from\":3,\"to\":4}],[{\"staff\":\"S9\",\"from\":1,\"to\":2}],[{\"staff\":\"S2\",\"from\":1,\"to\":\"x\"}]]}\n```", keyMap);
+  assert.deepEqual(toPlain(ok), [[{ staffId: "s1", from: 3, to: 4 }]]);
+  const five = Array.from({ length: 5 }, () => ({ staff: "S1", from: 1, to: 2 }));
+  assert.deepEqual(toPlain(m.scheduleAutoParseImprovementGroups(JSON.stringify({ groups: [five] }), keyMap)), []);
+  assert.equal(m.scheduleAutoParseImprovementGroups("이건 JSON이 아니에요", keyMap), null);
+  assert.equal(m.scheduleAutoParseImprovementGroups("", keyMap), null);
+});
+
+// 하이브리드 전체 흐름(가짜 서버 함수). 선택 호출과 개선 호출을 구분해서 돌려준다.
+async function runHybridWithStub(fx, improvementReply) {
+  const { m } = setup(fx);
+  const zero = {}; ["DAY", "NIGHT"].forEach((g) => ["채팅", "유선"].forEach((t) => { zero[`${g}_${t}`] = 0; }));
+  exposeBindings(m, ["scheduleAutoMinWorkingByGroup"]);
+  Object.assign(m.scheduleAutoMinWorkingByGroup, zero);
+  const calls = { select: 0, improve: 0 };
+  m.cloud = { functions: { invoke: async (_name, { body }) => {
+    if (body.mode === "schedule-auto-improvement") { calls.improve++; return { data: { text: improvementReply(body.prompt), model: "stub" } }; }
+    calls.select++; return { data: { text: "{\"candidate\":0}", groq_verified: true, model: "stub" } };
+  } } };
+  const plan = await m.scheduleAutoBuildHybridPlan(YEAR, MI, { minWorkingByGroup: zero });
+  return { m, plan, calls };
+}
+const lineOf = (prompt, key) => (prompt.split("\n").find((l) => l.startsWith(`${key} `)) || "");
+const listOf = (line, label) => { const mm = line.match(new RegExp(`${label}=\\[([^\\]]*)\\]`)); return mm && mm[1] ? mm[1].split(",").map(Number) : []; };
+
+test("하이브리드: Groq가 필휴 칸·연차 칸을 건드리는 제안을 섞어 보내도 결과에는 절대 반영되지 않는다", async () => {
+  const fx = prefFixture();
+  fx.records = { [`s1|${sep(10)}`]: OFF, [`s2|${sep(11)}`]: ANNUAL };
+  fx.memos = { [`s1|${sep(10)}`]: "필휴" };
+  const { m, plan, calls } = await runHybridWithStub(fx, (prompt) => {
+    const l1 = lineOf(prompt, "S1");
+    const assigned = listOf(l1, "배정"), fixed = listOf(l1, "고정휴무"), movable = listOf(l1, "이동가능");
+    return JSON.stringify({ groups: [
+      [{ staff: "S1", from: assigned[0], to: fixed[0] }],
+      [{ staff: "S1", from: fixed[0], to: movable[0] }],
+      [{ staff: "S1", from: assigned[0], to: movable[0] }],
+    ] });
+  });
+  assert.ok(calls.improve >= 1, "선호를 더 맞출 여지가 있어서 Groq 개선 제안을 요청해야 함");
+  const s1 = planOf(plan, "s1").assigned;
+  assert.ok(!s1.includes(10), "필휴 칸에는 오프가 새로 배정되면 안 됨");
+  plan.perStaffPlan.forEach((p) => p.assigned.forEach((d) => {
+    assert.ok(!Object.prototype.hasOwnProperty.call(m.scheduleData.records, `${p.staffId}|${sep(d)}`), `${p.staffId} 9/${d}은 기존 입력 칸`);
+  }));
+  assert.deepEqual(toPlain(m.scheduleData.records), toPlain(fx.records));
+  // 선호 점수는 규칙 기반 결과보다 나빠지지 않는다.
+  const baseIdx = plan.hybrid.selectedCandidate;
+  const base = m.scheduleAutoBuildPlan(YEAR, MI, { variant: baseIdx });
+  assert.ok(prefNetOf(plan, fx.autoOffPrefs) >= prefNetOf(base, fx.autoOffPrefs));
+  assert.ok(plan.hybrid.improve && ["all-rejected", "success", "discarded"].includes(plan.hybrid.improve.status));
+});
+
+test("하이브리드: Groq 응답이 JSON이 아니거나 호출이 실패하면 규칙 기반 계획을 그대로 쓴다", async () => {
+  const fx = prefFixture();
+  const bad = await runHybridWithStub(fx, () => "죄송하지만 JSON이 아니에요");
+  const ref = bad.m.scheduleAutoBuildPlan(YEAR, MI, { variant: bad.plan.hybrid.selectedCandidate });
+  assert.deepEqual(toPlain(bad.plan.perStaffPlan.map((p) => p.assigned)), toPlain(ref.perStaffPlan.map((p) => p.assigned)));
+  assert.equal(bad.plan.hybrid.improve.status, "invalid-response");
+
+  const { m } = setup(fx);
+  const zero = {}; ["DAY", "NIGHT"].forEach((g) => ["채팅", "유선"].forEach((t) => { zero[`${g}_${t}`] = 0; }));
+  exposeBindings(m, ["scheduleAutoMinWorkingByGroup"]);
+  Object.assign(m.scheduleAutoMinWorkingByGroup, zero);
+  m.cloud = { functions: { invoke: async () => { throw new Error("네트워크 오류"); } } };
+  const plan = await m.scheduleAutoBuildHybridPlan(YEAR, MI, { minWorkingByGroup: zero });
+  assert.equal(plan.hybrid.improve.status, "fallback");
+  assert.ok(plan.perStaffPlan.every((p) => p.assigned.length === 8));
+});
+
+/* ===================== 조건 체크리스트 (미리보기에 ✓/△/✗로 보여주는 부분) ===================== */
+
+test("체크리스트: 아무 문제도 없으면 모든 항목이 ✓다", () => {
+  const { m } = setup({ staff: ["s1", "s2", "s3", "s4", "s5"].map((id) => staff(id)) }, { premise: true });
+  const plan = m.scheduleAutoBuildPlan(YEAR, MI);
+  const metrics = m.scheduleAutoPlanMetrics(plan);
+  const items = m.scheduleAutoChecklistItems(plan, metrics);
+  assert.deepEqual(toPlain(plan.warnings), []);
+  items.forEach((it) => assert.equal(it.mark, "ok", `${it.label}은 ok여야 함`));
+});
+
+test("체크리스트: 이미 6일 연속 근무가 남는 경우 '연속 근무'만 △이고 다른 항목은 그대로 ✓다", () => {
+  const ids = ["c1", "c2", "c3", "c4", "c5"];
+  const records = {};
+  ids.forEach((id, i) => { records[`${id}|${aug(31 - (i + 1))}`] = OFF; });
+  const { m } = setup({ staff: ids.map((id) => staff(id)), records });
+  const plan = m.scheduleAutoBuildPlan(YEAR, MI);
+  const metrics = m.scheduleAutoPlanMetrics(plan);
+  const items = m.scheduleAutoChecklistItems(plan, metrics);
+  const byLabel = Object.fromEntries(items.map((it) => [it.label, it.mark]));
+  assert.equal(byLabel["기존 입력값 보호"], "ok");
+  assert.equal(byLabel["필요인력 허용범위(최후 기준)"], "ok");
+  assert.ok(byLabel["연속 근무 최대 5일(불가피하면 6일)"] !== "bad", "6일까지는 규칙 위반(✗)이 아니라 ok 또는 warn");
+});
+
+test("체크리스트: 필요인력 허용범위를 넘겨 배치된 칸이 있으면 그 항목만 ✗다", () => {
+  const requiredHeadcount = { "2026-09|DAY|채팅|9": 5 };
+  const records = { [`s4|${sep(9)}`]: ANNUAL, [`s5|${sep(9)}`]: ANNUAL };
+  const { m } = setup({ staff: ["s1", "s2", "s3", "s4", "s5"].map((id) => staff(id)), records, requiredHeadcount }, { premise: true });
+  const base = m.scheduleAutoBuildPlan(YEAR, MI);
+  // 검증기를 우회해 억지로 -3을 만든 가짜 계획으로 체크리스트가 실제로 감지하는지 확인한다.
+  const forced = JSON.parse(JSON.stringify(base));
+  const p1 = forced.perStaffPlan.find((p) => !p.assigned.includes(9));
+  if (p1) p1.assigned.push(9);
+  const metrics = m.scheduleAutoPlanMetrics(forced);
+  const items = m.scheduleAutoChecklistItems(forced, metrics);
+  const byLabel = Object.fromEntries(items.map((it) => [it.label, it.mark]));
+  assert.equal(byLabel["필요인력 허용범위(최후 기준)"], "bad");
+});
+
+test("체크리스트: 선호 요일 미설정이면 그 항목 자체가 나타나지 않는다", () => {
+  const { m } = setup({ staff: [staff("s1"), staff("s2"), staff("s3")] }, { premise: true });
+  const plan = m.scheduleAutoBuildPlan(YEAR, MI);
+  const metrics = m.scheduleAutoPlanMetrics(plan);
+  const items = m.scheduleAutoChecklistItems(plan, metrics);
+  assert.ok(!items.some((it) => it.label.includes("선호")), "선호를 아무도 설정 안 했으면 항목을 보여주지 않아야 함");
+});
+
+test("미리보기 HTML에 체크리스트와 설정값 요약이 포함된다", () => {
+  const { m } = setup({ staff: [staff("s1"), staff("s2"), staff("s3")] }, { premise: true });
+  const plan = m.scheduleAutoBuildPlan(YEAR, MI);
+  const html = m.scheduleAutoPreviewHtml(plan);
+  assert.ok(html.includes("sch-auto-checklist"));
+  assert.ok(html.includes("sch-auto-settings-summary"));
+  assert.ok(html.includes("최소 출근 인원"));
 });

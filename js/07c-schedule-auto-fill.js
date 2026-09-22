@@ -503,6 +503,10 @@
     const warnings = [];
     const perStaffPlan = [];
     const monthNo = monthIndex + 1;
+    // 인원별 경고와 계산 맥락. 배치 뒤에 오프를 옮기는 보정 단계(선호 교환·전원 출근 해소·선호 최대화)가 있어서,
+    // 경고는 바로 warnings에 넣지 않고 모아 두었다가 "최종 계획" 기준으로 다시 확정한다(옮겨진 칸에 대한 낡은 경고 방지).
+    const staffWarnCtx = new Map();
+    const staffWarnOrder = [];
 
     // 선호 요일이 있는 인원이 먼저 좋은 날짜를 고를 수 있게 하고, 그다음은 목표까지 더 많이 남은
     // 인원 순으로 정렬(안정 정렬 유지). 선호 요일이 같은 날에 몰리면 먼저 고른 사람이 우선한다.
@@ -607,6 +611,7 @@
           variant % 2 ? d : -d,
         ];
       });
+      const tolWarn = []; // 필요인력 허용범위를 넘겨 배치된 칸 — 나중에 그 칸이 옮겨지면 경고도 함께 사라진다
       const solved = scheduleAutoSolveDays({
         daysInMonth, carry, limit: LIMIT, maxWorkStreak: 6, needed,
         isRest: (d) => !!baseRest[d],
@@ -622,7 +627,7 @@
       });
       solved.picked.forEach((d) => {
         if (!dayFeasible[d]) {
-          warnings.push(`${staffLabel}님 ${monthNo}/${d} — 필요인력 허용범위를 벗어나 배치됐어요. 확인해주세요.`);
+          tolWarn.push({ d, text: `${staffLabel}님 ${monthNo}/${d} — 필요인력 허용범위를 벗어나 배치됐어요. 확인해주세요.` });
         }
         assigned.push(d);
         chosen[d] = true;
@@ -630,39 +635,21 @@
         staffTypes.forEach((t) => { working[g][t][d] -= 1; });
       });
 
+      let shortfallText = null;
       if (assigned.length < needed) {
         const minNote = minBlockedDays > 0
           ? ` 구분별 하루 출근 최소 인원 조건을 지키느라 오프를 넣을 수 없는 날이 ${minBlockedDays}일 있어요.`
           : "";
-        warnings.push(`${staffLabel}님은 빈 칸이 부족해 목표 ${needed}개 중 ${assigned.length}개만 배정됐어요.${minNote}`);
+        shortfallText = `${staffLabel}님은 빈 칸이 부족해 목표 ${needed}개 중 ${assigned.length}개만 배정됐어요.${minNote}`;
       }
 
-      // 최종 확인: 기존 일정 때문에 이미 3일을 넘는 연속 휴무(필휴 포함)가 있으면 알려준다.
-      // 새로 배정한 OFF는 solver에서 이 한도를 넘기지 않으므로, 기존 위반만 안내한다.
-      const finalRest = (d) => {
-        if (chosen[d]) return true;
-        const key = scheduleRecordKey(s.id, scheduleDateKey(year, monthIndex, d));
-        const rec = scheduleData.records[key];
-        if (!rec) return false;
-        return !scheduleAutoIsWorkRecord(rec);
-      };
-      const longOffRuns = scheduleAutoFindLongOffRuns(s.id, year, monthIndex, daysInMonth, offCarry, finalRest);
-      longOffRuns.forEach((r) => {
-        const span = r.start < 1
-          ? `지난달 말부터 이어져 ${monthNo}/${r.end}까지`
-          : `${monthNo}/${r.start}~${monthNo}/${r.end}`;
-        warnings.push(`${staffLabel}님 ${span} ${r.length}일 연속 휴무가 이미 입력되어 있어요(필휴 포함 최대 ${SCHEDULE_AUTO_MAX_OFF_STREAK}일). 기존 일정은 유지했으니 확인해주세요.`);
+      // 연속 휴무/연속 근무 경고는 오프를 옮기는 보정 단계가 끝난 뒤 최종 계획으로 계산한다(flushStaffWarnings).
+      staffWarnCtx.set(s.id, {
+        label: staffLabel, g, staffTypes, carry, offCarry, baseRest,
+        prefSet: new Set(prefDows), workPrefSet: new Set(workPrefDows),
+        tolWarn, shortfallText,
       });
-
-      // 최종 확인: 배정을 끝낸 뒤에도 5일을 넘는 연속 근무가 남아 있으면 알려준다
-      // (오프 목표 개수를 넘겨서까지 늘리지는 않으므로, 개수가 모자라거나 빈 칸이 없으면 남을 수 있다).
-      const longRuns = scheduleAutoFindLongRuns(daysInMonth, (d) => !!(baseRest[d] || chosen[d]), carry, LIMIT);
-      longRuns.forEach((r) => {
-        const span = r.start < 1
-          ? `지난달 말부터 이어져 ${monthNo}/${r.end}까지`
-          : `${monthNo}/${r.start}~${monthNo}/${r.end}`;
-        warnings.push(`${staffLabel}님 ${span} ${r.length}일 연속 근무가 남아요(최대 ${LIMIT}일). 오프 목표 개수 안에서는 해소할 수 없어서 직접 조정이 필요해요.`);
-      });
+      staffWarnOrder.push(s.id);
 
       if (needed > 0 || assigned.length > 0) {
         const sorted = assigned.slice().sort((a, b) => a - b);
@@ -899,6 +886,266 @@
     // 위 함수에서 빠르게 참조할 수 있도록 현재 계획의 OFF 집합을 만든다.
     const planByIdForRepair = new Map(perStaffPlan.map((p) => [p.staffId, new Set(p.assigned)]));
     const repairedAllWorkingDays = repairAllWorkingDays();
+
+    // ----- 선호 요일 최대화: 검증을 통과한 "오프 이동"만 반영 -----
+    // 오프 한 칸을 다른 날로 옮기는 이동(또는 두 사람이 서로 맞바꾸는 이동 묶음)을 하나씩 시험해서,
+    // 아래 강한 조건을 전부 통과하고 목표 점수가 좋아질 때만 채택한다. 하나라도 어긋나면 그 이동은 버린다.
+    //  - 옮길 수 있는 것: 이번 계획이 새로 배정한 오프뿐. 옮겨 갈 곳: 기록이 하나도 없는 빈 칸뿐.
+    //    → 필휴·연차·공가 등 이미 입력된 칸은 구조적으로 옮기거나 덮어쓸 수 없다.
+    //  - 옮긴 뒤 어떤 (조×업무구분×날짜) 칸이든 부족이 허용 최대치(금·토·월 0, 그 외 -2, 평일 공휴일 -2,
+    //    전원 출근 해소 예외 -1)를 넘으면 안 된다(-3 같은 값이 새로 생기지 않는다). 이미 넘은 칸은 더 나빠지지 않아야 한다.
+    //  - 구분별 하루 최소 출근 인원을 지킨다. 전원 출근하는 날(업무구분별·조 전체)이 새로 생기지 않는다.
+    //  - 옮기는 인원의 연속 근무(6일째 이상 횟수·7일째 금지)와 연속 오프(3일 초과분)가 지금보다 나빠지지 않는다.
+    //  - 인원별 오프 개수는 그대로다(이동만 하고 늘리거나 줄이지 않는다).
+    // 목표 점수(클수록 좋음, 앞자리 우선): ① 선호 오프 요일 적중 − 선호 출근 요일에 잡힌 오프 ② 필요인력 부족 감소 ③ 오프 분산.
+    const improve = { localMoves: 0, groqProposed: 0, groqAccepted: 0, groqRejected: [] };
+    const planByStaff = new Map(perStaffPlan.map((p) => [p.staffId, p]));
+    const dowOfDay = [], dateKeyOfDay = [];
+    for (let d = 1; d <= daysInMonth; d++) {
+      dowOfDay[d] = new Date(year, monthIndex, d).getDay();
+      dateKeyOfDay[d] = scheduleDateKey(year, monthIndex, d);
+    }
+    const hasRecordAt = (id, d) => Object.prototype.hasOwnProperty.call(scheduleData.records, scheduleRecordKey(id, dateKeyOfDay[d]));
+    const groupStaffAll = {
+      DAY: nonAdmin.filter((st) => st.group !== "night"),
+      NIGHT: nonAdmin.filter((st) => st.group === "night"),
+    };
+    const cellWorking = { DAY: {}, NIGHT: {} };  // [조][업무구분][날짜] 현재(계획 반영) 출근 인원
+    const groupWorking = { DAY: [], NIGHT: [] }; // [조][날짜] 조 전체 출근 인원
+    const offByDay = new Array(daysInMonth + 1).fill(0); // 날짜별 이번 계획의 오프 수(분산 점수용)
+    perStaffPlan.forEach((p) => p.assigned.forEach((d) => { offByDay[d] += 1; }));
+    ["DAY", "NIGHT"].forEach((g) => {
+      groupWorking[g] = new Array(daysInMonth + 1).fill(0);
+      TYPES.forEach((t) => {
+        cellWorking[g][t] = new Array(daysInMonth + 1).fill(0);
+        for (let d = 1; d <= daysInMonth; d++) {
+          let w = scheduleActualCount(groupStaffAll[g], t, dateKeyOfDay[d]);
+          groupStaffAll[g].forEach((st) => {
+            const set = planByIdForRepair.get(st.id);
+            if (set && set.has(d) && (st.types || []).indexOf(t) !== -1) w -= 1;
+          });
+          cellWorking[g][t][d] = w;
+        }
+      });
+      for (let d = 1; d <= daysInMonth; d++) {
+        let w = 0;
+        groupStaffAll[g].forEach((st) => {
+          const rec = scheduleData.records[scheduleRecordKey(st.id, dateKeyOfDay[d])];
+          const set = planByIdForRepair.get(st.id);
+          const isOff = (set && set.has(d)) || (rec && !scheduleAutoIsWorkRecord(rec));
+          if (!isOff) w++;
+        });
+        groupWorking[g][d] = w;
+      }
+    });
+
+    // 한 인원의 연속 근무/오프 위반 정도. 구간 "수"만 보면 이미 길어진 구간을 더 늘려도 같은 값이라서,
+    // 초과한 "일수"까지 함께 센다(이동 후 어느 하나라도 커지면 그 이동은 거부한다).
+    //  runs: 5일 초과 연속 근무 구간 수 / ex5: 5일을 넘긴 일수 합 / ex6: 6일을 넘긴 일수 합 / offEx: 3일을 넘긴 연속 오프 일수 합
+    function moveRunStats(ctx, set) {
+      let ws = ctx.carry, os = ctx.offCarry, runs = 0, ex5 = 0, ex6 = 0, offEx = 0;
+      const endWork = () => {
+        if (ws > LIMIT) { runs++; ex5 += ws - LIMIT; }
+        if (ws > LIMIT + 1) ex6 += ws - (LIMIT + 1);
+      };
+      for (let d = 1; d <= daysInMonth; d++) {
+        if (set.has(d) || ctx.baseRest[d]) {
+          endWork();
+          ws = 0; os++;
+        } else {
+          if (os > SCHEDULE_AUTO_MAX_OFF_STREAK) offEx += os - SCHEDULE_AUTO_MAX_OFF_STREAK;
+          os = 0; ws++;
+        }
+      }
+      endWork();
+      if (os > SCHEDULE_AUTO_MAX_OFF_STREAK) offEx += os - SCHEDULE_AUTO_MAX_OFF_STREAK;
+      return { runs, ex5, ex6, offEx };
+    }
+    function moveDayValue(ctx, d) {
+      return (ctx.prefSet.has(dowOfDay[d]) ? 1 : 0) - (ctx.workPrefSet.has(dowOfDay[d]) ? 1 : 0);
+    }
+    function movePrefNet(ctx, set) {
+      let n = 0;
+      set.forEach((d) => { n += moveDayValue(ctx, d); });
+      return n;
+    }
+
+    // moves: [{ staffId, from, to }, ...] (최대 4개). 통과하면 { ok: true, vec, ... }, 아니면 { ok: false, reason }.
+    function evaluateMoveGroup(moves) {
+      const fail = (reason) => ({ ok: false, reason });
+      if (!Array.isArray(moves) || moves.length === 0 || moves.length > 4) return fail("이동 묶음 형식");
+      const newSets = new Map();
+      const cellDelta = new Map();
+      const offDayDelta = new Map();
+      const bump = (map, key, n) => map.set(key, (map.get(key) || 0) + n);
+      for (const mv of moves) {
+        const ctx = mv ? staffWarnCtx.get(mv.staffId) : null;
+        const baseSet = ctx ? planByIdForRepair.get(mv.staffId) : null;
+        if (!ctx || !baseSet) return fail("배치 대상 인원이 아님");
+        const from = mv.from, to = mv.to;
+        if (!Number.isInteger(from) || !Number.isInteger(to) || from < 1 || to < 1 || from > daysInMonth || to > daysInMonth || from === to) return fail("날짜 형식");
+        const cur = newSets.get(mv.staffId) || new Set(baseSet);
+        if (!cur.has(from)) return fail("이번 계획이 배정한 오프가 아님");
+        if (cur.has(to)) return fail("이미 오프인 날");
+        if (hasRecordAt(mv.staffId, to)) return fail("이미 입력된 칸");
+        cur.delete(from); cur.add(to);
+        newSets.set(mv.staffId, cur);
+        ctx.staffTypes.forEach((t) => { bump(cellDelta, `${ctx.g}|${t}|${from}`, 1); bump(cellDelta, `${ctx.g}|${t}|${to}`, -1); });
+        bump(cellDelta, `${ctx.g}||${from}`, 1); bump(cellDelta, `${ctx.g}||${to}`, -1);
+        bump(offDayDelta, from, -1); bump(offDayDelta, to, 1);
+      }
+      for (const [id, set] of newSets) {
+        const ctx = staffWarnCtx.get(id);
+        const before = moveRunStats(ctx, planByIdForRepair.get(id));
+        const after = moveRunStats(ctx, set);
+        if (after.runs > before.runs || after.ex5 > before.ex5 || after.ex6 > before.ex6 || after.offEx > before.offEx) return fail("연속 근무·연속 오프 제한");
+      }
+      let shortGain = 0;
+      for (const [key, delta] of cellDelta) {
+        if (delta === 0) continue;
+        const [g, t, dStr] = key.split("|");
+        const d = Number(dStr);
+        if (t === "") {
+          const totalGroup = groupStaffAll[g].length;
+          const before = groupWorking[g][d], after = before + delta;
+          if (totalGroup > 0 && after === totalGroup && before !== totalGroup) return fail("조 전체가 전원 출근하는 날이 생김");
+          continue;
+        }
+        const before = cellWorking[g][t][d], after = before + delta, total = totalCount[g][t];
+        if (total > 0 && after === total && before !== total) return fail("전원 출근하는 날이 생김");
+        const req = required[g][t][d];
+        const hasReq = req !== null && req !== undefined;
+        if (after < before) {
+          const minW = Number(minWorkingByGroup[scheduleAutoMinWorkingKey(g, t)] ?? SCHEDULE_AUTO_MIN_WORKING);
+          if (minW > 0 && total >= minW && after < minW) return fail("구분별 최소 출근 인원");
+          if (hasReq) {
+            const tol = scheduleAutoToleranceInfo(dowOfDay[d], dateKeyOfDay[d]);
+            const effMax = (total > 0 && before === total) ? Math.max(tol.max, 1) : tol.max;
+            if (req - after > effMax) return fail("필요인력 허용범위 초과");
+          }
+        }
+        if (hasReq) shortGain += Math.max(0, req - before) - Math.max(0, req - after);
+      }
+      let v0 = 0;
+      for (const [id, set] of newSets) {
+        const ctx = staffWarnCtx.get(id);
+        v0 += movePrefNet(ctx, set) - movePrefNet(ctx, planByIdForRepair.get(id));
+      }
+      let v2 = 0;
+      for (const [d, dd] of offDayDelta) {
+        if (dd === 0) continue;
+        v2 -= Math.pow(offByDay[d] + dd, 2) - Math.pow(offByDay[d], 2);
+      }
+      return { ok: true, vec: [v0, shortGain, v2], newSets, cellDelta, offDayDelta };
+    }
+    function applyEvaluatedMoves(ev) {
+      ev.newSets.forEach((set, id) => {
+        planByIdForRepair.set(id, set);
+        const p = planByStaff.get(id);
+        const ctx = staffWarnCtx.get(id);
+        p.assigned = Array.from(set).sort((a, b) => a - b);
+        p.prefHits = p.assigned.filter((d) => ctx.prefSet.has(dowOfDay[d])).length;
+        if (p.workPrefDows) p.workPrefHits = p.assigned.filter((d) => !ctx.workPrefSet.has(dowOfDay[d])).length;
+      });
+      ev.cellDelta.forEach((delta, key) => {
+        const [g, t, dStr] = key.split("|");
+        const d = Number(dStr);
+        if (t === "") groupWorking[g][d] += delta;
+        else cellWorking[g][t][d] += delta;
+      });
+      ev.offDayDelta.forEach((dd, d) => { offByDay[d] += dd; });
+    }
+    const moveVecBetter = (vec) => vec[0] > 0 || (vec[0] === 0 && (vec[1] > 0 || (vec[1] === 0 && vec[2] > 0)));
+
+    // (1) 규칙 기반 탐색: 선호 점수(vec[0])가 좋아지는 이동만 시도한다. 단일 이동이 막히면 같은 조의 두 사람이 서로 맞바꾸는 묶음도 시험한다.
+    function improvePreferences() {
+      const prefPlans = perStaffPlan
+        .filter((p) => (p.prefDows && p.prefDows.length) || (p.workPrefDows && p.workPrefDows.length))
+        .slice()
+        .sort((a, b) => ((b.prefDows?.length || 0) + (b.workPrefDows?.length || 0)) - ((a.prefDows?.length || 0) + (a.workPrefDows?.length || 0)));
+      let guard = 0;
+      for (let pass = 0; pass < 8 && guard < 400; pass++) {
+        let progress = false;
+        for (const p of prefPlans) {
+          const ctx = staffWarnCtx.get(p.staffId);
+          const cur = planByIdForRepair.get(p.staffId);
+          const freeDays = [];
+          for (let d = 1; d <= daysInMonth; d++) if (!cur.has(d) && !hasRecordAt(p.staffId, d)) freeDays.push(d);
+          const pairs = [];
+          cur.forEach((a) => freeDays.forEach((b) => {
+            const gain = moveDayValue(ctx, b) - moveDayValue(ctx, a);
+            if (gain > 0) pairs.push({ a, b, gain });
+          }));
+          if (pairs.length === 0) continue;
+          pairs.sort((x, y) => (y.gain - x.gain) || (x.b - y.b) || (x.a - y.a));
+          let best = null;
+          pairs.forEach(({ a, b }) => {
+            const ev = evaluateMoveGroup([{ staffId: p.staffId, from: a, to: b }]);
+            if (ev.ok && ev.vec[0] > 0 && (!best || scheduleAutoCmpVec(ev.vec, best.vec) > 0)) best = ev;
+          });
+          if (!best) {
+            // 단일 이동이 전부 막혔다면, 같은 조의 다른 인원이 그 날짜의 오프를 서로 바꿔 주는 묶음을 시험한다.
+            for (const { a, b } of pairs.slice(0, 12)) {
+              for (const q of perStaffPlan) {
+                if (q.staffId === p.staffId) continue;
+                const qctx = staffWarnCtx.get(q.staffId);
+                if (!qctx || qctx.g !== ctx.g) continue;
+                const qset = planByIdForRepair.get(q.staffId);
+                if (!qset.has(b) || qset.has(a) || hasRecordAt(q.staffId, a)) continue;
+                const ev = evaluateMoveGroup([{ staffId: p.staffId, from: a, to: b }, { staffId: q.staffId, from: b, to: a }]);
+                if (ev.ok && ev.vec[0] > 0 && (!best || scheduleAutoCmpVec(ev.vec, best.vec) > 0)) best = ev;
+              }
+              if (best) break;
+            }
+          }
+          if (best) { applyEvaluatedMoves(best); improve.localMoves += 1; guard++; progress = true; }
+        }
+        if (!progress) break;
+      }
+    }
+    improvePreferences();
+
+    // (2) 외부(Groq) 제안: 각 묶음을 같은 검증에 통과시켜서 통과한 것만 반영한다. 선호 점수가 나빠지는 제안은 어떤 경우에도 버린다.
+    const proposedGroups = options && Array.isArray(options.groqMoveGroups) ? options.groqMoveGroups.slice(0, 8) : [];
+    proposedGroups.forEach((moves, gi) => {
+      improve.groqProposed += 1;
+      const ev = evaluateMoveGroup(moves);
+      if (!ev.ok) { improve.groqRejected.push({ index: gi, reason: ev.reason }); return; }
+      if (ev.vec[0] < 0 || !moveVecBetter(ev.vec)) { improve.groqRejected.push({ index: gi, reason: "개선되지 않음" }); return; }
+      applyEvaluatedMoves(ev);
+      improve.groqAccepted += 1;
+    });
+
+    // 선호 적중 집계를 최종 배정 기준으로 전부 다시 계산한다. (앞의 선호 교환 단계는 선호 출근 회피 값을 갱신하지 않아서
+    // 화면·검증 지표에 낡은 값이 남을 수 있었다.)
+    perStaffPlan.forEach((p) => {
+      const ctx = staffWarnCtx.get(p.staffId);
+      if (!ctx) return;
+      p.prefHits = p.assigned.filter((d) => ctx.prefSet.has(dowOfDay[d])).length;
+      if (p.workPrefDows) p.workPrefHits = p.assigned.filter((d) => !ctx.workPrefSet.has(dowOfDay[d])).length;
+    });
+
+    // 인원별 경고를 최종 계획 기준으로 확정한다. (옮겨진 칸의 "허용범위 초과" 경고는 사라지고,
+    // 연속 휴무/연속 근무 경고는 옮긴 뒤의 실제 구간으로 다시 계산한다.)
+    staffWarnOrder.forEach((id) => {
+      const ctx = staffWarnCtx.get(id);
+      const finalSet = planByIdForRepair.get(id) || new Set();
+      ctx.tolWarn.forEach((w) => { if (finalSet.has(w.d)) warnings.push(w.text); });
+      if (ctx.shortfallText) warnings.push(ctx.shortfallText);
+      const finalRest = (d) => finalSet.has(d) || !!ctx.baseRest[d];
+      scheduleAutoFindLongOffRuns(id, year, monthIndex, daysInMonth, ctx.offCarry, finalRest).forEach((r) => {
+        const span = r.start < 1
+          ? `지난달 말부터 이어져 ${monthNo}/${r.end}까지`
+          : `${monthNo}/${r.start}~${monthNo}/${r.end}`;
+        warnings.push(`${ctx.label}님 ${span} ${r.length}일 연속 휴무가 이미 입력되어 있어요(필휴 포함 최대 ${SCHEDULE_AUTO_MAX_OFF_STREAK}일). 기존 일정은 유지했으니 확인해주세요.`);
+      });
+      scheduleAutoFindLongRuns(daysInMonth, finalRest, ctx.carry, LIMIT).forEach((r) => {
+        const span = r.start < 1
+          ? `지난달 말부터 이어져 ${monthNo}/${r.end}까지`
+          : `${monthNo}/${r.start}~${monthNo}/${r.end}`;
+        warnings.push(`${ctx.label}님 ${span} ${r.length}일 연속 근무가 남아요(최대 ${LIMIT}일). 오프 목표 개수 안에서는 해소할 수 없어서 직접 조정이 필요해요.`);
+      });
+    });
     if (repairedAllWorkingDays > 0) {
       warnings.push(`모든 인원 출근 상태를 ${repairedAllWorkingDays}건 자동으로 해소했어요. 기존 입력 일정과 최소 출근 인원 조건은 유지했어요.`);
     }
@@ -984,7 +1231,7 @@
       });
     });
 
-    return { year, monthIndex, target, targetInfo, perStaffPlan, warnings, excluded };
+    return { year, monthIndex, target, targetInfo, perStaffPlan, warnings, excluded, improve };
   }
 
   // ----- 적용: 미리보기에서 "이대로 입력"을 눌렀을 때만 실제로 scheduleData에 반영한다. -----
@@ -1388,7 +1635,26 @@
         hybridHtml = `<div class="sch-auto-hybrid-note sch-auto-hybrid-note--fallback">Groq 연결을 사용할 수 없어 기준 자동배치로 진행했어요.</div>`;
       }
     }
+    const imp = hybrid && hybrid.improve ? hybrid.improve : null;
+    if (imp) {
+      const local = imp.localMoves > 0 ? `규칙 탐색으로 ${imp.localMoves}건 이동` : "";
+      let text = "";
+      if (imp.status === "success") {
+        text = `Groq 제안 ${imp.proposed}건 중 ${imp.accepted}건을 조건 검증 후 반영${imp.rejected > 0 ? ` (${imp.rejected}건은 조건 위반·무개선으로 제외)` : ""}`;
+      } else if (imp.status === "no-headroom") {
+        text = "선호 요일을 더 맞출 여지가 없어요";
+      } else if (imp.status === "no-proposal") {
+        text = "Groq가 더 나은 이동을 찾지 못했어요";
+      } else if (imp.status === "all-rejected" || imp.status === "discarded") {
+        text = `Groq 제안 ${imp.proposed}건은 조건 검증을 통과하지 못해 반영하지 않았어요`;
+      } else if (imp.status !== "skipped") {
+        text = "Groq 개선 제안은 쓰지 못해 기존 계획 그대로예요";
+      }
+      const parts = [local, text].filter(Boolean);
+      if (parts.length) hybridHtml += `<div class="sch-auto-hybrid-note">선호 요일 개선 · ${esc(parts.join(" · "))}</div>`;
+    }
     return `
+      ${scheduleAutoChecklistHtml(plan)}
       <div class="sch-auto-total">총 <b>${totalAssigned}칸</b>이 새로 채워질 예정이에요.${prefTotal > 0 ? ` 선호 오프 <b>${prefHits}/${prefTotal}칸</b>.` : ""}${workPrefTotal > 0 ? ` 선호 출근일 회피 <b>${workPrefAvoided}/${workPrefTotal}칸</b>.` : ""}</div>
       ${hybridHtml}
       ${excludedHtml}
@@ -1443,7 +1709,9 @@
     const assignedKeys = new Set();
     let protectedOverlap = 0;
     let targetShortage = 0;
-    let workViolationRuns = 0;
+    let workViolationRuns = 0;   // 5일 초과 구간(6일·7일 이상 모두 포함)
+    let sixDayRuns = 0;          // 정확히 6일(원칙 위반은 아니지만 예외로만 허용)
+    let sevenPlusRuns = 0;       // 7일 이상(규칙 위반)
     let offViolationRuns = 0;
     let offViolationExcess = 0;
     let prefHits = 0, prefTotal = 0, workPrefAvoided = 0, workPrefTotal = 0;
@@ -1468,6 +1736,7 @@
       };
       const longRuns = scheduleAutoFindLongRuns(daysInMonth, finalRest, carry, SCHEDULE_AUTO_MAX_WORK_STREAK);
       workViolationRuns += longRuns.length;
+      longRuns.forEach((r) => { if (r.length > SCHEDULE_AUTO_MAX_WORK_STREAK + 1) sevenPlusRuns += 1; else sixDayRuns += 1; });
       const offCarry = scheduleAutoCarryOffStreak(p.staffId, year, monthIndex);
       const longOffRuns = scheduleAutoFindLongOffRuns(p.staffId, year, monthIndex, daysInMonth, offCarry, finalRest);
       offViolationRuns += longOffRuns.length;
@@ -1496,9 +1765,12 @@
     });
 
     let minWorkingViolations = 0;
-    let toleranceViolations = 0;
+    let toleranceViolations = 0;   // 최후 허용범위(max)까지 넘은 칸
+    let idealMissCells = 0;        // 최후 허용범위(max) 안이지만 1순위(ideal) 범위는 못 지킨 칸
+    let toleranceCellsWithReq = 0; // 필요인력이 설정된 칸 수(비율 계산용)
     let allWorkingDays = 0;
     let totalSlack = 0;
+    let maxShortage = 0; // 가장 깊은 필요인력 부족(예: 3이면 -3인 칸이 있음)
     const minWorkingByGroup = scheduleAutoMinWorkingByGroup;
     ["DAY", "NIGHT"].forEach((g) => ["채팅", "유선"].forEach((t) => {
       const total = totalCount[g][t];
@@ -1514,7 +1786,10 @@
           const wasAllWorking = total > 0 && (w + 1) === total;
           const effectiveMax = wasAllWorking ? Math.max(tol.max, 1) : tol.max;
           const diff = w - req;
+          toleranceCellsWithReq += 1;
           if (-diff > effectiveMax) toleranceViolations += 1;
+          else if (-diff > tol.ideal) idealMissCells += 1;
+          if (-diff > maxShortage) maxShortage = -diff;
           totalSlack += diff;
         }
       }
@@ -1546,11 +1821,135 @@
 
     return {
       totalAssigned: plan.perStaffPlan.reduce((sum, p) => sum + p.assigned.length, 0),
-      protectedOverlap, targetShortage, workViolationRuns, offViolationRuns, offViolationExcess,
-      minWorkingViolations, toleranceViolations, allWorkingDays, groupAllWorkingDays, prefHits, prefTotal,
-      workPrefAvoided, workPrefTotal, offVariance, totalSlack,
+      protectedOverlap, targetShortage, workViolationRuns, sixDayRuns, sevenPlusRuns, offViolationRuns, offViolationExcess,
+      minWorkingViolations, toleranceViolations, idealMissCells, toleranceCellsWithReq,
+      allWorkingDays, groupAllWorkingDays, prefHits, prefTotal,
+      workPrefAvoided, workPrefTotal, offVariance, totalSlack, maxShortage,
+      // 선호 점수 = 선호 오프 요일에 잡힌 오프 수 − 선호 출근 요일에 잡힌 오프 수
+      prefNet: prefHits - (workPrefTotal - workPrefAvoided),
       warningCount: Array.isArray(plan.warnings) ? plan.warnings.length : 0,
     };
+  }
+
+  // ----- 조건 체크리스트: 미리보기에 "지금 이 계획이 설정한 조건을 지켰는지"를 항목별로 보여준다 -----
+  //  ok(✓)  : 완전히 지켰다.
+  //  warn(△): 규칙 위반은 아니지만 이상적인 수준까지는 못 미쳤다(허용된 예외 포함).
+  //  bad(✗) : 규칙을 어겼다. scheduleAutoBuildPlan은 구조적으로 이 상태를 만들 수 없어야 하므로,
+  //           실제로 뜨면 버그를 의심해야 한다(방어적 표시).
+  function scheduleAutoChecklistItems(plan, metrics) {
+    const items = [];
+    const add = (label, mark, note) => items.push({ label, mark, note: note || "" });
+
+    add(
+      "기존 입력값 보호",
+      metrics.protectedOverlap === 0 ? "ok" : "bad",
+      metrics.protectedOverlap === 0 ? "덮어쓴 칸 없음" : `덮어쓴 칸 ${metrics.protectedOverlap}개`
+    );
+
+    const minWLabels = { DAY_채팅: "주간채팅", DAY_유선: "주간유선", NIGHT_채팅: "야간채팅", NIGHT_유선: "야간유선" };
+    const minWText = Object.keys(minWLabels)
+      .map((key) => `${minWLabels[key]} ${scheduleAutoMinWorkingByGroup[key] ?? SCHEDULE_AUTO_MIN_WORKING}명`)
+      .join(" · ");
+    add(
+      "구분별 하루 최소 출근 인원",
+      metrics.minWorkingViolations === 0 ? "ok" : "bad",
+      `설정값(${minWText}) — 미만 칸 ${metrics.minWorkingViolations}개`
+    );
+
+    add(
+      "연속 오프 최대 3일",
+      metrics.offViolationRuns === 0 ? "ok" : "warn",
+      metrics.offViolationRuns === 0
+        ? "4일 이상 연휴 없음"
+        : `${metrics.offViolationRuns}건 — 기존 입력(연차·공가 등)에 의한 것, 자동배치가 만든 건 아님`
+    );
+
+    add(
+      "연속 근무 최대 5일(불가피하면 6일)",
+      metrics.sevenPlusRuns > 0 ? "bad" : (metrics.sixDayRuns > 0 ? "warn" : "ok"),
+      metrics.sevenPlusRuns > 0
+        ? `7일 이상 ${metrics.sevenPlusRuns}건 — 확인 필요`
+        : (metrics.sixDayRuns > 0 ? `6일 연속 ${metrics.sixDayRuns}건 — 규칙상 허용 범위` : "5일 이내")
+    );
+
+    add(
+      "필요인력 허용범위(최후 기준)",
+      metrics.toleranceViolations === 0 ? "ok" : "bad",
+      metrics.toleranceViolations === 0 ? "초과 칸 없음" : `초과 칸 ${metrics.toleranceViolations}개`
+    );
+
+    if (metrics.toleranceCellsWithReq > 0) {
+      add(
+        "필요인력 1순위(이상적) 범위",
+        metrics.idealMissCells === 0 ? "ok" : "warn",
+        metrics.idealMissCells === 0 ? "전 칸 충족" : `1순위 미달 ${metrics.idealMissCells}칸 — 최후 범위 안`
+      );
+    }
+
+    const prefDenom = metrics.prefTotal + metrics.workPrefTotal;
+    if (prefDenom > 0) {
+      const fullyMet = metrics.prefHits === metrics.prefTotal && metrics.workPrefAvoided === metrics.workPrefTotal;
+      add(
+        "선호 오프·선호 출근 요일",
+        fullyMet ? "ok" : "warn",
+        `선호 오프 ${metrics.prefHits}/${metrics.prefTotal} · 선호 출근일 회피 ${metrics.workPrefAvoided}/${metrics.workPrefTotal}`
+      );
+    }
+
+    add(
+      "모든 인원이 출근하는 날 해소",
+      (metrics.allWorkingDays === 0 && metrics.groupAllWorkingDays === 0) ? "ok" : "warn",
+      (metrics.allWorkingDays === 0 && metrics.groupAllWorkingDays === 0)
+        ? "잔여 없음"
+        : `잔여 ${metrics.allWorkingDays + metrics.groupAllWorkingDays}건 — 다른 하드 조건과 충돌`
+    );
+
+    add(
+      "오프 목표 개수 충족",
+      metrics.targetShortage === 0 ? "ok" : "warn",
+      metrics.targetShortage === 0 ? "전원 목표 충족" : `목표 대비 부족 ${metrics.targetShortage}칸`
+    );
+
+    return items;
+  }
+
+  // 지금 이 배치에 실제로 적용된 설정값(제외 인원·최소 출근 인원·선호 설정 인원 수)을 한 줄로 보여준다.
+  // 아래 체크리스트는 "이 값들을 지켰는지"를 판정하고, 이 줄은 "무엇을 설정했는지" 자체를 보여준다.
+  function scheduleAutoSettingsSummaryHtml(plan) {
+    const excludedCount = (plan.excluded || []).length;
+    const minWLabels = { DAY_채팅: "주간채팅", DAY_유선: "주간유선", NIGHT_채팅: "야간채팅", NIGHT_유선: "야간유선" };
+    const minWText = Object.keys(minWLabels).map((key) => `${minWLabels[key]} ${scheduleAutoMinWorkingByGroup[key] ?? SCHEDULE_AUTO_MIN_WORKING}명`).join(" · ");
+    const staffList = getStaffListForMonth(plan.year, plan.monthIndex);
+    const prefCount = staffList.filter((s) => scheduleAutoGetPrefDows(s.id).length > 0 || scheduleAutoGetWorkPrefDows(s.id).length > 0).length;
+    return `
+      <div class="sch-auto-settings-summary">
+        <span><b>최소 출근 인원</b> ${esc(minWText)}</span>
+        <span><b>제외 인원</b> ${excludedCount > 0 ? `${excludedCount}명` : "없음"}</span>
+        <span><b>선호 요일 설정</b> ${prefCount > 0 ? `${prefCount}명` : "없음"}</span>
+      </div>
+    `;
+  }
+
+  function scheduleAutoChecklistHtml(plan) {
+    const metrics = scheduleAutoPlanMetrics(plan);
+    const items = scheduleAutoChecklistItems(plan, metrics);
+    const glyph = { ok: "✓", warn: "△", bad: "✗" };
+    const rows = items.map((it) => `
+      <div class="sch-auto-check-row sch-auto-check-row--${it.mark}">
+        <span class="sch-auto-check-mark" aria-hidden="true">${glyph[it.mark]}</span>
+        <div class="sch-auto-check-text">
+          <div class="sch-auto-check-label">${esc(it.label)}</div>
+          ${it.note ? `<div class="sch-auto-check-note">${esc(it.note)}</div>` : ""}
+        </div>
+      </div>
+    `).join("");
+    return `
+      <div class="sch-auto-checklist">
+        <div class="sch-auto-checklist-title">조건 체크리스트 <span class="sch-auto-checklist-legend">✓ 지킴 · △ 규칙상 문제 없음 · ✗ 규칙 위반</span></div>
+        ${scheduleAutoSettingsSummaryHtml(plan)}
+        ${rows}
+      </div>
+    `;
   }
 
   function scheduleAutoMetricsNotWorseThanBase(candidate, base) {
@@ -1594,6 +1993,190 @@
       } catch (_e) {}
     }
     return null;
+  }
+
+
+  // ----- Groq 개선 제안 (검증을 통과한 이동만 반영) -----
+  // Groq는 "오프를 어디로 옮기면 선호가 더 맞는지"만 제안한다. 제안은 scheduleAutoBuildPlan의 이동 검증
+  // (필휴 등 기존 입력 칸 불가침, 필요인력 허용범위·최소 출근·연속 근무/오프·전원 출근 방지)을 통과한 것만 반영되고,
+  // 반영 결과는 한 번 더 metrics로 확인해서 기준 계획보다 나쁘면 통째로 버린다.
+  const SCHEDULE_AUTO_IMPROVE_MAX_PROMPT = 18000;
+
+  // 선호 때문에 더 옮길 여지가 있는지의 상한. 0이면 Groq를 부르지 않는다.
+  function scheduleAutoPreferenceHeadroom(plan) {
+    const year = plan.year, monthIndex = plan.monthIndex;
+    const daysInMonth = scheduleDaysInMonth(year, monthIndex);
+    let total = 0;
+    plan.perStaffPlan.forEach((p) => {
+      const off = new Set(p.prefDows || []);
+      const work = new Set(p.workPrefDows || []);
+      if (off.size === 0 && work.size === 0) return;
+      const val = (d) => { const w = new Date(year, monthIndex, d).getDay(); return (off.has(w) ? 1 : 0) - (work.has(w) ? 1 : 0); };
+      const assigned = new Set(p.assigned);
+      const freeVals = [];
+      for (let d = 1; d <= daysInMonth; d++) {
+        if (assigned.has(d)) continue;
+        if (Object.prototype.hasOwnProperty.call(scheduleData.records, scheduleRecordKey(p.staffId, scheduleDateKey(year, monthIndex, d)))) continue;
+        freeVals.push(val(d));
+      }
+      const assignedVals = p.assigned.map(val);
+      const better = freeVals.slice().sort((a, b) => b - a);
+      const worse = assignedVals.slice().sort((a, b) => a - b);
+      for (let i = 0; i < Math.min(better.length, worse.length); i++) {
+        if (better[i] > worse[i]) total += better[i] - worse[i]; else break;
+      }
+    });
+    return total;
+  }
+
+  function scheduleAutoImprovementPrompt(plan) {
+    const year = plan.year, monthIndex = plan.monthIndex;
+    const daysInMonth = scheduleDaysInMonth(year, monthIndex);
+    const nonAdminAll = getStaffListForMonth(year, monthIndex).filter((s) => !s.isAdmin && !(plan.excluded || []).some((x) => x.id === s.id));
+    const planByStaff = new Map(plan.perStaffPlan.map((p) => [p.staffId, p]));
+    const keyMap = new Map(); // "S1" -> staffId
+    const lines = [];
+    const dowText = (arr) => (arr && arr.length ? arr.map((n) => SCHEDULE_AUTO_DOW_LABELS[n]).join("") : "-");
+    // 선호가 있는 인원과 오프가 배정된 인원 순서(맞교환 상대가 될 수 있는 인원 포함).
+    const ordered = nonAdminAll
+      .filter((s) => planByStaff.has(s.id))
+      .sort((a, b) => {
+        const pa = planByStaff.get(a.id), pb = planByStaff.get(b.id);
+        const ha = ((pa.prefDows || []).length + (pa.workPrefDows || []).length) > 0 ? 1 : 0;
+        const hb = ((pb.prefDows || []).length + (pb.workPrefDows || []).length) > 0 ? 1 : 0;
+        return hb - ha;
+      });
+    ordered.forEach((s, i) => {
+      const p = planByStaff.get(s.id);
+      const key = `S${i + 1}`;
+      const assigned = new Set(p.assigned);
+      const movable = [], fixed = [];
+      for (let d = 1; d <= daysInMonth; d++) {
+        const rec = scheduleData.records[scheduleRecordKey(s.id, scheduleDateKey(year, monthIndex, d))];
+        if (rec) { if (!scheduleAutoIsWorkRecord(rec)) fixed.push(d); }
+        else if (!assigned.has(d)) movable.push(d);
+      }
+      const grp = s.group === "night" ? "야" : "주";
+      const types = (s.types || []).join("/") || "-";
+      lines.push(`${key} ${grp}·${types} 선호오프=${dowText(p.prefDows)} 선호출근=${dowText(p.workPrefDows)} 배정=[${p.assigned.join(",")}] 이동가능=[${movable.join(",")}] 고정휴무=[${fixed.join(",")}] 전월연속근무=${p.carry || 0}`);
+      keyMap.set(key, s.id);
+    });
+    // 날짜별 "오프를 더 넣어도 되는 여유"(spare): 0 이하인 날에는 오프를 추가하는 이동이 반드시 폐기된다.
+    const assignedByStaff = new Map(plan.perStaffPlan.map((p) => [p.staffId, new Set(p.assigned)]));
+    const spareLines = [];
+    ["DAY", "NIGHT"].forEach((g) => ["채팅", "유선"].forEach((t) => {
+      const groupStaff = nonAdminAll.filter((s) => (g === "NIGHT" ? s.group === "night" : s.group !== "night"));
+      const total = groupStaff.filter((s) => (s.types || []).indexOf(t) !== -1).length;
+      if (total === 0) return;
+      const minW = Number(scheduleAutoMinWorkingByGroup[scheduleAutoMinWorkingKey(g, t)] ?? SCHEDULE_AUTO_MIN_WORKING);
+      const arr = [];
+      for (let d = 1; d <= daysInMonth; d++) {
+        const dateKey = scheduleDateKey(year, monthIndex, d);
+        let w = scheduleActualCount(groupStaff, t, dateKey);
+        groupStaff.forEach((st) => { const set = assignedByStaff.get(st.id); if (set && set.has(d) && (st.types || []).indexOf(t) !== -1) w -= 1; });
+        let spare = minW > 0 && total >= minW ? w - minW : w;
+        const req = getRequiredHeadcount(year, monthIndex, g, t, d);
+        if (req !== null && req !== undefined) {
+          const tol = scheduleAutoToleranceInfo(new Date(year, monthIndex, d).getDay(), dateKey);
+          spare = Math.min(spare, w - (req - tol.max));
+        }
+        arr.push(spare);
+      }
+      spareLines.push(`${g === "NIGHT" ? "야" : "주"}·${t}: ${arr.join(",")}`);
+    }));
+    const prompt = `당신은 월별 직원 스케줄의 "개선 제안자"입니다. 이미 규칙으로 만든 계획에서, 인원별 선호 요일이 더 잘 맞도록 오프를 옮기는 제안만 합니다.\n\n`
+      + `목표: 각 인원의 선호오프 요일에 오프가 더 많이, 선호출근 요일에 오프는 더 적게 잡히게 하세요. 그 밖의 것은 목표가 아닙니다.\n\n`
+      + `제안 방식: 이동 = 한 인원의 "배정" 날짜 하나를 같은 인원의 "이동가능" 날짜 하나로 옮기는 것. 여러 이동을 한 묶음(최대 4개)으로 만들 수 있고, 묶음은 통째로 적용되거나 통째로 버려집니다(두 사람이 오프를 서로 맞바꾸는 용도).\n`
+      + `- "고정휴무"(필휴·연차 등)와 "이동가능"에 없는 날짜는 절대 사용할 수 없습니다.\n`
+      + `- 아래 "여유" 표에서 오프를 옮겨 갈 날짜가 0 이하이면 그 날 오프를 추가할 수 없습니다(같은 조·업무구분 기준). 이동으로 비워지는 날은 여유가 1 늘어납니다.\n`
+      + `- 연속 근무는 5일까지(불가피하면 6일), 연속 오프는 3일까지입니다. 인원별 오프 개수는 바꾸지 않습니다.\n`
+      + `- 규칙을 어기는 제안은 프로그램이 자동으로 폐기하니, 확신이 없으면 제안하지 마세요. 개선할 수 없으면 {"groups":[]}를 반환하세요.\n\n`
+      + `여유 표(날짜 1일부터 ${daysInMonth}일까지):\n${spareLines.join("\n")}\n\n`
+      + `인원(선호오프/선호출근은 요일):\n${lines.join("\n")}\n\n`
+      + `반드시 JSON 한 줄만 반환하세요. 형식: {"groups":[[{"staff":"S3","from":12,"to":13}],[{"staff":"S1","from":5,"to":6},{"staff":"S2","from":6,"to":5}]]}`;
+    return { prompt, keyMap };
+  }
+
+  function scheduleAutoParseImprovementGroups(text, keyMap) {
+    const raw = typeof text === "string" ? text.trim() : "";
+    if (!raw) return null;
+    const candidates = [];
+    const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+    if (fenced) candidates.push(fenced[1]);
+    candidates.push(raw);
+    const braces = raw.match(/\{[\s\S]*\}/);
+    if (braces) candidates.push(braces[0]);
+    for (const c of candidates) {
+      let parsed;
+      try { parsed = JSON.parse(c); } catch (_e) { continue; }
+      if (!parsed || !Array.isArray(parsed.groups)) continue;
+      const groups = [];
+      parsed.groups.slice(0, 8).forEach((g) => {
+        if (!Array.isArray(g) || g.length === 0 || g.length > 4) return;
+        const moves = [];
+        for (const mv of g) {
+          const staffId = mv && keyMap.get(String(mv.staff));
+          const from = Number(mv && mv.from), to = Number(mv && mv.to);
+          if (!staffId || !Number.isInteger(from) || !Number.isInteger(to)) return;
+          moves.push({ staffId, from, to });
+        }
+        groups.push(moves);
+      });
+      return groups;
+    }
+    return null;
+  }
+
+  async function scheduleAutoAskGroqImprove(plan) {
+    if (!cloud || typeof cloud.functions?.invoke !== "function") {
+      return { status: "unavailable", groups: [] };
+    }
+    const { prompt, keyMap } = scheduleAutoImprovementPrompt(plan);
+    if (prompt.length > SCHEDULE_AUTO_IMPROVE_MAX_PROMPT) {
+      return { status: "too-large", groups: [] };
+    }
+    const res = await cloud.functions.invoke("qa-groq-summary", {
+      body: { prompt, mode: "schedule-auto-improvement" },
+    });
+    if (res && res.error) throw res.error;
+    const data = res && res.data;
+    const groups = scheduleAutoParseImprovementGroups(data && data.text, keyMap);
+    if (groups === null) return { status: "invalid-response", groups: [], model: data?.model || null, usage: data?.usage || null };
+    return { status: "success", groups, model: data?.model || null, usage: data?.usage || null };
+  }
+
+  // 선택된 계획에 개선 단계를 적용한다. 어떤 실패든 원래 계획을 그대로 돌려준다.
+  async function scheduleAutoImprovePlanWithGroq(year, monthIndex, baseOptions, selectedIndex, selectedPlan, selectedMetrics) {
+    const info = {
+      status: "skipped", localMoves: selectedPlan.improve ? selectedPlan.improve.localMoves : 0,
+      proposed: 0, accepted: 0, rejected: 0, rejectReasons: [], model: null, usage: null, error: null,
+    };
+    try {
+      if (scheduleAutoPreferenceHeadroom(selectedPlan) <= 0) { info.status = "no-headroom"; return { plan: selectedPlan, info }; }
+      const asked = await scheduleAutoAskGroqImprove(selectedPlan);
+      info.model = asked.model || null; info.usage = asked.usage || null;
+      if (asked.status !== "success") { info.status = asked.status; return { plan: selectedPlan, info }; }
+      info.proposed = asked.groups.length;
+      if (asked.groups.length === 0) { info.status = "no-proposal"; return { plan: selectedPlan, info }; }
+      const improved = scheduleAutoBuildPlan(year, monthIndex, Object.assign({}, baseOptions, { variant: selectedIndex, groqMoveGroups: asked.groups }));
+      const m = scheduleAutoPlanMetrics(improved);
+      info.accepted = improved.improve.groqAccepted;
+      info.rejected = improved.improve.groqRejected.length;
+      info.rejectReasons = improved.improve.groqRejected.map((r) => r.reason);
+      // 2차 안전 확인: 이동 검증과 별개로, 최종 계획의 metrics가 기준보다 나쁘거나 -N이 더 깊어지면 통째로 버린다.
+      const safe = scheduleAutoMetricsNotWorseThanBase(m, selectedMetrics)
+        && m.maxShortage <= selectedMetrics.maxShortage
+        && m.prefNet >= selectedMetrics.prefNet
+        && m.warningCount <= selectedMetrics.warningCount;
+      if (improved.improve.groqAccepted > 0 && safe) { info.status = "success"; return { plan: improved, info }; }
+      info.status = improved.improve.groqAccepted > 0 ? "discarded" : "all-rejected";
+      return { plan: selectedPlan, info };
+    } catch (err) {
+      info.status = "fallback";
+      info.error = String(err?.message || err || "Groq 호출 실패");
+      console.warn("자동 배치 개선 제안 호출 실패 — 기존 계획으로 계속합니다.", err);
+      return { plan: selectedPlan, info };
+    }
   }
 
   async function scheduleAutoAskGroq(metricsList, allowedIndexes) {
@@ -1661,13 +2244,16 @@
     // Groq 응답이 없거나 검증되지 않았거나, 허용 후보 밖을 가리키면 기준 후보만 사용한다.
     if (!scheduleAutoMetricsNotWorseThanBase(metricsList[selectedIndex], baseMetrics)) selectedIndex = 0;
     if (groqResult && groqResult.status === "invalid-response") groqResult.status = "fallback";
-    const selected = candidates[selectedIndex];
+    let selected = candidates[selectedIndex];
+    const improvedResult = await scheduleAutoImprovePlanWithGroq(year, monthIndex, baseOptions, selectedIndex, selected, metricsList[selectedIndex]);
+    selected = improvedResult.plan;
     selected.hybrid = {
+      improve: improvedResult.info,
       enabled: true,
       candidateCount: candidates.length,
       allowedCandidateCount: allowedIndexes.length,
       selectedCandidate: selectedIndex,
-      metrics: metricsList[selectedIndex],
+      metrics: improvedResult.plan === candidates[selectedIndex] ? metricsList[selectedIndex] : scheduleAutoPlanMetrics(selected),
       groqStatus: groqResult?.status || "fallback",
       groqModel: groqResult?.model || null,
       groqUsage: groqResult?.usage || null,
