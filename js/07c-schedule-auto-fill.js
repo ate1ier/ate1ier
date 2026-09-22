@@ -61,6 +61,8 @@
   //  없다는 요청에 따름). 미리보기 표·요약에도 관리자는 변경 사항 없이 그대로 나온다.
 
   let scheduleAutoPlan = null; // 미리보기에 띄워둔 계획. 적용 버튼에서 이 값을 그대로 씀.
+  let scheduleAutoChecklistCollapsed = false; // 조건 체크리스트 접힘 상태(모달을 새로 열면 초기화됨)
+  let scheduleAutoSettingsLastKind = "off"; // 인원별 설정 팝업에서 마지막으로 본 탭("off" | "work")
   let scheduleAutoFitObserver = null; // 미리보기 표를 팝업 폭에 맞춰 축소할 때, 폭이 바뀌면 다시 맞추기 위한 관찰자
 
   // 하이브리드 자동배치: 기존 규칙으로만 유효한 후보를 여러 개 만든 뒤,
@@ -183,6 +185,12 @@
   function scheduleAutoTogglePrefDow(staffId, dow) { scheduleAutoSetPrefDow(staffId, dow, "off"); }
   function scheduleAutoToggleWorkPrefDow(staffId, dow) { scheduleAutoSetPrefDow(staffId, dow, "work"); }
   function scheduleAutoPrefLabel(dows) { return dows.map((n) => SCHEDULE_AUTO_DOW_LABELS[n]).join("·"); }
+  // 탭 하나(선호 오프 또는 선호 출근) 전체를 통째로 비운다. 다른 쪽 탭 설정은 건드리지 않는다.
+  function scheduleAutoClearPrefKind(kind) {
+    const map = kind === "work" ? "autoWorkPrefs" : "autoOffPrefs";
+    scheduleData[map] = {};
+    saveScheduleData();
+  }
 
   // ----- 이번 배치에서 제외할 인원 (조건) -----
   // 저장하지 않는 "이번 실행 한정" 조건. openScheduleAutoModal이 열 때마다 비운다.
@@ -1723,11 +1731,7 @@
               <div class="sch-auto-cond-body" id="sch-auto-exclude-area">${scheduleAutoExcludeAreaHtml(staffList, scheduleAutoExcludedIds)}</div>
             </div>
             <div class="sch-auto-settings-buttons" aria-label="인원별 설정">
-              <button type="button" class="ghost-btn sch-auto-settings-btn" id="sch-auto-settings-btn" aria-expanded="false" aria-controls="sch-auto-settings-menu">인원별 설정</button>
-              <div class="sch-auto-settings-menu" id="sch-auto-settings-menu" hidden>
-                <button type="button" class="sch-auto-settings-menu-btn" id="sch-auto-off-settings-btn">인원별 오프 설정</button>
-                <button type="button" class="sch-auto-settings-menu-btn" id="sch-auto-work-settings-btn">인원별 선호 설정</button>
-              </div>
+              <button type="button" class="ghost-btn sch-auto-settings-btn" id="sch-auto-settings-btn">인원별 설정</button>
             </div>
           </div>
         </div>
@@ -1738,18 +1742,23 @@
       </div>`;
   }
 
-  // 인원별 설정 팝업. 오프와 선호 출근을 각각 별도 화면에서 편집한다.
-  // 요일은 월~일 순서로 표시한다. kind: "off" | "work"
+  // 인원별 설정 팝업. 위쪽 탭(선호 오프 설정 / 선호 출근 설정)을 눌러 같은 팝업 안에서
+  // 두 화면을 오갈 수 있다. 요일은 월~일 순서로 표시한다. kind: "off" | "work"
   function scheduleAutoSettingsPopupHtml(staffList, excludedIds, kind) {
     const mode = kind === "work" ? "work" : "off";
     const excludedSet = new Set(excludedIds || []);
     const dayOrder = [1, 2, 3, 4, 5, 6, 0]; // 월~일
     const isWork = mode === "work";
-    const title = isWork ? "인원별 선호 설정" : "인원별 오프 설정";
     const descTitle = isWork ? "선호 출근 요일" : "선호 오프 요일";
     const desc = isWork
       ? "각 인원이 출근을 선호하는 요일을 선택하세요. 선택한 요일에는 오프 배정을 피해서 배치해요."
       : "각 인원이 오프를 선호하는 요일을 선택하세요. 선택한 요일에는 오프를 우선 배정해요.";
+    const tabsHtml = `
+      <div class="sch-auto-set-tabs" role="tablist">
+        <button type="button" class="sch-auto-set-tab${!isWork ? " is-active" : ""}" data-auto-set-tab="off" role="tab" aria-selected="${!isWork}">선호 오프 설정</button>
+        <button type="button" class="sch-auto-set-tab${isWork ? " is-active" : ""}" data-auto-set-tab="work" role="tab" aria-selected="${isWork}">선호 출근 설정</button>
+        <button type="button" class="ghost-btn sch-auto-set-reset-btn" id="sch-auto-set-reset-btn" data-auto-set-reset="${mode}">${isWork ? "선호 출근" : "선호 오프"} 초기화</button>
+      </div>`;
     const head = dayOrder.map((dow) => {
       const label = SCHEDULE_AUTO_DOW_LABELS[dow];
       return `<th class="sch-auto-set-dow${dow === 0 ? " is-sun" : dow === 6 ? " is-sat" : ""}">${label}</th>`;
@@ -1775,11 +1784,12 @@
       return `<tr class="sch-auto-set-group"><th colspan="8">${g.label} <span class="sch-auto-set-group-count">${g.list.length}명</span></th></tr>${rows}`;
     }).join("");
     return `
-      <div class="sch-preview-box sch-auto-set-box">
+      <div class="sch-preview-box sch-auto-set-box" data-auto-set-kind="${mode}">
         <div class="sch-preview-head">
-          <span>${title} <span class="sch-auto-prefs-count" id="sch-auto-set-count">${esc(scheduleAutoPrefsCountText(staffList))}</span></span>
+          <span>인원별 설정 <span class="sch-auto-prefs-count" id="sch-auto-set-count">${esc(scheduleAutoPrefsCountText(staffList))}</span></span>
           <button type="button" class="sch-preview-close" id="sch-auto-set-close-x" aria-label="닫기">✕</button>
         </div>
+        ${tabsHtml}
         <div class="sch-preview-body sch-auto-set-body">
           <div class="sch-auto-set-desc"><b>${descTitle}</b> — ${desc} <span class="sch-auto-set-note">설정은 달이 바뀌어도 계속 적용돼요. 필수 조건은 아니며 필요인력·연속 근무 제한 등과 충돌하면 다른 날로 조정될 수 있어요.</span></div>
           ${groups.length === 0 ? `<div class="sch-adjust-empty">이번 달 인원이 없어요.</div>` : `
@@ -1826,16 +1836,10 @@
     scheduleAutoRefreshPreview();
   }
 
-  function scheduleAutoCloseSettingsChooser() {
-    const menu = document.getElementById("sch-auto-settings-menu");
-    const trigger = document.getElementById("sch-auto-settings-btn");
-    if (menu) menu.hidden = true;
-    if (trigger) trigger.setAttribute("aria-expanded", "false");
-  }
-
   function openScheduleAutoSettingsPopup(kind) {
     closeScheduleAutoSettingsPopup();
     const mode = kind === "work" ? "work" : "off";
+    scheduleAutoSettingsLastKind = mode;
     const staffList = getStaffListForMonth(scheduleUi.year, scheduleUi.monthIndex);
     const overlay = document.createElement("div");
     overlay.id = "sch-auto-settings-overlay";
@@ -1845,6 +1849,26 @@
     overlay.onclick = (e) => { if (e.target === overlay) closeScheduleAutoSettingsPopup(); };
     document.getElementById("sch-auto-set-close-x").onclick = () => closeScheduleAutoSettingsPopup();
     document.getElementById("sch-auto-set-done-btn").onclick = () => closeScheduleAutoSettingsPopup();
+    // 상단 탭(선호 오프 설정 / 선호 출근 설정): 팝업을 닫지 않고 같은 자리에서 화면만 바꾼다.
+    overlay.addEventListener("click", (e) => {
+      const tab = e.target && e.target.closest ? e.target.closest("[data-auto-set-tab]") : null;
+      if (!tab) return;
+      const nextKind = tab.getAttribute("data-auto-set-tab") === "work" ? "work" : "off";
+      if (nextKind === mode) return;
+      openScheduleAutoSettingsPopup(nextKind);
+    });
+    // 초기화: 지금 보고 있는 탭(선호 오프 또는 선호 출근)의 전체 인원 설정을 한 번에 비운다.
+    // 다른 탭 설정은 건드리지 않는다.
+    overlay.addEventListener("click", (e) => {
+      const resetBtn = e.target && e.target.closest ? e.target.closest("[data-auto-set-reset]") : null;
+      if (!resetBtn) return;
+      const resetKind = resetBtn.getAttribute("data-auto-set-reset") === "work" ? "work" : "off";
+      const label = resetKind === "work" ? "선호 출근" : "선호 오프";
+      if (!window.confirm(`${label} 설정을 전체 인원 기준으로 모두 초기화할까요? 되돌릴 수 없어요.`)) return;
+      scheduleAutoClearPrefKind(resetKind);
+      openScheduleAutoSettingsPopup(resetKind);
+      if (scheduleAutoPlan) scheduleAutoRefreshPreview();
+    });
     overlay.addEventListener("click", (e) => {
       const chip = e.target && e.target.closest ? e.target.closest("[data-auto-pref-staff]") : null;
       if (chip) scheduleAutoHandlePrefChipClick(chip);
@@ -2076,6 +2100,8 @@
     let toleranceViolations = 0;   // 최후 허용범위(max)까지 넘은 칸
     let idealMissCells = 0;        // 최후 허용범위(max) 안이지만 1순위(ideal) 범위는 못 지킨 칸
     let toleranceCellsWithReq = 0; // 필요인력이 설정된 칸 수(비율 계산용)
+    const toleranceViolationDates = []; // 초과 칸이 며칠·어느 구분인지(체크리스트에 날짜로 보여주기 위함)
+    const toleranceGroupLabels = { DAY: { 채팅: "주간채팅", 유선: "주간유선" }, NIGHT: { 채팅: "야간채팅", 유선: "야간유선" } };
     let allWorkingDays = 0;
     let totalSlack = 0;
     let maxShortage = 0; // 가장 깊은 필요인력 부족(예: 3이면 -3인 칸이 있음)
@@ -2095,8 +2121,10 @@
           const effectiveMax = wasAllWorking ? Math.max(tol.max, 1) : tol.max;
           const diff = w - req;
           toleranceCellsWithReq += 1;
-          if (-diff > effectiveMax) toleranceViolations += 1;
-          else if (-diff > tol.ideal) idealMissCells += 1;
+          if (-diff > effectiveMax) {
+            toleranceViolations += 1;
+            toleranceViolationDates.push(`${monthIndex + 1}/${d}(${toleranceGroupLabels[g][t]})`);
+          } else if (-diff > tol.ideal) idealMissCells += 1;
           if (-diff > maxShortage) maxShortage = -diff;
           totalSlack += diff;
         }
@@ -2130,7 +2158,7 @@
     return {
       totalAssigned: plan.perStaffPlan.reduce((sum, p) => sum + p.assigned.length, 0),
       protectedOverlap, targetShortage, workViolationRuns, sixDayRuns, sevenPlusRuns, offViolationRuns, offViolationExcess,
-      minWorkingViolations, toleranceViolations, idealMissCells, toleranceCellsWithReq,
+      minWorkingViolations, toleranceViolations, idealMissCells, toleranceCellsWithReq, toleranceViolationDates,
       allWorkingDays, groupAllWorkingDays, prefHits, prefTotal,
       workPrefAvoided, workPrefTotal, offVariance, totalSlack, maxShortage,
       // 선호 점수 = 선호 오프 요일에 잡힌 오프 수 − 선호 출근 요일에 잡힌 오프 수
@@ -2144,6 +2172,16 @@
   //  warn(△): 규칙 위반은 아니지만 이상적인 수준까지는 못 미쳤다(허용된 예외 포함).
   //  bad(✗) : 규칙을 어겼다. scheduleAutoBuildPlan은 구조적으로 이 상태를 만들 수 없어야 하므로,
   //           실제로 뜨면 버그를 의심해야 한다(방어적 표시).
+  // 위반 칸 날짜 목록을 "(10/17(야간채팅), 10/22(주간유선))"처럼 짧게 표시한다.
+  // 너무 많으면 앞쪽 몇 개만 보여주고 나머지는 "외 N건"으로 줄인다.
+  function scheduleAutoFormatDateList(dates, max) {
+    if (!dates || dates.length === 0) return "";
+    const limit = max || 8;
+    const shown = dates.slice(0, limit);
+    const extra = dates.length - shown.length;
+    return `(${shown.join(", ")}${extra > 0 ? ` 외 ${extra}건` : ""})`;
+  }
+
   function scheduleAutoChecklistItems(plan, metrics) {
     const items = [];
     const add = (label, mark, note) => items.push({ label, mark, note: note || "" });
@@ -2183,7 +2221,9 @@
     add(
       "필요인력 허용범위(최후 기준)",
       metrics.toleranceViolations === 0 ? "ok" : "bad",
-      metrics.toleranceViolations === 0 ? "초과 칸 없음" : `초과 칸 ${metrics.toleranceViolations}개`
+      metrics.toleranceViolations === 0
+        ? "초과 칸 없음"
+        : `초과 칸 ${metrics.toleranceViolations}개 ${scheduleAutoFormatDateList(metrics.toleranceViolationDates)}`
     );
 
     if (metrics.toleranceCellsWithReq > 0) {
@@ -2251,11 +2291,17 @@
         </div>
       </div>
     `).join("");
+    const collapsed = scheduleAutoChecklistCollapsed;
     return `
-      <div class="sch-auto-checklist">
-        <div class="sch-auto-checklist-title">조건 체크리스트 <span class="sch-auto-checklist-legend">✓ 지킴 · △ 규칙상 문제 없음 · ✗ 규칙 위반</span></div>
-        ${scheduleAutoSettingsSummaryHtml(plan)}
-        ${rows}
+      <div class="sch-auto-checklist${collapsed ? " sch-auto-checklist--collapsed" : ""}">
+        <button type="button" class="sch-auto-checklist-toggle" aria-expanded="${collapsed ? "false" : "true"}">
+          <span class="sch-auto-checklist-title">조건 체크리스트 <span class="sch-auto-checklist-legend">✓ 지킴 · △ 규칙상 문제 없음 · ✗ 규칙 위반</span></span>
+          <span class="sch-auto-checklist-caret" aria-hidden="true">${collapsed ? "▸" : "▾"}</span>
+        </button>
+        <div class="sch-auto-checklist-body">
+          ${scheduleAutoSettingsSummaryHtml(plan)}
+          ${rows}
+        </div>
       </div>
     `;
   }
@@ -2586,6 +2632,63 @@
     if (applyBtn) applyBtn.disabled = total === 0;
   }
 
+  // "?" 버튼을 누르면 뜨는 배치 조건 안내를, 그냥 나열된 문장 목록이 아니라
+  // 실제로 자동배치가 조건을 적용하는 우선순위 순서대로 도식표(위→아래, 화살표로 연결)로 보여준다.
+  // 각 단계(tier)는 { badge: 배지 텍스트, items: [{ title, desc }] } 형태.
+  function scheduleAutoInfoDiagramHtml() {
+    const tiers = [
+      {
+        badge: "1순위 · 절대 불가침",
+        items: [
+          { title: "기존 입력값 보호", desc: "이미 값이 입력된 칸은 그대로 유지, 기본값(근무)인 빈 칸에만 새 오프를 배정해요." },
+          { title: "구분별 하루 최소 출근 인원", desc: "설정한 최소 출근 인원 밑으로는 어떤 경우에도 내려가지 않아요." },
+        ],
+      },
+      {
+        badge: "2순위 · 최후 허용선",
+        items: [
+          { title: "필요인력 허용범위(최후 기준)", desc: "금·토·월 0 / 그 외 요일 -1(최후의 수단 -2) / 평일 공휴일은 금·토·월도 -2까지 허용해요. (대비 +는 항상 허용, 부족만 제한)" },
+        ],
+      },
+      {
+        badge: "3순위 · 규칙(불가피하면 예외)",
+        items: [
+          { title: `연속 근무 최대 ${SCHEDULE_AUTO_MAX_WORK_STREAK}일`, desc: "불가피하면 6일까지 허용해요. 전월 말일부터 이어진 연속 근무일수도 포함해서 계산해요." },
+          { title: `연속 오프 최대 ${SCHEDULE_AUTO_MAX_OFF_STREAK}일`, desc: "메모에 \"필휴\"로 표시된 오프도 연결된 연속 오프 계산에 포함돼요." },
+          { title: "전원 출근하는 날 방지", desc: "각 구분별로 모든 인원이 출근하는 날은 만들지 않아요. 이를 피하기 위해 필요한 경우에 한해 그 날짜의 필요인력 부족을 -1까지 더 허용해요." },
+        ],
+      },
+      {
+        badge: "4순위 · 가능하면 지키는 선호",
+        items: [
+          { title: "선호 출근·오프 요일", desc: "\"인원별 설정\" 기준으로 선호 출근일엔 오프를 피하고 선호 오프일엔 오프를 우선 배정해요. 필수는 아니라 위 조건과 충돌하면 조정돼요." },
+          { title: "오프 목표 개수 충족", desc: "목표 개수 = 공휴일+토요일+일요일 기준 인원별 자동 계산. 대휴·공휴는 항상 차감, 오프는 \"필휴\" 표시가 있을 때만 차감, 연차·공가·육휴·특휴는 차감 안 해요." },
+        ],
+      },
+    ];
+    const tierHtml = tiers.map((tier, i) => `
+      <div class="sch-auto-priority-tier">
+        <div class="sch-auto-priority-badge">${esc(tier.badge)}</div>
+        <div class="sch-auto-priority-boxes">
+          ${tier.items.map((it) => `
+            <div class="sch-auto-priority-box">
+              <div class="sch-auto-priority-box-title">${esc(it.title)}</div>
+              <div class="sch-auto-priority-box-desc">${it.desc}</div>
+            </div>
+          `).join("")}
+        </div>
+      </div>
+      ${i < tiers.length - 1 ? `<div class="sch-auto-priority-arrow" aria-hidden="true">↓</div>` : ""}
+    `).join("");
+    return `
+      <div class="sch-auto-priority-diagram">${tierHtml}</div>
+      <div class="sch-auto-priority-notes">
+        <div>제외할 인원: 이번 배치에만 적용(저장 안 됨) · 재직 인원에서 빠진 것으로 필요인력 계산 · 오프 신규 배정 없음 · 미리보기 표에서 제외(실제 스케줄 표의 해당 인원 칸은 변경 없음)</div>
+        <div>저장 방식: 미리보기 단계에서는 저장되지 않음, "이대로 입력" 클릭 시에만 반영돼요.</div>
+      </div>
+    `;
+  }
+
   function openScheduleAutoModal() {
     const { year, monthIndex } = scheduleUi;
     if (scheduleIsMonthLocked(year, monthIndex)) {
@@ -2595,6 +2698,7 @@
     closeScheduleAutoModal();
     scheduleAutoResetExcluded(); // 제외 조건은 이번 실행 한정이라 열 때마다 비운다
     scheduleAutoPlan = null;
+    scheduleAutoChecklistCollapsed = false;
     const monthStaff = getStaffListForMonth(year, monthIndex);
 
     const overlay = document.createElement("div");
@@ -2610,19 +2714,7 @@
           <button type="button" class="sch-preview-close" id="sch-auto-close-x" aria-label="닫기">✕</button>
         </div>
         <div class="sch-auto-info-card" id="sch-auto-info-card" hidden>
-          <ul>
-            <li>목표 오프 개수 = 공휴일 + 토요일 + 일요일을 기준으로 인원별 자동 계산</li>
-            <li>목표 차감: 대휴·공휴는 항상 차감 / 오프는 메모에 "필휴" 표시가 있을 때만 차감 / 연차·공가·육휴·특휴는 차감 안 함</li>
-            <li>배치 범위: 이미 값이 입력된 칸은 그대로 유지, 기본값(근무)인 빈 칸에만 새 오프 배정</li>
-            <li>필요인력 허용범위: 금·토·월 0 / 그 외 요일 -1(최후의 수단 -2) / 평일 공휴일은 금·토·월도 -2까지 허용 (대비 +는 항상 허용, 부족만 제한)</li>
-            <li>각 구분별 모든 인원이 출근하는 날은 만들지 않으며, 이를 피하기 위해 필요한 경우에 한해 해당 날짜의 필요인력 부족을 -1까지 허용합니다.</li>
-            <li>구분별 하루 최소 출근 인원은 위 입력값을 각각 적용</li>
-            <li>연속 근무 제한: 최대 <b>${SCHEDULE_AUTO_MAX_WORK_STREAK}일</b> (전월 말일부터 이어진 연속 근무일수 포함)</li>
-            <li>연속 오프 제한: <b>${SCHEDULE_AUTO_MAX_OFF_STREAK}일</b> (필휴도 연결된 연속 오프에 포함)</li>
-            <li>선호 출근·오프 요일: \"인원별 설정\"을 기준으로 선호 출근일에는 오프를 피하고 선호 오프일에는 오프를 우선 배정 (필수 아님, 위 조건과 충돌 시 조정)</li>
-            <li>제외할 인원: 이번 배치에만 적용 (저장 안 됨) / 재직 인원에서 빠진 것으로 필요인력 계산 / 오프 신규 배정 없음 / 미리보기 표에서 제외 (실제 스케줄 표의 해당 인원 칸은 변경 없음)</li>
-            <li>저장 방식: 미리보기 단계에서는 저장되지 않음, "이대로 입력" 클릭 시에만 반영</li>
-          </ul>
+          ${scheduleAutoInfoDiagramHtml()}
         </div>
         <div class="sch-preview-body sch-auto-body">
           ${scheduleAutoConditionsHtml(monthStaff)}
@@ -2686,6 +2778,19 @@
         actions.appendChild(applyBtn);
       }
     };
+    // 조건 체크리스트 접기/펼치기: 미리보기를 다시 그릴 때도(배치 재실행 등) 접힌 상태가
+    // 유지되도록 상태를 모듈 변수(scheduleAutoChecklistCollapsed)에 저장해둔다.
+    overlay.addEventListener("click", (e) => {
+      const toggle = e.target && e.target.closest ? e.target.closest(".sch-auto-checklist-toggle") : null;
+      if (!toggle) return;
+      const box = toggle.closest(".sch-auto-checklist");
+      if (!box) return;
+      scheduleAutoChecklistCollapsed = !scheduleAutoChecklistCollapsed;
+      box.classList.toggle("sch-auto-checklist--collapsed", scheduleAutoChecklistCollapsed);
+      toggle.setAttribute("aria-expanded", scheduleAutoChecklistCollapsed ? "false" : "true");
+      const caret = toggle.querySelector(".sch-auto-checklist-caret");
+      if (caret) caret.textContent = scheduleAutoChecklistCollapsed ? "▸" : "▾";
+    });
     overlay.addEventListener("change", (e) => {
       const input = e.target && e.target.closest ? e.target.closest("[data-auto-min-working]") : null;
       if (!input) return;
@@ -2695,24 +2800,10 @@
       scheduleAutoMinWorkingByGroup[key] = value;
       if (scheduleAutoPlan) scheduleAutoRefreshPreview();
     });
-    // 배치 조건: "인원별 설정"을 누르면 오프/선호 설정을 각각 선택할 수 있다.
+    // 배치 조건: "인원별 설정"을 누르면 팝업이 바로 뜬다(마지막으로 본 탭을 기억).
     const settingsBtn = document.getElementById("sch-auto-settings-btn");
-    const settingsMenu = document.getElementById("sch-auto-settings-menu");
-    if (settingsBtn && settingsMenu) {
-      settingsBtn.onclick = (e) => {
-        e.stopPropagation();
-        const nextHidden = !settingsMenu.hidden;
-        settingsMenu.hidden = nextHidden;
-        settingsBtn.setAttribute("aria-expanded", nextHidden ? "false" : "true");
-      };
-      document.getElementById("sch-auto-off-settings-btn").onclick = () => {
-        scheduleAutoCloseSettingsChooser();
-        openScheduleAutoSettingsPopup("off");
-      };
-      document.getElementById("sch-auto-work-settings-btn").onclick = () => {
-        scheduleAutoCloseSettingsChooser();
-        openScheduleAutoSettingsPopup("work");
-      };
+    if (settingsBtn) {
+      settingsBtn.onclick = () => openScheduleAutoSettingsPopup(scheduleAutoSettingsLastKind);
     }
     overlay.addEventListener("change", (e) => {
       const sel = e.target && e.target.closest ? e.target.closest("[data-auto-exclude-select]") : null;

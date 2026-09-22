@@ -399,8 +399,8 @@ test("인원별 설정은 오프/선호 출근을 별도 팝업으로 열고 월
   const list = m.getStaffListForMonth(YEAR, MI);
   const offHtml = m.scheduleAutoSettingsPopupHtml(list, [], "off");
   const workHtml = m.scheduleAutoSettingsPopupHtml(list, [], "work");
-  assert.ok(offHtml.includes("인원별 오프 설정"));
-  assert.ok(workHtml.includes("인원별 선호 설정"));
+  assert.ok(offHtml.includes("선호 오프 설정") && offHtml.includes('data-auto-set-tab="off" role="tab" aria-selected="true"'));
+  assert.ok(workHtml.includes("선호 출근 설정") && workHtml.includes('data-auto-set-tab="work" role="tab" aria-selected="true"'));
   assert.equal(count(offHtml, /data-auto-pref-kind="off"/g), 14);
   assert.equal(count(offHtml, /data-auto-pref-kind="work"/g), 0);
   assert.equal(count(workHtml, /data-auto-pref-kind="work"/g), 14);
@@ -413,6 +413,21 @@ test("인원별 설정은 오프/선호 출근을 별도 팝업으로 열고 월
     assert.ok(!html.includes("<b>홍</b>"));
     assert.ok(html.includes("&lt;b&gt;홍&lt;/b&gt;"));
   }
+  assert.ok(offHtml.includes('data-auto-set-reset="off"') && offHtml.includes("선호 오프 초기화"));
+  assert.ok(workHtml.includes('data-auto-set-reset="work"') && workHtml.includes("선호 출근 초기화"));
+});
+
+test("탭별 초기화: 그 탭 설정만 전체 인원 기준으로 비우고 다른 탭 설정은 그대로 둔다", () => {
+  const { m, saved } = setup({
+    staff: [staff("s1"), staff("s2")],
+    autoOffPrefs: { s1: { dows: [1] }, s2: { dows: [2] } },
+    autoWorkPrefs: { s1: { dows: [5] } },
+  });
+  m.scheduleAutoClearPrefKind("off");
+  assert.deepEqual(toPlain(m.scheduleAutoGetPrefDows("s1")), []);
+  assert.deepEqual(toPlain(m.scheduleAutoGetPrefDows("s2")), []);
+  assert.deepEqual(toPlain(m.scheduleAutoGetWorkPrefDows("s1")), [5], "선호 출근 설정은 건드리지 않는다");
+  assert.equal(saved().autoOffPrefs && Object.keys(saved().autoOffPrefs).length, 0);
 });
 
 test("인원별 설정 팝업: 주간·야간·관리자로 묶고 제외 중인 인원은 표시한다", () => {
@@ -559,14 +574,12 @@ test("제외 영역 HTML: 아직 제외하지 않은 인원만 선택지에 나�
   assert.equal(count(all, /data-auto-exclude-remove=/g), 3);
 });
 
-test("배치 조건 영역: 인원별 설정 버튼을 누르면 오프/선호 설정을 각각 선택할 수 있다", () => {
+test("배치 조건 영역: 인원별 설정 버튼을 누르면 팝업이 바로 뜬다(드롭다운 없음)", () => {
   const { m } = setup({ staff: [staff("s1"), staff("s2")], autoOffPrefs: { s1: { dows: [1] } } });
   const html = m.scheduleAutoConditionsHtml(m.getStaffListForMonth(YEAR, MI));
   assert.ok(html.includes("배치 조건") && html.includes("제외할 인원"));
   assert.ok(html.includes('id="sch-auto-settings-btn"') && html.includes("인원별 설정"));
-  assert.ok(html.includes('id="sch-auto-off-settings-btn"') && html.includes("인원별 오프 설정"));
-  assert.ok(html.includes('id="sch-auto-work-settings-btn"') && html.includes("인원별 선호 설정"));
-  assert.ok(html.includes('id="sch-auto-settings-menu"') && html.includes('hidden'));
+  assert.ok(!html.includes("sch-auto-settings-menu"), "드롭다운 메뉴는 더 이상 없어야 한다");
   assert.ok(!html.includes("<details"));
 });
 
@@ -1302,6 +1315,17 @@ test("체크리스트: 필요인력 허용범위를 넘겨 배치된 칸이 있�
   const items = m.scheduleAutoChecklistItems(forced, metrics);
   const byLabel = Object.fromEntries(items.map((it) => [it.label, it.mark]));
   assert.equal(byLabel["필요인력 허용범위(최후 기준)"], "bad");
+  const byNote = Object.fromEntries(items.map((it) => [it.label, it.note]));
+  // 초과 칸이 며칠인지(9/9) 노트에 날짜로 함께 나와야 한다.
+  assert.match(byNote["필요인력 허용범위(최후 기준)"], /9\/9/);
+});
+
+test("체크리스트: 필요인력 허용범위 초과 칸이 많으면 앞쪽 몇 개만 보여주고 '외 N건'으로 줄인다", () => {
+  const { m } = setup({ staff: [staff("s1")] }, { premise: true });
+  const dates = Array.from({ length: 10 }, (_, i) => `9/${i + 1}(주간채팅)`);
+  const text = m.scheduleAutoFormatDateList(dates);
+  assert.equal(text, "(9/1(주간채팅), 9/2(주간채팅), 9/3(주간채팅), 9/4(주간채팅), 9/5(주간채팅), 9/6(주간채팅), 9/7(주간채팅), 9/8(주간채팅) 외 2건)");
+  assert.equal(m.scheduleAutoFormatDateList([]), "");
 });
 
 test("체크리스트: 선호 요일 미설정이면 그 항목 자체가 나타나지 않는다", () => {

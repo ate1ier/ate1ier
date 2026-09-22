@@ -346,6 +346,27 @@
   }
   .sch-auto-info-card li + li { margin-top: 6px; }
   .sch-auto-info-card b { color: var(--text); }
+  /* 배치 조건 안내(?): 우선순위 순서(위→아래)로 보여주는 도식표 */
+  .sch-auto-priority-diagram { display: flex; flex-direction: column; align-items: stretch; }
+  .sch-auto-priority-tier {
+    border: 1px solid var(--hairline); border-radius: 10px; padding: 10px 12px;
+    background: var(--panel);
+  }
+  .sch-auto-priority-badge {
+    display: inline-block; font-size: 11px; font-weight: 700; color: var(--accent);
+    background: var(--blue-dim); border-radius: 999px; padding: 2px 9px; margin-bottom: 8px;
+  }
+  .sch-auto-priority-boxes { display: flex; flex-direction: column; gap: 8px; }
+  .sch-auto-priority-box { padding-left: 2px; }
+  .sch-auto-priority-box-title { font-size: 12.5px; font-weight: 600; color: var(--text); }
+  .sch-auto-priority-box-desc { font-size: 11.5px; color: var(--text-faint); line-height: 1.5; margin-top: 2px; }
+  .sch-auto-priority-arrow {
+    text-align: center; color: var(--text-faint); font-size: 13px; line-height: 1; margin: 4px 0;
+  }
+  .sch-auto-priority-notes {
+    margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--hairline);
+    display: flex; flex-direction: column; gap: 6px; font-size: 11.5px; color: var(--text-faint); line-height: 1.6;
+  }
   .sch-auto-warnings {
     background: var(--amber-dim, var(--elevated)); border: 1px solid var(--amber); border-radius: 10px;
     padding: 10px 12px; margin-bottom: 14px;
@@ -364,8 +385,15 @@
     border: 1px solid var(--hairline); border-radius: 10px; padding: 10px 12px; margin-bottom: 14px;
     background: var(--panel); display: flex; flex-direction: column; gap: 6px;
   }
-  .sch-auto-checklist-title { font-size: 12.5px; font-weight: 600; color: var(--text); margin-bottom: 2px; }
+  .sch-auto-checklist-toggle {
+    display: flex; align-items: center; justify-content: space-between; width: 100%;
+    background: none; border: none; padding: 0; margin: 0; cursor: pointer; text-align: left; font: inherit;
+  }
+  .sch-auto-checklist-title { font-size: 12.5px; font-weight: 600; color: var(--text); }
   .sch-auto-checklist-legend { font-weight: 400; color: var(--text-faint); margin-left: 6px; }
+  .sch-auto-checklist-caret { color: var(--text-faint); font-size: 11px; margin-left: 8px; flex-shrink: 0; }
+  .sch-auto-checklist-body { display: flex; flex-direction: column; gap: 6px; }
+  .sch-auto-checklist--collapsed .sch-auto-checklist-body { display: none; }
   .sch-auto-settings-summary {
     display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12px; color: var(--text-dim);
     padding-bottom: 6px; margin-bottom: 2px; border-bottom: 1px solid var(--hairline);
@@ -660,17 +688,15 @@ html[data-theme="light"] .sch-auto-min-working-item input{background:var(--panel
     .sch-auto-pref-choice-btn { min-width: 48px; height: 28px; padding: 0 5px; font-size: 10px; }
   }
 
-/* 인원별 설정 선택 메뉴: 오프 설정과 선호 설정을 각각 별도 팝업으로 연다. */
-.sch-auto-settings-buttons { position: relative; }
-.sch-auto-settings-menu {
-  position: absolute; right: 0; top: calc(100% + 6px); z-index: 90; min-width: 150px;
-  display: flex; flex-direction: column; gap: 3px; padding: 5px;
-  background: var(--elevated); border: 1px solid var(--hairline-strong); border-radius: 10px;
-  box-shadow: var(--mac-shadow-float);
+/* 인원별 설정 팝업 상단 탭: 선호 오프 설정 / 선호 출근 설정을 같은 팝업 안에서 오간다. */
+.sch-auto-set-tabs {
+  display: flex; align-items: center; gap: 6px; padding: 10px 18px 0; flex-shrink: 0;
 }
-.sch-auto-settings-menu[hidden] { display: none; }
-.sch-auto-settings-menu-btn {
-  width: 100%; padding: 8px 10px; border: 0; border-radius: 7px; background: transparent;
-  color: var(--text-dim); text-align: left; font: inherit; font-size: 12px; cursor: pointer; white-space: nowrap;
+.sch-auto-set-tab {
+  padding: 7px 14px; border: 1px solid var(--hairline); border-radius: 999px; background: transparent;
+  color: var(--text-faint); font-size: 12.5px; font-weight: 600; cursor: pointer;
 }
-.sch-auto-settings-menu-btn:hover { background: var(--accent-dim); color: var(--text); }
+.sch-auto-set-tab:hover { color: var(--text); background: var(--elevated); }
+.sch-auto-set-tab.is-active { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+.sch-auto-set-reset-btn { margin-left: auto; padding: 7px 12px; font-size: 12px; white-space: nowrap; }
+
