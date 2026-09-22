@@ -51,7 +51,7 @@
     --page-title-weight: 600;
   }
   html[data-theme="light"] {
-    /* ---- 라이트 모드 가독성 강화: 배경/경계 대비를 높이고 선택 강조는 중립색으로 사용 ---- */
+    /* ---- 라이트 모드: 배경/경계 대비를 높이고 선택 강조는 선명한 보라 계열로 사용 ---- */
     --bg: #f1f3f5;
     --panel: #ffffff;
     --elevated: #e7eaee;
@@ -60,9 +60,9 @@
     --text: #1d1f22;
     --text-dim: #555a60;
     --text-faint: #747a81;
-    --accent: #4b5056;
-    --accent-dim: rgba(75, 80, 86, 0.13);
-    --accent-dim-soft: rgba(75, 80, 86, 0.07);
+    --accent: #7c3aed;
+    --accent-dim: rgba(124, 58, 237, 0.16);
+    --accent-dim-soft: rgba(124, 58, 237, 0.08);
     --accent-text: #ffffff;
     --weekend-tint: #e9ecef;
     --native-color-scheme: light;
