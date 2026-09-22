@@ -635,12 +635,13 @@
       // ④ 1순위 필요인력 범위인지 ⑤ 제약 없음 ⑥ 여유 ⑦ 분산 ⑧ 빠른 날짜
       // ※ 선호는 이 단계에서 반영하고, 아래 최종 보정 단계에서 서로의 오프를 안전하게 교환해
       //    선호가 실제 결과에 더 많이 반영되도록 한다. 강한 조건을 깨는 교환은 하지 않는다.
-      const dayFeasible = {}, dayVec = {};
+      const dayFeasible = {}, dayIdeal = {}, dayVec = {};
       remainingFree.forEach((d) => {
         const dow = new Date(year, monthIndex, d).getDay();
         const dateKey = scheduleDateKey(year, monthIndex, d);
         const tolInfo = scheduleAutoToleranceInfo(dow, dateKey);
         let idealOk = true, maxOk = true;
+        let priorityRangeOk = true;
         let hasConstraint = false;
         let minSlack = Infinity;
         let breaksAllWorking = false;
@@ -660,11 +661,14 @@
           const effectiveMax = breaksThisGroupAllWorking ? Math.max(tolInfo.max, 1) : tolInfo.max;
           if (-diff > tolInfo.ideal) idealOk = false;
           if (-diff > effectiveMax) maxOk = false;
+          if (-diff > tolInfo.ideal && !breaksThisGroupAllWorking) priorityRangeOk = false;
+          if (-diff > effectiveMax) priorityRangeOk = false;
           minSlack = Math.min(minSlack, effectiveMax + diff); // 클수록 여유(인원이 더 남을수록 안전)
         });
         // 경고("허용범위를 벗어나 배치됐어요")는 "최후의 수단 범위"까지 넘겼을 때만 띄운다.
         // 1순위 범위를 못 맞춰 최후의 수단 범위로 배치된 건 정상 동작이라 경고 대상이 아니다.
         dayFeasible[d] = maxOk;
+        dayIdeal[d] = priorityRangeOk;
         const prefWeight = [3, 5, 2, 4, 6, 1][variant % 6];
         const workPrefWeight = [3, 5, 2, 4, 6, 1][(variant + 2) % 6];
         const prefScore = prefDows.indexOf(dow) !== -1 ? prefWeight : (workPrefDows.indexOf(dow) !== -1 ? -workPrefWeight : 0);
@@ -686,15 +690,15 @@
         ];
       });
       const tolWarn = []; // 필요인력 허용범위를 넘겨 배치된 칸 — 나중에 그 칸이 옮겨지면 경고도 함께 사라진다
-      const solved = scheduleAutoSolveDays({
+      const solveDays = (idealOnly) => scheduleAutoSolveDays({
         daysInMonth, carry, limit: LIMIT, maxWorkStreak: 6, needed,
         isRest: (d) => !!baseRest[d],
         // 필요인력 허용범위(최후 기준, dayFeasible)를 넘기는 날은 애초에 후보에서 제외한다.
-        // 이전에는 dayFeasible이 dayScore(점수)에만 반영돼서, 연속근무 5일 제한을 지키려고
-        // 오히려 필요인력 허용범위를 넘는 날을 골라버리는 경우가 있었다(그 반대가 맞다:
-        // 필요인력 허용범위는 -2/0에서 더 물러설 수단이 없는 절대 기준이고, 연속근무는
-        // 6일까지 예외가 있는 쪽이라 필요인력 쪽이 먼저 지켜져야 한다).
-        isFree: (d) => !!isFreeDay[d] && !!dayFeasible[d],
+        // 먼저 1순위 범위(idealOk)만으로 목표를 채울 수 있는지 시도한다. 가능하면 -2까지
+        // 넓히지 않고 0~-1 범위 안에서 끝낸다. 다만 연속근무/연속오프/기존 일정 때문에
+        // ideal-only로 목표를 다 채울 수 없는 경우에는 기존 정책대로 최후 허용범위(maxOk)까지
+        // 한 단계 넓혀서 남은 오프를 채운다.
+        isFree: (d) => !!isFreeDay[d] && !!dayFeasible[d] && (!idealOnly || !!dayIdeal[d]),
         isProtectedRest: (d) => {
           const dateKey = scheduleDateKey(year, monthIndex, d);
           const rec = scheduleData.records[scheduleRecordKey(s.id, dateKey)];
@@ -704,6 +708,17 @@
         offLimit: SCHEDULE_AUTO_MAX_OFF_STREAK,
         dayScore: (d) => dayVec[d],
       });
+      const idealSolved = solveDays(true);
+      const maxSolved = solveDays(false);
+      // 1순위 범위만으로 목표를 채울 수 있어도, 그 선택 때문에 연속근무 위반이 새로
+      // 생기면 안 된다. 먼저 연속근무 위반 수가 적은 해를 고르고, 위반 수가 같을 때만
+      // ideal-only 결과를 우선해서 -2 확장을 불필요하게 사용하지 않는다.
+      let solved;
+      if (idealSolved.picked.length < needed) solved = maxSolved;
+      else if (maxSolved.picked.length < needed) solved = idealSolved;
+      else if (idealSolved.violations < maxSolved.violations) solved = idealSolved;
+      else if (idealSolved.violations > maxSolved.violations) solved = maxSolved;
+      else solved = idealSolved;
       solved.picked.forEach((d) => {
         if (!dayFeasible[d]) {
           tolWarn.push({ d, text: `${staffLabel}님 ${monthNo}/${d} — 필요인력 허용범위를 벗어나 배치됐어요. 확인해주세요.` });
@@ -718,7 +733,7 @@
       let shortfallText = null;
       if (assigned.length < needed) {
         const minNote = minBlockedDays > 0
-          ? ` 구분별 하루 출근 최소 인원 조건을 지키느라 오프를 넣을 수 없는 날이 ${minBlockedDays}일 있어요.`
+          ? ` 출근 3명 이상을 지키느라 오프를 넣을 수 없는 날이 ${minBlockedDays}일 있어요.`
           : "";
         const earlyNote = earlyBlockedDays > 0
           ? ` 주간 유선/채팅 07:00 근무 인원 최소 1명 조건을 지키느라 오프를 넣을 수 없는 날이 ${earlyBlockedDays}일 있어요.`
@@ -965,7 +980,7 @@
       if (p.assigned.length >= p.needed) { ctx.shortfallText = null; return; }
       const stillBlocked = (staffMinBlockedDayList.get(p.staffId) || []).filter((d) => p.assigned.indexOf(d) === -1).length;
       const minNote = stillBlocked > 0
-        ? ` 구분별 하루 출근 최소 인원 조건을 지키느라 오프를 넣을 수 없는 날이 ${stillBlocked}일 있어요.`
+        ? ` 출근 3명 이상을 지키느라 오프를 넣을 수 없는 날이 ${stillBlocked}일 있어요.`
         : "";
       ctx.shortfallText = `${ctx.label}님은 빈 칸이 부족해 목표 ${p.needed}개 중 ${p.assigned.length}개만 배정됐어요.${minNote}`;
     });
@@ -1104,7 +1119,7 @@
             for (const st of groupStaff) {
               const rec = scheduleData.records[scheduleRecordKey(st.id, targetDateKey)];
               const set = planByIdForRepair.get(st.id);
-              const isOff = (set && set.has(d)) || (rec && !scheduleAutoIsWorkRecord(rec));
+              const isOff = (set && set.has(d)) || (rec && !(hasActiveMinWorking ? scheduleCountsAsWorked(rec) : scheduleAutoIsWorkRecord(rec)));
               if (!isOff) groupWorking++;
             }
             if (groupWorking !== total) continue;
@@ -1151,7 +1166,7 @@
                 for (const sourceStaff of groupStaff) {
                   const sourceRec = scheduleData.records[scheduleRecordKey(sourceStaff.id, sourceDateKey)];
                   const sourceSet = planByIdForRepair.get(sourceStaff.id);
-                  const sourceIsOff = (sourceSet && sourceSet.has(sourceDay)) || (sourceRec && !scheduleAutoIsWorkRecord(sourceRec));
+                  const sourceIsOff = (sourceSet && sourceSet.has(sourceDay)) || (sourceRec && !scheduleCountsAsWorked(sourceRec));
                   if (sourceStaff.id === st.id) continue;
                   if (sourceIsOff) { sourceWouldBeAllWorking = false; break; }
                 }
@@ -1161,6 +1176,14 @@
                 next.delete(sourceDay);
                 next.add(d);
                 if (!autoPlanValidSet(st.id, next)) continue;
+                if (!hasActiveMinWorking) {
+                  const ctx = staffWarnCtx.get(st.id);
+                  if (ctx) {
+                    const beforeStats = moveRunStats(ctx, assigned);
+                    const afterStats = moveRunStats(ctx, next);
+                    if (afterStats.runs > beforeStats.runs || afterStats.ex5 > beforeStats.ex5 || afterStats.ex6 > beforeStats.ex6) continue;
+                  }
+                }
 
                 plan.assigned = Array.from(next).sort((x, y) => x - y);
                 planByIdForRepair.set(st.id, new Set(plan.assigned));
@@ -1189,6 +1212,7 @@
 
     // 위 함수에서 빠르게 참조할 수 있도록 현재 계획의 OFF 집합을 만든다.
     const planByIdForRepair = new Map(perStaffPlan.map((p) => [p.staffId, new Set(p.assigned)]));
+    const hasActiveMinWorking = ["DAY", "NIGHT"].some((g) => TYPES.some((t) => Number(minWorkingByGroup[scheduleAutoMinWorkingKey(g, t)] ?? 0) > 0));
     const repairedAllWorkingDays = repairAllWorkingDays();
 
     // ----- 선호 요일 최대화: 검증을 통과한 "오프 이동"만 반영 -----
@@ -1507,7 +1531,7 @@
           if (s2.id === excludeId) { count++; return; } // 지금 이동을 시도 중인 당사자는 별도로 처리
           const rec2 = scheduleData.records[scheduleRecordKey(s2.id, scheduleDateKey(year, monthIndex, day))];
           const set2 = planByIdForRepair.get(s2.id);
-          const isOff2 = (set2 && set2.has(day)) || (rec2 && !scheduleAutoIsWorkRecord(rec2));
+          const isOff2 = (set2 && set2.has(day)) || (rec2 && !(hasActiveMinWorking ? scheduleCountsAsWorked(rec2) : scheduleAutoIsWorkRecord(rec2)));
           if (!isOff2) count++;
         });
         return { count, total: groupStaff2.length };
@@ -1544,6 +1568,19 @@
                   const { count: typeWorking2 } = typeWorkingOn(g, t2, d, null);
                   const minWorking = Number(minWorkingByGroup[scheduleAutoMinWorkingKey(g, t2)] ?? SCHEDULE_AUTO_MIN_WORKING);
                   if (typeWorking2 - 1 < minWorking) { targetSafe = false; break; }
+                  // 07:00 시작 인원 조건도 업무구분별 전원 출근 해소 이동에서 다시 확인한다.
+                  // 이 사람이 이른 조이고, 이 이동으로 해당 업무구분의 이른 조 출근이 0명이 되면
+                  // 다른 오프 위치로 바꿀 수 없도록 한다. 기존 자동배치 조건은 건드리지 않고
+                  // 이번에 추가된 07:00 절대 조건만 한 겹 더 보호한다.
+                  if (g === "DAY" && scheduleAutoIsEarlyShiftStaff(st) && earlyTotalCount[g][t2] >= SCHEDULE_AUTO_EARLY_SHIFT_MIN_WORKING) {
+                    const earlyGroupStaff = groupStaff.filter((st2) => scheduleAutoIsEarlyShiftStaff(st2));
+                    let earlyWorkingNow = scheduleActualCount(earlyGroupStaff, t2, targetDateKey);
+                    earlyGroupStaff.forEach((st2) => {
+                      const set2 = planByIdForRepair.get(st2.id);
+                      if (set2 && set2.has(d)) earlyWorkingNow -= 1;
+                    });
+                    if (earlyWorkingNow - 1 < SCHEDULE_AUTO_EARLY_SHIFT_MIN_WORKING) { targetSafe = false; break; }
+                  }
                   const targetReq = required[g][t2][d];
                   if (targetReq !== null && targetReq !== undefined) {
                     const tol = scheduleAutoToleranceInfo(targetDow, targetDateKey);
@@ -1573,6 +1610,14 @@
                   next.delete(sourceDay);
                   next.add(d);
                   if (!autoPlanValidSet(st.id, next)) continue;
+                  if (!hasActiveMinWorking) {
+                    const ctx = staffWarnCtx.get(st.id);
+                    if (ctx) {
+                      const beforeStats = moveRunStats(ctx, assigned);
+                      const afterStats = moveRunStats(ctx, next);
+                      if (afterStats.runs > beforeStats.runs || afterStats.ex5 > beforeStats.ex5 || afterStats.ex6 > beforeStats.ex6) continue;
+                    }
+                  }
 
                   plan.assigned = Array.from(next).sort((a, b) => a - b);
                   planByIdForRepair.set(st.id, new Set(plan.assigned));
@@ -1600,11 +1645,11 @@
       return repaired;
     }
     const repairedTypeAllWorkingDays = repairTypeAllWorkingDays();
-    if (repairedTypeAllWorkingDays > 0) {
+    if (hasActiveMinWorking && repairedTypeAllWorkingDays > 0) {
       warnings.push(`구분(채팅/유선)만 전원 출근 상태인 날을 ${repairedTypeAllWorkingDays}건 자동으로 해소했어요(전원 출근 해소 목적에 한해 필요인력 부족 -1까지 추가 허용). 기존 입력 일정과 최소 출근 인원 조건은 유지했어요.`);
     }
 
-    if (repairedAllWorkingDays > 0) {
+    if (hasActiveMinWorking && repairedAllWorkingDays > 0) {
       warnings.push(`모든 인원 출근 상태를 ${repairedAllWorkingDays}건 자동으로 해소했어요. 기존 입력 일정과 최소 출근 인원 조건은 유지했어요.`);
     }
 
@@ -1632,6 +1677,8 @@
     });
     ["DAY", "NIGHT"].forEach((g) => {
       TYPES.forEach((t) => {
+        const minForGroup = Number(minWorkingByGroup[scheduleAutoMinWorkingKey(g, t)] ?? 0);
+        if (!(minForGroup > 0)) return;
         const total = totalCount[g][t];
         if (total <= 0) return;
         const allWorkingDays = [];
@@ -1647,6 +1694,8 @@
 
     // 조 전체 기준 최종 전원 출근 확인. Groq가 성공했든 fallback이든 동일한 기준으로 검사한다.
     ["DAY", "NIGHT"].forEach((g) => {
+      const groupHasMinWorking = TYPES.some((t) => Number(minWorkingByGroup[scheduleAutoMinWorkingKey(g, t)] ?? 0) > 0);
+      if (!groupHasMinWorking) return;
       const groupStaff = nonAdmin.filter((st) => g === "NIGHT" ? st.group === "night" : st.group !== "night");
       const totalGroup = groupStaff.length;
       if (totalGroup <= 0) return;
@@ -1657,7 +1706,7 @@
           const dateKey = scheduleDateKey(year, monthIndex, d);
           const rec = scheduleData.records[scheduleRecordKey(st.id, dateKey)];
           const set = planByIdForRepair.get(st.id);
-          const isOff = (set && set.has(d)) || (rec && !scheduleAutoIsWorkRecord(rec));
+          const isOff = (set && set.has(d)) || (rec && !(hasActiveMinWorking ? scheduleCountsAsWorked(rec) : scheduleAutoIsWorkRecord(rec)));
           if (!isOff) workingCount++;
         });
         if (workingCount === totalGroup) allWorkingDays.push(`${monthLabelNo}/${d}`);
@@ -2108,7 +2157,7 @@
       ? `<div class="sch-auto-excluded-note">제외한 인원: <b>${plan.excluded.map((x) => esc(scheduleAutoStaffLabel(x))).join(", ")}</b> — 재직 인원에서 뺀 채로 계산했고 아래 표에서도 빠져 있어요. 실제 스케줄 표의 이 인원 칸은 바뀌지 않아요.</div>`
       : "";
     const emptyHtml = totalAssigned === 0
-      ? `<div class="sch-auto-none">이번 달은 새로 배정할 칸이 없어요(이미 목표 개수를 채웠거나 대상 인원이 없어요).</div>`
+      ? `<div class="sch-auto-none">새로 배정할 칸이 없어요(이미 목표 개수를 채웠거나 대상 인원이 없어요).</div>`
       : "";
     const hybrid = plan.hybrid || null;
     let hybridHtml = "";
@@ -2148,7 +2197,7 @@
     }
     return `
       ${scheduleAutoChecklistHtml(plan)}
-      <div class="sch-auto-total">총 <b>${totalAssigned}칸</b>이 새로 채워질 예정이에요.${prefTotal > 0 ? ` 선호 오프 <b>${prefHits}/${prefTotal}칸</b>.` : ""}${workPrefTotal > 0 ? ` 선호 출근일 회피 <b>${workPrefAvoided}/${workPrefTotal}칸</b>.` : ""}</div>
+      <div class="sch-auto-total">총 <b>${totalAssigned}칸</b>이 새로 채워질 예정이에요.${prefTotal > 0 ? ` 선호 요일 반영 <b>${prefHits}/${prefTotal}칸</b>.` : ""}${workPrefTotal > 0 ? ` 선호 출근일 회피 <b>${workPrefAvoided}/${workPrefTotal}칸</b>.` : ""}</div>
       ${hybridHtml}
       ${excludedHtml}
       ${warningsHtml}
@@ -2324,7 +2373,7 @@
           const dateKey = scheduleDateKey(year, monthIndex, d);
           const rec = scheduleData.records[scheduleRecordKey(st.id, dateKey)];
           const set = assignedByStaff.get(st.id);
-          const isOff = (set && set.has(d)) || (rec && !scheduleAutoIsWorkRecord(rec));
+          const isOff = (set && set.has(d)) || (rec && !scheduleCountsAsWorked(rec));
           if (!isOff) workingCount++;
         });
         if (totalGroup > 0 && workingCount === totalGroup) groupAllWorkingDays++;

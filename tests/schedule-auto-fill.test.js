@@ -179,7 +179,7 @@ test("이미 입력된 오프·연차·교육이 섞여 있어도 이번 달 연
     // v: 연차는 쉬는 날로 본다
     [`v|${sep(10)}`]: { status: "ANNUAL", attendance: null }, [`v|${sep(11)}`]: { status: "ANNUAL", attendance: null },
   };
-  const { m } = setup({ staff: [staff("a"), staff("e"), staff("v"), staff("z")], records });
+  const { m } = setup({ staff: [staff("a"), staff("e"), staff("v"), staff("z")], records, memos: { [`a|${sep(1)}`]: "필휴", [`a|${sep(14)}`]: "필휴" } });
   const plan = m.scheduleAutoBuildPlan(YEAR, MI);
   const recs = withPlan(m.scheduleData.records, plan);
   ["a", "e", "v", "z"].forEach((id) => assert.ok(maxRun(recs, id, 0) <= 5, `${id}: 연속 근무 5일 초과`));
@@ -190,8 +190,9 @@ test("이미 입력된 오프·연차·교육이 섞여 있어도 이번 달 연
 
 test("오프 목표 개수를 넘겨서까지 늘리지는 않고, 못 고치는 연속 근무는 경고로 알려준다", () => {
   const records = {};
-  for (let d = 1; d <= 8; d++) records[`q|${sep(d)}`] = OFF; // 이미 8개(목표 달성) — 그런데 9/9~9/30은 22일 연속 근무
-  const { m } = setup({ staff: [staff("q")], records });
+  const memos = {};
+  for (let d = 1; d <= 8; d++) { records[`q|${sep(d)}`] = OFF; memos[`q|${sep(d)}`] = "필휴"; } // 이미 목표 8개를 채운 필휴 8개 — 그런데 9/9~9/30은 22일 연속 근무
+  const { m } = setup({ staff: [staff("q")], records, memos });
   const plan = m.scheduleAutoBuildPlan(YEAR, MI);
   assert.equal(planOf(plan, "q"), undefined, "목표를 이미 채웠으면 새로 배정하지 않는다");
   assert.ok(plan.warnings.some((w) => w.includes("이름-q") && w.includes("9/9~9/30") && w.includes("22일 연속 근무")));
@@ -694,8 +695,9 @@ test("표를 그리다 예외가 나도 제외 인원 필터가 남지 않아 �
 
 test("배정할 칸이 없으면 안내 문구와 함께 현재 표를 그대로 보여준다", () => {
   const records = {};
-  for (let d = 1; d <= 8; d++) records[`s1|${sep(d)}`] = OFF; // 이미 목표 8개를 채움
-  const { m } = setup({ staff: [staff("s1")], records });
+  const memos = {};
+  for (let d = 1; d <= 8; d++) { records[`s1|${sep(d)}`] = OFF; memos[`s1|${sep(d)}`] = "필휴"; } // 이미 목표 8개를 채운 필휴 8개
+  const { m } = setup({ staff: [staff("s1")], records, memos });
   const html = m.scheduleAutoPreviewHtml(m.scheduleAutoBuildPlan(YEAR, MI));
   assert.ok(html.includes("새로 배정할 칸이 없어요"));
   assert.ok(html.includes('<table class="schedule-table">'));
@@ -1343,4 +1345,94 @@ test("미리보기 HTML에 체크리스트와 설정값 요약이 포함된다",
   assert.ok(html.includes("sch-auto-checklist"));
   assert.ok(html.includes("sch-auto-settings-summary"));
   assert.ok(html.includes("최소 출근 인원"));
+});
+
+/* ===================== 추가 대전제: 주간 07:00 시작 인원 최소 1명 ===================== */
+function earlyHeadcount(records, staffList, type, d) {
+  return staffList.filter((st) => !st.isAdmin
+    && st.group !== "night"
+    && (st.types || []).includes(type)
+    && /^07:00(?:-|$)/.test(String(st.workHours || ""))
+    && countsAsWorked(records[`${st.id}|${sep(d)}`])).length;
+}
+
+test("07:00 조건: 시작 시각만 보므로 07:00-14:00와 07:00-16:00 모두 이른 조로 인정한다", () => {
+  const list = [
+    staff("e1", { workHours: "07:00-14:00" }),
+    staff("e2", { workHours: "07:00-16:00" }),
+    ...mkStaff("n", 3, { workHours: "09:00-18:00" }),
+  ];
+  const { m } = premise({ staff: list });
+  const plan = m.scheduleAutoBuildPlan(YEAR, MI);
+  const recs = withPlan(m.scheduleData.records, plan);
+  for (let d = 1; d <= 30; d++) {
+    assert.ok(earlyHeadcount(recs, list, "채팅", d) >= 1, `9/${d}: 07:00 시작 인원이 최소 1명이어야 함`);
+  }
+});
+
+test("07:00 조건: 07:00 인원 2명 중 1명이 기존 필휴면 다른 1명에게 같은 날 자동 오프를 주지 않는다", () => {
+  const list = [
+    staff("e1", { workHours: "07:00-14:00" }),
+    staff("e2", { workHours: "07:00-16:00" }),
+    ...mkStaff("n", 3, { workHours: "09:00-18:00" }),
+  ];
+  const records = { [`e1|${sep(8)}`]: OFF };
+  const memos = { [`e1|${sep(8)}`]: "필휴" };
+  const { m } = premise({ staff: list, records, memos });
+  const plan = m.scheduleAutoBuildPlan(YEAR, MI);
+  assert.ok(!planOf(plan, "e2").assigned.includes(8), "e2는 e1의 필휴 때문에 9/8에 자동 오프가 될 수 없음");
+  const recs = withPlan(m.scheduleData.records, plan);
+  assert.equal(earlyHeadcount(recs, list, "채팅", 8), 1);
+});
+
+test("07:00 조건: 두 07:00 인원이 모두 기존 필휴인 날은 자동배치가 건드리지 않고 기존 0명을 경고한다", () => {
+  const list = [
+    staff("f1", { workHours: "07:00-14:00" }),
+    staff("f2", { workHours: "07:00-16:00" }),
+    ...mkStaff("n", 3, { workHours: "09:00-18:00" }),
+  ];
+  const records = {
+    [`f1|${sep(8)}`]: OFF,
+    [`f2|${sep(8)}`]: OFF,
+  };
+  const memos = { [`f1|${sep(8)}`]: "필휴", [`f2|${sep(8)}`]: "필휴" };
+  const { m } = premise({ staff: list, records, memos });
+  const plan = m.scheduleAutoBuildPlan(YEAR, MI);
+  assert.ok(!planOf(plan, "f1").assigned.includes(8));
+  assert.ok(!planOf(plan, "f2").assigned.includes(8));
+  const recs = withPlan(m.scheduleData.records, plan);
+  assert.equal(earlyHeadcount(recs, list, "채팅", 8), 0, "기존 필휴 2개는 자동배치가 수정하지 않음");
+  assert.ok(plan.warnings.some((w) => w.includes("07:00 근무 인원이 0명") && w.includes("9/8")));
+});
+
+test("07:00 조건: 선호 보정·전원출근 해소 후에도 기존에 지켜지던 07:00 최소 1명이 깨지지 않는다", () => {
+  const rnd = mulberry32(20260922 + 700);
+  const pick = (arr) => arr[Math.floor(rnd() * arr.length)];
+  const list = [
+    staff("p1", { workHours: "07:00-14:00" }),
+    staff("p2", { workHours: "07:00-16:00" }),
+    ...Array.from({ length: 6 }, (_, i) => staff(`p${i + 3}`, { workHours: "09:00-18:00" })),
+  ];
+  const records = {};
+  const memos = {};
+  for (const st of list) {
+    for (let d = 1; d <= 30; d++) {
+      if (rnd() < 0.05) {
+        const kind = pick([OFF, ANNUAL, { status: "WORK", attendance: "ABSENT" }]);
+        records[`${st.id}|${sep(d)}`] = kind;
+        if (kind.status === "OFF") memos[`${st.id}|${sep(d)}`] = "필휴";
+      }
+    }
+  }
+  const { m } = premise({ staff: list, records, memos });
+  const before = {};
+  for (let d = 1; d <= 30; d++) before[d] = earlyHeadcount(records, list, "채팅", d);
+  const plan = m.scheduleAutoBuildPlan(YEAR, MI);
+  const recs = withPlan(m.scheduleData.records, plan);
+  for (let d = 1; d <= 30; d++) {
+    const after = earlyHeadcount(recs, list, "채팅", d);
+    if (before[d] >= 1) assert.ok(after >= 1, `9/${d}: 기존에 07:00 인원이 있었는데 자동배치 후 0명이 됨`);
+    else assert.equal(after, 0, `9/${d}: 기존 입력으로 07:00 인원이 0명이면 자동배치가 기존 입력을 되살리거나 새로 만들지 않음`);
+  }
+  assert.equal(m.scheduleAutoPlanMetrics(plan).earlyWorkingViolations, 0);
 });

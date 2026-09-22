@@ -11,7 +11,7 @@ const { createFakeDocument, createMemoryLocalStorage, countMatches } = require("
 
 function loadCalendar() {
   const sandbox = createSandbox({
-    today: new Date(2026, 8, 15), // 2026-09-15(화)로 "오늘" 고정
+    __CALENDAR_TEST_TODAY__: new Date(2026, 8, 15), // 2026-09-15(화)로 "오늘" 고정
     KR_HOLIDAYS: {},
     acctKey: (k) => k,
     localStorage: createMemoryLocalStorage(),

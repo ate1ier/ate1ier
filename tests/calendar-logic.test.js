@@ -13,7 +13,7 @@ const { createFakeDocument, createMemoryLocalStorage } = require("./helpers/fake
 // "오늘"은 2026-09-15(화)로 고정한다.
 function loadCalendar(extra) {
   const sandbox = createSandbox(Object.assign({
-    today: new Date(2026, 8, 15),
+    __CALENDAR_TEST_TODAY__: new Date(2026, 8, 15),
     KR_HOLIDAYS: { "2026-09-16": "가짜 공휴일" },
     acctKey: (k) => k,
     localStorage: createMemoryLocalStorage(),
