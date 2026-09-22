@@ -12249,6 +12249,27 @@
     });
   }
 
+  // ----- 추가 대전제: 주간(DAY) 유선/채팅 각 구분, 07:00 시작(이른 조) 인원 하루 최소 1명 -----
+  // 근무시간(workHours) 문자열의 "시작 시각"이 07:00이면 종료 시각과 상관없이 "이른 조"로 본다
+  // (예: "07:00-14:00", "07:00-16:00" 모두 해당). 위 구분별 하루 최소 출근 인원(3명)과 같은 급의
+  // 강한 조건으로, 야간(NIGHT)에는 적용하지 않는다.
+  const SCHEDULE_AUTO_EARLY_SHIFT_START_MIN = 7 * 60; // 07:00을 분으로 환산
+  const SCHEDULE_AUTO_EARLY_SHIFT_MIN_WORKING = 1;
+  function scheduleAutoIsEarlyShiftStaff(s) {
+    return !!s && scheduleStartMinutes(s) === SCHEDULE_AUTO_EARLY_SHIFT_START_MIN;
+  }
+  // 이 인원이 "이른 조"이고, 이 오프를 넣었을 때 그 인원이 속한 구분(조×업무구분) 중 하나라도
+  // 그 날 이른 조 출근 인원이 0명이 되는지. DAY에서만 적용한다. 그 구분에 이른 조 인원이 애초에
+  // 한 명도 없으면 지킬 수 없는 조건이므로 적용하지 않는다(그 구분은 경고로 알려줌).
+  function scheduleAutoEarlyShiftBlocked(g, s, staffTypes, earlyWorking, earlyTotalCount, d) {
+    if (g !== "DAY" || !scheduleAutoIsEarlyShiftStaff(s)) return false;
+    return staffTypes.some((t) => {
+      if (!(earlyTotalCount[g][t] >= SCHEDULE_AUTO_EARLY_SHIFT_MIN_WORKING)) return false;
+      return earlyWorking[g][t][d] - 1 < SCHEDULE_AUTO_EARLY_SHIFT_MIN_WORKING; // 이 오프를 반영했다고 가정했을 때 남는 이른 조 출근 인원
+
+    });
+  }
+
   // ----- 인원별 "선호 오프 / 선호 출근 요일" (소프트 조건) -----
   // 두 설정 모두 달과 상관없이 계속 적용된다. 같은 사람의 같은 요일은 둘 중 하나만 선택할 수 있다.
   function scheduleAutoGetPrefDowsFromMap(map, staffId) {
@@ -12597,16 +12618,23 @@
     const working = {};
     const required = {};
     const totalCount = {}; // 조×업무구분별 그 달 재직 인원수(최소 출근 인원 조건 계산용)
+    const earlyWorking = {}; // 조×업무구분×날짜별 "이른 조(07:00 시작)" 출근 인원수(DAY에서만 사용)
+    const earlyTotalCount = {}; // 조×업무구분별 그 달 이른 조 재직 인원수
     ["DAY", "NIGHT"].forEach((g) => {
       const groupStaff = nonAdmin.filter((s) => (g === "NIGHT" ? s.group === "night" : s.group !== "night"));
       working[g] = {}; required[g] = {}; totalCount[g] = {};
+      earlyWorking[g] = {}; earlyTotalCount[g] = {};
       TYPES.forEach((t) => {
         working[g][t] = {}; required[g][t] = {};
         totalCount[g][t] = groupStaff.filter((s) => (s.types || []).indexOf(t) !== -1).length;
+        const earlyStaff = groupStaff.filter((s) => (s.types || []).indexOf(t) !== -1 && scheduleAutoIsEarlyShiftStaff(s));
+        earlyTotalCount[g][t] = earlyStaff.length;
+        earlyWorking[g][t] = {};
         for (let d = 1; d <= daysInMonth; d++) {
           const dateKey = scheduleDateKey(year, monthIndex, d);
           working[g][t][d] = scheduleActualCount(groupStaff, t, dateKey);
           required[g][t][d] = getRequiredHeadcount(year, monthIndex, g, t, d);
+          earlyWorking[g][t][d] = scheduleActualCount(earlyStaff, t, dateKey);
         }
       });
     });
@@ -12616,6 +12644,8 @@
 
     // 인원별로 "최소 출근 인원 조건 때문에 오프를 못 넣은 빈 칸" 날짜 목록(빌려오기 보정 단계에서 사용).
     const staffMinBlockedDayList = new Map();
+    // 인원별로 "이른 조(07:00) 최소 1명 조건 때문에 오프를 못 넣은 빈 칸" 날짜 목록(빌려오기 보정 단계에서 사용).
+    const staffEarlyBlockedDayList = new Map();
 
     const warnings = [];
     const perStaffPlan = [];
@@ -12672,15 +12702,20 @@
       const baseRest = {}, isFreeDay = {};
       let minBlockedDays = 0; // 대전제 때문에 오프를 못 넣는 (그 인원의) 빈 칸 수 — 목표를 못 채웠을 때 원인 안내용
       const minBlockedDayList = []; // 위와 같은 날짜의 실제 번호 목록(빌려오기 보정 단계에서 사용)
+      let earlyBlockedDays = 0; // 이른 조(07:00) 최소 1명 조건 때문에 오프를 못 넣는 (그 인원의) 빈 칸 수
+      const earlyBlockedDayList = [];
       for (let d = 1; d <= daysInMonth; d++) {
         const key = scheduleRecordKey(s.id, scheduleDateKey(year, monthIndex, d));
         const has = Object.prototype.hasOwnProperty.call(scheduleData.records, key);
         const minBlocked = !has && scheduleAutoMinWorkingBlocked(g, staffTypes, working, totalCount, d, minWorkingByGroup);
+        const earlyBlocked = !has && !minBlocked && scheduleAutoEarlyShiftBlocked(g, s, staffTypes, earlyWorking, earlyTotalCount, d);
         if (minBlocked) { minBlockedDays++; minBlockedDayList.push(d); }
-        isFreeDay[d] = !has && !minBlocked;
+        if (earlyBlocked) { earlyBlockedDays++; earlyBlockedDayList.push(d); }
+        isFreeDay[d] = !has && !minBlocked && !earlyBlocked;
         baseRest[d] = has && !scheduleAutoIsWorkRecord(scheduleData.records[key]);
       }
       staffMinBlockedDayList.set(s.id, minBlockedDayList);
+      staffEarlyBlockedDayList.set(s.id, earlyBlockedDayList);
       const chosen = {};
       if (typeof globalThis.__DEBUG_STAFF !== "undefined" && s.id === globalThis.__DEBUG_STAFF) {
         console.log("DEBUG", s.id, "needed", needed, "carry", carry, "offCarry", offCarry, "minBlockedDays", minBlockedDays, "remainingFree", remainingFree.length, "freeAfterBlock", remainingFree.filter(d=>isFreeDay[d]).length);
@@ -12771,6 +12806,7 @@
         chosen[d] = true;
         assignedCountByDay[d] += 1;
         staffTypes.forEach((t) => { working[g][t][d] -= 1; });
+        if (scheduleAutoIsEarlyShiftStaff(s)) staffTypes.forEach((t) => { earlyWorking[g][t][d] -= 1; });
       });
 
       let shortfallText = null;
@@ -12778,14 +12814,17 @@
         const minNote = minBlockedDays > 0
           ? ` 구분별 하루 출근 최소 인원 조건을 지키느라 오프를 넣을 수 없는 날이 ${minBlockedDays}일 있어요.`
           : "";
-        shortfallText = `${staffLabel}님은 빈 칸이 부족해 목표 ${needed}개 중 ${assigned.length}개만 배정됐어요.${minNote}`;
+        const earlyNote = earlyBlockedDays > 0
+          ? ` 주간 유선/채팅 07:00 근무 인원 최소 1명 조건을 지키느라 오프를 넣을 수 없는 날이 ${earlyBlockedDays}일 있어요.`
+          : "";
+        shortfallText = `${staffLabel}님은 빈 칸이 부족해 목표 ${needed}개 중 ${assigned.length}개만 배정됐어요.${minNote}${earlyNote}`;
       }
 
       // 연속 휴무/연속 근무 경고는 오프를 옮기는 보정 단계가 끝난 뒤 최종 계획으로 계산한다(flushStaffWarnings).
       staffWarnCtx.set(s.id, {
         label: staffLabel, g, staffTypes, carry, offCarry, baseRest,
         prefSet: new Set(prefDows), workPrefSet: new Set(workPrefDows),
-        tolWarn, shortfallText,
+        tolWarn, shortfallText, isEarly: scheduleAutoIsEarlyShiftStaff(s),
       });
       staffWarnOrder.push(s.id);
 
@@ -12852,7 +12891,9 @@
 
     // day의 (group×type) 실제 투입 인원이, 거기 새로 오프 하나를 더 넣어도(=1명 줄어도) 안전한지.
     // 최소 출근 인원(예외 없음)과 필요인력 허용범위(최후 기준, tolInfo.max)를 함께 본다.
-    function scheduleAutoBorrowSlotFeasible(g, types, d) {
+    // isEarly: 이 슬롯을 내주는(또는 받는) 인원이 "이른 조(07:00 시작)"인지. 이른 조 인원이면
+    // 주간 07:00 최소 1명 조건도 함께 확인한다(야간은 대상이 아니다).
+    function scheduleAutoBorrowSlotFeasible(g, types, d, isEarly) {
       const dow = new Date(year, monthIndex, d).getDay();
       const dateKey = scheduleDateKey(year, monthIndex, d);
       const tolInfo = scheduleAutoToleranceInfo(dow, dateKey);
@@ -12866,11 +12907,15 @@
           const diff = (working[g][t][d] - 1) - req;
           if (-diff > tolInfo.max) return false;
         }
+        if (g === "DAY" && isEarly && earlyTotalCount[g][t] >= SCHEDULE_AUTO_EARLY_SHIFT_MIN_WORKING) {
+          if (earlyWorking[g][t][d] - 1 < SCHEDULE_AUTO_EARLY_SHIFT_MIN_WORKING) return false;
+        }
         return true;
       });
     }
-    function scheduleAutoApplyOffDelta(types, g, d, delta) {
+    function scheduleAutoApplyOffDelta(types, g, d, delta, isEarly) {
       types.forEach((t) => { if (working[g] && working[g][t]) working[g][t][d] += delta; });
+      if (isEarly) types.forEach((t) => { if (earlyWorking[g] && earlyWorking[g][t]) earlyWorking[g][t][d] += delta; });
     }
     function scheduleAutoStaffTypesOf(st) { return TYPES.filter((t) => (st.types || []).indexOf(t) !== -1); }
 
@@ -12880,6 +12925,7 @@
       const g = targetStaff.group === "night" ? "NIGHT" : "DAY";
       const staffTypes = scheduleAutoStaffTypesOf(targetStaff);
       if (!staffTypes.length) return;
+      const targetIsEarly = scheduleAutoIsEarlyShiftStaff(targetStaff);
       const blockedDays = (staffMinBlockedDayList.get(targetPlan.staffId) || []).slice();
       let gap = targetPlan.needed - targetPlan.assigned.length;
 
@@ -12911,9 +12957,10 @@
 
         const moved = []; // 롤백용: { sourcePlan, sTypes, oldAssigned, oldPrefHits, d2 }
         for (const sourcePlan of candidates) {
-          if (scheduleAutoBorrowSlotFeasible(g, staffTypes, d)) break;
+          if (scheduleAutoBorrowSlotFeasible(g, staffTypes, d, targetIsEarly)) break;
           const st = staffById.get(sourcePlan.staffId);
           const sTypes = scheduleAutoStaffTypesOf(st);
+          const sIsEarly = scheduleAutoIsEarlyShiftStaff(st);
           const isPrefDay = (sourcePlan.prefDows || []).indexOf(dow) !== -1;
           const used = sacrificedPrefByStaff.get(sourcePlan.staffId) || 0;
           if (isPrefDay && used >= SCHEDULE_AUTO_SHORTFALL_PREF_SACRIFICE_LIMIT) continue;
@@ -12924,7 +12971,7 @@
             if (d2 === d || sourceAssignedSet.has(d2)) continue;
             const key2 = scheduleRecordKey(sourcePlan.staffId, scheduleDateKey(year, monthIndex, d2));
             if (Object.prototype.hasOwnProperty.call(scheduleData.records, key2)) continue;
-            if (!scheduleAutoBorrowSlotFeasible(g, sTypes, d2)) continue;
+            if (!scheduleAutoBorrowSlotFeasible(g, sTypes, d2, sIsEarly)) continue;
             const nextSourceSet = new Set(sourceAssignedSet); nextSourceSet.delete(d); nextSourceSet.add(d2);
             if (!autoPlanValidSet(sourcePlan.staffId, nextSourceSet)) continue;
             d2Found = d2;
@@ -12934,8 +12981,8 @@
 
           const oldAssigned = sourcePlan.assigned.slice();
           const oldPrefHits = sourcePlan.prefHits || 0;
-          scheduleAutoApplyOffDelta(sTypes, g, d, +1);
-          scheduleAutoApplyOffDelta(sTypes, g, d2Found, -1);
+          scheduleAutoApplyOffDelta(sTypes, g, d, +1, sIsEarly);
+          scheduleAutoApplyOffDelta(sTypes, g, d2Found, -1, sIsEarly);
           sourcePlan.assigned = oldAssigned.filter((x) => x !== d).concat([d2Found]).sort((a, b) => a - b);
           if (sourcePlan.prefDows) {
             sourcePlan.prefHits = sourcePlan.assigned.filter((x) => sourcePlan.prefDows.indexOf(new Date(year, monthIndex, x).getDay()) !== -1).length;
@@ -12943,14 +12990,14 @@
           const newPrefHits = sourcePlan.prefHits || 0;
           const sacrificedDelta = Math.max(0, oldPrefHits - newPrefHits);
           if (sacrificedDelta > 0) sacrificedPrefByStaff.set(sourcePlan.staffId, used + sacrificedDelta);
-          moved.push({ sourcePlan, sTypes, oldAssigned, oldPrefHits, d2: d2Found, sacrificedDelta });
+          moved.push({ sourcePlan, sTypes, oldAssigned, oldPrefHits, d2: d2Found, sacrificedDelta, sIsEarly });
         }
 
-        if (!scheduleAutoBorrowSlotFeasible(g, staffTypes, d)) {
+        if (!scheduleAutoBorrowSlotFeasible(g, staffTypes, d, targetIsEarly)) {
           // 이 날짜는 결국 못 풀었다 — 이번에 옮긴 것들을 전부 원위치(날짜·선호 적중·손해 한도)로 되돌린다.
-          moved.forEach(({ sourcePlan, sTypes, oldAssigned, oldPrefHits, d2, sacrificedDelta }) => {
-            scheduleAutoApplyOffDelta(sTypes, g, d, -1);
-            scheduleAutoApplyOffDelta(sTypes, g, d2, +1);
+          moved.forEach(({ sourcePlan, sTypes, oldAssigned, oldPrefHits, d2, sacrificedDelta, sIsEarly }) => {
+            scheduleAutoApplyOffDelta(sTypes, g, d, -1, sIsEarly);
+            scheduleAutoApplyOffDelta(sTypes, g, d2, +1, sIsEarly);
             sourcePlan.assigned = oldAssigned;
             sourcePlan.prefHits = oldPrefHits;
             if (sacrificedDelta > 0) {
@@ -12961,7 +13008,7 @@
           return;
         }
 
-        scheduleAutoApplyOffDelta(staffTypes, g, d, -1);
+        scheduleAutoApplyOffDelta(staffTypes, g, d, -1, targetIsEarly);
         targetPlan.assigned = targetPlan.assigned.concat([d]).sort((a, b) => a - b);
         gap--;
       });
@@ -13068,19 +13115,29 @@
       while (changed && guard++ < daysInMonth * Math.max(1, perStaffPlan.length) * 2) {
         changed = false;
         const currentWorking = {};
+        const currentEarlyWorking = {};
         ["DAY", "NIGHT"].forEach((g) => {
           currentWorking[g] = {};
+          currentEarlyWorking[g] = {};
           TYPES.forEach((t) => {
             currentWorking[g][t] = {};
+            currentEarlyWorking[g][t] = {};
             const groupStaff = nonAdmin.filter((st) => (g === "NIGHT" ? st.group === "night" : st.group !== "night") && (st.types || []).indexOf(t) !== -1);
+            const earlyGroupStaff = groupStaff.filter((st) => scheduleAutoIsEarlyShiftStaff(st));
             for (let d = 1; d <= daysInMonth; d++) {
               const dateKey = scheduleDateKey(year, monthIndex, d);
               let w = scheduleActualCount(groupStaff, t, dateKey);
+              let ew = scheduleActualCount(earlyGroupStaff, t, dateKey);
               groupStaff.forEach((st) => {
                 const set = planByIdForRepair.get(st.id);
                 if (set && set.has(d)) w -= 1;
               });
+              earlyGroupStaff.forEach((st) => {
+                const set = planByIdForRepair.get(st.id);
+                if (set && set.has(d)) ew -= 1;
+              });
               currentWorking[g][t][d] = w;
+              currentEarlyWorking[g][t][d] = ew;
             }
           });
         });
@@ -13126,6 +13183,12 @@
                   const tol = scheduleAutoToleranceInfo(targetDow, targetDateKey);
                   const effectiveMax = Math.max(Number(tol.max || 0), 1);
                   if (targetReq - (typeWorking - 1) > effectiveMax) { targetSafe = false; break; }
+                }
+                // 주간 07:00 근무 인원 최소 1명 조건: 이 사람이 이른 조라면, 오프를 넣었을 때
+                // 그 구분의 이른 조 출근 인원이 0명이 되지 않는지도 함께 확인한다.
+                if (g === "DAY" && scheduleAutoIsEarlyShiftStaff(st) && earlyTotalCount[g][t] >= SCHEDULE_AUTO_EARLY_SHIFT_MIN_WORKING) {
+                  const earlyTypeWorking = currentEarlyWorking[g][t][d];
+                  if (earlyTypeWorking - 1 < SCHEDULE_AUTO_EARLY_SHIFT_MIN_WORKING) { targetSafe = false; break; }
                 }
               }
               if (!targetSafe) continue;
@@ -13233,6 +13296,24 @@
       }
     });
 
+    // [조][업무구분][날짜] 현재(계획 반영) "이른 조(07:00 시작)" 출근 인원. 선호 요일 최대화 단계의
+    // 오프 이동이 이 조건(주간 유선/채팅 하루 최소 1명)을 깨지 않도록 cellWorking과 같은 방식으로 추적한다.
+    const cellEarlyWorking = { DAY: {}, NIGHT: {} };
+    ["DAY", "NIGHT"].forEach((g) => {
+      TYPES.forEach((t) => {
+        const earlyStaffAll = groupStaffAll[g].filter((st) => (st.types || []).indexOf(t) !== -1 && scheduleAutoIsEarlyShiftStaff(st));
+        cellEarlyWorking[g][t] = new Array(daysInMonth + 1).fill(0);
+        for (let d = 1; d <= daysInMonth; d++) {
+          let w = scheduleActualCount(earlyStaffAll, t, dateKeyOfDay[d]);
+          earlyStaffAll.forEach((st) => {
+            const set = planByIdForRepair.get(st.id);
+            if (set && set.has(d)) w -= 1;
+          });
+          cellEarlyWorking[g][t][d] = w;
+        }
+      });
+    });
+
     // 한 인원의 연속 근무/오프 위반 정도. 구간 "수"만 보면 이미 길어진 구간을 더 늘려도 같은 값이라서,
     // 초과한 "일수"까지 함께 센다(이동 후 어느 하나라도 커지면 그 이동은 거부한다).
     //  runs: 5일 초과 연속 근무 구간 수 / ex5: 5일을 넘긴 일수 합 / ex6: 6일을 넘긴 일수 합 / offEx: 3일을 넘긴 연속 오프 일수 합
@@ -13270,6 +13351,7 @@
       if (!Array.isArray(moves) || moves.length === 0 || moves.length > 4) return fail("이동 묶음 형식");
       const newSets = new Map();
       const cellDelta = new Map();
+      const earlyCellDelta = new Map();
       const offDayDelta = new Map();
       const bump = (map, key, n) => map.set(key, (map.get(key) || 0) + n);
       for (const mv of moves) {
@@ -13286,6 +13368,9 @@
         newSets.set(mv.staffId, cur);
         ctx.staffTypes.forEach((t) => { bump(cellDelta, `${ctx.g}|${t}|${from}`, 1); bump(cellDelta, `${ctx.g}|${t}|${to}`, -1); });
         bump(cellDelta, `${ctx.g}||${from}`, 1); bump(cellDelta, `${ctx.g}||${to}`, -1);
+        if (ctx.isEarly) {
+          ctx.staffTypes.forEach((t) => { bump(earlyCellDelta, `${ctx.g}|${t}|${from}`, 1); bump(earlyCellDelta, `${ctx.g}|${t}|${to}`, -1); });
+        }
         bump(offDayDelta, from, -1); bump(offDayDelta, to, 1);
       }
       for (const [id, set] of newSets) {
@@ -13320,6 +13405,16 @@
         }
         if (hasReq) shortGain += Math.max(0, req - before) - Math.max(0, req - after);
       }
+      for (const [key, delta] of earlyCellDelta) {
+        if (delta === 0) continue;
+        const [g, t, dStr] = key.split("|");
+        if (g !== "DAY") continue; // 주간 유선/채팅에만 적용하는 조건
+        const d = Number(dStr);
+        const before = cellEarlyWorking[g][t][d], after = before + delta;
+        if (after < before && earlyTotalCount[g][t] >= SCHEDULE_AUTO_EARLY_SHIFT_MIN_WORKING && after < SCHEDULE_AUTO_EARLY_SHIFT_MIN_WORKING) {
+          return fail("주간 07:00 근무 인원 최소 1명");
+        }
+      }
       let v0 = 0;
       for (const [id, set] of newSets) {
         const ctx = staffWarnCtx.get(id);
@@ -13330,7 +13425,7 @@
         if (dd === 0) continue;
         v2 -= Math.pow(offByDay[d] + dd, 2) - Math.pow(offByDay[d], 2);
       }
-      return { ok: true, vec: [v0, shortGain, v2], newSets, cellDelta, offDayDelta };
+      return { ok: true, vec: [v0, shortGain, v2], newSets, cellDelta, earlyCellDelta, offDayDelta };
     }
     function applyEvaluatedMoves(ev) {
       ev.newSets.forEach((set, id) => {
@@ -13347,6 +13442,12 @@
         if (t === "") groupWorking[g][d] += delta;
         else cellWorking[g][t][d] += delta;
       });
+      if (ev.earlyCellDelta) {
+        ev.earlyCellDelta.forEach((delta, key) => {
+          const [g, t, dStr] = key.split("|");
+          cellEarlyWorking[g][t][Number(dStr)] += delta;
+        });
+      }
       ev.offDayDelta.forEach((dd, d) => { offByDay[d] += dd; });
     }
     const moveVecBetter = (vec) => vec[0] > 0 || (vec[0] === 0 && (vec[1] > 0 || (vec[1] === 0 && vec[2] > 0)));
@@ -13639,6 +13740,25 @@
           warnings.push(`${label} 구분은 이미 입력된 일정 때문에 출근 인원이 ${minWorking}명 미만인 날이 있어요: ${low.join(", ")}. 이 구분 인원에게는 그 날 새 오프를 넣지 않았어요.`);
         }
       });
+    });
+
+    // 추가 대전제 최종 확인: 주간(DAY) 유선/채팅 각 구분, 07:00 근무(이른 조) 인원이 배정 후에도
+    // 0명이 되는 날이 있는지 알려준다. 새 오프는 0명이 되는 날에는 넣지 않으므로, 여기 걸리는 날은
+    // 이미 입력된 값(연차·공가·결근 등) 때문이다. 그 구분에 애초에 이른 조 인원이 없으면(=이 조건이
+    // 적용될 대상 자체가 없으면) 조용히 건너뛴다(경고로 알리지 않음 — 07:00 근무제를 안 쓰는
+    // 조직에서는 이 조건 자체가 항상 해당 없음이라 매번 경고가 뜨면 소음이 된다).
+    TYPES.forEach((t) => {
+      const g = "DAY";
+      const label = `주간 ${t}`;
+      const earlyTotal = earlyTotalCount[g][t];
+      if (earlyTotal === 0) return;
+      const low = [];
+      for (let d = 1; d <= daysInMonth; d++) {
+        if (earlyWorking[g][t][d] < SCHEDULE_AUTO_EARLY_SHIFT_MIN_WORKING) low.push(`${monthLabelNo}/${d}(${earlyWorking[g][t][d]}명)`);
+      }
+      if (low.length > 0) {
+        warnings.push(`${label} 구분은 이미 입력된 일정 때문에 07:00 근무 인원이 0명인 날이 있어요: ${low.join(", ")}. 이 구분 인원에게는 그 날 새 오프를 넣지 않았어요.`);
+      }
     });
 
     return { year, monthIndex, target, targetInfo, perStaffPlan, warnings, excluded, improve };
@@ -14170,24 +14290,44 @@
     });
 
     const working = {}, required = {}, totalCount = {};
+    const earlyWorking = {}, earlyTotalCount = {};
     ["DAY", "NIGHT"].forEach((g) => {
       const groupStaff = nonAdmin.filter((s) => (g === "NIGHT" ? s.group === "night" : s.group !== "night"));
       working[g] = {}; required[g] = {}; totalCount[g] = {};
+      earlyWorking[g] = {}; earlyTotalCount[g] = {};
       ["채팅", "유선"].forEach((t) => {
         working[g][t] = {}; required[g][t] = {};
         totalCount[g][t] = groupStaff.filter((s) => (s.types || []).indexOf(t) !== -1).length;
+        const earlyStaff = groupStaff.filter((s) => (s.types || []).indexOf(t) !== -1 && scheduleAutoIsEarlyShiftStaff(s));
+        earlyTotalCount[g][t] = earlyStaff.length;
+        earlyWorking[g][t] = {};
         for (let d = 1; d <= daysInMonth; d++) {
           const dateKey = scheduleDateKey(year, monthIndex, d);
           let w = scheduleActualCount(groupStaff, t, dateKey);
+          let ew = scheduleActualCount(earlyStaff, t, dateKey);
           groupStaff.forEach((st) => {
             if ((st.types || []).indexOf(t) === -1) return;
             const set = assignedByStaff.get(st.id);
             if (set && set.has(d)) w -= 1;
           });
+          earlyStaff.forEach((st) => {
+            const set = assignedByStaff.get(st.id);
+            if (set && set.has(d)) ew -= 1;
+          });
           working[g][t][d] = w;
           required[g][t][d] = getRequiredHeadcount(year, monthIndex, g, t, d);
+          earlyWorking[g][t][d] = ew;
         }
       });
+    });
+
+    // 주간(DAY) 유선/채팅 07:00 근무(이른 조) 인원 최소 1명 조건 위반 칸 수.
+    let earlyWorkingViolations = 0;
+    ["채팅", "유선"].forEach((t) => {
+      if (earlyTotalCount.DAY[t] < SCHEDULE_AUTO_EARLY_SHIFT_MIN_WORKING) return;
+      for (let d = 1; d <= daysInMonth; d++) {
+        if (earlyWorking.DAY[t][d] < SCHEDULE_AUTO_EARLY_SHIFT_MIN_WORKING) earlyWorkingViolations += 1;
+      }
     });
 
     let minWorkingViolations = 0;
@@ -14252,7 +14392,7 @@
     return {
       totalAssigned: plan.perStaffPlan.reduce((sum, p) => sum + p.assigned.length, 0),
       protectedOverlap, targetShortage, workViolationRuns, sixDayRuns, sevenPlusRuns, offViolationRuns, offViolationExcess,
-      minWorkingViolations, toleranceViolations, idealMissCells, toleranceCellsWithReq, toleranceViolationDates,
+      minWorkingViolations, earlyWorkingViolations, toleranceViolations, idealMissCells, toleranceCellsWithReq, toleranceViolationDates,
       allWorkingDays, groupAllWorkingDays, prefHits, prefTotal,
       workPrefAvoided, workPrefTotal, offVariance, totalSlack, maxShortage,
       // 선호 점수 = 선호 오프 요일에 잡힌 오프 수 − 선호 출근 요일에 잡힌 오프 수
@@ -14294,6 +14434,12 @@
       "구분별 하루 최소 출근 인원",
       metrics.minWorkingViolations === 0 ? "ok" : "bad",
       `설정값(${minWText}) — 미만 칸 ${metrics.minWorkingViolations}개`
+    );
+
+    add(
+      "주간 07:00 근무 인원 최소 1명",
+      metrics.earlyWorkingViolations === 0 ? "ok" : "bad",
+      metrics.earlyWorkingViolations === 0 ? "미만 칸 없음" : `미만 칸 ${metrics.earlyWorkingViolations}개`
     );
 
     add(
@@ -14403,7 +14549,7 @@
   function scheduleAutoMetricsNotWorseThanBase(candidate, base) {
     const hardKeys = [
       "protectedOverlap", "workViolationRuns", "offViolationRuns", "offViolationExcess",
-      "minWorkingViolations", "toleranceViolations", "allWorkingDays", "groupAllWorkingDays", "targetShortage",
+      "minWorkingViolations", "earlyWorkingViolations", "toleranceViolations", "allWorkingDays", "groupAllWorkingDays", "targetShortage",
     ];
     return hardKeys.every((key) => Number(candidate[key] || 0) <= Number(base[key] || 0));
   }
@@ -14736,6 +14882,7 @@
         items: [
           { title: "기존 입력값 보호", desc: "이미 값이 입력된 칸은 그대로 유지, 기본값(근무)인 빈 칸에만 새 오프를 배정해요." },
           { title: "구분별 하루 최소 출근 인원", desc: "설정한 최소 출근 인원 밑으로는 어떤 경우에도 내려가지 않아요." },
+          { title: "주간 07:00 근무 인원 최소 1명", desc: "주간 유선·채팅 각 구분마다 근무시간이 07:00 시작인 인원이 하루 최소 1명은 출근하도록 해요(종료 시각은 상관없어요). 그 구분에 07:00 시작 인원이 아예 없으면 지킬 수 없어서 적용하지 않고 안내해요." },
         ],
       },
       {
