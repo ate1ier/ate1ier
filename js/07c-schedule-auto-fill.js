@@ -76,6 +76,15 @@
   // 선호 오프 요일이 있는 인원은, 목표 오프 개수 안에서 적어도 이 개수(목표 오프 개수가 이보다
   // 작으면 목표 개수까지만)는 선호 요일에 맞추도록 마지막 보정 단계에서 우선적으로 스왑을 배정한다.
   const SCHEDULE_AUTO_PREF_FLOOR = 5;
+  // ----- 최소 출근 인원 때문에 자리가 하나도 안 나는 사람을 위한 "빌려오기" 한도 -----
+  // 어떤 인원이 구분별 하루 최소 출근 인원 조건에 막혀 목표 오프를 못 채우면(이응님 사례),
+  // 같은 조·같은 업무구분의 동료 중 그 날 자동배치로 오프를 받은 사람의 오프를 다른 빈 날로
+  // 옮겨서 자리를 만들어준다(최소출근/필요인력 허용범위·연속근무·연속오프는 그대로 지킨다).
+  // 옮기는 동료의 그 날이 그 동료의 "선호 오프 요일"이었다면 선호 적중이 하나 깎이는데,
+  // 이 손해를 한 사람당 최대 이 개수까지만 허용한다(선호 우선순위 자체는 바꾸지 않고,
+  // 자리가 정말 안 나는 최후의 경우에만 쓰는 한도다). 선호가 아닌 날을 옮기는 건 이 한도에
+  // 포함하지 않는다(공짜이므로 항상 우선 시도한다).
+  const SCHEDULE_AUTO_SHORTFALL_PREF_SACRIFICE_LIMIT = 3;
   const SCHEDULE_AUTO_DOW_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
 
   // 대전제: 구분(조×업무구분)별 하루 최소 출근 인원.
@@ -503,6 +512,9 @@
     const assignedCountByDay = {}; // 이번 실행에서 그 날짜에 이미 몇 명 배정했는지(분산용)
     for (let d = 1; d <= daysInMonth; d++) assignedCountByDay[d] = 0;
 
+    // 인원별로 "최소 출근 인원 조건 때문에 오프를 못 넣은 빈 칸" 날짜 목록(빌려오기 보정 단계에서 사용).
+    const staffMinBlockedDayList = new Map();
+
     const warnings = [];
     const perStaffPlan = [];
     const monthNo = monthIndex + 1;
@@ -557,14 +569,16 @@
       // 대전제(구분별 출근 최소 3명)에 걸리는 날은 어떤 요일이든 빈 칸이어도 후보에서 제외한다.
       const baseRest = {}, isFreeDay = {};
       let minBlockedDays = 0; // 대전제 때문에 오프를 못 넣는 (그 인원의) 빈 칸 수 — 목표를 못 채웠을 때 원인 안내용
+      const minBlockedDayList = []; // 위와 같은 날짜의 실제 번호 목록(빌려오기 보정 단계에서 사용)
       for (let d = 1; d <= daysInMonth; d++) {
         const key = scheduleRecordKey(s.id, scheduleDateKey(year, monthIndex, d));
         const has = Object.prototype.hasOwnProperty.call(scheduleData.records, key);
         const minBlocked = !has && scheduleAutoMinWorkingBlocked(g, staffTypes, working, totalCount, d, minWorkingByGroup);
-        if (minBlocked) minBlockedDays++;
+        if (minBlocked) { minBlockedDays++; minBlockedDayList.push(d); }
         isFreeDay[d] = !has && !minBlocked;
         baseRest[d] = has && !scheduleAutoIsWorkRecord(scheduleData.records[key]);
       }
+      staffMinBlockedDayList.set(s.id, minBlockedDayList);
       const chosen = {};
       if (typeof globalThis.__DEBUG_STAFF !== "undefined" && s.id === globalThis.__DEBUG_STAFF) {
         console.log("DEBUG", s.id, "needed", needed, "carry", carry, "offCarry", offCarry, "minBlockedDays", minBlockedDays, "remainingFree", remainingFree.length, "freeAfterBlock", remainingFree.filter(d=>isFreeDay[d]).length);
@@ -722,6 +736,152 @@
     }
     const planById = new Map(perStaffPlan.map((p) => [p.staffId, p]));
     const staffById = new Map(monthStaff.map((s) => [s.id, s]));
+
+    // ----- 최소 출근 인원 때문에 자리가 안 나는 사람을 위한 "빌려오기" 보정 -----
+    // (이응님 사례) 어떤 인원이 목표 오프 개수를 다 못 채운 게 "구분별 하루 최소 출근 인원"
+    // 조건 때문이면, 같은 조·업무구분의 동료 중 그 날 자동배치로 오프를 받은 사람의 오프를
+    // 다른 빈 날로 옮겨서 그 자리를 대신 내어준다. 선호 반영 우선순위 자체는 그대로 두되(이
+    // 단계는 선호 요일 최대화보다 먼저 실행해 부족 인원에게 빈 칸을 최우선으로 확보해 준다),
+    // 동료의 그 날이 동료 자신의 선호 오프 요일이었을 때만 "선호 적중 1개 손해"로 치고,
+    // 그 손해를 동료 한 명당 SCHEDULE_AUTO_SHORTFALL_PREF_SACRIFICE_LIMIT(3)개까지만 허용한다.
+    // 선호와 무관한 날을 옮기는 건 공짜이므로 항상 먼저 시도한다.
+    // 이미 입력된 칸(필휴·연차 등)과 이번 실행에서 아직 배정 안 된 빈 칸은 건드리지 않는다.
+    const sacrificedPrefByStaff = new Map(); // staffId -> 이번 보정으로 깎인 선호 오프 적중 개수(누적, 한도 체크용)
+
+    // day의 (group×type) 실제 투입 인원이, 거기 새로 오프 하나를 더 넣어도(=1명 줄어도) 안전한지.
+    // 최소 출근 인원(예외 없음)과 필요인력 허용범위(최후 기준, tolInfo.max)를 함께 본다.
+    function scheduleAutoBorrowSlotFeasible(g, types, d) {
+      const dow = new Date(year, monthIndex, d).getDay();
+      const dateKey = scheduleDateKey(year, monthIndex, d);
+      const tolInfo = scheduleAutoToleranceInfo(dow, dateKey);
+      return types.every((t) => {
+        const key = scheduleAutoMinWorkingKey(g, t);
+        const minWorking = Number(Object.prototype.hasOwnProperty.call(minWorkingByGroup, key) ? minWorkingByGroup[key] : scheduleAutoGetMinWorking(g, t));
+        const total = totalCount[g][t];
+        if (minWorking > 0 && total >= minWorking && working[g][t][d] - 1 < minWorking) return false;
+        const req = required[g][t][d];
+        if (req !== null && req !== undefined) {
+          const diff = (working[g][t][d] - 1) - req;
+          if (-diff > tolInfo.max) return false;
+        }
+        return true;
+      });
+    }
+    function scheduleAutoApplyOffDelta(types, g, d, delta) {
+      types.forEach((t) => { if (working[g] && working[g][t]) working[g][t][d] += delta; });
+    }
+    function scheduleAutoStaffTypesOf(st) { return TYPES.filter((t) => (st.types || []).indexOf(t) !== -1); }
+
+    function scheduleAutoBorrowFor(targetPlan) {
+      const targetStaff = staffById.get(targetPlan.staffId);
+      if (!targetStaff) return;
+      const g = targetStaff.group === "night" ? "NIGHT" : "DAY";
+      const staffTypes = scheduleAutoStaffTypesOf(targetStaff);
+      if (!staffTypes.length) return;
+      const blockedDays = (staffMinBlockedDayList.get(targetPlan.staffId) || []).slice();
+      let gap = targetPlan.needed - targetPlan.assigned.length;
+
+      blockedDays.forEach((d) => {
+        if (gap <= 0) return;
+        if (targetPlan.assigned.indexOf(d) !== -1) return;
+        const targetKey = scheduleRecordKey(targetPlan.staffId, scheduleDateKey(year, monthIndex, d));
+        if (Object.prototype.hasOwnProperty.call(scheduleData.records, targetKey)) return;
+        const nextTargetSet = new Set(targetPlan.assigned); nextTargetSet.add(d);
+        if (!autoPlanValidSet(targetPlan.staffId, nextTargetSet)) return;
+
+        const dow = new Date(year, monthIndex, d).getDay();
+        let candidates = perStaffPlan.filter((p) => {
+          if (p.staffId === targetPlan.staffId) return false;
+          const st = staffById.get(p.staffId);
+          if (!st) return false;
+          const sg = st.group === "night" ? "NIGHT" : "DAY";
+          if (sg !== g) return false;
+          const sTypes = scheduleAutoStaffTypesOf(st);
+          if (!sTypes.some((t) => staffTypes.indexOf(t) !== -1)) return false;
+          return p.assigned.indexOf(d) !== -1;
+        });
+        // 선호 요일이 아닌(=공짜인) 동료부터 시도한다.
+        candidates = candidates.slice().sort((a, b) => {
+          const costA = (a.prefDows || []).indexOf(dow) !== -1 ? 1 : 0;
+          const costB = (b.prefDows || []).indexOf(dow) !== -1 ? 1 : 0;
+          return costA - costB;
+        });
+
+        const moved = []; // 롤백용: { sourcePlan, sTypes, oldAssigned, oldPrefHits, d2 }
+        for (const sourcePlan of candidates) {
+          if (scheduleAutoBorrowSlotFeasible(g, staffTypes, d)) break;
+          const st = staffById.get(sourcePlan.staffId);
+          const sTypes = scheduleAutoStaffTypesOf(st);
+          const isPrefDay = (sourcePlan.prefDows || []).indexOf(dow) !== -1;
+          const used = sacrificedPrefByStaff.get(sourcePlan.staffId) || 0;
+          if (isPrefDay && used >= SCHEDULE_AUTO_SHORTFALL_PREF_SACRIFICE_LIMIT) continue;
+
+          const sourceAssignedSet = new Set(sourcePlan.assigned);
+          let d2Found = -1;
+          for (let d2 = 1; d2 <= daysInMonth; d2++) {
+            if (d2 === d || sourceAssignedSet.has(d2)) continue;
+            const key2 = scheduleRecordKey(sourcePlan.staffId, scheduleDateKey(year, monthIndex, d2));
+            if (Object.prototype.hasOwnProperty.call(scheduleData.records, key2)) continue;
+            if (!scheduleAutoBorrowSlotFeasible(g, sTypes, d2)) continue;
+            const nextSourceSet = new Set(sourceAssignedSet); nextSourceSet.delete(d); nextSourceSet.add(d2);
+            if (!autoPlanValidSet(sourcePlan.staffId, nextSourceSet)) continue;
+            d2Found = d2;
+            break;
+          }
+          if (d2Found === -1) continue;
+
+          const oldAssigned = sourcePlan.assigned.slice();
+          const oldPrefHits = sourcePlan.prefHits || 0;
+          scheduleAutoApplyOffDelta(sTypes, g, d, +1);
+          scheduleAutoApplyOffDelta(sTypes, g, d2Found, -1);
+          sourcePlan.assigned = oldAssigned.filter((x) => x !== d).concat([d2Found]).sort((a, b) => a - b);
+          if (sourcePlan.prefDows) {
+            sourcePlan.prefHits = sourcePlan.assigned.filter((x) => sourcePlan.prefDows.indexOf(new Date(year, monthIndex, x).getDay()) !== -1).length;
+          }
+          const newPrefHits = sourcePlan.prefHits || 0;
+          const sacrificedDelta = Math.max(0, oldPrefHits - newPrefHits);
+          if (sacrificedDelta > 0) sacrificedPrefByStaff.set(sourcePlan.staffId, used + sacrificedDelta);
+          moved.push({ sourcePlan, sTypes, oldAssigned, oldPrefHits, d2: d2Found, sacrificedDelta });
+        }
+
+        if (!scheduleAutoBorrowSlotFeasible(g, staffTypes, d)) {
+          // 이 날짜는 결국 못 풀었다 — 이번에 옮긴 것들을 전부 원위치(날짜·선호 적중·손해 한도)로 되돌린다.
+          moved.forEach(({ sourcePlan, sTypes, oldAssigned, oldPrefHits, d2, sacrificedDelta }) => {
+            scheduleAutoApplyOffDelta(sTypes, g, d, -1);
+            scheduleAutoApplyOffDelta(sTypes, g, d2, +1);
+            sourcePlan.assigned = oldAssigned;
+            sourcePlan.prefHits = oldPrefHits;
+            if (sacrificedDelta > 0) {
+              const used = sacrificedPrefByStaff.get(sourcePlan.staffId) || 0;
+              sacrificedPrefByStaff.set(sourcePlan.staffId, Math.max(0, used - sacrificedDelta));
+            }
+          });
+          return;
+        }
+
+        scheduleAutoApplyOffDelta(staffTypes, g, d, -1);
+        targetPlan.assigned = targetPlan.assigned.concat([d]).sort((a, b) => a - b);
+        gap--;
+      });
+    }
+
+    perStaffPlan
+      .filter((p) => (staffMinBlockedDayList.get(p.staffId) || []).length > 0 && p.needed > p.assigned.length)
+      .sort((a, b) => (b.needed - b.assigned.length) - (a.needed - a.assigned.length))
+      .forEach(scheduleAutoBorrowFor);
+
+    // 이번 보정으로 부족분이 줄었거나 해소됐으면, 경고 문구도 최신 배정 개수 기준으로 다시 만든다.
+    perStaffPlan.forEach((p) => {
+      const ctx = staffWarnCtx.get(p.staffId);
+      if (!ctx || !ctx.shortfallText) return;
+      if (p.assigned.length >= p.needed) { ctx.shortfallText = null; return; }
+      const stillBlocked = (staffMinBlockedDayList.get(p.staffId) || []).filter((d) => p.assigned.indexOf(d) === -1).length;
+      const minNote = stillBlocked > 0
+        ? ` 구분별 하루 출근 최소 인원 조건을 지키느라 오프를 넣을 수 없는 날이 ${stillBlocked}일 있어요.`
+        : "";
+      ctx.shortfallText = `${ctx.label}님은 빈 칸이 부족해 목표 ${p.needed}개 중 ${p.assigned.length}개만 배정됐어요.${minNote}`;
+    });
+
     // 목표선(SCHEDULE_AUTO_PREF_FLOOR, 목표 오프 개수보다 작으면 그 개수까지)에 아직 못 미친 사람을
     // 가장 먼저 처리해 남은 스왑 기회를 우선 배정한다. 목표선을 채운 사람들 사이에서는 (기존처럼)
     // 선호 요일을 더 많이 설정한 사람 순으로 추가 최적화를 시도한다.
@@ -1178,6 +1338,122 @@
         warnings.push(`${ctx.label}님 ${span} ${r.length}일 연속 근무가 남아요(최대 ${LIMIT}일). 오프 목표 개수 안에서는 해소할 수 없어서 직접 조정이 필요해요.`);
       });
     });
+    // ----- 업무구분별(채팅/유선 단독) 전원 출근 제거 -----
+    // 위 repairAllWorkingDays()는 "조 전체(예: 주간 9명)"가 다 출근했을 때만 손을 대서,
+    // "채팅 4명만 전원 출근" 같은 구분 단위 전원 출근은 잡지 못했다(원래도 -1 추가 허용
+    // 예외는 있었지만, 배치 단계에서 아무도 그 날을 고르지 않으면 그대로 남았다). 여기서는
+    // (조×업무구분) 단위로 같은 방식(이미 배정된 오프의 자리만 서로 바꾸고, 총 오프 개수는
+    // 그대로 유지)으로 다시 찾아서 없앤다. 필요인력 허용범위는 전원 출근 해소 목적에 한해
+    // 기존과 동일하게 -1까지 추가로 허용한다(금·토·월 부족 0 규칙도 이 한도 안에서는 예외).
+    function repairTypeAllWorkingDays() {
+      let repaired = 0;
+      let changed = true;
+      let guard = 0;
+      // 어떤 사람이 (조×업무구분) t2에서 day에 실제로 출근 중인 인원수.
+      function typeWorkingOn(g, t2, day, excludeId) {
+        const groupStaff2 = nonAdmin.filter((s2) => (g === "NIGHT" ? s2.group === "night" : s2.group !== "night") && (s2.types || []).indexOf(t2) !== -1);
+        let count = 0;
+        groupStaff2.forEach((s2) => {
+          if (s2.id === excludeId) { count++; return; } // 지금 이동을 시도 중인 당사자는 별도로 처리
+          const rec2 = scheduleData.records[scheduleRecordKey(s2.id, scheduleDateKey(year, monthIndex, day))];
+          const set2 = planByIdForRepair.get(s2.id);
+          const isOff2 = (set2 && set2.has(day)) || (rec2 && !scheduleAutoIsWorkRecord(rec2));
+          if (!isOff2) count++;
+        });
+        return { count, total: groupStaff2.length };
+      }
+      while (changed && guard++ < daysInMonth * Math.max(1, perStaffPlan.length) * 2) {
+        changed = false;
+        let fixedOne = false;
+        for (const g of ["DAY", "NIGHT"]) {
+          if (fixedOne) break;
+          for (const t of TYPES) {
+            if (fixedOne) break;
+            const groupStaff = nonAdmin.filter((st) => (g === "NIGHT" ? st.group === "night" : st.group !== "night") && (st.types || []).indexOf(t) !== -1);
+            const total = groupStaff.length;
+            if (total <= 0) continue;
+
+            for (let d = 1; d <= daysInMonth; d++) {
+              const targetDateKey = scheduleDateKey(year, monthIndex, d);
+              const { count: typeWorkingNow } = typeWorkingOn(g, t, d, null);
+              if (typeWorkingNow !== total) continue;
+
+              const targetDow = new Date(year, monthIndex, d).getDay();
+              for (const st of groupStaff) {
+                const plan = perStaffPlan.find((x) => x.staffId === st.id);
+                if (!plan) continue;
+                const assigned = new Set(plan.assigned);
+                const targetKey = scheduleRecordKey(st.id, targetDateKey);
+                if (assigned.has(d) || Object.prototype.hasOwnProperty.call(scheduleData.records, targetKey)) continue;
+
+                // 이 사람이 겸직 중인 모든 업무구분에서 최소 출근/필요인력 허용범위(전원 출근
+                // 해소용 -1 포함)를 함께 확인한다.
+                let targetSafe = true;
+                for (const t2 of TYPES) {
+                  if ((st.types || []).indexOf(t2) === -1) continue;
+                  const { count: typeWorking2 } = typeWorkingOn(g, t2, d, null);
+                  const minWorking = Number(minWorkingByGroup[scheduleAutoMinWorkingKey(g, t2)] ?? SCHEDULE_AUTO_MIN_WORKING);
+                  if (typeWorking2 - 1 < minWorking) { targetSafe = false; break; }
+                  const targetReq = required[g][t2][d];
+                  if (targetReq !== null && targetReq !== undefined) {
+                    const tol = scheduleAutoToleranceInfo(targetDow, targetDateKey);
+                    const effectiveMax = Math.max(Number(tol.max || 0), 1);
+                    if (targetReq - (typeWorking2 - 1) > effectiveMax) { targetSafe = false; break; }
+                  }
+                }
+                if (!targetSafe) continue;
+
+                for (const sourceDay of plan.assigned.slice()) {
+                  if (sourceDay === d) continue;
+                  const sourceDateKey = scheduleDateKey(year, monthIndex, sourceDay);
+                  const sourceKey = scheduleRecordKey(st.id, sourceDateKey);
+                  if (Object.prototype.hasOwnProperty.call(scheduleData.records, sourceKey)) continue;
+
+                  // 이 오프를 원래 날짜에서 빼면, 이 사람이 겸직 중인 어떤 업무구분이든
+                  // 그 날 새로 전원 출근이 생기지 않는지 확인한다.
+                  let sourceCreatesAllWorking = false;
+                  for (const t2 of TYPES) {
+                    if ((st.types || []).indexOf(t2) === -1) continue;
+                    const { count: working2, total: total2 } = typeWorkingOn(g, t2, sourceDay, st.id);
+                    if (working2 === total2) { sourceCreatesAllWorking = true; break; }
+                  }
+                  if (sourceCreatesAllWorking) continue;
+
+                  const next = new Set(assigned);
+                  next.delete(sourceDay);
+                  next.add(d);
+                  if (!autoPlanValidSet(st.id, next)) continue;
+
+                  plan.assigned = Array.from(next).sort((a, b) => a - b);
+                  planByIdForRepair.set(st.id, new Set(plan.assigned));
+                  if (plan.prefDows) {
+                    const pref = new Set(plan.prefDows);
+                    plan.prefHits = plan.assigned.filter((x) => pref.has(new Date(year, monthIndex, x).getDay())).length;
+                  }
+                  if (plan.workPrefDows) {
+                    const wp = new Set(plan.workPrefDows);
+                    plan.workPrefHits = plan.assigned.filter((x) => !wp.has(new Date(year, monthIndex, x).getDay())).length;
+                  }
+                  repaired++;
+                  fixedOne = true;
+                  changed = true;
+                  break;
+                }
+                if (fixedOne) break;
+              }
+              if (fixedOne) break;
+            }
+          }
+        }
+        if (!fixedOne) break;
+      }
+      return repaired;
+    }
+    const repairedTypeAllWorkingDays = repairTypeAllWorkingDays();
+    if (repairedTypeAllWorkingDays > 0) {
+      warnings.push(`구분(채팅/유선)만 전원 출근 상태인 날을 ${repairedTypeAllWorkingDays}건 자동으로 해소했어요(전원 출근 해소 목적에 한해 필요인력 부족 -1까지 추가 허용). 기존 입력 일정과 최소 출근 인원 조건은 유지했어요.`);
+    }
+
     if (repairedAllWorkingDays > 0) {
       warnings.push(`모든 인원 출근 상태를 ${repairedAllWorkingDays}건 자동으로 해소했어요. 기존 입력 일정과 최소 출근 인원 조건은 유지했어요.`);
     }
