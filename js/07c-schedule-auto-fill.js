@@ -784,6 +784,39 @@
     const planById = new Map(perStaffPlan.map((p) => [p.staffId, p]));
     const staffById = new Map(monthStaff.map((s) => [s.id, s]));
 
+    // 선호 오프 교환처럼 두 사람의 자동 오프 위치를 동시에 바꾸는 단계에서는
+    // 개별 인원의 연속근무/휴무만 검사해서는 안 된다. 특히 07:00 시작 인원이
+    // 아닌 사람과 이른 조 인원의 오프를 교환하면, 초기 배치에서 지켜졌던
+    // "주간 유선/채팅 07:00 최소 1명" 조건이 깨질 수 있다.
+    // 현재 perStaffPlan을 기준으로 overrides에 들어온 인원만 새 오프 집합으로
+    // 대체해, 두 사람의 교환 결과 전체를 다시 계산한다.
+    function autoPlanEarlyValidWithOverrides(overrides) {
+      for (const t of TYPES) {
+        if (earlyTotalCount.DAY[t] < SCHEDULE_AUTO_EARLY_SHIFT_MIN_WORKING) continue;
+        const earlyStaff = nonAdmin.filter((st) =>
+          st.group !== "night" &&
+          (st.types || []).indexOf(t) !== -1 &&
+          scheduleAutoIsEarlyShiftStaff(st)
+        );
+        for (let d = 1; d <= daysInMonth; d++) {
+          const dateKey = scheduleDateKey(year, monthIndex, d);
+          let workingCount = 0;
+          for (const st of earlyStaff) {
+            const rec = scheduleData.records[scheduleRecordKey(st.id, dateKey)];
+            const override = overrides && overrides.get(st.id);
+            const currentPlan = override || (() => {
+              const p = planById.get(st.id);
+              return p ? new Set(p.assigned) : new Set();
+            })();
+            const isOff = currentPlan.has(d) || (!!rec && !scheduleAutoIsWorkRecord(rec));
+            if (!isOff) workingCount++;
+          }
+          if (workingCount < SCHEDULE_AUTO_EARLY_SHIFT_MIN_WORKING) return false;
+        }
+      }
+      return true;
+    }
+
     // ----- 최소 출근 인원 때문에 자리가 안 나는 사람을 위한 "빌려오기" 보정 -----
     // (이응님 사례) 어떤 인원이 목표 오프 개수를 다 못 채운 게 "구분별 하루 최소 출근 인원"
     // 조건 때문이면, 같은 조·업무구분의 동료 중 그 날 자동배치로 오프를 받은 사람의 오프를
@@ -995,6 +1028,14 @@
           const nextSource = new Set(sourceAssigned);
           nextSource.delete(d); nextSource.add(swapOut);
           if (!autoPlanValidSet(targetPlan.staffId, nextTarget) || !autoPlanValidSet(sourcePlan.staffId, nextSource)) continue;
+
+          // 두 사람의 교환 결과를 동시에 대입해서, 주간 유선/채팅의 07:00
+          // 시작 인원이 하루라도 0명이 되지 않는지 확인한다.
+          const earlyOverrides = new Map([
+            [targetPlan.staffId, nextTarget],
+            [sourcePlan.staffId, nextSource],
+          ]);
+          if (!autoPlanEarlyValidWithOverrides(earlyOverrides)) continue;
 
           targetAssigned.clear(); nextTarget.forEach(x => targetAssigned.add(x));
           sourceAssigned.clear(); nextSource.forEach(x => sourceAssigned.add(x));
