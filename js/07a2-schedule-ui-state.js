@@ -49,6 +49,8 @@
     if (getChosungString(s.nickname || "").indexOf(needle) !== -1) return true;
     const keywordFn = SCHEDULE_SEARCH_KEYWORD_MATCHERS[needle];
     if (keywordFn && keywordFn(s)) return true;
+    // 사용자가 추가한 업무 구분 이름도 검색어로 쓸 수 있게 한다(대소문자 무시).
+    if (customWorkTypes.some((t) => t.toLowerCase() === needle && (s.types || []).indexOf(t) !== -1)) return true;
     return false;
   }
   function scheduleStaffMatchesSearch(s, query) {

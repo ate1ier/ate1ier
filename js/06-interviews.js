@@ -429,7 +429,7 @@
       <span class="interview-agent-meta">
         ${agent.timezone ? `<span class="interview-agent-timezone">${ICON_CLOCK} ${esc(agent.timezone)}</span>` : ""}
         <span class="badge sm ${agent.group === "night" ? "night" : "day"}">${agent.group === "night" ? "야간" : "주간"}</span>
-        ${(agent.workTypes || []).map((t) => `<span class="badge sm ${t === "유선" ? "voice" : "chat"}">${esc(t)}</span>`).join("")}
+        ${renderWorkTypeBadges(agent.workTypes, "sm")}
       </span>
     ` : "";
     const manager = rec.managerId ? agentsData.find((a) => a.id === rec.managerId) : null;

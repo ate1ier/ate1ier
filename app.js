@@ -1523,6 +1523,9 @@
       <button type="button" class="theme-menu-item" id="settings-backup-btn">
         ${ICON_BACKUP}<span class="theme-menu-name">데이터 백업</span>
       </button>
+      <button type="button" class="theme-menu-item" id="settings-worktypes-btn">
+        ${ICON_SETTINGS}<span class="theme-menu-name">업무 구분 관리</span>
+      </button>
       <button type="button" class="theme-menu-item" id="settings-discord-btn">
         ${ICON_DISCORD}<span class="theme-menu-name">디스코드 채널</span>
       </button>
@@ -1543,6 +1546,8 @@
     });
     const manualBtn = document.getElementById("settings-manual-btn");
     if (manualBtn) manualBtn.onclick = () => { closeSettingsMenu(); openManualModal(); };
+    const worktypesBtn = document.getElementById("settings-worktypes-btn");
+    if (worktypesBtn) worktypesBtn.onclick = () => { closeSettingsMenu(); openWorkTypesModal(() => renderApp()); };
     const backupBtn = document.getElementById("settings-backup-btn");
     if (backupBtn) backupBtn.onclick = () => { closeSettingsMenu(); openBackupModal(); };
     const discordBtn = document.getElementById("settings-discord-btn");
@@ -3133,6 +3138,162 @@
     "2030-10-09": "한글날",
     "2030-12-25": "기독탄신일",
   };
+
+  // ==================== 업무 구분(유선/채팅 + 사용자 추가 항목) 공용 설정 ====================
+  // 예전에는 "유선"/"채팅" 두 가지가 코드 곳곳에 글자 그대로 박혀 있었다. 스케줄의
+  // "필요인력" 자동 계산·자동 채움 로직(07c-schedule-auto-fill.js)은 이 두 가지를
+  // 기준으로 짜여 있는 정산 로직이라 그대로 두고, 그 외에 상담사 관리 · 면담일지 ·
+  // QA · 홈 화면처럼 "이 사람이 어떤 업무를 하는지 보여주는 용도"로 쓰이는 곳에서는
+  // 사용자가 새 구분을 자유롭게 추가할 수 있게 한다.
+  const WORK_TYPES_BUILTIN = ["유선", "채팅"];
+  const WORK_TYPES_KEY = acctKey("work-types:custom-list");
+  const WORK_TYPES_MAX_CUSTOM = 12;
+  const WORK_TYPES_MAX_LEN = 8;
+
+  function loadCustomWorkTypes() {
+    try {
+      const raw = localStorage.getItem(WORK_TYPES_KEY);
+      const parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed.filter((t) => typeof t === "string" && t.trim()) : [];
+    } catch (e) { return []; }
+  }
+  let customWorkTypes = loadCustomWorkTypes();
+  function saveCustomWorkTypes() {
+    try { localStorage.setItem(WORK_TYPES_KEY, JSON.stringify(customWorkTypes)); }
+    catch (e) {}
+  }
+  // 업무 구분 전체(기본 + 사용자 추가) 목록. 순서는 항상 "유선/채팅"이 먼저 오고,
+  // 그 뒤에 추가한 순서대로 붙는다 — 배지 색상도 이 순서를 기준으로 고정된다.
+  function getAllWorkTypes() { return WORK_TYPES_BUILTIN.concat(customWorkTypes); }
+  function isBuiltinWorkType(t) { return WORK_TYPES_BUILTIN.indexOf(t) !== -1; }
+
+  function addCustomWorkType(nameRaw) {
+    const name = String(nameRaw || "").trim();
+    if (!name) return { ok: false, reason: "이름을 입력해 주세요." };
+    if (name.length > WORK_TYPES_MAX_LEN) return { ok: false, reason: `${WORK_TYPES_MAX_LEN}자 이내로 입력해 주세요.` };
+    const dup = getAllWorkTypes().some((t) => t.toLowerCase() === name.toLowerCase());
+    if (dup) return { ok: false, reason: "이미 있는 업무 구분이에요." };
+    if (customWorkTypes.length >= WORK_TYPES_MAX_CUSTOM) return { ok: false, reason: `업무 구분은 최대 ${WORK_TYPES_MAX_CUSTOM}개까지 추가할 수 있어요.` };
+    customWorkTypes.push(name);
+    saveCustomWorkTypes();
+    return { ok: true };
+  }
+  // 커스텀 업무 구분을 지우면서, 이미 그 구분이 붙어 있던 상담사들에게서도 함께 지운다
+  // (상담사 기록에만 이름이 남아 배지가 "떠돌게" 되는 것을 막기 위해).
+  function removeCustomWorkType(name) {
+    if (isBuiltinWorkType(name)) return { ok: false, reason: "유선/채팅은 기본 항목이라 삭제할 수 없어요." };
+    const idx = customWorkTypes.indexOf(name);
+    if (idx === -1) return { ok: false, reason: "이미 삭제된 업무 구분이에요." };
+    customWorkTypes.splice(idx, 1);
+    saveCustomWorkTypes();
+    if (typeof agentsData !== "undefined" && Array.isArray(agentsData)) {
+      let touched = false;
+      agentsData.forEach((a) => {
+        if (a.workTypes && a.workTypes.indexOf(name) !== -1) {
+          a.workTypes = a.workTypes.filter((t) => t !== name);
+          touched = true;
+        }
+      });
+      if (touched && typeof saveAgentsData === "function") saveAgentsData();
+    }
+    return { ok: true };
+  }
+
+  // 배지 색상 클래스. 유선/채팅은 기존 색을 그대로 쓰고, 추가한 항목들은 등록
+  // 순서에 따라 teal → purple → pink 세 가지 색을 돌려가며 씀(css/06-agents.css 참고).
+  const WORK_TYPE_CUSTOM_PALETTE = ["custom-1", "custom-2", "custom-3"];
+  function workTypeBadgeClass(t) {
+    if (t === "유선") return "voice";
+    if (t === "채팅") return "chat";
+    const idx = customWorkTypes.indexOf(t);
+    if (idx === -1) return "custom-1"; // 삭제된 구분이 남아있던 옛 기록 등, 안전망
+    return WORK_TYPE_CUSTOM_PALETTE[idx % WORK_TYPE_CUSTOM_PALETTE.length];
+  }
+  // 상담사 관리/QA/면담일지/홈에서 공통으로 쓰는 업무 구분 배지 렌더러.
+  // sizeClass에 "sm"을 넣으면 작은 배지(.badge.sm)로 그려진다.
+  function renderWorkTypeBadges(types, sizeClass) {
+    return (types || [])
+      .map((t) => `<span class="badge ${sizeClass ? "sm" : ""} ${workTypeBadgeClass(t)}">${esc(t)}</span>`)
+      .join(" ");
+  }
+
+  /* ===================== 업무 구분 관리 모달 ===================== */
+  // (다른 모달들과 같은 manual-modal-overlay/box 뼈대를 그대로 사용)
+  function closeWorkTypesModal() {
+    const el = document.getElementById("work-types-modal-overlay");
+    if (el) el.remove();
+  }
+  // onChange: 추가/삭제가 실제로 일어났을 때 호출되는 콜백(각 화면에서 다시 그리는 용도).
+  function openWorkTypesModal(onChange) {
+    closeWorkTypesModal();
+    const overlay = document.createElement("div");
+    overlay.id = "work-types-modal-overlay";
+    overlay.className = "manual-modal-overlay";
+    function renderList() {
+      return customWorkTypes.length
+        ? customWorkTypes.map((t) => `
+            <div class="work-type-row">
+              <span class="badge ${workTypeBadgeClass(t)}">${esc(t)}</span>
+              <button type="button" class="ghost-btn danger" data-remove-type="${esc(t)}" title="삭제">삭제</button>
+            </div>
+          `).join("")
+        : `<div class="work-type-empty">아직 추가한 업무 구분이 없어요.</div>`;
+    }
+    overlay.innerHTML = `
+      <div class="manual-modal-box work-types-modal-box" role="dialog" aria-modal="true" aria-label="업무 구분 관리">
+        <div class="manual-modal-head">
+          <span>업무 구분 관리</span>
+          <button type="button" class="manual-modal-close" id="work-types-modal-close" aria-label="닫기">✕</button>
+        </div>
+        <div class="manual-modal-body">
+          <div class="work-type-builtin-note">
+            <span class="badge voice">유선</span><span class="badge chat">채팅</span>
+            <span class="work-type-builtin-label">은 기본 항목이라 삭제할 수 없어요.</span>
+          </div>
+          <div id="work-types-list">${renderList()}</div>
+          <div class="work-type-add-row">
+            <input type="text" id="work-type-new-input" placeholder="예: 대면, 이메일" maxlength="${WORK_TYPES_MAX_LEN}">
+            <button type="button" class="primary-btn" id="work-type-add-btn">추가</button>
+          </div>
+          <div class="work-type-add-error" id="work-type-add-error"></div>
+          <p class="work-type-hint">여기서 추가한 업무 구분은 상담사 관리·면담일지·QA·홈 화면의 배지와 검색에 바로 반영돼요. (월별 스케줄의 필요인력 자동계산은 유선/채팅 기준을 그대로 사용해요.)</p>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    function refresh() {
+      const list = document.getElementById("work-types-list");
+      if (list) list.innerHTML = renderList();
+      attachRemoveHandlers();
+      if (typeof onChange === "function") onChange();
+    }
+    function attachRemoveHandlers() {
+      overlay.querySelectorAll("[data-remove-type]").forEach((btn) => {
+        btn.onclick = () => {
+          const name = btn.getAttribute("data-remove-type");
+          if (!confirm(`"${name}" 업무 구분을 삭제할까요? 이 구분이 붙어 있던 상담사에게서도 함께 지워져요.`)) return;
+          removeCustomWorkType(name);
+          refresh();
+        };
+      });
+    }
+    attachRemoveHandlers();
+    overlay.querySelector("#work-types-modal-close").onclick = () => closeWorkTypesModal();
+    overlay.onclick = (e) => { if (e.target === overlay) closeWorkTypesModal(); };
+    const input = overlay.querySelector("#work-type-new-input");
+    const errEl = overlay.querySelector("#work-type-add-error");
+    function doAdd() {
+      const res = addCustomWorkType(input.value);
+      if (!res.ok) { errEl.textContent = res.reason; return; }
+      errEl.textContent = "";
+      input.value = "";
+      refresh();
+      input.focus();
+    }
+    overlay.querySelector("#work-type-add-btn").onclick = doAdd;
+    input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); doAdd(); } });
+    setTimeout(() => input.focus(), 0);
+  }
 
   function getHoliday(iso) { return KR_HOLIDAYS[iso] || null; }
 
@@ -5034,7 +5195,10 @@
   };
   function agentMatchesSearchKeyword(a, needle) {
     const fn = AGENT_SEARCH_KEYWORD_MATCHERS[needle];
-    return !!fn && fn(a);
+    if (fn) return fn(a);
+    // 사용자가 추가한 업무 구분 이름도 그대로 검색어로 쓸 수 있게 한다(대소문자 무시).
+    const customHit = customWorkTypes.some((t) => t.toLowerCase() === needle && (a.workTypes || []).indexOf(t) !== -1);
+    return customHit;
   }
   function agentMatchesSearch(a, query) {
     const needle = (query || "").trim().toLowerCase();
@@ -5052,6 +5216,11 @@
     if (filterType === "night") return a.group === "night";
     if (filterType === "working") return a.status !== "RESIGNED";
     if (filterType === "resigned") return a.status === "RESIGNED";
+    // 사용자가 추가한 업무 구분 필터 버튼은 "custom:이름" 형태의 filterType으로 들어온다.
+    if (filterType && filterType.indexOf("custom:") === 0) {
+      const typeName = filterType.slice("custom:".length);
+      return (a.workTypes || []).indexOf(typeName) !== -1;
+    }
     return true;
   }
   // filterTypes: Set(문자열). 비어있으면 전체 통과. 여러 개면 모두 만족(AND)해야 통과 — 버튼 중복 선택 지원.
@@ -5141,7 +5310,7 @@
 
   function workTypeBadgesHtml(types) {
     if (!types || types.length === 0) return `<span class="agent-field-empty">-</span>`;
-    return types.map((t) => `<span class="badge ${t === "유선" ? "voice" : "chat"}">${esc(t)}</span>`).join("");
+    return renderWorkTypeBadges(types);
   }
   function scheduleGroupLabel(group) { return group === "night" ? `${ICON_MOON} 야간` : `${ICON_SUN} 주간`; }
   function scheduleGroupBadgeHtml(group) {
@@ -5150,7 +5319,7 @@
 
   function renderAgentRow(a, section, draggable) {
     const selected = a.id === agentsUi.selectedId;
-    const typeBadges = (a.workTypes || []).map((t) => `<span class="badge sm ${t === "유선" ? "voice" : "chat"}">${esc(t)}</span>`).join("");
+    const typeBadges = renderWorkTypeBadges(a.workTypes, "sm");
     const groupBadge = `<span class="badge sm ${a.group === "night" ? "night" : "day"}">${a.group === "night" ? "야간" : "주간"}</span>`;
     const isResigned = a.status === "RESIGNED";
     const scheduledResign = isAgentScheduledResign(a);
@@ -5251,6 +5420,10 @@
           <div class="agent-checkbox-row">
             <label class="agent-checkbox"><input type="checkbox" id="agent-input-voice" ${workTypes.indexOf("유선") !== -1 ? "checked" : ""}> 유선</label>
             <label class="agent-checkbox"><input type="checkbox" id="agent-input-chat" ${workTypes.indexOf("채팅") !== -1 ? "checked" : ""}> 채팅</label>
+            ${customWorkTypes.map((t) => `
+              <label class="agent-checkbox"><input type="checkbox" class="agent-input-custom-type" data-worktype="${esc(t)}" ${workTypes.indexOf(t) !== -1 ? "checked" : ""}> ${esc(t)}</label>
+            `).join("")}
+            <button type="button" class="ghost-btn agent-worktype-manage-btn" id="agent-worktype-manage-btn">+ 관리</button>
           </div>
         </div>
         <div class="agent-form-label">근무 조
@@ -5379,7 +5552,7 @@
     const nightCount = nonAdminAgents.filter((a) => a.group === "night").length;
     const pinnedCount = agentsData.filter((a) => a.pinned).length;
 
-    const summaryHtml = `<div class="agent-summary">전체 ${totalCount}명 · 관리자 ${adminCount}명 · 유선 ${voiceCount}명 · 채팅 ${chatCount}명 · 주간 ${dayCount}명 · 야간 ${nightCount}명 · 재직 ${workingCount}명 · 퇴사 ${resignedCount}명 · 고정 ${pinnedCount}명</div>`;
+    const summaryHtml = `<div class="agent-summary">전체 ${totalCount}명 · 관리자 ${adminCount}명 · 유선 ${voiceCount}명 · 채팅 ${chatCount}명 · 주간 ${dayCount}명 · 야간 ${nightCount}명 · 재직 ${workingCount}명 · 퇴사 ${resignedCount}명 · 고정 ${pinnedCount}명${customWorkTypes.map((t) => ` · ${esc(t)} ${nonAdminAgents.filter((a) => (a.workTypes || []).indexOf(t) !== -1).length}명`).join("")}</div>`;
 
     const controlsHtml = `
       <div class="agent-controls">
@@ -5392,6 +5565,9 @@
             <button type="button" class="agent-filter-btn ${agentsUi.filterTypes.has("night") ? "active" : ""}" data-filter="night">야간</button>
             <button type="button" class="agent-filter-btn ${agentsUi.filterTypes.has("working") ? "active" : ""}" data-filter="working">재직</button>
             <button type="button" class="agent-filter-btn ${agentsUi.filterTypes.has("resigned") ? "active" : ""}" data-filter="resigned">퇴사</button>
+            ${customWorkTypes.map((t) => `
+              <button type="button" class="agent-filter-btn ${agentsUi.filterTypes.has(`custom:${t}`) ? "active custom-active" : ""}" data-filter="custom:${esc(t)}">${esc(t)}</button>
+            `).join("")}
           </div>
           <div class="agent-search-input">
             <input type="text" class="agent-search-input-field" id="agent-search-input" placeholder="이름 또는 LDAP 검색" value="${esc(agentsUi.searchQuery)}" autocomplete="off">
@@ -5566,6 +5742,16 @@
 
     const form = document.getElementById("agent-form");
     if (form) {
+      const worktypeManageBtn = document.getElementById("agent-worktype-manage-btn");
+      // 관리 모달에서 추가/삭제가 일어나면 renderApp()으로 폼을 다시 그려서
+      // 방금 추가한 업무 구분 체크박스가 바로 나타나게 한다. 단, 입력 중이던
+      // 이름/사번 등 다른 값은 폼을 새로 그리며 날아가므로, 다시 그리기 전에
+      // 지금까지 고른 업무 구분만 v.workTypes에 반영해 모달을 열기 전 상태를 최대한 살린다.
+      if (worktypeManageBtn) {
+        worktypeManageBtn.onclick = () => {
+          openWorkTypesModal(() => renderApp());
+        };
+      }
       enhanceDateInput(document.getElementById("agent-input-hiredate"));
       const resignDateInput = document.getElementById("agent-input-resigndate");
       if (resignDateInput) enhanceDateInput(resignDateInput);
@@ -5597,6 +5783,7 @@
         const workTypes = [];
         if (document.getElementById("agent-input-voice").checked) workTypes.push("유선");
         if (document.getElementById("agent-input-chat").checked) workTypes.push("채팅");
+        form.querySelectorAll(".agent-input-custom-type:checked").forEach((el) => workTypes.push(el.getAttribute("data-worktype")));
         const group = document.getElementById("agent-input-group-night").checked ? "night" : "day";
         const isAdmin = document.getElementById("agent-input-admin").checked;
         const selectedResigned = document.getElementById("agent-input-status-resigned").checked;
@@ -6667,7 +6854,7 @@
             ${agentsList.length === 0 ? `
               <tr><td class="qa-empty" colspan="7">${forCapture ? "해당하는 상담사가 없어요." : `근무중인 상담사가 없어요. "상담사 관리"에서 인원을 등록해주세요.`}</td></tr>
             ` : agentsList.map((a) => {
-              const typeBadges = (a.workTypes || []).map((t) => `<span class="badge sm ${t === "유선" ? "voice" : "chat"}">${esc(t)}</span>`).join(" ");
+              const typeBadges = renderWorkTypeBadges(a.workTypes, "sm");
               const groupBadge = `<span class="badge sm ${a.group === "night" ? "night" : "day"}">${a.group === "night" ? "야간" : "주간"}</span>`;
               const val = getQAScore(a.id, year, monthIndex);
               const scoreCell = forCapture
@@ -7451,7 +7638,7 @@
       <span class="interview-agent-meta">
         ${agent.timezone ? `<span class="interview-agent-timezone">${ICON_CLOCK} ${esc(agent.timezone)}</span>` : ""}
         <span class="badge sm ${agent.group === "night" ? "night" : "day"}">${agent.group === "night" ? "야간" : "주간"}</span>
-        ${(agent.workTypes || []).map((t) => `<span class="badge sm ${t === "유선" ? "voice" : "chat"}">${esc(t)}</span>`).join("")}
+        ${renderWorkTypeBadges(agent.workTypes, "sm")}
       </span>
     ` : "";
     const manager = rec.managerId ? agentsData.find((a) => a.id === rec.managerId) : null;
@@ -8315,6 +8502,8 @@
     if (getChosungString(s.nickname || "").indexOf(needle) !== -1) return true;
     const keywordFn = SCHEDULE_SEARCH_KEYWORD_MATCHERS[needle];
     if (keywordFn && keywordFn(s)) return true;
+    // 사용자가 추가한 업무 구분 이름도 검색어로 쓸 수 있게 한다(대소문자 무시).
+    if (customWorkTypes.some((t) => t.toLowerCase() === needle && (s.types || []).indexOf(t) !== -1)) return true;
     return false;
   }
   function scheduleStaffMatchesSearch(s, query) {
@@ -14858,7 +15047,7 @@
         const meta = SCHEDULE_STATUS_META[s.record.status];
         flags.push(`<span class="flag off">${esc(meta ? meta.label : "휴무")}</span>`);
       }
-      const typeBadges = (s.types || []).map((t) => `<span class="badge sm ${t === "유선" ? "voice" : "chat"}">${esc(t)}</span>`).join("");
+      const typeBadges = renderWorkTypeBadges(s.types, "sm");
       const ldapText = s.nickname && s.nickname !== s.name ? s.nickname : "";
       return `
         <div class="home-staff-row ${s.record.status !== "WORK" ? "is-off" : ""}">

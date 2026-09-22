@@ -113,7 +113,7 @@
         const meta = SCHEDULE_STATUS_META[s.record.status];
         flags.push(`<span class="flag off">${esc(meta ? meta.label : "휴무")}</span>`);
       }
-      const typeBadges = (s.types || []).map((t) => `<span class="badge sm ${t === "유선" ? "voice" : "chat"}">${esc(t)}</span>`).join("");
+      const typeBadges = renderWorkTypeBadges(s.types, "sm");
       const ldapText = s.nickname && s.nickname !== s.name ? s.nickname : "";
       return `
         <div class="home-staff-row ${s.record.status !== "WORK" ? "is-off" : ""}">

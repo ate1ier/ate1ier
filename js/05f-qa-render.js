@@ -32,7 +32,7 @@
             ${agentsList.length === 0 ? `
               <tr><td class="qa-empty" colspan="7">${forCapture ? "해당하는 상담사가 없어요." : `근무중인 상담사가 없어요. "상담사 관리"에서 인원을 등록해주세요.`}</td></tr>
             ` : agentsList.map((a) => {
-              const typeBadges = (a.workTypes || []).map((t) => `<span class="badge sm ${t === "유선" ? "voice" : "chat"}">${esc(t)}</span>`).join(" ");
+              const typeBadges = renderWorkTypeBadges(a.workTypes, "sm");
               const groupBadge = `<span class="badge sm ${a.group === "night" ? "night" : "day"}">${a.group === "night" ? "야간" : "주간"}</span>`;
               const val = getQAScore(a.id, year, monthIndex);
               const scoreCell = forCapture

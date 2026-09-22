@@ -195,7 +195,10 @@
   };
   function agentMatchesSearchKeyword(a, needle) {
     const fn = AGENT_SEARCH_KEYWORD_MATCHERS[needle];
-    return !!fn && fn(a);
+    if (fn) return fn(a);
+    // 사용자가 추가한 업무 구분 이름도 그대로 검색어로 쓸 수 있게 한다(대소문자 무시).
+    const customHit = customWorkTypes.some((t) => t.toLowerCase() === needle && (a.workTypes || []).indexOf(t) !== -1);
+    return customHit;
   }
   function agentMatchesSearch(a, query) {
     const needle = (query || "").trim().toLowerCase();
@@ -213,6 +216,11 @@
     if (filterType === "night") return a.group === "night";
     if (filterType === "working") return a.status !== "RESIGNED";
     if (filterType === "resigned") return a.status === "RESIGNED";
+    // 사용자가 추가한 업무 구분 필터 버튼은 "custom:이름" 형태의 filterType으로 들어온다.
+    if (filterType && filterType.indexOf("custom:") === 0) {
+      const typeName = filterType.slice("custom:".length);
+      return (a.workTypes || []).indexOf(typeName) !== -1;
+    }
     return true;
   }
   // filterTypes: Set(문자열). 비어있으면 전체 통과. 여러 개면 모두 만족(AND)해야 통과 — 버튼 중복 선택 지원.
@@ -302,7 +310,7 @@
 
   function workTypeBadgesHtml(types) {
     if (!types || types.length === 0) return `<span class="agent-field-empty">-</span>`;
-    return types.map((t) => `<span class="badge ${t === "유선" ? "voice" : "chat"}">${esc(t)}</span>`).join("");
+    return renderWorkTypeBadges(types);
   }
   function scheduleGroupLabel(group) { return group === "night" ? `${ICON_MOON} 야간` : `${ICON_SUN} 주간`; }
   function scheduleGroupBadgeHtml(group) {
@@ -311,7 +319,7 @@
 
   function renderAgentRow(a, section, draggable) {
     const selected = a.id === agentsUi.selectedId;
-    const typeBadges = (a.workTypes || []).map((t) => `<span class="badge sm ${t === "유선" ? "voice" : "chat"}">${esc(t)}</span>`).join("");
+    const typeBadges = renderWorkTypeBadges(a.workTypes, "sm");
     const groupBadge = `<span class="badge sm ${a.group === "night" ? "night" : "day"}">${a.group === "night" ? "야간" : "주간"}</span>`;
     const isResigned = a.status === "RESIGNED";
     const scheduledResign = isAgentScheduledResign(a);
@@ -412,6 +420,10 @@
           <div class="agent-checkbox-row">
             <label class="agent-checkbox"><input type="checkbox" id="agent-input-voice" ${workTypes.indexOf("유선") !== -1 ? "checked" : ""}> 유선</label>
             <label class="agent-checkbox"><input type="checkbox" id="agent-input-chat" ${workTypes.indexOf("채팅") !== -1 ? "checked" : ""}> 채팅</label>
+            ${customWorkTypes.map((t) => `
+              <label class="agent-checkbox"><input type="checkbox" class="agent-input-custom-type" data-worktype="${esc(t)}" ${workTypes.indexOf(t) !== -1 ? "checked" : ""}> ${esc(t)}</label>
+            `).join("")}
+            <button type="button" class="ghost-btn agent-worktype-manage-btn" id="agent-worktype-manage-btn">+ 관리</button>
           </div>
         </div>
         <div class="agent-form-label">근무 조
@@ -540,7 +552,7 @@
     const nightCount = nonAdminAgents.filter((a) => a.group === "night").length;
     const pinnedCount = agentsData.filter((a) => a.pinned).length;
 
-    const summaryHtml = `<div class="agent-summary">전체 ${totalCount}명 · 관리자 ${adminCount}명 · 유선 ${voiceCount}명 · 채팅 ${chatCount}명 · 주간 ${dayCount}명 · 야간 ${nightCount}명 · 재직 ${workingCount}명 · 퇴사 ${resignedCount}명 · 고정 ${pinnedCount}명</div>`;
+    const summaryHtml = `<div class="agent-summary">전체 ${totalCount}명 · 관리자 ${adminCount}명 · 유선 ${voiceCount}명 · 채팅 ${chatCount}명 · 주간 ${dayCount}명 · 야간 ${nightCount}명 · 재직 ${workingCount}명 · 퇴사 ${resignedCount}명 · 고정 ${pinnedCount}명${customWorkTypes.map((t) => ` · ${esc(t)} ${nonAdminAgents.filter((a) => (a.workTypes || []).indexOf(t) !== -1).length}명`).join("")}</div>`;
 
     const controlsHtml = `
       <div class="agent-controls">
@@ -553,6 +565,9 @@
             <button type="button" class="agent-filter-btn ${agentsUi.filterTypes.has("night") ? "active" : ""}" data-filter="night">야간</button>
             <button type="button" class="agent-filter-btn ${agentsUi.filterTypes.has("working") ? "active" : ""}" data-filter="working">재직</button>
             <button type="button" class="agent-filter-btn ${agentsUi.filterTypes.has("resigned") ? "active" : ""}" data-filter="resigned">퇴사</button>
+            ${customWorkTypes.map((t) => `
+              <button type="button" class="agent-filter-btn ${agentsUi.filterTypes.has(`custom:${t}`) ? "active custom-active" : ""}" data-filter="custom:${esc(t)}">${esc(t)}</button>
+            `).join("")}
           </div>
           <div class="agent-search-input">
             <input type="text" class="agent-search-input-field" id="agent-search-input" placeholder="이름 또는 LDAP 검색" value="${esc(agentsUi.searchQuery)}" autocomplete="off">
@@ -727,6 +742,16 @@
 
     const form = document.getElementById("agent-form");
     if (form) {
+      const worktypeManageBtn = document.getElementById("agent-worktype-manage-btn");
+      // 관리 모달에서 추가/삭제가 일어나면 renderApp()으로 폼을 다시 그려서
+      // 방금 추가한 업무 구분 체크박스가 바로 나타나게 한다. 단, 입력 중이던
+      // 이름/사번 등 다른 값은 폼을 새로 그리며 날아가므로, 다시 그리기 전에
+      // 지금까지 고른 업무 구분만 v.workTypes에 반영해 모달을 열기 전 상태를 최대한 살린다.
+      if (worktypeManageBtn) {
+        worktypeManageBtn.onclick = () => {
+          openWorkTypesModal(() => renderApp());
+        };
+      }
       enhanceDateInput(document.getElementById("agent-input-hiredate"));
       const resignDateInput = document.getElementById("agent-input-resigndate");
       if (resignDateInput) enhanceDateInput(resignDateInput);
@@ -758,6 +783,7 @@
         const workTypes = [];
         if (document.getElementById("agent-input-voice").checked) workTypes.push("유선");
         if (document.getElementById("agent-input-chat").checked) workTypes.push("채팅");
+        form.querySelectorAll(".agent-input-custom-type:checked").forEach((el) => workTypes.push(el.getAttribute("data-worktype")));
         const group = document.getElementById("agent-input-group-night").checked ? "night" : "day";
         const isAdmin = document.getElementById("agent-input-admin").checked;
         const selectedResigned = document.getElementById("agent-input-status-resigned").checked;

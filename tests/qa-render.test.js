@@ -21,6 +21,7 @@ function loadQA() {
     renderApp: () => {},
     sortAgentList: (list) => list,
     agentMatchesSearch: () => true,
+    acctKey: (k) => `acct:test:${k}`,
     document: createFakeDocument(),
     localStorage: createMemoryLocalStorage(),
     setTimeout: () => 0,
@@ -29,6 +30,7 @@ function loadQA() {
   loadIntoContext(sandbox, [
     "js/01a-icons.js",
     "js/01f-settings-menu-utils.js",
+    "js/01l-work-types-config.js",
     "js/05a-qa-data.js",
     "js/05b-qa-stats.js",
     "js/05d-qa-summary-trend.js",

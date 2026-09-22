@@ -40,6 +40,9 @@
       <button type="button" class="theme-menu-item" id="settings-backup-btn">
         ${ICON_BACKUP}<span class="theme-menu-name">데이터 백업</span>
       </button>
+      <button type="button" class="theme-menu-item" id="settings-worktypes-btn">
+        ${ICON_SETTINGS}<span class="theme-menu-name">업무 구분 관리</span>
+      </button>
       <button type="button" class="theme-menu-item" id="settings-discord-btn">
         ${ICON_DISCORD}<span class="theme-menu-name">디스코드 채널</span>
       </button>
@@ -60,6 +63,8 @@
     });
     const manualBtn = document.getElementById("settings-manual-btn");
     if (manualBtn) manualBtn.onclick = () => { closeSettingsMenu(); openManualModal(); };
+    const worktypesBtn = document.getElementById("settings-worktypes-btn");
+    if (worktypesBtn) worktypesBtn.onclick = () => { closeSettingsMenu(); openWorkTypesModal(() => renderApp()); };
     const backupBtn = document.getElementById("settings-backup-btn");
     if (backupBtn) backupBtn.onclick = () => { closeSettingsMenu(); openBackupModal(); };
     const discordBtn = document.getElementById("settings-discord-btn");

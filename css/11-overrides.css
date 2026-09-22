@@ -266,3 +266,31 @@
   .app-time-item:hover { background: var(--panel); }
   .app-time-item.selected { background: var(--accent); color: #ffffff; font-weight: 600; }
   .app-time-done { border-color: var(--accent); color: var(--accent); }
+
+  /* ---- 업무 구분(유선/채팅 + 사용자 추가) 배지 색상 & 관리 모달 ---- */
+  .badge.custom-1 { color: var(--teal); background: var(--teal-dim); }
+  .badge.custom-2 { color: var(--purple); background: var(--purple-dim); }
+  .badge.custom-3 { color: var(--pink); background: var(--pink-dim); }
+  .agent-filter-btn.custom-active { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+
+  .work-types-modal-box { width: min(94vw, 440px); }
+  .work-type-builtin-note {
+    display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 13px;
+    color: var(--text-dim); padding: 10px 12px; border: 1px solid var(--hairline); border-radius: 12px; margin-bottom: 14px;
+  }
+  .work-type-builtin-label { margin-left: 2px; }
+  #work-types-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+  .work-type-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 8px 10px; border: 1px solid var(--hairline); border-radius: 12px;
+  }
+  .work-type-row .ghost-btn { padding: 5px 11px; font-size: 12.5px; }
+  .work-type-empty { font-size: 13px; color: var(--text-faint); padding: 10px 2px; }
+  .work-type-add-row { display: flex; gap: 8px; }
+  .work-type-add-row input {
+    flex: 1; min-width: 0; padding: 9px 12px; border-radius: 10px; border: 1px solid var(--hairline);
+    background: var(--panel); color: var(--text); font-size: 13.5px;
+  }
+  .work-type-add-row input:focus { outline: none; border-color: var(--accent); }
+  .work-type-add-error { color: var(--red); font-size: 12.5px; min-height: 16px; margin-top: 6px; }
+  .work-type-hint { font-size: 12px; color: var(--text-faint); line-height: 1.55; margin-top: 8px; }
