@@ -11978,6 +11978,9 @@
   // 새로 배정하는 오프가 기존 휴무(필휴 포함)와 연결되어 연속 휴무가 4일 이상 생기지 않게 한다.
   // 필휴도 연속 오프 길이에 포함한다. (필휴 자체는 자동배치가 수정하지 않는 보호 일정이다.)
   const SCHEDULE_AUTO_MAX_OFF_STREAK = 3;
+  // 선호 오프 요일이 있는 인원은, 목표 오프 개수 안에서 적어도 이 개수(목표 오프 개수가 이보다
+  // 작으면 목표 개수까지만)는 선호 요일에 맞추도록 마지막 보정 단계에서 우선적으로 스왑을 배정한다.
+  const SCHEDULE_AUTO_PREF_FLOOR = 5;
   const SCHEDULE_AUTO_DOW_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
 
   // 대전제: 구분(조×업무구분)별 하루 최소 출근 인원.
@@ -12413,19 +12416,29 @@
     const staffWarnCtx = new Map();
     const staffWarnOrder = [];
 
-    // 선호 요일이 있는 인원이 먼저 좋은 날짜를 고를 수 있게 하고, 그다음은 목표까지 더 많이 남은
-    // 인원 순으로 정렬(안정 정렬 유지). 선호 요일이 같은 날에 몰리면 먼저 고른 사람이 우선한다.
+    // 처리 순서(먼저 처리될수록 빈 칸이 아직 많이 남아 있어 유리하다):
+    //  ①이월 연속근무일수(carry)가 많은 사람 우선 — 한도(5일, 불가피시 6일)에 가깝거나 이미 넘은 사람은
+    //    월초 며칠 안에 오프를 넣지 못하면 그 초과를 영영 못 끊으므로 가장 급하다.
+    //  ②그다음은 이번 달 남은 목표 오프 개수가 많은 사람 우선 — 빈 칸이 다른 사람 오프로 먼저
+    //    소진되면 필요인력/최소출근 조건에 막혀 목표를 채울 기회 자체가 사라지기 때문이다.
+    //  ③선호 요일 설정 여부는 위 두 기준이 동률일 때만 살짝 우선한다. 선호 자체는 이 순서와
+    //    무관하게 개인별 점수(dayVec, 아래)와 마지막 "선호 요일 최대화" 보정 단계에서 별도로 반영되므로,
+    //    선호 유무를 최우선 기준으로 두면(예전 방식) 선호 없는 고수요 인원이 항상 뒤로 밀려
+    //    필요인력 하한에 막혀 목표 오프를 하나도 못 받는 문제가 있었다.
     // 관리자는 자동 배치 대상에서 완전히 제외한다. 필요인력 집계뿐 아니라 목표 오프 계산·신규 오프 배정도 하지 않는다.
+    const hasPref = (id) => (scheduleAutoGetPrefDows(id).length > 0 || scheduleAutoGetWorkPrefDows(id).length > 0 ? 1 : 0);
     const order = monthStaff
       .filter((s) => !s.isAdmin)
-      .map((s, idx) => ({ s, idx }));
-    const hasPref = (id) => (scheduleAutoGetPrefDows(id).length > 0 || scheduleAutoGetWorkPrefDows(id).length > 0 ? 1 : 0);
+      .map((s, idx) => ({
+        s, idx,
+        carry: scheduleAutoCarryStreak(s.id, year, monthIndex),
+        needed: Math.max(0, target - scheduleAutoAlreadyOffCount(s.id, year, monthIndex)),
+        pref: hasPref(s.id),
+      }));
     order.sort((a, b) => {
-      const pa = hasPref(a.s.id), pb = hasPref(b.s.id);
-      if (pa !== pb) return pb - pa;
-      const na = Math.max(0, target - scheduleAutoAlreadyOffCount(a.s.id, year, monthIndex));
-      const nb = Math.max(0, target - scheduleAutoAlreadyOffCount(b.s.id, year, monthIndex));
-      if (nb !== na) return nb - na;
+      if (a.carry !== b.carry) return b.carry - a.carry;
+      if (a.needed !== b.needed) return b.needed - a.needed;
+      if (a.pref !== b.pref) return b.pref - a.pref;
       // 후보별로 동률 순서를 바꿔 같은 강한 조건 안에서 다른 조합을 만든다.
       if (variant % 3 === 1) return b.idx - a.idx;
       if (variant % 3 === 2) return ((a.idx + variant) % Math.max(1, order.length)) - ((b.idx + variant) % Math.max(1, order.length));
@@ -12458,6 +12471,10 @@
         baseRest[d] = has && !scheduleAutoIsWorkRecord(scheduleData.records[key]);
       }
       const chosen = {};
+      if (typeof globalThis.__DEBUG_STAFF !== "undefined" && s.id === globalThis.__DEBUG_STAFF) {
+        console.log("DEBUG", s.id, "needed", needed, "carry", carry, "offCarry", offCarry, "minBlockedDays", minBlockedDays, "remainingFree", remainingFree.length, "freeAfterBlock", remainingFree.filter(d=>isFreeDay[d]).length);
+      }
+
 
       // 날짜별 점수(클수록 좋고, 앞 항목이 우선. 고른 날짜들의 합을 앞자리부터 비교한다):
       // ① 그 인원의 조×업무구분 필요인력이 최후 허용범위 안인지
@@ -12610,10 +12627,20 @@
     }
     const planById = new Map(perStaffPlan.map((p) => [p.staffId, p]));
     const staffById = new Map(monthStaff.map((s) => [s.id, s]));
+    // 목표선(SCHEDULE_AUTO_PREF_FLOOR, 목표 오프 개수보다 작으면 그 개수까지)에 아직 못 미친 사람을
+    // 가장 먼저 처리해 남은 스왑 기회를 우선 배정한다. 목표선을 채운 사람들 사이에서는 (기존처럼)
+    // 선호 요일을 더 많이 설정한 사람 순으로 추가 최적화를 시도한다.
     const prefRepairOrder = perStaffPlan
       .filter((p) => (p.prefDows && p.prefDows.length) || (p.workPrefDows && p.workPrefDows.length))
       .slice()
-      .sort((a, b) => ((b.prefDows?.length || 0) + (b.workPrefDows?.length || 0)) - ((a.prefDows?.length || 0) + (a.workPrefDows?.length || 0)));
+      .sort((a, b) => {
+        const floorA = (a.prefDows && a.prefDows.length) ? Math.min(a.needed, SCHEDULE_AUTO_PREF_FLOOR) : 0;
+        const floorB = (b.prefDows && b.prefDows.length) ? Math.min(b.needed, SCHEDULE_AUTO_PREF_FLOOR) : 0;
+        const gapA = Math.max(0, floorA - (a.prefHits || 0));
+        const gapB = Math.max(0, floorB - (b.prefHits || 0));
+        if (gapA !== gapB) return gapB - gapA;
+        return ((b.prefDows?.length || 0) + (b.workPrefDows?.length || 0)) - ((a.prefDows?.length || 0) + (a.workPrefDows?.length || 0));
+      });
 
     prefRepairOrder.forEach((targetPlan) => {
       const targetStaff = staffById.get(targetPlan.staffId);
