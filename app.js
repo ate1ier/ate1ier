@@ -9839,8 +9839,9 @@
           views: [{ state: "frozen", xSplit: infoCols, ySplit: 3, showGridLines: false }],
         });
         ws.columns = [
-          { width: 5.7 }, { width: 9.2 }, { width: 7.2 }, { width: 8.5 }, { width: 9.0 }, { width: 8.9 },
-          { width: 4.4 }, { width: 13 }, { width: 13 }, { width: 13 }, { width: 13 },
+          { width: 5.7 }, { width: 9.2 }, { width: 7.2 }, { width: 8.5 }, { width: 13.0 }, { width: 8.9 },
+          // 근무·휴일·연차·대휴·결근 집계 열은 원본 양식처럼 동일한 폭으로 맞춘다.
+          { width: 4.4 }, { width: 4.4 }, { width: 4.4 }, { width: 4.4 }, { width: 4.4 },
         ].concat(days.map(() => ({ width: 4.7 }))).concat([{ width: 9.4 }]);
 
         // 1행: 일(day) 숫자만 수식으로 표시 (=DAY(같은 열의 2행))
@@ -9863,7 +9864,7 @@
           const col = infoCols + 1 + i;
           const cell = row2.getCell(col);
           cell.value = { formula: i === 0 ? `${anchorColL}3` : `${scheduleColLetter(col - 1)}2+1` };
-          cell.numFmt = "m/d";
+          cell.numFmt = 'm"/"d';
         });
         row2.getCell(anchorCol).value = "기준 월";
         row2.getCell(anchorCol).font = { bold: true };
@@ -9877,7 +9878,10 @@
           const col = infoCols + 1 + i;
           row3.getCell(col).value = { formula: `TEXT(${scheduleColLetter(col)}2,"AAA")` };
         });
-        row3.getCell(anchorCol).value = new Date(year, monthIndex, 1);
+        // JavaScript Date를 그대로 넣으면 브라우저/ExcelJS의 UTC 변환으로 전월 말일 15:00로 밀릴 수 있다.
+        // Excel serial을 직접 계산해 해당 월의 정확한 1일(자정)을 저장한다.
+        const excelSerial = Math.floor((Date.UTC(year, monthIndex, 1) - Date.UTC(1899, 11, 30)) / 86400000);
+        row3.getCell(anchorCol).value = excelSerial;
         row3.getCell(anchorCol).numFmt = 'mm"월" dd"일"';
         applyBorder(row3.getCell(anchorCol));
         row3.getCell(anchorCol).alignment = { horizontal: "center", vertical: "middle" };
