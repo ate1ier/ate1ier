@@ -44,7 +44,7 @@
       scheduleData.collapseByMonth[key] = {
         collapsedRowGroups: [], colGroups: [], manualHiddenDays: [],
         manualHiddenStaffIds: [], manualHiddenInfoCols: [], manualHiddenSummaryRows: [],
-        manualHiddenBatches: [],
+        manualHiddenBatches: [], manualExcludedAggregateStaffIds: [],
       };
     }
     return scheduleData.collapseByMonth[key];
@@ -262,6 +262,10 @@
     // "숨긴 열/행" 패널에서 같이 접은 항목들을 한 덩어리로 보여주고, 버튼 하나로 한 번에
     // 펼칠 수 있게 하려는 용도다(날짜는 연속 여부로 자동 판단하므로 여기 포함 안 함).
     manualHiddenBatches: [],
+    // 우클릭 메뉴에서 "집계 제외"로 표시한 staffId 모음. 행 자체는 그대로 표시하되
+    // (구분만 가능할 정도로 옅은 회색으로 칠해서) 유선/채팅 인원·필요인력 대비·총 인원 등
+    // 집계 행 계산에서는 빼준다. 달마다 따로 저장한다(manualHiddenStaffIds와 같은 방식).
+    manualExcludedAggregateStaffIds: new Set(),
     searchQuery: "", // 상담사 검색어. 쉼표(,)로 여러 명을 한 번에 검색할 수 있다.
   };
 

@@ -9,6 +9,7 @@
     state.manualHiddenInfoCols = Array.from(scheduleUi.manualHiddenInfoCols);
     state.manualHiddenSummaryRows = Array.from(scheduleUi.manualHiddenSummaryRows);
     state.manualHiddenBatches = scheduleUi.manualHiddenBatches.map((b) => ({ ...b }));
+    state.manualExcludedAggregateStaffIds = Array.from(scheduleUi.manualExcludedAggregateStaffIds);
     saveScheduleData();
   }
   // scheduleData.collapseByMonth에 저장돼 있던(=서버에서 불러온) 지금 달의 접기 상태를
@@ -23,6 +24,7 @@
     scheduleUi.manualHiddenInfoCols = new Set(state.manualHiddenInfoCols || []);
     scheduleUi.manualHiddenSummaryRows = new Set(state.manualHiddenSummaryRows || []);
     scheduleUi.manualHiddenBatches = (state.manualHiddenBatches || []).map((b) => ({ ...b }));
+    scheduleUi.manualExcludedAggregateStaffIds = new Set(state.manualExcludedAggregateStaffIds || []);
   }
   // 페이지가 처음 로드될 때, 지금 보고 있는 달(기본은 이번 달)에 저장돼 있던 접기 상태를
   // 곧바로 불러와둔다.
@@ -348,6 +350,15 @@
     if (scheduleHeaderSelRows.size > 0) labelParts.push(`행 ${scheduleHeaderSelRows.size}개`);
     const showNameMemo = !!memoStaffId && scheduleHeaderSelCols.size === 0
       && scheduleHeaderSelRows.size === 1 && scheduleHeaderSelRows.has(`s:${memoStaffId}`);
+    // 인원 행 하나만 선택된 상태로 우클릭했으면(이름 칸이 아니어도 됨) "집계 제외" 토글 버튼을 보여준다.
+    const singleRowKey = (scheduleHeaderSelCols.size === 0 && scheduleHeaderSelRows.size === 1)
+      ? Array.from(scheduleHeaderSelRows)[0] : null;
+    const aggregateExcludeStaffId = (singleRowKey && singleRowKey.startsWith("s:")) ? singleRowKey.slice(2) : null;
+    let aggregateExcludeHtml = "";
+    if (aggregateExcludeStaffId) {
+      const excluded = scheduleIsAggregateExcluded(aggregateExcludeStaffId);
+      aggregateExcludeHtml = `<button type="button" data-toggle-aggregate-exclude="${esc(aggregateExcludeStaffId)}">${excluded ? "집계 제외 해제" : "집계 제외"}</button>`;
+    }
     let memoHtml = "";
     if (showNameMemo) {
       const { year, monthIndex } = scheduleUi;
@@ -363,6 +374,7 @@
     }
     menu.innerHTML = `<div class="sch-menu-title">${labelParts.join(" · ")} 선택됨</div>` +
       memoHtml +
+      aggregateExcludeHtml +
       `<button type="button" data-collapse-header-sel="1">접기</button>` +
       `<button type="button" class="sch-menu-reset" data-clear-header-sel="1">선택 해제</button>`;
     document.body.appendChild(menu);
@@ -390,6 +402,14 @@
         scheduleClearHeaderSelection();
         setScheduleNameMemo(memoStaffId, scheduleUi.year, scheduleUi.monthIndex, "");
         updateScheduleTableArea();
+      };
+    }
+    const aggregateExcludeBtn = menu.querySelector("[data-toggle-aggregate-exclude]");
+    if (aggregateExcludeBtn) {
+      aggregateExcludeBtn.onclick = () => {
+        closeScheduleMenu();
+        scheduleClearHeaderSelection();
+        scheduleToggleAggregateExclusion(aggregateExcludeStaffId);
       };
     }
     const clearBtn = menu.querySelector("[data-clear-header-sel]");
@@ -432,6 +452,20 @@
     scheduleUi.manualHiddenStaffIds.delete(staffId);
     scheduleSaveCollapseState();
     renderApp();
+  }
+  // ----- 인원 행 "집계 제외" -----
+  // 행은 그대로 표에 남겨두되(구분만 가능할 정도로 옅은 회색으로 칠함), 유선/채팅 인원·필요인력
+  // 대비·총 인원 등 집계 행 계산에서는 그 인원을 빼준다. 휴직 등으로 잠깐 빠지는 인원을
+  // 표에서 아예 숨기지 않고도 집계에서만 제외하고 싶을 때 쓴다. 다시 우클릭하면 풀 수 있다.
+  function scheduleIsAggregateExcluded(staffId) { return scheduleUi.manualExcludedAggregateStaffIds.has(staffId); }
+  function scheduleSetAggregateExcluded(staffId, excluded) {
+    if (excluded) scheduleUi.manualExcludedAggregateStaffIds.add(staffId);
+    else scheduleUi.manualExcludedAggregateStaffIds.delete(staffId);
+    scheduleSaveCollapseState();
+    renderApp();
+  }
+  function scheduleToggleAggregateExclusion(staffId) {
+    scheduleSetAggregateExcluded(staffId, !scheduleIsAggregateExcluded(staffId));
   }
   function scheduleUnhideAll() {
     scheduleUi.manualHiddenDays = new Set();

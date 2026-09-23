@@ -60,6 +60,11 @@
   .sch-colgroup-remove-btn:hover { background: var(--red-dim); color: var(--red); }
   .schedule-table .sch-col-hidden { display: none; }
   .schedule-table tr.sch-row-hidden { display: none; }
+  /* "집계 제외" 처리한 인원 행: 데이터는 그대로 두고 구분만 가능할 정도로 옅은 회색으로 칠한다.
+     유선/채팅 인원·필요인력 대비·총 인원 등 집계 행 계산에서는 이 인원을 뺀다(js에서 처리). */
+  .schedule-table tr.sch-row-excluded td, .schedule-table tr.sch-row-excluded th {
+    background: var(--hairline) !important;
+  }
   /* 열 머리글(날짜)·행 머리글(닉네임 칸) 클릭으로 선택 → 오른쪽 클릭으로 접기 */
   .schedule-table th.sch-col-th, .schedule-table td.sch-row-th { cursor: pointer; }
   /* 머리글을 끌어서 범위 선택할 때 글자가 파랗게 드래그 선택되지 않게 한다 */

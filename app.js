@@ -8226,7 +8226,7 @@
       scheduleData.collapseByMonth[key] = {
         collapsedRowGroups: [], colGroups: [], manualHiddenDays: [],
         manualHiddenStaffIds: [], manualHiddenInfoCols: [], manualHiddenSummaryRows: [],
-        manualHiddenBatches: [],
+        manualHiddenBatches: [], manualExcludedAggregateStaffIds: [],
       };
     }
     return scheduleData.collapseByMonth[key];
@@ -8444,6 +8444,10 @@
     // "숨긴 열/행" 패널에서 같이 접은 항목들을 한 덩어리로 보여주고, 버튼 하나로 한 번에
     // 펼칠 수 있게 하려는 용도다(날짜는 연속 여부로 자동 판단하므로 여기 포함 안 함).
     manualHiddenBatches: [],
+    // 우클릭 메뉴에서 "집계 제외"로 표시한 staffId 모음. 행 자체는 그대로 표시하되
+    // (구분만 가능할 정도로 옅은 회색으로 칠해서) 유선/채팅 인원·필요인력 대비·총 인원 등
+    // 집계 행 계산에서는 빼준다. 달마다 따로 저장한다(manualHiddenStaffIds와 같은 방식).
+    manualExcludedAggregateStaffIds: new Set(),
     searchQuery: "", // 상담사 검색어. 쉼표(,)로 여러 명을 한 번에 검색할 수 있다.
   };
 
@@ -8463,6 +8467,7 @@
     state.manualHiddenInfoCols = Array.from(scheduleUi.manualHiddenInfoCols);
     state.manualHiddenSummaryRows = Array.from(scheduleUi.manualHiddenSummaryRows);
     state.manualHiddenBatches = scheduleUi.manualHiddenBatches.map((b) => ({ ...b }));
+    state.manualExcludedAggregateStaffIds = Array.from(scheduleUi.manualExcludedAggregateStaffIds);
     saveScheduleData();
   }
   // scheduleData.collapseByMonth에 저장돼 있던(=서버에서 불러온) 지금 달의 접기 상태를
@@ -8477,6 +8482,7 @@
     scheduleUi.manualHiddenInfoCols = new Set(state.manualHiddenInfoCols || []);
     scheduleUi.manualHiddenSummaryRows = new Set(state.manualHiddenSummaryRows || []);
     scheduleUi.manualHiddenBatches = (state.manualHiddenBatches || []).map((b) => ({ ...b }));
+    scheduleUi.manualExcludedAggregateStaffIds = new Set(state.manualExcludedAggregateStaffIds || []);
   }
   // 페이지가 처음 로드될 때, 지금 보고 있는 달(기본은 이번 달)에 저장돼 있던 접기 상태를
   // 곧바로 불러와둔다.
@@ -8802,6 +8808,15 @@
     if (scheduleHeaderSelRows.size > 0) labelParts.push(`행 ${scheduleHeaderSelRows.size}개`);
     const showNameMemo = !!memoStaffId && scheduleHeaderSelCols.size === 0
       && scheduleHeaderSelRows.size === 1 && scheduleHeaderSelRows.has(`s:${memoStaffId}`);
+    // 인원 행 하나만 선택된 상태로 우클릭했으면(이름 칸이 아니어도 됨) "집계 제외" 토글 버튼을 보여준다.
+    const singleRowKey = (scheduleHeaderSelCols.size === 0 && scheduleHeaderSelRows.size === 1)
+      ? Array.from(scheduleHeaderSelRows)[0] : null;
+    const aggregateExcludeStaffId = (singleRowKey && singleRowKey.startsWith("s:")) ? singleRowKey.slice(2) : null;
+    let aggregateExcludeHtml = "";
+    if (aggregateExcludeStaffId) {
+      const excluded = scheduleIsAggregateExcluded(aggregateExcludeStaffId);
+      aggregateExcludeHtml = `<button type="button" data-toggle-aggregate-exclude="${esc(aggregateExcludeStaffId)}">${excluded ? "집계 제외 해제" : "집계 제외"}</button>`;
+    }
     let memoHtml = "";
     if (showNameMemo) {
       const { year, monthIndex } = scheduleUi;
@@ -8817,6 +8832,7 @@
     }
     menu.innerHTML = `<div class="sch-menu-title">${labelParts.join(" · ")} 선택됨</div>` +
       memoHtml +
+      aggregateExcludeHtml +
       `<button type="button" data-collapse-header-sel="1">접기</button>` +
       `<button type="button" class="sch-menu-reset" data-clear-header-sel="1">선택 해제</button>`;
     document.body.appendChild(menu);
@@ -8844,6 +8860,14 @@
         scheduleClearHeaderSelection();
         setScheduleNameMemo(memoStaffId, scheduleUi.year, scheduleUi.monthIndex, "");
         updateScheduleTableArea();
+      };
+    }
+    const aggregateExcludeBtn = menu.querySelector("[data-toggle-aggregate-exclude]");
+    if (aggregateExcludeBtn) {
+      aggregateExcludeBtn.onclick = () => {
+        closeScheduleMenu();
+        scheduleClearHeaderSelection();
+        scheduleToggleAggregateExclusion(aggregateExcludeStaffId);
       };
     }
     const clearBtn = menu.querySelector("[data-clear-header-sel]");
@@ -8886,6 +8910,20 @@
     scheduleUi.manualHiddenStaffIds.delete(staffId);
     scheduleSaveCollapseState();
     renderApp();
+  }
+  // ----- 인원 행 "집계 제외" -----
+  // 행은 그대로 표에 남겨두되(구분만 가능할 정도로 옅은 회색으로 칠함), 유선/채팅 인원·필요인력
+  // 대비·총 인원 등 집계 행 계산에서는 그 인원을 빼준다. 휴직 등으로 잠깐 빠지는 인원을
+  // 표에서 아예 숨기지 않고도 집계에서만 제외하고 싶을 때 쓴다. 다시 우클릭하면 풀 수 있다.
+  function scheduleIsAggregateExcluded(staffId) { return scheduleUi.manualExcludedAggregateStaffIds.has(staffId); }
+  function scheduleSetAggregateExcluded(staffId, excluded) {
+    if (excluded) scheduleUi.manualExcludedAggregateStaffIds.add(staffId);
+    else scheduleUi.manualExcludedAggregateStaffIds.delete(staffId);
+    scheduleSaveCollapseState();
+    renderApp();
+  }
+  function scheduleToggleAggregateExclusion(staffId) {
+    scheduleSetAggregateExcluded(staffId, !scheduleIsAggregateExcluded(staffId));
   }
   function scheduleUnhideAll() {
     scheduleUi.manualHiddenDays = new Set();
@@ -9390,6 +9428,10 @@
     const adminStaff = monthStaff.filter((s) => s.isAdmin);
     const dayStaff = sortStaffByType(monthStaff.filter((s) => s.group !== "night" && !s.isAdmin));
     const nightStaff = sortStaffByType(monthStaff.filter((s) => s.group === "night" && !s.isAdmin));
+    // "집계 제외"로 표시해둔 인원은 행 자체는 그대로 두되(옅은 회색으로 표시), 유선/채팅 인원·
+    // 필요인력 대비·총 인원 등 집계 행 계산에서만 뺀다. 아래 집계 관련 함수(summaryRowHtml·
+    // requiredHeadcountBlockHtml·totalRowHtml)에 넘기는 staffList는 이 함수로 한 번 걸러서 쓴다.
+    const aggOnly = (list) => list.filter((s) => !scheduleUi.manualExcludedAggregateStaffIds.has(s.id));
     // 인원 정보 열(닉네임~결근) 하나를 그려주는 헬퍼. asTh=true면 헤더 셀(선택 가능),
     // false면 각 인원 행의 값 칸(행 선택 가능)을 만든다. 개별로 접어둔 열은 아예 마크업에서
     // 빼버린다(위 infoColCount 주석 참고) — 그래야 요약행들의 colspan 너비도 같이 맞는다.
@@ -9431,6 +9473,7 @@
       const rowIdx = scheduleRowCounter++;
       const searchHidden = !scheduleStaffMatchesSearch(s, scheduleUi.searchQuery);
       const rowHiddenCls = (scheduleUi.manualHiddenStaffIds.has(s.id) || searchHidden) ? " sch-row-hidden" : "";
+      const rowExcludedCls = scheduleUi.manualExcludedAggregateStaffIds.has(s.id) ? " sch-row-excluded" : "";
       const cells = days.map((d) => {
         const dateKey = scheduleDateKey(year, monthIndex, d);
         const record = getScheduleRecord(s.id, dateKey);
@@ -9456,7 +9499,7 @@
         return infoColHtml(c, false, infoColValues[c.key], extraCls, s.id, c.key === "name" ? nameMemo : "");
       }).join("");
       return `
-        <tr class="${rowHiddenCls.trim()}">
+        <tr class="${(rowHiddenCls + rowExcludedCls).trim()}">
           ${infoCells}
           ${cells}
         </tr>
@@ -9600,7 +9643,7 @@
       } else {
         const key = scheduleRowGroupKey(filterMode, "ADMIN");
         bodyHtml += groupHeaderRow(key, `${ICON_SHIELD} 관리자 (${adminStaff.length}명)`, true);
-        bodyHtml += groupBody(key, () => adminStaff.map(staffRowHtml).join("") + summaryRowHtml("관리자 인원", adminStaff, null, "관리자"));
+        bodyHtml += groupBody(key, () => adminStaff.map(staffRowHtml).join("") + summaryRowHtml("관리자 인원", aggOnly(adminStaff), null, "관리자"));
       }
     } else if (filterMode === "DAY" || filterMode === "NIGHT") {
       // "주간 저장" / "야간 저장": 관리자는 빼고 해당 조만 보여준다.
@@ -9612,8 +9655,8 @@
         const key = scheduleRowGroupKey(filterMode, filterMode);
         bodyHtml += groupHeaderRow(key, groupTitle);
         bodyHtml += groupBody(key, () =>
-          subGroupsHtml(staffList, key) + summaryRowHtml("채팅 인원", staffList, "채팅", `${filterMode}·채팅인원`) + summaryRowHtml("유선 인원", staffList, "유선", `${filterMode}·유선인원`) +
-          (hideRequiredRows ? "" : requiredHeadcountBlockHtml(filterMode, filterMode === "DAY" ? "주간" : "야간", staffList))
+          subGroupsHtml(staffList, key) + summaryRowHtml("채팅 인원", aggOnly(staffList), "채팅", `${filterMode}·채팅인원`) + summaryRowHtml("유선 인원", aggOnly(staffList), "유선", `${filterMode}·유선인원`) +
+          (hideRequiredRows ? "" : requiredHeadcountBlockHtml(filterMode, filterMode === "DAY" ? "주간" : "야간", aggOnly(staffList)))
         );
       }
     } else if (filterMode === "VOICE" || filterMode === "CHAT") {
@@ -9628,15 +9671,15 @@
         if (dayTyped.length > 0) {
           const key = scheduleRowGroupKey(filterMode, "DAY_TYPED");
           bodyHtml += groupHeaderRow(key, `${ICON_SUN} 주간 · ${typeName} (${dayTyped.length}명)`);
-          bodyHtml += groupBody(key, () => dayTyped.map(staffRowHtml).join("") + summaryRowHtml(`${typeName} 인원`, dayTyped, typeName, `DAY_TYPED·${typeKey}`));
+          bodyHtml += groupBody(key, () => dayTyped.map(staffRowHtml).join("") + summaryRowHtml(`${typeName} 인원`, aggOnly(dayTyped), typeName, `DAY_TYPED·${typeKey}`));
         }
         if (nightTyped.length > 0) {
           const key = scheduleRowGroupKey(filterMode, "NIGHT_TYPED");
           bodyHtml += groupHeaderRow(key, `${ICON_MOON} 야간 · ${typeName} (${nightTyped.length}명)`);
-          bodyHtml += groupBody(key, () => nightTyped.map(staffRowHtml).join("") + summaryRowHtml(`${typeName} 인원`, nightTyped, typeName, `NIGHT_TYPED·${typeKey}`));
+          bodyHtml += groupBody(key, () => nightTyped.map(staffRowHtml).join("") + summaryRowHtml(`${typeName} 인원`, aggOnly(nightTyped), typeName, `NIGHT_TYPED·${typeKey}`));
         }
         if (dayTyped.length > 0 && nightTyped.length > 0) {
-          bodyHtml += totalRowHtml(`주/야간 총 ${typeName} 출근 인원`, [{ staffList: dayTyped, type: typeName }, { staffList: nightTyped, type: typeName }], `total·${typeKey}`);
+          bodyHtml += totalRowHtml(`주/야간 총 ${typeName} 출근 인원`, [{ staffList: aggOnly(dayTyped), type: typeName }, { staffList: aggOnly(nightTyped), type: typeName }], `total·${typeKey}`);
         }
       }
     } else if (dayStaff.length === 0 && nightStaff.length === 0 && adminStaff.length === 0) {
@@ -9645,27 +9688,27 @@
       if (adminStaff.length > 0) {
         const key = scheduleRowGroupKey(filterMode, "ADMIN");
         bodyHtml += groupHeaderRow(key, `${ICON_SHIELD} 관리자 (${adminStaff.length}명)`, true);
-        bodyHtml += groupBody(key, () => adminStaff.map(staffRowHtml).join("") + summaryRowHtml("관리자 인원", adminStaff, null, "관리자"));
+        bodyHtml += groupBody(key, () => adminStaff.map(staffRowHtml).join("") + summaryRowHtml("관리자 인원", aggOnly(adminStaff), null, "관리자"));
       }
       if (dayStaff.length > 0) {
         const key = scheduleRowGroupKey(filterMode, "DAY");
         bodyHtml += groupHeaderRow(key, `${ICON_SUN} 아침조 / 주간 (${dayStaff.length}명)`);
         bodyHtml += groupBody(key, () =>
-          subGroupsHtml(dayStaff, key) + summaryRowHtml("채팅 인원", dayStaff, "채팅", "DAY·채팅인원") + summaryRowHtml("유선 인원", dayStaff, "유선", "DAY·유선인원") +
-          (hideRequiredRows ? "" : requiredHeadcountBlockHtml("DAY", "주간", dayStaff))
+          subGroupsHtml(dayStaff, key) + summaryRowHtml("채팅 인원", aggOnly(dayStaff), "채팅", "DAY·채팅인원") + summaryRowHtml("유선 인원", aggOnly(dayStaff), "유선", "DAY·유선인원") +
+          (hideRequiredRows ? "" : requiredHeadcountBlockHtml("DAY", "주간", aggOnly(dayStaff)))
         );
       }
       if (nightStaff.length > 0) {
         const key = scheduleRowGroupKey(filterMode, "NIGHT");
         bodyHtml += groupHeaderRow(key, `${ICON_MOON} 야간조 (${nightStaff.length}명)`);
         bodyHtml += groupBody(key, () =>
-          subGroupsHtml(nightStaff, key) + summaryRowHtml("채팅 인원", nightStaff, "채팅", "NIGHT·채팅인원") + summaryRowHtml("유선 인원", nightStaff, "유선", "NIGHT·유선인원") +
-          (hideRequiredRows ? "" : requiredHeadcountBlockHtml("NIGHT", "야간", nightStaff))
+          subGroupsHtml(nightStaff, key) + summaryRowHtml("채팅 인원", aggOnly(nightStaff), "채팅", "NIGHT·채팅인원") + summaryRowHtml("유선 인원", aggOnly(nightStaff), "유선", "NIGHT·유선인원") +
+          (hideRequiredRows ? "" : requiredHeadcountBlockHtml("NIGHT", "야간", aggOnly(nightStaff)))
         );
       }
       if (dayStaff.length > 0 && nightStaff.length > 0) {
-        bodyHtml += totalRowHtml("주/야간 총 채팅 출근 인원", [{ staffList: dayStaff, type: "채팅" }, { staffList: nightStaff, type: "채팅" }], "total·채팅");
-        bodyHtml += totalRowHtml("주/야간 총 유선 출근 인원", [{ staffList: dayStaff, type: "유선" }, { staffList: nightStaff, type: "유선" }], "total·유선");
+        bodyHtml += totalRowHtml("주/야간 총 채팅 출근 인원", [{ staffList: aggOnly(dayStaff), type: "채팅" }, { staffList: aggOnly(nightStaff), type: "채팅" }], "total·채팅");
+        bodyHtml += totalRowHtml("주/야간 총 유선 출근 인원", [{ staffList: aggOnly(dayStaff), type: "유선" }, { staffList: aggOnly(nightStaff), type: "유선" }], "total·유선");
       }
     }
 
@@ -11444,6 +11487,24 @@
             </div>
             <div><button class="ghost-btn" id="sch-unhide-all-btn">모두 펼치기</button></div>
           `}
+          ${scheduleUi.manualExcludedAggregateStaffIds.size > 0 ? `
+            <div class="schedule-colgroup-divider"></div>
+            <div class="schedule-colgroup-subtitle">집계 제외한 인원</div>
+            <div class="schedule-colgroup-desc">
+              인원 행을 선택한 뒤 오른쪽 마우스 버튼으로 "집계 제외"를 고르면 여기에 쌓여요. 행은 표에 그대로 남고(옅은 회색으로 표시), 유선/채팅 인원·필요인력 대비·총 인원 등 집계에서만 빠져요.
+            </div>
+            <div class="schedule-colgroup-list">
+              ${Array.from(scheduleUi.manualExcludedAggregateStaffIds).map((id) => {
+                const staff = getStaffListForMonth(scheduleUi.year, scheduleUi.monthIndex).find((s) => s.id === id);
+                return `
+                <span class="schedule-colgroup-chip">
+                  ${esc(staff ? staff.nickname : "(알 수 없음)")}
+                  <button class="sch-colgroup-toggle-btn" data-unexclude-aggregate-staff="${id}">해제</button>
+                </span>
+              `;
+              }).join("")}
+            </div>
+          ` : ""}
         </div>
       ` : ""}
       <div id="schedule-table-area"><div class="schedule-table-wrap"><div class="schedule-scale-inner">${buildScheduleTableHtml()}</div></div></div>
@@ -11489,6 +11550,9 @@
     });
     root.querySelectorAll("[data-unhide-summaryrow]").forEach((btn) => {
       btn.onclick = () => scheduleUnhideSummaryRow(btn.getAttribute("data-unhide-summaryrow"));
+    });
+    root.querySelectorAll("[data-unexclude-aggregate-staff]").forEach((btn) => {
+      btn.onclick = () => scheduleSetAggregateExcluded(btn.getAttribute("data-unexclude-aggregate-staff"), false);
     });
     const unhideAllBtn = document.getElementById("sch-unhide-all-btn");
     if (unhideAllBtn) unhideAllBtn.onclick = () => scheduleUnhideAll();

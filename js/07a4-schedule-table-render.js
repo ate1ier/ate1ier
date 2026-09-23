@@ -32,6 +32,10 @@
     const adminStaff = monthStaff.filter((s) => s.isAdmin);
     const dayStaff = sortStaffByType(monthStaff.filter((s) => s.group !== "night" && !s.isAdmin));
     const nightStaff = sortStaffByType(monthStaff.filter((s) => s.group === "night" && !s.isAdmin));
+    // "집계 제외"로 표시해둔 인원은 행 자체는 그대로 두되(옅은 회색으로 표시), 유선/채팅 인원·
+    // 필요인력 대비·총 인원 등 집계 행 계산에서만 뺀다. 아래 집계 관련 함수(summaryRowHtml·
+    // requiredHeadcountBlockHtml·totalRowHtml)에 넘기는 staffList는 이 함수로 한 번 걸러서 쓴다.
+    const aggOnly = (list) => list.filter((s) => !scheduleUi.manualExcludedAggregateStaffIds.has(s.id));
     // 인원 정보 열(닉네임~결근) 하나를 그려주는 헬퍼. asTh=true면 헤더 셀(선택 가능),
     // false면 각 인원 행의 값 칸(행 선택 가능)을 만든다. 개별로 접어둔 열은 아예 마크업에서
     // 빼버린다(위 infoColCount 주석 참고) — 그래야 요약행들의 colspan 너비도 같이 맞는다.
@@ -73,6 +77,7 @@
       const rowIdx = scheduleRowCounter++;
       const searchHidden = !scheduleStaffMatchesSearch(s, scheduleUi.searchQuery);
       const rowHiddenCls = (scheduleUi.manualHiddenStaffIds.has(s.id) || searchHidden) ? " sch-row-hidden" : "";
+      const rowExcludedCls = scheduleUi.manualExcludedAggregateStaffIds.has(s.id) ? " sch-row-excluded" : "";
       const cells = days.map((d) => {
         const dateKey = scheduleDateKey(year, monthIndex, d);
         const record = getScheduleRecord(s.id, dateKey);
@@ -98,7 +103,7 @@
         return infoColHtml(c, false, infoColValues[c.key], extraCls, s.id, c.key === "name" ? nameMemo : "");
       }).join("");
       return `
-        <tr class="${rowHiddenCls.trim()}">
+        <tr class="${(rowHiddenCls + rowExcludedCls).trim()}">
           ${infoCells}
           ${cells}
         </tr>
@@ -242,7 +247,7 @@
       } else {
         const key = scheduleRowGroupKey(filterMode, "ADMIN");
         bodyHtml += groupHeaderRow(key, `${ICON_SHIELD} 관리자 (${adminStaff.length}명)`, true);
-        bodyHtml += groupBody(key, () => adminStaff.map(staffRowHtml).join("") + summaryRowHtml("관리자 인원", adminStaff, null, "관리자"));
+        bodyHtml += groupBody(key, () => adminStaff.map(staffRowHtml).join("") + summaryRowHtml("관리자 인원", aggOnly(adminStaff), null, "관리자"));
       }
     } else if (filterMode === "DAY" || filterMode === "NIGHT") {
       // "주간 저장" / "야간 저장": 관리자는 빼고 해당 조만 보여준다.
@@ -254,8 +259,8 @@
         const key = scheduleRowGroupKey(filterMode, filterMode);
         bodyHtml += groupHeaderRow(key, groupTitle);
         bodyHtml += groupBody(key, () =>
-          subGroupsHtml(staffList, key) + summaryRowHtml("채팅 인원", staffList, "채팅", `${filterMode}·채팅인원`) + summaryRowHtml("유선 인원", staffList, "유선", `${filterMode}·유선인원`) +
-          (hideRequiredRows ? "" : requiredHeadcountBlockHtml(filterMode, filterMode === "DAY" ? "주간" : "야간", staffList))
+          subGroupsHtml(staffList, key) + summaryRowHtml("채팅 인원", aggOnly(staffList), "채팅", `${filterMode}·채팅인원`) + summaryRowHtml("유선 인원", aggOnly(staffList), "유선", `${filterMode}·유선인원`) +
+          (hideRequiredRows ? "" : requiredHeadcountBlockHtml(filterMode, filterMode === "DAY" ? "주간" : "야간", aggOnly(staffList)))
         );
       }
     } else if (filterMode === "VOICE" || filterMode === "CHAT") {
@@ -270,15 +275,15 @@
         if (dayTyped.length > 0) {
           const key = scheduleRowGroupKey(filterMode, "DAY_TYPED");
           bodyHtml += groupHeaderRow(key, `${ICON_SUN} 주간 · ${typeName} (${dayTyped.length}명)`);
-          bodyHtml += groupBody(key, () => dayTyped.map(staffRowHtml).join("") + summaryRowHtml(`${typeName} 인원`, dayTyped, typeName, `DAY_TYPED·${typeKey}`));
+          bodyHtml += groupBody(key, () => dayTyped.map(staffRowHtml).join("") + summaryRowHtml(`${typeName} 인원`, aggOnly(dayTyped), typeName, `DAY_TYPED·${typeKey}`));
         }
         if (nightTyped.length > 0) {
           const key = scheduleRowGroupKey(filterMode, "NIGHT_TYPED");
           bodyHtml += groupHeaderRow(key, `${ICON_MOON} 야간 · ${typeName} (${nightTyped.length}명)`);
-          bodyHtml += groupBody(key, () => nightTyped.map(staffRowHtml).join("") + summaryRowHtml(`${typeName} 인원`, nightTyped, typeName, `NIGHT_TYPED·${typeKey}`));
+          bodyHtml += groupBody(key, () => nightTyped.map(staffRowHtml).join("") + summaryRowHtml(`${typeName} 인원`, aggOnly(nightTyped), typeName, `NIGHT_TYPED·${typeKey}`));
         }
         if (dayTyped.length > 0 && nightTyped.length > 0) {
-          bodyHtml += totalRowHtml(`주/야간 총 ${typeName} 출근 인원`, [{ staffList: dayTyped, type: typeName }, { staffList: nightTyped, type: typeName }], `total·${typeKey}`);
+          bodyHtml += totalRowHtml(`주/야간 총 ${typeName} 출근 인원`, [{ staffList: aggOnly(dayTyped), type: typeName }, { staffList: aggOnly(nightTyped), type: typeName }], `total·${typeKey}`);
         }
       }
     } else if (dayStaff.length === 0 && nightStaff.length === 0 && adminStaff.length === 0) {
@@ -287,27 +292,27 @@
       if (adminStaff.length > 0) {
         const key = scheduleRowGroupKey(filterMode, "ADMIN");
         bodyHtml += groupHeaderRow(key, `${ICON_SHIELD} 관리자 (${adminStaff.length}명)`, true);
-        bodyHtml += groupBody(key, () => adminStaff.map(staffRowHtml).join("") + summaryRowHtml("관리자 인원", adminStaff, null, "관리자"));
+        bodyHtml += groupBody(key, () => adminStaff.map(staffRowHtml).join("") + summaryRowHtml("관리자 인원", aggOnly(adminStaff), null, "관리자"));
       }
       if (dayStaff.length > 0) {
         const key = scheduleRowGroupKey(filterMode, "DAY");
         bodyHtml += groupHeaderRow(key, `${ICON_SUN} 아침조 / 주간 (${dayStaff.length}명)`);
         bodyHtml += groupBody(key, () =>
-          subGroupsHtml(dayStaff, key) + summaryRowHtml("채팅 인원", dayStaff, "채팅", "DAY·채팅인원") + summaryRowHtml("유선 인원", dayStaff, "유선", "DAY·유선인원") +
-          (hideRequiredRows ? "" : requiredHeadcountBlockHtml("DAY", "주간", dayStaff))
+          subGroupsHtml(dayStaff, key) + summaryRowHtml("채팅 인원", aggOnly(dayStaff), "채팅", "DAY·채팅인원") + summaryRowHtml("유선 인원", aggOnly(dayStaff), "유선", "DAY·유선인원") +
+          (hideRequiredRows ? "" : requiredHeadcountBlockHtml("DAY", "주간", aggOnly(dayStaff)))
         );
       }
       if (nightStaff.length > 0) {
         const key = scheduleRowGroupKey(filterMode, "NIGHT");
         bodyHtml += groupHeaderRow(key, `${ICON_MOON} 야간조 (${nightStaff.length}명)`);
         bodyHtml += groupBody(key, () =>
-          subGroupsHtml(nightStaff, key) + summaryRowHtml("채팅 인원", nightStaff, "채팅", "NIGHT·채팅인원") + summaryRowHtml("유선 인원", nightStaff, "유선", "NIGHT·유선인원") +
-          (hideRequiredRows ? "" : requiredHeadcountBlockHtml("NIGHT", "야간", nightStaff))
+          subGroupsHtml(nightStaff, key) + summaryRowHtml("채팅 인원", aggOnly(nightStaff), "채팅", "NIGHT·채팅인원") + summaryRowHtml("유선 인원", aggOnly(nightStaff), "유선", "NIGHT·유선인원") +
+          (hideRequiredRows ? "" : requiredHeadcountBlockHtml("NIGHT", "야간", aggOnly(nightStaff)))
         );
       }
       if (dayStaff.length > 0 && nightStaff.length > 0) {
-        bodyHtml += totalRowHtml("주/야간 총 채팅 출근 인원", [{ staffList: dayStaff, type: "채팅" }, { staffList: nightStaff, type: "채팅" }], "total·채팅");
-        bodyHtml += totalRowHtml("주/야간 총 유선 출근 인원", [{ staffList: dayStaff, type: "유선" }, { staffList: nightStaff, type: "유선" }], "total·유선");
+        bodyHtml += totalRowHtml("주/야간 총 채팅 출근 인원", [{ staffList: aggOnly(dayStaff), type: "채팅" }, { staffList: aggOnly(nightStaff), type: "채팅" }], "total·채팅");
+        bodyHtml += totalRowHtml("주/야간 총 유선 출근 인원", [{ staffList: aggOnly(dayStaff), type: "유선" }, { staffList: aggOnly(nightStaff), type: "유선" }], "total·유선");
       }
     }
 

@@ -275,6 +275,38 @@ test("buildScheduleTableHtml: 개별로 접은 날짜·인원에는 숨김 클�
   assert.equal(countMatches(m.buildScheduleTableHtml(), /sch-row-hidden/), 1);
 });
 
+test("buildScheduleTableHtml: 집계 제외한 인원은 행은 그대로 남지만(옅은 회색) 유선/채팅 인원 집계에서는 빠진다", () => {
+  const m = loadSchedule();
+  const before = m.buildScheduleTableHtml();
+  assert.equal(/data-staff-id="s1"/.test(before), true);
+  assert.equal(countMatches(before, /sch-row-excluded/), 0);
+  // 제외 전: s1(유선·주간) 1명이 9/1 "유선 인원" 집계 1번째(9/1) 칸에 들어가 있다.
+  const voiceRowBefore = before.slice(before.indexOf('data-row-key="r:DAY·유선인원"'));
+  assert.equal(/<\/td><td[^>]*>(\d+)<\/td>/.exec(voiceRowBefore)[1], "1");
+
+  m.scheduleUi.manualExcludedAggregateStaffIds.add("s1");
+  const after = m.buildScheduleTableHtml();
+  // 행 자체는 그대로 남고, 옅은 회색 클래스만 붙는다(숨겨지지 않는다).
+  assert.equal(/data-staff-id="s1"/.test(after), true);
+  assert.equal(countMatches(after, /sch-row-excluded/), 1);
+  assert.equal(countMatches(after, /sch-row-hidden/), 0);
+  // "유선 인원" 집계에서는 s1이 빠져서 0명이 된다.
+  const voiceRowAfter = after.slice(after.indexOf('data-row-key="r:DAY·유선인원"'));
+  assert.equal(/<\/td><td[^>]*>(\d+)<\/td>/.exec(voiceRowAfter)[1], "0");
+});
+
+test("scheduleSetAggregateExcluded: 집계 제외 상태는 그 달에만 저장되고 다른 달로 이동하면 사라진다", () => {
+  const m = loadSchedule();
+  m.scheduleSetAggregateExcluded("s1", true);
+  assert.equal(m.scheduleUi.manualExcludedAggregateStaffIds.has("s1"), true);
+
+  m.scheduleShiftMonth(1); // 10월로 이동 — 제외 표시가 없어야 한다.
+  assert.equal(m.scheduleUi.manualExcludedAggregateStaffIds.has("s1"), false);
+
+  m.scheduleShiftMonth(-1); // 다시 9월로 — 저장해둔 제외 표시가 그대로 돌아온다.
+  assert.equal(m.scheduleUi.manualExcludedAggregateStaffIds.has("s1"), true);
+});
+
 test("buildScheduleTableHtml: 인원 정보 칸의 특수문자는 이스케이프해서 넣는다", () => {
   const fx = buildFixture();
   fx.staff[0].name = "<b>김주간</b>";

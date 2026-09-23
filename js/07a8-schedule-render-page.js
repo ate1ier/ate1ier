@@ -92,6 +92,24 @@
             </div>
             <div><button class="ghost-btn" id="sch-unhide-all-btn">모두 펼치기</button></div>
           `}
+          ${scheduleUi.manualExcludedAggregateStaffIds.size > 0 ? `
+            <div class="schedule-colgroup-divider"></div>
+            <div class="schedule-colgroup-subtitle">집계 제외한 인원</div>
+            <div class="schedule-colgroup-desc">
+              인원 행을 선택한 뒤 오른쪽 마우스 버튼으로 "집계 제외"를 고르면 여기에 쌓여요. 행은 표에 그대로 남고(옅은 회색으로 표시), 유선/채팅 인원·필요인력 대비·총 인원 등 집계에서만 빠져요.
+            </div>
+            <div class="schedule-colgroup-list">
+              ${Array.from(scheduleUi.manualExcludedAggregateStaffIds).map((id) => {
+                const staff = getStaffListForMonth(scheduleUi.year, scheduleUi.monthIndex).find((s) => s.id === id);
+                return `
+                <span class="schedule-colgroup-chip">
+                  ${esc(staff ? staff.nickname : "(알 수 없음)")}
+                  <button class="sch-colgroup-toggle-btn" data-unexclude-aggregate-staff="${id}">해제</button>
+                </span>
+              `;
+              }).join("")}
+            </div>
+          ` : ""}
         </div>
       ` : ""}
       <div id="schedule-table-area"><div class="schedule-table-wrap"><div class="schedule-scale-inner">${buildScheduleTableHtml()}</div></div></div>
@@ -137,6 +155,9 @@
     });
     root.querySelectorAll("[data-unhide-summaryrow]").forEach((btn) => {
       btn.onclick = () => scheduleUnhideSummaryRow(btn.getAttribute("data-unhide-summaryrow"));
+    });
+    root.querySelectorAll("[data-unexclude-aggregate-staff]").forEach((btn) => {
+      btn.onclick = () => scheduleSetAggregateExcluded(btn.getAttribute("data-unexclude-aggregate-staff"), false);
     });
     const unhideAllBtn = document.getElementById("sch-unhide-all-btn");
     if (unhideAllBtn) unhideAllBtn.onclick = () => scheduleUnhideAll();
