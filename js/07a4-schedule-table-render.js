@@ -396,7 +396,7 @@
         summaryText: solid("000000"),
         total: solid("B3A2C7"),
         totalText: solid("000000"),
-        border: solid("DEE1E6"),
+        border: solid("000000"),
         nickname: solid("24262B"),
         groupLabel: solid("FF0000"),
         anchorBg: solid("FFC000"),
@@ -442,10 +442,11 @@
         const ws = wb.addWorksheet(sheetName, {
           views: [{ state: "frozen", xSplit: infoCols, ySplit: 3, showGridLines: false }],
         });
+        // 제공된 기준 엑셀 양식과 동일한 열 너비를 사용한다.
         ws.columns = [
-          { width: 6 }, { width: 11 }, { width: 8 }, { width: 10 }, { width: 10 }, { width: 11 },
-          { width: 6 }, { width: 6 }, { width: 6 }, { width: 6 }, { width: 6 },
-        ].concat(days.map(() => ({ width: 4.7 }))).concat([{ width: 9.5 }]);
+          { width: 5.7 }, { width: 9.2 }, { width: 7.2 }, { width: 8.5 }, { width: 9.0 }, { width: 8.9 },
+          { width: 4.4 }, { width: 4.4 }, { width: 4.4 }, { width: 4.4 }, { width: 4.4 },
+        ].concat(days.map(() => ({ width: 4.7 }))).concat([{ width: 8.2 }]);
 
         // 1행: 일(day) 숫자만 수식으로 표시 (=DAY(같은 열의 2행))
         const row1 = ws.addRow([]);
@@ -467,7 +468,8 @@
           const col = infoCols + 1 + i;
           const cell = row2.getCell(col);
           cell.value = { formula: i === 0 ? `${anchorColL}3` : `${scheduleColLetter(col - 1)}2+1` };
-          cell.numFmt = "mm/dd";
+          // 기준 양식과 동일하게 10/1처럼 월·일 앞의 0은 표시하지 않는다.
+          cell.numFmt = "m/d";
         });
         row2.getCell(anchorCol).value = "기준 월";
         row2.getCell(anchorCol).font = { bold: true };
@@ -481,6 +483,7 @@
           const col = infoCols + 1 + i;
           row3.getCell(col).value = { formula: `TEXT(${scheduleColLetter(col)}2,"AAA")` };
         });
+        // "기준 월"은 반드시 다운로드 대상 월의 1일을 실제 날짜값으로 저장한다.
         row3.getCell(anchorCol).value = new Date(year, monthIndex, 1);
         row3.getCell(anchorCol).numFmt = 'mm"월" dd"일"';
         applyBorder(row3.getCell(anchorCol));
@@ -495,6 +498,34 @@
             applyBorder(cell);
           }
         });
+
+        // 제공된 기준 엑셀의 요약 헤더 색상을 그대로 적용한다.
+        const summaryHeaderFills = {
+          9: solid("B8CCE5"), // 연차
+          10: solid("FFFF00"), // 대휴
+          11: solid("F3DCDB"), // 결근
+        };
+        Object.keys(summaryHeaderFills).forEach((colNum) => {
+          const cell = row2.getCell(Number(colNum));
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: summaryHeaderFills[colNum] } };
+          cell.font = { color: { argb: solid("000000") } };
+        });
+
+        // 토요일은 파란색, 일요일 및 공휴일은 빨간색으로 날짜/요일 헤더를 표시한다.
+        const SATURDAY_BLUE = solid("0070C0");
+        const SUNDAY_HOLIDAY_RED = solid("FF0000");
+        days.forEach((d, i) => {
+          const col = infoCols + 1 + i;
+          const dateKey = scheduleDateKey(year, monthIndex, d);
+          const dow = new Date(year, monthIndex, d).getDay();
+          const isHoliday = !!getHoliday(dateKey);
+          const headerColor = dow === 6 ? SATURDAY_BLUE : (dow === 0 || isHoliday) ? SUNDAY_HOLIDAY_RED : null;
+          if (headerColor) {
+            row2.getCell(col).font = Object.assign({}, row2.getCell(col).font, { color: { argb: headerColor } });
+            row3.getCell(col).font = Object.assign({}, row3.getCell(col).font, { color: { argb: headerColor } });
+          }
+        });
+
         for (let c = 2; c <= infoCols; c++) ws.mergeCells(2, c, 3, c);
 
         function addStaffRow(s) {
