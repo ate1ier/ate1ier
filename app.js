@@ -9971,6 +9971,19 @@
               cell.note = { texts: [{ text: memo }], margins: { insetmode: "auto" } };
             }
           });
+
+          // 엑셀에서도 화면의 인원 행 구분을 유지한다.
+          // 집계 제외 인원은 아주 옅은 회색, 채팅 인원은 아주 옅은 노란색으로
+          // 행 전체를 표시하며, 둘 다 해당하면 제외 인원의 회색을 우선한다.
+          const isAggregateExcluded = !!(scheduleUi.manualExcludedAggregateStaffIds
+            && scheduleUi.manualExcludedAggregateStaffIds.has(s.id));
+          const isChatStaff = (s.types || []).indexOf("채팅") !== -1;
+          const rowBg = isAggregateExcluded ? "FFF7F7F7" : (isChatStaff ? "FFFFF9D9" : null);
+          if (rowBg) {
+            for (let c = 1; c <= totalCols; c++) {
+              row.getCell(c).fill = { type: "pattern", pattern: "solid", fgColor: { argb: rowBg } };
+            }
+          }
           return r;
         }
 
@@ -9988,14 +10001,18 @@
         }
 
         // range의 각 날짜 열에서 근무("1")+반차 0.5명을 더한 인원 집계 행.
-        function addPersonSummaryRow(label, range) {
+        function addPersonSummaryRow(label, rangeOrRows) {
           const row = ws.addRow([]);
           ws.mergeCells(row.number, 2, row.number, infoCols);
           row.getCell(2).value = label;
+          const rows = Array.isArray(rangeOrRows)
+            ? rangeOrRows
+            : Array.from({ length: rangeOrRows.end - rangeOrRows.start + 1 }, (_, i) => rangeOrRows.start + i);
           days.forEach((d, i) => {
             const col = infoCols + 1 + i;
             const colL = scheduleColLetter(col);
-            row.getCell(col).value = { formula: `COUNTIF(${colL}${range.start}:${colL}${range.end},"1")+(COUNTIF(${colL}${range.start}:${colL}${range.end},"반차")*0.5)` };
+            const formulaParts = rows.map((rn) => `COUNTIF(${colL}${rn},"1")+(COUNTIF(${colL}${rn},"반차")*0.5)`);
+            row.getCell(col).value = { formula: formulaParts.length ? formulaParts.join("+") : "0" };
           });
           for (let c = 2; c <= totalCols; c++) {
             const cell = row.getCell(c);
@@ -10030,24 +10047,32 @@
         // 나눠 각각 인원 집계행을 만들고, 채팅/유선 시트는 이미 한 업무 구분만 모여 있으므로
         // 나누지 않고 인원 집계행 하나만 만든다.
         function addGroupBlock(groupLabel, groupStaff) {
-          addGroupLabelRow(groupLabel, groupStaff.length);
+          // "집계 제외" 인원은 행 자체는 그대로 엑셀에 남기되, 조별 인원수와
+          // 채팅/유선 집계에는 포함하지 않는다. 즉 화면의 "집계 제외" 기준과
+          // 다운로드된 엑셀의 집계 기준을 동일하게 맞춘다.
+          const includedGroupStaff = groupStaff.filter((s) => !scheduleIsAggregateExcluded(s.id));
+          addGroupLabelRow(groupLabel, includedGroupStaff.length);
           // 샘플 양식과 동일하게: "주간" 조의 집계행에만 "총"을 붙이고("주간 총 채팅 인원"),
           // "야간" 조는 붙이지 않는다("야간 채팅 인원").
           const totalPrefix = groupLabel === "주간" ? `${groupLabel} 총` : groupLabel;
           if (!singleTypeLabel) {
             const { chat, voice, etc } = splitByType(groupStaff);
-            let chatRange = null, voiceRange = null;
-            if (chat.length > 0) { const start = ws.rowCount + 1; chat.forEach(addStaffRow); chatRange = { start, end: ws.rowCount }; }
-            if (voice.length > 0) { const start = ws.rowCount + 1; voice.forEach(addStaffRow); voiceRange = { start, end: ws.rowCount }; }
+            let chatRows = [], voiceRows = [];
+            if (chat.length > 0) {
+              chat.forEach((s) => { const r = addStaffRow(s); if (!scheduleIsAggregateExcluded(s.id)) chatRows.push(r); });
+            }
+            if (voice.length > 0) {
+              voice.forEach((s) => { const r = addStaffRow(s); if (!scheduleIsAggregateExcluded(s.id)) voiceRows.push(r); });
+            }
             if (etc.length > 0) etc.forEach(addStaffRow);
             const result = {};
-            if (chatRange) result.chatRow = addPersonSummaryRow(`${totalPrefix} 채팅 인원`, chatRange);
-            if (voiceRange) result.voiceRow = addPersonSummaryRow(`${totalPrefix} 유선 인원`, voiceRange);
+            if (chatRows.length > 0) result.chatRow = addPersonSummaryRow(`${totalPrefix} 채팅 인원`, chatRows);
+            if (voiceRows.length > 0) result.voiceRow = addPersonSummaryRow(`${totalPrefix} 유선 인원`, voiceRows);
             return result;
           }
-          const start = ws.rowCount + 1;
-          groupStaff.forEach(addStaffRow);
-          return { sumRow: addPersonSummaryRow(`${totalPrefix} ${singleTypeLabel} 인원`, { start, end: ws.rowCount }) };
+          const includedRows = [];
+          groupStaff.forEach((s) => { const r = addStaffRow(s); if (!scheduleIsAggregateExcluded(s.id)) includedRows.push(r); });
+          return { sumRow: addPersonSummaryRow(`${totalPrefix} ${singleTypeLabel} 인원`, includedRows) };
         }
 
         if (adminStaff.length === 0 && dayStaff.length === 0 && nightStaff.length === 0) {

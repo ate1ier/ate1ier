@@ -571,6 +571,19 @@
               cell.note = { texts: [{ text: memo }], margins: { insetmode: "auto" } };
             }
           });
+
+          // 엑셀에서도 화면의 인원 행 구분을 유지한다.
+          // 집계 제외 인원은 아주 옅은 회색, 채팅 인원은 아주 옅은 노란색으로
+          // 행 전체를 표시하며, 둘 다 해당하면 제외 인원의 회색을 우선한다.
+          const isAggregateExcluded = !!(scheduleUi.manualExcludedAggregateStaffIds
+            && scheduleUi.manualExcludedAggregateStaffIds.has(s.id));
+          const isChatStaff = (s.types || []).indexOf("채팅") !== -1;
+          const rowBg = isAggregateExcluded ? "FFF7F7F7" : (isChatStaff ? "FFFFF9D9" : null);
+          if (rowBg) {
+            for (let c = 1; c <= totalCols; c++) {
+              row.getCell(c).fill = { type: "pattern", pattern: "solid", fgColor: { argb: rowBg } };
+            }
+          }
           return r;
         }
 
