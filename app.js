@@ -9332,43 +9332,6 @@
   // 데이터도 함께 바꿔서 두 화면이 항상 같은 값을 보여주도록 한다.
   // 이름/사번/입사일 등 나머지 정보는 "상담사 관리"에서 수정하면 자동으로 반영된다.
   function scheduleMonthLabel() { return `${scheduleUi.year}년 ${scheduleUi.monthIndex + 1}월`; }
-  // 오늘 버튼: 현재 달이면 오늘 날짜 열로 바로 이동하고, 다른 달을 보고 있으면
-  // 현재 달로 전환한 뒤 오늘 날짜 열을 가운데쯤으로 가져온다.
-  function scheduleGoToday() {
-    const now = new Date();
-    const targetYear = now.getFullYear();
-    const targetMonth = now.getMonth();
-    const targetDay = now.getDate();
-    const sameMonth = scheduleUi.year === targetYear && scheduleUi.monthIndex === targetMonth;
-
-    const scrollToToday = () => {
-      requestAnimationFrame(() => {
-        const wrap = document.querySelector("#schedule-table-area .schedule-table-wrap");
-        const cell = document.querySelector(`#schedule-table-area .schedule-table thead th[data-col-key="d:${targetDay}"]`);
-        if (!wrap || !cell) return;
-        const wrapRect = wrap.getBoundingClientRect();
-        const cellRect = cell.getBoundingClientRect();
-        const cellLeftInScroll = cellRect.left - wrapRect.left + wrap.scrollLeft;
-        const left = cellLeftInScroll - Math.max(0, (wrap.clientWidth - cellRect.width) / 2);
-        wrap.scrollTo({ left: Math.max(0, left), behavior: "smooth" });
-        cell.classList.add("sch-today-focus");
-        setTimeout(() => cell.classList.remove("sch-today-focus"), 1400);
-      });
-    };
-
-    if (!sameMonth) {
-      scheduleUi.year = targetYear;
-      scheduleUi.monthIndex = targetMonth;
-      scheduleHeaderSelCols = new Set();
-      scheduleHeaderSelRows = new Set();
-      scheduleSyncUiCollapseFromData();
-      renderApp();
-      scrollToToday();
-      return;
-    }
-    scrollToToday();
-  }
-
   function scheduleShiftMonth(delta) {
     let m = scheduleUi.monthIndex + delta;
     let y = scheduleUi.year;
@@ -10184,6 +10147,10 @@
     const table = inner ? inner.querySelector("table") : null;
     if (!wrap || !inner || !table) return;
     inner.style.transform = "none";
+    const headRow1 = table.querySelector("thead tr:first-child");
+    if (headRow1) {
+      inner.style.setProperty("--sch-head-row1-height", `${headRow1.offsetHeight}px`);
+    }
     inner.style.width = "auto";
     inner.style.height = "auto";
     wrap.style.height = "auto";
@@ -10201,103 +10168,8 @@
     inner.style.width = `${naturalW}px`;
     inner.style.height = `${naturalH}px`;
     inner.style.transform = `translateX(${offsetX}px) scale(${scale})`;
-    wrap.style.overflowX = "hidden";
+    wrap.style.overflowX = "clip";
     wrap.style.height = `${naturalH * scale}px`;
-  }
-
-
-  // 브라우저 페이지 스크롤 시 월별 스케줄의 날짜/요일 헤더를 화면 상단에 고정한다.
-  // 표 자체는 기존처럼 가로 스크롤/폭 맞춤을 유지하고, 고정 상태에서는 헤더만 복제해
-  // viewport 위에 올린다. 이렇게 하면 overflow-x 컨테이너 때문에 native position:sticky가
-  // 페이지 스크롤에 묶이는 브라우저별 차이를 피할 수 있다.
-  let _scheduleStickyHead = null;
-  let _scheduleStickySource = null;
-  let _scheduleStickyListenersAttached = false;
-
-  function scheduleStickyHeadEnsure() {
-    if (_scheduleStickyHead && _scheduleStickyHead.isConnected) return _scheduleStickyHead;
-    const el = document.createElement("div");
-    el.id = "schedule-sticky-head";
-    el.setAttribute("aria-hidden", "true");
-    el.style.cssText = "position:fixed;left:0;top:0;display:none;overflow:hidden;pointer-events:none;z-index:80;background:var(--panel);border-bottom:1px solid var(--hairline-strong);box-shadow:0 3px 10px -6px #00000080;box-sizing:border-box;";
-    document.body.appendChild(el);
-    _scheduleStickyHead = el;
-    return el;
-  }
-
-  function scheduleStickyHeadHide() {
-    if (_scheduleStickyHead) _scheduleStickyHead.style.display = "none";
-    _scheduleStickySource = null;
-  }
-
-  function scheduleStickyHeadRebuild(table) {
-    const el = scheduleStickyHeadEnsure();
-    if (!table) { scheduleStickyHeadHide(); return; }
-    const sourceHead = table.querySelector("thead");
-    if (!sourceHead) { scheduleStickyHeadHide(); return; }
-    el.innerHTML = "";
-    const clone = table.cloneNode(true);
-    clone.removeAttribute("id");
-    clone.classList.add("schedule-sticky-clone");
-    const tbody = clone.querySelector("tbody");
-    if (tbody) {
-      tbody.style.visibility = "hidden";
-      tbody.style.pointerEvents = "none";
-    }
-    clone.style.margin = "0";
-    clone.style.transformOrigin = "top left";
-    el.appendChild(clone);
-    _scheduleStickySource = table;
-  }
-
-  function scheduleStickyHeadSync() {
-    const wrap = document.querySelector("#schedule-table-area .schedule-table-wrap");
-    const table = wrap ? wrap.querySelector(".schedule-table") : null;
-    if (!wrap || !table || !table.tHead) { scheduleStickyHeadHide(); return; }
-
-    const tableRect = table.getBoundingClientRect();
-    const headRect = table.tHead.getBoundingClientRect();
-    const wrapRect = wrap.getBoundingClientRect();
-    const headHeight = Math.ceil(headRect.height);
-
-    // 표가 화면을 지나간 뒤부터, 표 하단이 화면 위로 완전히 사라지기 전까지만 고정.
-    const shouldShow = tableRect.top < 0 && tableRect.bottom > headHeight && headHeight > 0;
-    if (!shouldShow) { scheduleStickyHeadHide(); return; }
-
-    if (_scheduleStickySource !== table) scheduleStickyHeadRebuild(table);
-    const el = scheduleStickyHeadEnsure();
-    const clone = el.querySelector(".schedule-sticky-clone");
-    if (!clone) return;
-
-    const naturalWidth = Math.max(1, table.offsetWidth);
-    const renderedWidth = Math.max(1, tableRect.width);
-    const scale = renderedWidth / naturalWidth;
-    const renderedHeight = headHeight;
-
-    // tableRect.left는 데스크톱 축소/중앙정렬 및 모바일 가로스크롤을 모두 반영한다.
-    el.style.left = `${Math.round(tableRect.left)}px`;
-    el.style.top = "0px";
-    el.style.width = `${Math.max(0, Math.min(window.innerWidth - Math.max(0, tableRect.left), renderedWidth))}px`;
-    el.style.height = `${renderedHeight}px`;
-    el.style.display = "block";
-
-    clone.style.width = `${naturalWidth}px`;
-    clone.style.transform = `scale(${scale})`;
-    clone.style.transformOrigin = "top left";
-
-    // 원본 헤더의 2행 sticky CSS는 복제본에서는 불필요하고 오히려 top offset을 만들 수 있으므로 해제.
-    clone.querySelectorAll("thead th").forEach((th) => {
-      th.style.position = "static";
-      th.style.top = "auto";
-    });
-  }
-
-  function scheduleStickyHeadBind() {
-    if (_scheduleStickyListenersAttached) return;
-    _scheduleStickyListenersAttached = true;
-    window.addEventListener("scroll", scheduleStickyHeadSync, { passive: true });
-    window.addEventListener("resize", scheduleStickyHeadSync, { passive: true });
-    document.addEventListener("scroll", scheduleStickyHeadSync, { passive: true, capture: true });
   }
 
   // wrap의 너비를 안정적으로 관찰해서, 폰트 늦게 로드/레이아웃 지연/화면 회전 등
@@ -10334,8 +10206,6 @@
     fitScheduleTable();
     syncScheduleLogWidth();
     watchScheduleTableSize();
-    scheduleStickyHeadBind();
-    requestAnimationFrame(scheduleStickyHeadSync);
   }
 
   // 월별 스케줄 표를 통째로 PNG 이미지로 캡처해서 다운로드한다.
@@ -11534,10 +11404,9 @@
       <div class="schedule-top">
         <div class="schedule-title">월별 스케줄</div>
         <div class="schedule-month-nav">
-          <button class="schedule-month-btn" id="sch-prev-month" title="이전 달">‹</button>
+          <button class="schedule-month-btn" id="sch-prev-month">‹</button>
           <div class="schedule-month-label">${scheduleMonthLabel()}${scheduleIsMonthLocked(scheduleUi.year, scheduleUi.monthIndex) ? ` <span class="sch-locked-badge">${ICON_LOCK} 확정됨</span>` : ""}</div>
-          <button class="schedule-month-btn" id="sch-next-month" title="다음 달">›</button>
-          <button class="ghost-btn sch-today-btn" id="sch-today-btn" title="오늘 날짜로 이동">오늘</button>
+          <button class="schedule-month-btn" id="sch-next-month">›</button>
           <button class="ghost-btn sch-lock-toggle-btn ${scheduleIsMonthLocked(scheduleUi.year, scheduleUi.monthIndex) ? "locked" : ""}" id="sch-lock-btn" style="margin-left:8px;">${scheduleIsMonthLocked(scheduleUi.year, scheduleUi.monthIndex) ? `${ICON_UNLOCK} 잠금 해제` : `${ICON_LOCK} 이 달 잠그기`}</button>
           <button class="ghost-btn ${scheduleBulkPasteOpen ? "active" : ""}" id="sch-bulk-btn" style="margin-left:8px;">${ICON_CLIPBOARD} 일괄 붙여넣기</button>
           <button class="ghost-btn" id="sch-capture-btn">${ICON_CAMERA} 이미지로 저장 ▾</button>
@@ -11651,7 +11520,6 @@
 
     document.getElementById("sch-prev-month").onclick = () => scheduleShiftMonth(-1);
     document.getElementById("sch-next-month").onclick = () => scheduleShiftMonth(1);
-    document.getElementById("sch-today-btn").onclick = () => scheduleGoToday();
     document.getElementById("sch-lock-btn").onclick = () => scheduleToggleMonthLock(scheduleUi.year, scheduleUi.monthIndex);
     document.getElementById("sch-capture-btn").onclick = (e) => openScheduleCaptureMenu(e.currentTarget);
     document.getElementById("sch-excel-btn").onclick = () => exportScheduleToExcel();
