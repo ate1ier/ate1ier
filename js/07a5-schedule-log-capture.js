@@ -64,22 +64,121 @@
     const inner = wrap ? wrap.querySelector(".schedule-scale-inner") : null;
     const table = inner ? inner.querySelector("table") : null;
     if (!wrap || !inner || !table) return;
-
-    // 예전에는 표 전체를 transform: scale()로 화면 폭에 억지로 맞췄다.
-    // 그러면 transform이 sticky의 기준 영역이 되어 브라우저 세로 스크롤 시
-    // 헤더가 화면 상단에 제대로 붙지 않는 문제가 생긴다.
-    // 이제는 원래 크기로 표시하고, 가로 방향만 표 래퍼에서 스크롤한다.
     inner.style.transform = "none";
-    inner.style.width = "max-content";
+    inner.style.width = "auto";
     inner.style.height = "auto";
     wrap.style.height = "auto";
-    wrap.style.overflowX = "auto";
-    wrap.style.overflowY = "clip";
+    // 모바일 화면에서는 표를 억지로 축소해서 글씨를 읽을 수 없게 만드는 대신,
+    // 표를 원래 크기 그대로 두고 가로 스크롤(스크린 좌우로 넘기기)로 보게 한다.
+    // (고정된 인원 정보 열이 sticky로 남아있어 스크롤해도 어떤 상담사인지 계속 보임)
+    if (window.innerWidth <= 720) return;
+    const naturalW = table.offsetWidth;
+    const naturalH = table.offsetHeight;
+    const availW = wrap.clientWidth;
+    if (naturalW <= 0 || availW <= 0) return;
+    const scale = Math.min(availW / naturalW, 1);
+    const scaledW = naturalW * scale;
+    const offsetX = Math.max(0, (availW - scaledW) / 2);
+    inner.style.width = `${naturalW}px`;
+    inner.style.height = `${naturalH}px`;
+    inner.style.transform = `translateX(${offsetX}px) scale(${scale})`;
+    wrap.style.overflowX = "hidden";
+    wrap.style.height = `${naturalH * scale}px`;
+  }
 
-    const headRow1 = table.querySelector("thead tr:first-child");
-    if (headRow1) {
-      inner.style.setProperty("--sch-head-row1-height", `${headRow1.offsetHeight}px`);
+
+  // 브라우저 페이지 스크롤 시 월별 스케줄의 날짜/요일 헤더를 화면 상단에 고정한다.
+  // 표 자체는 기존처럼 가로 스크롤/폭 맞춤을 유지하고, 고정 상태에서는 헤더만 복제해
+  // viewport 위에 올린다. 이렇게 하면 overflow-x 컨테이너 때문에 native position:sticky가
+  // 페이지 스크롤에 묶이는 브라우저별 차이를 피할 수 있다.
+  let _scheduleStickyHead = null;
+  let _scheduleStickySource = null;
+  let _scheduleStickyListenersAttached = false;
+
+  function scheduleStickyHeadEnsure() {
+    if (_scheduleStickyHead && _scheduleStickyHead.isConnected) return _scheduleStickyHead;
+    const el = document.createElement("div");
+    el.id = "schedule-sticky-head";
+    el.setAttribute("aria-hidden", "true");
+    el.style.cssText = "position:fixed;left:0;top:0;display:none;overflow:hidden;pointer-events:none;z-index:80;background:var(--panel);border-bottom:1px solid var(--hairline-strong);box-shadow:0 3px 10px -6px #00000080;box-sizing:border-box;";
+    document.body.appendChild(el);
+    _scheduleStickyHead = el;
+    return el;
+  }
+
+  function scheduleStickyHeadHide() {
+    if (_scheduleStickyHead) _scheduleStickyHead.style.display = "none";
+    _scheduleStickySource = null;
+  }
+
+  function scheduleStickyHeadRebuild(table) {
+    const el = scheduleStickyHeadEnsure();
+    if (!table) { scheduleStickyHeadHide(); return; }
+    const sourceHead = table.querySelector("thead");
+    if (!sourceHead) { scheduleStickyHeadHide(); return; }
+    el.innerHTML = "";
+    const clone = table.cloneNode(true);
+    clone.removeAttribute("id");
+    clone.classList.add("schedule-sticky-clone");
+    const tbody = clone.querySelector("tbody");
+    if (tbody) {
+      tbody.style.visibility = "hidden";
+      tbody.style.pointerEvents = "none";
     }
+    clone.style.margin = "0";
+    clone.style.transformOrigin = "top left";
+    el.appendChild(clone);
+    _scheduleStickySource = table;
+  }
+
+  function scheduleStickyHeadSync() {
+    const wrap = document.querySelector("#schedule-table-area .schedule-table-wrap");
+    const table = wrap ? wrap.querySelector(".schedule-table") : null;
+    if (!wrap || !table || !table.tHead) { scheduleStickyHeadHide(); return; }
+
+    const tableRect = table.getBoundingClientRect();
+    const headRect = table.tHead.getBoundingClientRect();
+    const wrapRect = wrap.getBoundingClientRect();
+    const headHeight = Math.ceil(headRect.height);
+
+    // 표가 화면을 지나간 뒤부터, 표 하단이 화면 위로 완전히 사라지기 전까지만 고정.
+    const shouldShow = tableRect.top < 0 && tableRect.bottom > headHeight && headHeight > 0;
+    if (!shouldShow) { scheduleStickyHeadHide(); return; }
+
+    if (_scheduleStickySource !== table) scheduleStickyHeadRebuild(table);
+    const el = scheduleStickyHeadEnsure();
+    const clone = el.querySelector(".schedule-sticky-clone");
+    if (!clone) return;
+
+    const naturalWidth = Math.max(1, table.offsetWidth);
+    const renderedWidth = Math.max(1, tableRect.width);
+    const scale = renderedWidth / naturalWidth;
+    const renderedHeight = headHeight;
+
+    // tableRect.left는 데스크톱 축소/중앙정렬 및 모바일 가로스크롤을 모두 반영한다.
+    el.style.left = `${Math.round(tableRect.left)}px`;
+    el.style.top = "0px";
+    el.style.width = `${Math.max(0, Math.min(window.innerWidth - Math.max(0, tableRect.left), renderedWidth))}px`;
+    el.style.height = `${renderedHeight}px`;
+    el.style.display = "block";
+
+    clone.style.width = `${naturalWidth}px`;
+    clone.style.transform = `scale(${scale})`;
+    clone.style.transformOrigin = "top left";
+
+    // 원본 헤더의 2행 sticky CSS는 복제본에서는 불필요하고 오히려 top offset을 만들 수 있으므로 해제.
+    clone.querySelectorAll("thead th").forEach((th) => {
+      th.style.position = "static";
+      th.style.top = "auto";
+    });
+  }
+
+  function scheduleStickyHeadBind() {
+    if (_scheduleStickyListenersAttached) return;
+    _scheduleStickyListenersAttached = true;
+    window.addEventListener("scroll", scheduleStickyHeadSync, { passive: true });
+    window.addEventListener("resize", scheduleStickyHeadSync, { passive: true });
+    document.addEventListener("scroll", scheduleStickyHeadSync, { passive: true, capture: true });
   }
 
   // wrap의 너비를 안정적으로 관찰해서, 폰트 늦게 로드/레이아웃 지연/화면 회전 등
@@ -116,6 +215,8 @@
     fitScheduleTable();
     syncScheduleLogWidth();
     watchScheduleTableSize();
+    scheduleStickyHeadBind();
+    requestAnimationFrame(scheduleStickyHeadSync);
   }
 
   // 월별 스케줄 표를 통째로 PNG 이미지로 캡처해서 다운로드한다.
