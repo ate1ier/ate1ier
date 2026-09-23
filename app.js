@@ -9332,6 +9332,43 @@
   // 데이터도 함께 바꿔서 두 화면이 항상 같은 값을 보여주도록 한다.
   // 이름/사번/입사일 등 나머지 정보는 "상담사 관리"에서 수정하면 자동으로 반영된다.
   function scheduleMonthLabel() { return `${scheduleUi.year}년 ${scheduleUi.monthIndex + 1}월`; }
+  // 오늘 버튼: 현재 달이면 오늘 날짜 열로 바로 이동하고, 다른 달을 보고 있으면
+  // 현재 달로 전환한 뒤 오늘 날짜 열을 가운데쯤으로 가져온다.
+  function scheduleGoToday() {
+    const now = new Date();
+    const targetYear = now.getFullYear();
+    const targetMonth = now.getMonth();
+    const targetDay = now.getDate();
+    const sameMonth = scheduleUi.year === targetYear && scheduleUi.monthIndex === targetMonth;
+
+    const scrollToToday = () => {
+      requestAnimationFrame(() => {
+        const wrap = document.querySelector("#schedule-table-area .schedule-table-wrap");
+        const cell = document.querySelector(`#schedule-table-area .schedule-table thead th[data-col-key="d:${targetDay}"]`);
+        if (!wrap || !cell) return;
+        const wrapRect = wrap.getBoundingClientRect();
+        const cellRect = cell.getBoundingClientRect();
+        const cellLeftInScroll = cellRect.left - wrapRect.left + wrap.scrollLeft;
+        const left = cellLeftInScroll - Math.max(0, (wrap.clientWidth - cellRect.width) / 2);
+        wrap.scrollTo({ left: Math.max(0, left), behavior: "smooth" });
+        cell.classList.add("sch-today-focus");
+        setTimeout(() => cell.classList.remove("sch-today-focus"), 1400);
+      });
+    };
+
+    if (!sameMonth) {
+      scheduleUi.year = targetYear;
+      scheduleUi.monthIndex = targetMonth;
+      scheduleHeaderSelCols = new Set();
+      scheduleHeaderSelRows = new Set();
+      scheduleSyncUiCollapseFromData();
+      renderApp();
+      scrollToToday();
+      return;
+    }
+    scrollToToday();
+  }
+
   function scheduleShiftMonth(delta) {
     let m = scheduleUi.monthIndex + delta;
     let y = scheduleUi.year;
@@ -10146,26 +10183,22 @@
     const inner = wrap ? wrap.querySelector(".schedule-scale-inner") : null;
     const table = inner ? inner.querySelector("table") : null;
     if (!wrap || !inner || !table) return;
+
+    // 예전에는 표 전체를 transform: scale()로 화면 폭에 억지로 맞췄다.
+    // 그러면 transform이 sticky의 기준 영역이 되어 브라우저 세로 스크롤 시
+    // 헤더가 화면 상단에 제대로 붙지 않는 문제가 생긴다.
+    // 이제는 원래 크기로 표시하고, 가로 방향만 표 래퍼에서 스크롤한다.
     inner.style.transform = "none";
-    inner.style.width = "auto";
+    inner.style.width = "max-content";
     inner.style.height = "auto";
     wrap.style.height = "auto";
-    // 모바일 화면에서는 표를 억지로 축소해서 글씨를 읽을 수 없게 만드는 대신,
-    // 표를 원래 크기 그대로 두고 가로 스크롤(스크린 좌우로 넘기기)로 보게 한다.
-    // (고정된 인원 정보 열이 sticky로 남아있어 스크롤해도 어떤 상담사인지 계속 보임)
-    if (window.innerWidth <= 720) return;
-    const naturalW = table.offsetWidth;
-    const naturalH = table.offsetHeight;
-    const availW = wrap.clientWidth;
-    if (naturalW <= 0 || availW <= 0) return;
-    const scale = Math.min(availW / naturalW, 1);
-    const scaledW = naturalW * scale;
-    const offsetX = Math.max(0, (availW - scaledW) / 2);
-    inner.style.width = `${naturalW}px`;
-    inner.style.height = `${naturalH}px`;
-    inner.style.transform = `translateX(${offsetX}px) scale(${scale})`;
-    wrap.style.overflowX = "hidden";
-    wrap.style.height = `${naturalH * scale}px`;
+    wrap.style.overflowX = "auto";
+    wrap.style.overflowY = "clip";
+
+    const headRow1 = table.querySelector("thead tr:first-child");
+    if (headRow1) {
+      inner.style.setProperty("--sch-head-row1-height", `${headRow1.offsetHeight}px`);
+    }
   }
 
   // wrap의 너비를 안정적으로 관찰해서, 폰트 늦게 로드/레이아웃 지연/화면 회전 등
@@ -11400,9 +11433,10 @@
       <div class="schedule-top">
         <div class="schedule-title">월별 스케줄</div>
         <div class="schedule-month-nav">
-          <button class="schedule-month-btn" id="sch-prev-month">‹</button>
+          <button class="schedule-month-btn" id="sch-prev-month" title="이전 달">‹</button>
           <div class="schedule-month-label">${scheduleMonthLabel()}${scheduleIsMonthLocked(scheduleUi.year, scheduleUi.monthIndex) ? ` <span class="sch-locked-badge">${ICON_LOCK} 확정됨</span>` : ""}</div>
-          <button class="schedule-month-btn" id="sch-next-month">›</button>
+          <button class="schedule-month-btn" id="sch-next-month" title="다음 달">›</button>
+          <button class="ghost-btn sch-today-btn" id="sch-today-btn" title="오늘 날짜로 이동">오늘</button>
           <button class="ghost-btn sch-lock-toggle-btn ${scheduleIsMonthLocked(scheduleUi.year, scheduleUi.monthIndex) ? "locked" : ""}" id="sch-lock-btn" style="margin-left:8px;">${scheduleIsMonthLocked(scheduleUi.year, scheduleUi.monthIndex) ? `${ICON_UNLOCK} 잠금 해제` : `${ICON_LOCK} 이 달 잠그기`}</button>
           <button class="ghost-btn ${scheduleBulkPasteOpen ? "active" : ""}" id="sch-bulk-btn" style="margin-left:8px;">${ICON_CLIPBOARD} 일괄 붙여넣기</button>
           <button class="ghost-btn" id="sch-capture-btn">${ICON_CAMERA} 이미지로 저장 ▾</button>
@@ -11516,6 +11550,7 @@
 
     document.getElementById("sch-prev-month").onclick = () => scheduleShiftMonth(-1);
     document.getElementById("sch-next-month").onclick = () => scheduleShiftMonth(1);
+    document.getElementById("sch-today-btn").onclick = () => scheduleGoToday();
     document.getElementById("sch-lock-btn").onclick = () => scheduleToggleMonthLock(scheduleUi.year, scheduleUi.monthIndex);
     document.getElementById("sch-capture-btn").onclick = (e) => openScheduleCaptureMenu(e.currentTarget);
     document.getElementById("sch-excel-btn").onclick = () => exportScheduleToExcel();

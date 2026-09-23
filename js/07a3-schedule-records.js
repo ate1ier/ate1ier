@@ -222,6 +222,43 @@
   // 데이터도 함께 바꿔서 두 화면이 항상 같은 값을 보여주도록 한다.
   // 이름/사번/입사일 등 나머지 정보는 "상담사 관리"에서 수정하면 자동으로 반영된다.
   function scheduleMonthLabel() { return `${scheduleUi.year}년 ${scheduleUi.monthIndex + 1}월`; }
+  // 오늘 버튼: 현재 달이면 오늘 날짜 열로 바로 이동하고, 다른 달을 보고 있으면
+  // 현재 달로 전환한 뒤 오늘 날짜 열을 가운데쯤으로 가져온다.
+  function scheduleGoToday() {
+    const now = new Date();
+    const targetYear = now.getFullYear();
+    const targetMonth = now.getMonth();
+    const targetDay = now.getDate();
+    const sameMonth = scheduleUi.year === targetYear && scheduleUi.monthIndex === targetMonth;
+
+    const scrollToToday = () => {
+      requestAnimationFrame(() => {
+        const wrap = document.querySelector("#schedule-table-area .schedule-table-wrap");
+        const cell = document.querySelector(`#schedule-table-area .schedule-table thead th[data-col-key="d:${targetDay}"]`);
+        if (!wrap || !cell) return;
+        const wrapRect = wrap.getBoundingClientRect();
+        const cellRect = cell.getBoundingClientRect();
+        const cellLeftInScroll = cellRect.left - wrapRect.left + wrap.scrollLeft;
+        const left = cellLeftInScroll - Math.max(0, (wrap.clientWidth - cellRect.width) / 2);
+        wrap.scrollTo({ left: Math.max(0, left), behavior: "smooth" });
+        cell.classList.add("sch-today-focus");
+        setTimeout(() => cell.classList.remove("sch-today-focus"), 1400);
+      });
+    };
+
+    if (!sameMonth) {
+      scheduleUi.year = targetYear;
+      scheduleUi.monthIndex = targetMonth;
+      scheduleHeaderSelCols = new Set();
+      scheduleHeaderSelRows = new Set();
+      scheduleSyncUiCollapseFromData();
+      renderApp();
+      scrollToToday();
+      return;
+    }
+    scrollToToday();
+  }
+
   function scheduleShiftMonth(delta) {
     let m = scheduleUi.monthIndex + delta;
     let y = scheduleUi.year;

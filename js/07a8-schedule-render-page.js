@@ -5,9 +5,10 @@
       <div class="schedule-top">
         <div class="schedule-title">월별 스케줄</div>
         <div class="schedule-month-nav">
-          <button class="schedule-month-btn" id="sch-prev-month">‹</button>
+          <button class="schedule-month-btn" id="sch-prev-month" title="이전 달">‹</button>
           <div class="schedule-month-label">${scheduleMonthLabel()}${scheduleIsMonthLocked(scheduleUi.year, scheduleUi.monthIndex) ? ` <span class="sch-locked-badge">${ICON_LOCK} 확정됨</span>` : ""}</div>
-          <button class="schedule-month-btn" id="sch-next-month">›</button>
+          <button class="schedule-month-btn" id="sch-next-month" title="다음 달">›</button>
+          <button class="ghost-btn sch-today-btn" id="sch-today-btn" title="오늘 날짜로 이동">오늘</button>
           <button class="ghost-btn sch-lock-toggle-btn ${scheduleIsMonthLocked(scheduleUi.year, scheduleUi.monthIndex) ? "locked" : ""}" id="sch-lock-btn" style="margin-left:8px;">${scheduleIsMonthLocked(scheduleUi.year, scheduleUi.monthIndex) ? `${ICON_UNLOCK} 잠금 해제` : `${ICON_LOCK} 이 달 잠그기`}</button>
           <button class="ghost-btn ${scheduleBulkPasteOpen ? "active" : ""}" id="sch-bulk-btn" style="margin-left:8px;">${ICON_CLIPBOARD} 일괄 붙여넣기</button>
           <button class="ghost-btn" id="sch-capture-btn">${ICON_CAMERA} 이미지로 저장 ▾</button>
@@ -121,6 +122,7 @@
 
     document.getElementById("sch-prev-month").onclick = () => scheduleShiftMonth(-1);
     document.getElementById("sch-next-month").onclick = () => scheduleShiftMonth(1);
+    document.getElementById("sch-today-btn").onclick = () => scheduleGoToday();
     document.getElementById("sch-lock-btn").onclick = () => scheduleToggleMonthLock(scheduleUi.year, scheduleUi.monthIndex);
     document.getElementById("sch-capture-btn").onclick = (e) => openScheduleCaptureMenu(e.currentTarget);
     document.getElementById("sch-excel-btn").onclick = () => exportScheduleToExcel();
