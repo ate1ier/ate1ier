@@ -9980,8 +9980,24 @@
           const isChatStaff = (s.types || []).indexOf("채팅") !== -1;
           const rowBg = isAggregateExcluded ? "FFF7F7F7" : (isChatStaff ? "FFFFF9D9" : null);
           if (rowBg) {
+            // 행 구분 배경은 표 안의 기본 셀에만 적용한다.
+            // 휴일/연차/대휴/결근 등 근무 형태 셀은 기존 STATUS_FILL 색상을 그대로 유지한다.
             for (let c = 1; c <= totalCols; c++) {
-              row.getCell(c).fill = { type: "pattern", pattern: "solid", fgColor: { argb: rowBg } };
+              const targetCell = row.getCell(c);
+              const dateIndex = c - infoCols - 1;
+              const isScheduleCell = dateIndex >= 0 && dateIndex < days.length;
+              const d = isScheduleCell ? days[dateIndex] : null;
+              const dateKey = isScheduleCell ? scheduleDateKey(year, monthIndex, d) : null;
+              const statusLabel = isScheduleCell
+                ? (() => {
+                    const raw = scheduleCellDisplay(getScheduleRecord(s.id, dateKey)).label;
+                    return raw === "오프" ? "휴일" : raw;
+                  })()
+                : "";
+              const hasStatusFill = isScheduleCell && !!STATUS_FILL[statusLabel];
+              if (!hasStatusFill) {
+                targetCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: rowBg } };
+              }
             }
           }
           return r;
