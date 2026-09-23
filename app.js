@@ -9818,6 +9818,16 @@
         STATUS_FILL[label] = pastel(STATUS_BASE[label]);
         STATUS_TEXT[label] = solid(STATUS_BASE[label]);
       });
+      // 제공된 KOC 스케줄 원본 엑셀의 근무 형태 색상을 그대로 사용한다.
+      // 날짜별 상태 셀은 행의 제외/채팅 배경보다 이 색상을 우선한다.
+      STATUS_FILL["휴일"] = solid("DBEEF3");
+      STATUS_TEXT["휴일"] = solid("000000");
+      STATUS_FILL["연차"] = solid("B8CCE5");
+      STATUS_TEXT["연차"] = solid("000000");
+      STATUS_FILL["대휴"] = solid("FFFF00");
+      STATUS_TEXT["대휴"] = solid("000000");
+      STATUS_FILL["결근"] = solid("F3DCDB");
+      STATUS_TEXT["결근"] = solid("000000");
       STATUS_FILL["퇴사"] = solid("E4E6EA");
       STATUS_TEXT["퇴사"] = solid("7C7D84");
 
