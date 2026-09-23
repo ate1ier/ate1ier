@@ -13893,100 +13893,9 @@
     flashScheduleStatus(`자동 배치 ${cellsToWrite.length}칸 적용 완료`, 2000);
   }
 
-  // ----- 현재 배치 점검 -----
-  // 현재 월별 스케줄에 이미 입력된 값만 대상으로 자동 배치와 동일한 조건을 계산한다.
-  // 이 점검은 scheduleData를 수정하지 않고, 자동 배치에 쓰는 동일한 metrics/checklist를 재사용한다.
-  function buildCurrentScheduleCheckPlan(year, monthIndex) {
-    const monthStaff = getStaffListForMonth(year, monthIndex);
-    const daysInMonth = scheduleDaysInMonth(year, monthIndex);
-    const target = scheduleAutoTargetInfo(year, monthIndex).target;
-    const perStaffPlan = monthStaff
-      .filter((s) => !s.isAdmin)
-      .map((s) => {
-        const assigned = [];
-        for (let d = 1; d <= daysInMonth; d++) {
-          const dateKey = scheduleDateKey(year, monthIndex, d);
-          const rec = scheduleData.records[scheduleRecordKey(s.id, dateKey)];
-          if (rec && !scheduleAutoIsWorkRecord(rec)) assigned.push(d);
-        }
-        return {
-          staffId: s.id,
-          assigned,
-          target,
-          needed: 0,
-          prefDows: scheduleAutoGetPrefDows(s.id),
-          workPrefDows: scheduleAutoGetWorkPrefDows(s.id),
-        };
-      });
-    return {
-      year,
-      monthIndex,
-      currentScheduleCheck: true,
-      excluded: [],
-      perStaffPlan,
-      warnings: [],
-    };
-  }
-
-  function openCurrentScheduleCheckModal() {
-    const { year, monthIndex } = scheduleUi;
-    const plan = buildCurrentScheduleCheckPlan(year, monthIndex);
-    const metrics = scheduleAutoPlanMetrics(plan);
-    const items = scheduleAutoChecklistItems(plan, metrics);
-    const glyph = { ok: "O", warn: "△", bad: "X" };
-    const rows = items.map((it) => `
-      <div class="sch-auto-check-row sch-auto-check-row--${it.mark}">
-        <span class="sch-auto-check-mark" aria-hidden="true">${glyph[it.mark]}</span>
-        <div class="sch-auto-check-text">
-          <div class="sch-auto-check-label">${esc(it.label)}</div>
-          ${it.note ? `<div class="sch-auto-check-note">${esc(it.note)}</div>` : ""}
-        </div>
-      </div>
-    `).join("");
-
-    const overlay = document.createElement("div");
-    overlay.id = "sch-current-check-overlay";
-    overlay.className = "sch-preview-overlay";
-    overlay.innerHTML = `
-      <div class="sch-preview-box sch-auto-box">
-        <div class="sch-preview-head">
-          <span class="sch-auto-head-title">현재 배치 점검 · ${esc(scheduleMonthLabel())}</span>
-          <button type="button" class="sch-preview-close" id="sch-current-check-close" aria-label="닫기">✕</button>
-        </div>
-        <div class="sch-preview-body">
-          <div class="sch-auto-settings-summary">
-            <span><b>대상</b> 현재 입력된 월별 스케줄 전체</span>
-            <span><b>판정 기준</b> 자동 배치와 동일한 조건</span>
-          </div>
-          <div class="sch-auto-checklist">
-            <div class="sch-auto-checklist-body">${rows}</div>
-          </div>
-        </div>
-      </div>
-    `;
-    document.body.appendChild(overlay);
-    const close = () => {
-      const el = document.getElementById("sch-current-check-overlay");
-      if (el) el.remove();
-    };
-    document.getElementById("sch-current-check-close").onclick = close;
-    overlay.addEventListener("mousedown", (e) => {
-      if (e.target === overlay) close();
-    });
-    setTimeout(() => {
-      const onKey = (e) => {
-        if (e.key !== "Escape") return;
-        close();
-        document.removeEventListener("keydown", onKey, true);
-      };
-      document.addEventListener("keydown", onKey, true);
-    }, 0);
-  }
-
-  // ----- 자동 배치 버튼 드롭다운: "자동 배치" / "현재 배치 점검" / "필휴·연차 제외 스케줄 삭제" -----
+  // ----- 자동 배치 버튼 드롭다운: "자동 배치" / "필휴·연차 제외 스케줄 삭제" -----
   const SCHEDULE_AUTO_MENU_ITEMS = [
     { key: "OPEN", label: "자동 배치" },
-    { key: "CHECK_CURRENT", label: "현재 배치 점검" },
     { key: "DELETE_EXCEPT_PROTECTED", label: "필휴·연차 제외 스케줄 삭제", danger: true },
   ];
 
@@ -13997,7 +13906,7 @@
     menu.id = "sch-menu";
     menu.className = "sch-menu";
     menu.innerHTML = SCHEDULE_AUTO_MENU_ITEMS.map((o, idx) => {
-      const divider = idx === 2 ? `<div class="sch-menu-divider"></div>` : "";
+      const divider = idx === 1 ? `<div class="sch-menu-divider"></div>` : "";
       return `${divider}<button type="button" class="${o.danger ? "sch-menu-danger" : ""}" data-auto-menu="${o.key}">${o.danger ? ICON_TRASH + " " : ""}${esc(o.label)}</button>`;
     }).join("");
     document.body.appendChild(menu);
@@ -14010,7 +13919,6 @@
         const key = btn.getAttribute("data-auto-menu");
         closeScheduleMenu();
         if (key === "OPEN") openScheduleAutoModal();
-        else if (key === "CHECK_CURRENT") openCurrentScheduleCheckModal();
         else if (key === "DELETE_EXCEPT_PROTECTED") scheduleAutoDeleteExceptProtected();
       };
     });
@@ -14459,36 +14367,13 @@
       p.assigned.forEach((d) => {
         const key = scheduleRecordKey(p.staffId, scheduleDateKey(year, monthIndex, d));
         assignedKeys.add(key);
-        if (!plan.currentScheduleCheck && Object.prototype.hasOwnProperty.call(scheduleData.records, key)) protectedOverlap += 1;
+        if (Object.prototype.hasOwnProperty.call(scheduleData.records, key)) protectedOverlap += 1;
       });
-      if (plan.currentScheduleCheck) {
-        const actualOff = scheduleAutoAlreadyOffCount(p.staffId, year, monthIndex);
-        const targetForStaff = Number(p.target || 0);
-        targetShortage += Math.max(0, targetForStaff - actualOff);
-      } else {
-        targetShortage += Math.max(0, Number(p.needed || 0) - p.assigned.length);
-      }
-      if (plan.currentScheduleCheck) {
-        const prefDows = new Set(p.prefDows || []);
-        const workPrefDows = new Set(p.workPrefDows || []);
-        let ph = 0, wh = 0, pt = 0, wt = 0;
-        for (let d = 1; d <= daysInMonth; d++) {
-          const key = scheduleRecordKey(p.staffId, scheduleDateKey(year, monthIndex, d));
-          const rec = scheduleData.records[key];
-          const isOff = !!rec && !scheduleAutoIsWorkRecord(rec);
-          if (!isOff) continue;
-          const dow = new Date(year, monthIndex, d).getDay();
-          if (prefDows.size) { pt++; if (prefDows.has(dow)) ph++; }
-          if (workPrefDows.size) { wt++; if (!workPrefDows.has(dow)) wh++; }
-        }
-        prefHits += ph; prefTotal += pt;
-        workPrefAvoided += wh; workPrefTotal += wt;
-      } else {
-        prefHits += Number(p.prefHits || 0);
-        if (p.prefDows && p.prefDows.length) prefTotal += p.assigned.length;
-        workPrefAvoided += Number(p.workPrefHits || 0);
-        if (p.workPrefDows && p.workPrefDows.length) workPrefTotal += p.assigned.length;
-      }
+      targetShortage += Math.max(0, Number(p.needed || 0) - p.assigned.length);
+      prefHits += Number(p.prefHits || 0);
+      if (p.prefDows && p.prefDows.length) prefTotal += p.assigned.length;
+      workPrefAvoided += Number(p.workPrefHits || 0);
+      if (p.workPrefDows && p.workPrefDows.length) workPrefTotal += p.assigned.length;
       const carry = scheduleAutoCarryStreak(p.staffId, year, monthIndex);
       const finalRest = (d) => {
         if (set.has(d)) return true;
@@ -14736,7 +14621,7 @@
   function scheduleAutoChecklistHtml(plan) {
     const metrics = scheduleAutoPlanMetrics(plan);
     const items = scheduleAutoChecklistItems(plan, metrics);
-    const glyph = plan.currentScheduleCheck ? { ok: "O", warn: "△", bad: "X" } : { ok: "✓", warn: "△", bad: "✗" };
+    const glyph = { ok: "✓", warn: "△", bad: "✗" };
     const rows = items.map((it) => `
       <div class="sch-auto-check-row sch-auto-check-row--${it.mark}">
         <span class="sch-auto-check-mark" aria-hidden="true">${glyph[it.mark]}</span>
@@ -14750,7 +14635,7 @@
     return `
       <div class="sch-auto-checklist${collapsed ? " sch-auto-checklist--collapsed" : ""}">
         <button type="button" class="sch-auto-checklist-toggle" aria-expanded="${collapsed ? "false" : "true"}">
-          <span class="sch-auto-checklist-title">${plan.currentScheduleCheck ? "현재 배치 점검" : "조건 체크리스트"} <span class="sch-auto-checklist-legend">${plan.currentScheduleCheck ? "O 충족 · △ 허용된 예외/이상적 기준 미달 · X 위반" : "✓ 지킴 · △ 규칙상 문제 없음 · ✗ 규칙 위반"}</span></span>
+          <span class="sch-auto-checklist-title">조건 체크리스트 <span class="sch-auto-checklist-legend">✓ 지킴 · △ 규칙상 문제 없음 · ✗ 규칙 위반</span></span>
           <span class="sch-auto-checklist-caret" aria-hidden="true">${collapsed ? "▸" : "▾"}</span>
         </button>
         <div class="sch-auto-checklist-body">
