@@ -338,10 +338,15 @@
   }
 
   // 월별 스케줄 표를 엑셀(.xlsx)로 내려받는다.
-  // - 화면(월별 스케줄 표)에 실제 적용 중인 색을 그대로 읽어와 상태별 셀 배경에 입혀서
-  //   전체/관리자/주간/야간/유선/채팅 구분이 눈에 잘 들어오게 한다.
-  // - 근무/오프/연차/대휴/결근 합계, 채팅·유선·관리자 인원 집계, 주야간 합계는 값이 아니라
-  //   COUNTIF·합계 수식으로 넣어서, 엑셀에서 날짜 칸을 직접 고쳐도 합계가 자동으로 다시 계산된다.
+  // 사내에서 예전부터 쓰던 수기 엑셀 양식(통합/채팅/유선 3개 시트, 기준일 하나에서
+  // 수식으로 이어지는 날짜 행, 근무=SUM 수식 등)과 열 순서·수식 스타일을 맞췄다.
+  // - 통합 시트: 전체 인원(관리자+주간+야간, 주간/야간은 다시 채팅/유선/미지정 순)
+  // - 채팅/유선 시트: 업무 구분이 채팅(또는 유선)인 인원만 모아서 같은 양식으로 반복
+  // - 근무/휴일/연차/대휴/결근 합계와 채팅·유선 인원 집계는 값이 아니라 SUM·COUNTIF
+  //   수식으로 넣어서, 엑셀에서 날짜 칸을 직접 고쳐도 합계가 자동으로 다시 계산된다.
+  //   (반차는 인원 집계에서 0.5명으로 센다.)
+  // - "필요인력 대비 편성(O/X)" 판정은 앱에 없는 날짜별 수기 허용치가 있어야 하는
+  //   부분이라 이 내보내기에는 포함하지 않는다.
   async function exportScheduleToExcel() {
     if (typeof ExcelJS === "undefined") {
       flashScheduleStatus("엑셀 변환 기능을 불러오지 못했어요. 인터넷 연결을 확인해주세요.");
@@ -355,13 +360,15 @@
       const numDays = scheduleDaysInMonth(year, monthIndex);
       const days = [];
       for (let d = 1; d <= numDays; d++) days.push(d);
-      const infoCols = 10;
+      // A: 이름 참조(=C{row}, 정렬·검색용) ~ K: 결근. L부터 날짜 열.
+      const infoCols = 11;
       const totalCols = infoCols + numDays;
+      const anchorCol = totalCols + 1; // 날짜 수식이 참조하는 "기준 월" 칸(맨 오른쪽)
+      const anchorColL = scheduleColLetter(anchorCol);
+      const firstDayColL = scheduleColLetter(infoCols + 1);
+      const lastDayColL = scheduleColLetter(infoCols + numDays);
 
       const monthStaff = getStaffListForMonth(year, monthIndex);
-      const adminStaff = monthStaff.filter((s) => s.isAdmin);
-      const dayStaff = sortStaffByType(monthStaff.filter((s) => s.group !== "night" && !s.isAdmin));
-      const nightStaff = sortStaffByType(monthStaff.filter((s) => s.group === "night" && !s.isAdmin));
 
       // 엑셀은 화면 밖에서(인쇄·공유 등) 보는 경우가 많으므로, 현재 켜둔 화면 테마(다크 등)와
       // 상관없이 항상 밝고 차분한 "보고용" 팔레트를 쓴다. 상태별 배경은 화면 월별 스케줄 표와
@@ -377,26 +384,22 @@
       const pastel = (hex, alpha) => "FF" + blendWithWhite(hex, alpha || 0x26);
 
       const COLOR = {
-        header: solid("EEF0F3"),
+        headerBg: solid("DBEEF3"),
         headerText: solid("4D5057"),
-        group: solid("E4E6EA"),
-        groupText: solid("6C4FC2"),
-        subgroup: solid("F2F3F5"),
-        subgroupText: solid("5B5E66"),
-        summary: solid("FAFBFC"),
-        summaryText: solid("5B5E66"),
-        total: pastel("6C4FC2", 0x30),
-        totalText: solid("3D2E70"),
+        dateGray: solid("BFBFBF"),
+        summary: solid("D7E4BC"),
+        summaryText: solid("000000"),
+        total: solid("B3A2C7"),
+        totalText: solid("000000"),
         border: solid("DEE1E6"),
         nickname: solid("24262B"),
-        requiredBg: pastel("3778B0", 0x22),
-        requiredText: solid("3D2E70"),
-        statusOkText: solid("2C7F96"),
-        statusNgText: solid("C94F4F"),
+        groupLabel: solid("FF0000"),
+        anchorBg: solid("FFC000"),
+        amountBg: solid("FFFFCC"),
       };
       // 월별 스케줄 표의 범례와 같은 상태별 색(배경은 옅게, 글자는 진하게)
       const STATUS_BASE = {
-        "오프": "3778B0",
+        "휴일": "3778B0",
         "연차": "B9791E",
         "대휴": "2C7F96",
         "반차": "C2603F",
@@ -418,305 +421,243 @@
       STATUS_TEXT["퇴사"] = solid("7C7D84");
 
       const wb = new ExcelJS.Workbook();
-      const ws = wb.addWorksheet(`${year}년 ${monthIndex + 1}월`, {
-        views: [{ state: "frozen", xSplit: infoCols, ySplit: 2, showGridLines: false }],
-      });
-      ws.columns = [
-        { width: 12 }, { width: 8 }, { width: 10 }, { width: 11 }, { width: 12 },
-        { width: 6 }, { width: 6 }, { width: 6 }, { width: 6 }, { width: 6 },
-      ].concat(days.map(() => ({ width: 5 })));
-
       const thinBorder = { style: "thin", color: { argb: COLOR.border } };
       function applyBorder(cell) {
         cell.border = { top: thinBorder, left: thinBorder, bottom: thinBorder, right: thinBorder };
       }
 
-      // 1행: 날짜, 2행: 항목명 · 요일
-      const row1Vals = new Array(infoCols).fill("");
-      days.forEach((d) => row1Vals.push(`${pad2(monthIndex + 1)}/${pad2(d)}`));
-      const row1 = ws.addRow(row1Vals);
-      ws.mergeCells(1, 1, 1, infoCols);
+      // sheetName: 시트 이름("통합"/"채팅"/"유선"). staffList: 이 시트에 실을 인원(이미
+      // 업무 구분으로 걸러진 목록). singleTypeLabel: "채팅"/"유선"이면 주간·야간을 채팅/유선으로
+      // 다시 나누지 않고 통째로 하나의 인원 집계행만 만든다(통합 시트는 undefined로 호출).
+      function buildSheet(sheetName, staffList, singleTypeLabel) {
+        const adminStaff = staffList.filter((s) => s.isAdmin);
+        const dayStaff = sortStaffByType(staffList.filter((s) => s.group !== "night" && !s.isAdmin));
+        const nightStaff = sortStaffByType(staffList.filter((s) => s.group === "night" && !s.isAdmin));
 
-      const row2Vals = ["닉네임", "이름", "사번", "입사일자", "근무시간", "근무", "오프", "연차", "대휴", "결근"];
-      days.forEach((d) => {
-        const wd = new Date(year, monthIndex, d).getDay();
-        row2Vals.push(WEEKDAYS[wd]);
-      });
-      const row2 = ws.addRow(row2Vals);
-
-      // 화면의 월별 스케줄 표와 같은 기준(토=파랑, 일/공휴일=빨강)으로 날짜 열 글자색을 정한다.
-      const dateColColor = days.map((d) => {
-        const wd = new Date(year, monthIndex, d).getDay();
-        const isHoliday = !!getHoliday(scheduleDateKey(year, monthIndex, d));
-        if (wd === 6) return solid("3778B0");
-        if (isHoliday || wd === 0) return solid("C94F4F");
-        return null;
-      });
-
-      [row1, row2].forEach((row) => {
-        for (let c = 1; c <= totalCols; c++) {
-          const cell = row.getCell(c);
-          const dateColor = c > infoCols ? dateColColor[c - infoCols - 1] : null;
-          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR.header } };
-          cell.font = { color: { argb: dateColor || COLOR.headerText }, bold: true };
-          cell.alignment = { horizontal: "center", vertical: "middle" };
-          applyBorder(cell);
-        }
-      });
-
-      function addLabelRow(label, kind) {
-        const row = ws.addRow([label]);
-        ws.mergeCells(row.number, 1, row.number, totalCols);
-        const fill = kind === "subgroup" ? COLOR.subgroup : COLOR.group;
-        const textColor = kind === "subgroup" ? COLOR.subgroupText : COLOR.groupText;
-        for (let c = 1; c <= totalCols; c++) {
-          const cell = row.getCell(c);
-          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: fill } };
-          cell.font = { color: { argb: textColor }, bold: kind !== "subgroup" };
-          cell.alignment = { horizontal: "left", vertical: "middle" };
-          applyBorder(cell);
-        }
-        return row.number;
-      }
-
-      function addStaffRow(s) {
-        const rowValues = new Array(totalCols).fill("");
-        rowValues[0] = s.nickname || "";
-        rowValues[1] = s.name || "";
-        rowValues[2] = s.empNo || "";
-        rowValues[3] = s.hireDate || "";
-        rowValues[4] = s.workHours || "";
-        const labels = days.map((d) => {
-          const dateKey = scheduleDateKey(year, monthIndex, d);
-          return scheduleCellDisplay(getScheduleRecord(s.id, dateKey)).label;
+        const ws = wb.addWorksheet(sheetName, {
+          views: [{ state: "frozen", xSplit: infoCols, ySplit: 3, showGridLines: false }],
         });
-        labels.forEach((label, i) => { rowValues[infoCols + i] = label; });
+        ws.columns = [
+          { width: 6 }, { width: 11 }, { width: 8 }, { width: 10 }, { width: 10 }, { width: 11 },
+          { width: 6 }, { width: 6 }, { width: 6 }, { width: 6 }, { width: 6 },
+        ].concat(days.map(() => ({ width: 4.7 }))).concat([{ width: 9.5 }]);
 
-        const row = ws.addRow(rowValues);
-        const r = row.number;
-        const rangeRef = `${scheduleColLetter(infoCols + 1)}${r}:${scheduleColLetter(infoCols + numDays)}${r}`;
-        // 근무=WORK(라벨 "1")+지각, 연차/대휴/결근은 해당 라벨 개수를 그대로 센다.
-        // 오프는 화면 집계(scheduleStaffMonthCounts)와 동일하게 오프뿐 아니라
-        // 대휴·공휴·육휴·특휴까지 모두 포함해서 센다. (대휴는 별도 열에도 단독 표시됨)
-        row.getCell(6).value = { formula: `COUNTIF(${rangeRef},"1")+COUNTIF(${rangeRef},"지각")` };
-        row.getCell(7).value = { formula: `COUNTIF(${rangeRef},"오프")+COUNTIF(${rangeRef},"대휴")+COUNTIF(${rangeRef},"공휴")+COUNTIF(${rangeRef},"육휴")+COUNTIF(${rangeRef},"특휴")` };
-        row.getCell(8).value = { formula: `COUNTIF(${rangeRef},"연차")` };
-        row.getCell(9).value = { formula: `COUNTIF(${rangeRef},"대휴")` };
-        row.getCell(10).value = { formula: `COUNTIF(${rangeRef},"결근")` };
-
-        for (let c = 1; c <= totalCols; c++) applyBorder(row.getCell(c));
-        row.getCell(1).font = { bold: true, color: { argb: COLOR.nickname } };
-        row.getCell(1).alignment = { horizontal: "center", vertical: "middle" };
-        for (let c = 2; c <= 5; c++) row.getCell(c).alignment = { horizontal: "left", vertical: "middle" };
-        // 이름 칸에 남긴 메모도 셀 메모처럼 엑셀 "메모(노트)"로 넣는다(이름은 2번째 열).
-        const nameMemo = getScheduleNameMemo(s.id, year, monthIndex);
-        if (nameMemo) {
-          row.getCell(2).note = { texts: [{ text: nameMemo }], margins: { insetmode: "auto" } };
-        }
-        for (let c = 6; c <= 10; c++) row.getCell(c).alignment = { horizontal: "center", vertical: "middle" };
-
-        labels.forEach((label, i) => {
-          const cell = row.getCell(infoCols + 1 + i);
+        // 1행: 일(day) 숫자만 수식으로 표시 (=DAY(같은 열의 2행))
+        const row1 = ws.addRow([]);
+        days.forEach((d, i) => {
+          const col = infoCols + 1 + i;
+          const cell = row1.getCell(col);
+          cell.value = { formula: `DAY(${scheduleColLetter(col)}2)` };
+          cell.font = { color: { argb: COLOR.dateGray } };
           cell.alignment = { horizontal: "center", vertical: "middle" };
-          const fillArgb = STATUS_FILL[label];
-          if (fillArgb) {
-            cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: fillArgb } };
-            cell.font = { bold: label === "지각" || label === "결근", color: { argb: STATUS_TEXT[label] || COLOR.nickname } };
-          }
-          // 화면에서 남긴 셀 메모는 엑셀에서 "메모(노트)"로 그대로 들어간다 (셀에 빨간 삼각형 표시,
-          // 마우스를 올리면 내용이 보임). 이미지 저장(html2canvas 캡처)과 달리 엑셀에는 항상 반영된다.
-          const dayNum = days[i];
-          const memo = getScheduleMemo(s.id, scheduleDateKey(year, monthIndex, dayNum));
-          if (memo) {
-            cell.note = { texts: [{ text: memo }], margins: { insetmode: "auto" } };
+        });
+
+        // 2행: 인원정보 항목명 + 날짜(기준 월 칸에서 이어지는 수식 체인)
+        const row2 = ws.addRow([]);
+        ["", "LDAP", "이름", "사번", "입사일자", "근무시간", "근무", "휴일", "연차", "대휴", "결근"].forEach((h, i) => {
+          if (i === 0) return;
+          row2.getCell(i + 1).value = h;
+        });
+        days.forEach((d, i) => {
+          const col = infoCols + 1 + i;
+          const cell = row2.getCell(col);
+          cell.value = { formula: i === 0 ? `${anchorColL}3` : `${scheduleColLetter(col - 1)}2+1` };
+          cell.numFmt = "mm/dd";
+        });
+        row2.getCell(anchorCol).value = "기준 월";
+        row2.getCell(anchorCol).font = { bold: true };
+        row2.getCell(anchorCol).fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR.anchorBg } };
+        applyBorder(row2.getCell(anchorCol));
+        row2.getCell(anchorCol).alignment = { horizontal: "center", vertical: "middle" };
+
+        // 3행: 요일(=TEXT(2행,"AAA")) + 기준일(그 달 1일) 값
+        const row3 = ws.addRow([]);
+        days.forEach((d, i) => {
+          const col = infoCols + 1 + i;
+          row3.getCell(col).value = { formula: `TEXT(${scheduleColLetter(col)}2,"AAA")` };
+        });
+        row3.getCell(anchorCol).value = new Date(year, monthIndex, 1);
+        row3.getCell(anchorCol).numFmt = 'mm"월" dd"일"';
+        applyBorder(row3.getCell(anchorCol));
+        row3.getCell(anchorCol).alignment = { horizontal: "center", vertical: "middle" };
+
+        [row2, row3].forEach((row) => {
+          for (let c = 2; c <= totalCols; c++) {
+            const cell = row.getCell(c);
+            cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR.headerBg } };
+            cell.font = Object.assign({ color: { argb: COLOR.headerText } }, cell.font);
+            cell.alignment = { horizontal: "center", vertical: "middle" };
+            applyBorder(cell);
           }
         });
-        return r;
-      }
+        for (let c = 2; c <= infoCols; c++) ws.mergeCells(2, c, 3, c);
 
-      // rowRanges: [{start,end}, ...] 연속된 행 구간들을 그대로 더한다. 구간이 없으면(해당
-      // 업무 구분 인원이 0명) 수식 대신 0을 넣는다.
-      function addSummaryRow(label, rowRanges) {
-        const row = ws.addRow([label]);
-        ws.mergeCells(row.number, 1, row.number, infoCols);
-        days.forEach((d, i) => {
-          const col = infoCols + 1 + i;
-          const colL = scheduleColLetter(col);
-          const cell = row.getCell(col);
-          if (rowRanges.length === 0) {
-            cell.value = 0;
-          } else {
-            const parts = rowRanges.map(({ start, end }) => `COUNTIF(${colL}${start}:${colL}${end},"1")+COUNTIF(${colL}${start}:${colL}${end},"지각")`);
-            cell.value = { formula: parts.join("+") };
+        function addStaffRow(s) {
+          const row = ws.addRow([]);
+          const r = row.number;
+          row.getCell(1).value = { formula: `C${r}` };
+          row.getCell(2).value = s.nickname || "";
+          row.getCell(3).value = s.name || "";
+          row.getCell(4).value = s.empNo || "";
+          if (s.hireDate) {
+            row.getCell(5).value = new Date(s.hireDate);
+            row.getCell(5).numFmt = "yyyy-mm-dd";
           }
-        });
-        for (let c = 1; c <= totalCols; c++) {
-          const cell = row.getCell(c);
-          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR.summary } };
-          cell.font = { color: { argb: COLOR.summaryText } };
-          cell.alignment = { horizontal: "center", vertical: "middle" };
-          applyBorder(cell);
-        }
-        return row.number;
-      }
+          row.getCell(6).value = s.workHours || "";
 
-      // summaryRowNums: 같은 날짜 열끼리 더할 위쪽 요약행들의 행 번호
-      function addTotalRow(label, summaryRowNums) {
-        const row = ws.addRow([label]);
-        ws.mergeCells(row.number, 1, row.number, infoCols);
-        days.forEach((d, i) => {
-          const col = infoCols + 1 + i;
-          const colL = scheduleColLetter(col);
-          row.getCell(col).value = { formula: summaryRowNums.map((rn) => `${colL}${rn}`).join("+") };
-        });
-        for (let c = 1; c <= totalCols; c++) {
-          const cell = row.getCell(c);
-          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR.total } };
-          cell.font = { color: { argb: COLOR.totalText }, bold: true };
-          cell.alignment = { horizontal: "center", vertical: "middle" };
-          applyBorder(cell);
-        }
-        return row.number;
-      }
+          const rangeRef = `${firstDayColL}${r}:${lastDayColL}${r}`;
+          const rangeAbs = `$${firstDayColL}${r}:$${lastDayColL}${r}`;
+          // 근무=근무일(SUM)+반차+공가, 휴일=휴일류(육휴·특휴·대휴·공휴 포함) 개수,
+          // 연차/대휴/결근은 해당 라벨 개수를 그대로 센다.
+          row.getCell(7).value = { formula: `SUM(${rangeRef})+COUNTIF(${rangeRef},"반차")+COUNTIF(${rangeRef},"공가")` };
+          row.getCell(8).value = { formula: `COUNTIF(${rangeAbs},H$2)+COUNTIF(${rangeAbs},"육휴")+COUNTIF(${rangeAbs},"특휴")+COUNTIF(${rangeAbs},"대휴")+COUNTIF(${rangeAbs},"공휴")` };
+          row.getCell(9).value = { formula: `COUNTIF(${rangeAbs},I$2)` };
+          row.getCell(10).value = { formula: `COUNTIF(${rangeAbs},J$2)` };
+          row.getCell(11).value = { formula: `COUNTIF(${rangeAbs},K$2)` };
 
-      // "필요인력" 행: 화면에서 사용자가 직접 입력한 숫자를 그대로 값으로 넣는다(입력 안 한 날짜는 빈칸).
-      function addRequiredHeadcountRow(groupKey, type, label) {
-        const row = ws.addRow([label]);
-        ws.mergeCells(row.number, 1, row.number, infoCols);
-        days.forEach((d, i) => {
-          const col = infoCols + 1 + i;
-          const val = getRequiredHeadcount(year, monthIndex, groupKey, type, d);
-          if (val !== null) row.getCell(col).value = val;
-        });
-        for (let c = 1; c <= totalCols; c++) {
-          const cell = row.getCell(c);
-          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR.requiredBg } };
-          cell.font = { color: { argb: COLOR.requiredText } };
-          cell.alignment = { horizontal: "center", vertical: "middle" };
-          applyBorder(cell);
-        }
-        return row.number;
-      }
-      // "대비" 행: 실제 투입 인력 - 필요인력(위 요약행의 COUNTIF 수식을 그대로 참조).
-      // 필요인력 칸이 비어 있으면 빈칸을 유지하는 수식(IF)으로 넣어, 엑셀에서 값을 고쳐도 다시 계산된다.
-      function addRequiredDiffRow(label, requiredRowNum, summaryRowNum) {
-        const row = ws.addRow([label]);
-        ws.mergeCells(row.number, 1, row.number, infoCols);
-        days.forEach((d, i) => {
-          const col = infoCols + 1 + i;
-          const colL = scheduleColLetter(col);
-          row.getCell(col).value = { formula: `IF(${colL}${requiredRowNum}="","",${colL}${summaryRowNum}-${colL}${requiredRowNum})` };
-        });
-        for (let c = 1; c <= totalCols; c++) {
-          const cell = row.getCell(c);
-          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR.summary } };
-          cell.font = { color: { argb: COLOR.summaryText } };
-          cell.alignment = { horizontal: "center", vertical: "middle" };
-          applyBorder(cell);
-        }
-        return row.number;
-      }
-      // "인력 대비 편성" 행: 대비가 0 이상이면 O, 음수면 X, 필요인력 미입력 날짜는 빈칸.
-      // computeMark는 셀 글자색(O=녹색/X=빨강)을 정하기 위해 화면과 같은 방식으로 미리 계산한 값이고,
-      // 실제 셀 값은 수식으로 넣어 엑셀에서 원본 데이터를 고치면 자동으로 다시 계산된다.
-      function addRequiredStatusRow(label, groupKey, type, staffList, requiredRowNum, summaryRowNum) {
-        const row = ws.addRow([label]);
-        ws.mergeCells(row.number, 1, row.number, infoCols);
-        days.forEach((d, i) => {
-          const col = infoCols + 1 + i;
-          const colL = scheduleColLetter(col);
-          row.getCell(col).value = { formula: `IF(${colL}${requiredRowNum}="","",IF(${colL}${summaryRowNum}-${colL}${requiredRowNum}>=0,"O","X"))` };
-          const required = getRequiredHeadcount(year, monthIndex, groupKey, type, d);
-          const cell = row.getCell(col);
-          if (required !== null) {
+          for (let c = 2; c <= totalCols; c++) {
+            applyBorder(row.getCell(c));
+            row.getCell(c).alignment = { horizontal: "center", vertical: "middle" };
+          }
+          for (let c = 7; c <= 11; c++) {
+            const amountCell = row.getCell(c);
+            amountCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR.amountBg } };
+            amountCell.numFmt = '_-* #,##0_-;-* #,##0_-;_-* "-"_-;_-@';
+          }
+          row.getCell(2).font = { bold: true, color: { argb: COLOR.nickname } };
+          // 이름 칸에 남긴 메모도 셀 메모처럼 엑셀 "메모(노트)"로 넣는다.
+          const nameMemo = getScheduleNameMemo(s.id, year, monthIndex);
+          if (nameMemo) {
+            row.getCell(3).note = { texts: [{ text: nameMemo }], margins: { insetmode: "auto" } };
+          }
+
+          days.forEach((d, i) => {
+            const col = infoCols + 1 + i;
+            const cell = row.getCell(col);
             const dateKey = scheduleDateKey(year, monthIndex, d);
-            const diff = scheduleActualCount(staffList, type, dateKey) - required;
-            cell.font = { bold: true, color: { argb: diff >= 0 ? COLOR.statusOkText : COLOR.statusNgText } };
+            const appLabel = scheduleCellDisplay(getScheduleRecord(s.id, dateKey)).label;
+            // 화면·복사/붙여넣기 등 앱 내부에서는 "오프"라는 값을 그대로 쓰지만,
+            // 엑셀 내보내기에서는(헤더도 "휴일"로 통일했으므로) 이 칸의 표시 값도
+            // "휴일"로 바꿔서 써야 헤더 문구·COUNTIF(H$2 등) 수식과 어긋나지 않는다.
+            const label = appLabel === "오프" ? "휴일" : appLabel;
+            // 근무("1")는 SUM 수식이 실제로 더할 수 있게 문자열이 아닌 숫자로 넣는다.
+            cell.value = label === "1" ? 1 : label;
+            const fillArgb = STATUS_FILL[label];
+            if (fillArgb) {
+              cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: fillArgb } };
+              cell.font = { bold: label === "지각" || label === "결근", color: { argb: STATUS_TEXT[label] || COLOR.nickname } };
+            }
+            // 화면에서 남긴 셀 메모는 엑셀에서 "메모(노트)"로 그대로 들어간다.
+            const memo = getScheduleMemo(s.id, dateKey);
+            if (memo) {
+              cell.note = { texts: [{ text: memo }], margins: { insetmode: "auto" } };
+            }
+          });
+          return r;
+        }
+
+        // "주간"/"야간" 같은 조 라벨 한 줄(굵은 빨강 글자 + 인원 수). 채팅/유선 구분 없이
+        // 짧게 표시만 하고, 별도 배경색·테두리는 넣지 않는다.
+        function addGroupLabelRow(label, count) {
+          const row = ws.addRow([]);
+          row.getCell(2).value = label;
+          row.getCell(2).font = { bold: true, color: { argb: COLOR.groupLabel } };
+          row.getCell(2).alignment = { horizontal: "center", vertical: "middle" };
+          row.getCell(3).value = count;
+          row.getCell(3).alignment = { horizontal: "center", vertical: "middle" };
+          row.height = 15;
+          return row.number;
+        }
+
+        // range의 각 날짜 열에서 근무("1")+반차 0.5명을 더한 인원 집계 행.
+        function addPersonSummaryRow(label, range) {
+          const row = ws.addRow([]);
+          ws.mergeCells(row.number, 2, row.number, infoCols);
+          row.getCell(2).value = label;
+          days.forEach((d, i) => {
+            const col = infoCols + 1 + i;
+            const colL = scheduleColLetter(col);
+            row.getCell(col).value = { formula: `COUNTIF(${colL}${range.start}:${colL}${range.end},"1")+(COUNTIF(${colL}${range.start}:${colL}${range.end},"반차")*0.5)` };
+          });
+          for (let c = 2; c <= totalCols; c++) {
+            const cell = row.getCell(c);
+            cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR.summary } };
+            cell.font = { color: { argb: COLOR.summaryText } };
+            cell.alignment = { horizontal: "center", vertical: "middle" };
+            applyBorder(cell);
           }
+          return row.number;
+        }
+
+        function addTotalRow(label, rowNums) {
+          const row = ws.addRow([]);
+          ws.mergeCells(row.number, 2, row.number, infoCols);
+          row.getCell(2).value = label;
+          days.forEach((d, i) => {
+            const col = infoCols + 1 + i;
+            const colL = scheduleColLetter(col);
+            row.getCell(col).value = { formula: `SUM(${rowNums.map((rn) => `${colL}${rn}`).join("+")})` };
+          });
+          for (let c = 2; c <= totalCols; c++) {
+            const cell = row.getCell(c);
+            cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR.total } };
+            cell.font = { color: { argb: COLOR.totalText }, bold: true };
+            cell.alignment = { horizontal: "center", vertical: "middle" };
+            applyBorder(cell);
+          }
+          return row.number;
+        }
+
+        // groupLabel(주간/야간) 한 조 전체를 쓴다. 통합 시트(singleTypeLabel 없음)는 채팅/유선을
+        // 나눠 각각 인원 집계행을 만들고, 채팅/유선 시트는 이미 한 업무 구분만 모여 있으므로
+        // 나누지 않고 인원 집계행 하나만 만든다.
+        function addGroupBlock(groupLabel, groupStaff) {
+          addGroupLabelRow(groupLabel, groupStaff.length);
+          // 샘플 양식과 동일하게: "주간" 조의 집계행에만 "총"을 붙이고("주간 총 채팅 인원"),
+          // "야간" 조는 붙이지 않는다("야간 채팅 인원").
+          const totalPrefix = groupLabel === "주간" ? `${groupLabel} 총` : groupLabel;
+          if (!singleTypeLabel) {
+            const { chat, voice, etc } = splitByType(groupStaff);
+            let chatRange = null, voiceRange = null;
+            if (chat.length > 0) { const start = ws.rowCount + 1; chat.forEach(addStaffRow); chatRange = { start, end: ws.rowCount }; }
+            if (voice.length > 0) { const start = ws.rowCount + 1; voice.forEach(addStaffRow); voiceRange = { start, end: ws.rowCount }; }
+            if (etc.length > 0) etc.forEach(addStaffRow);
+            const result = {};
+            if (chatRange) result.chatRow = addPersonSummaryRow(`${totalPrefix} 채팅 인원`, chatRange);
+            if (voiceRange) result.voiceRow = addPersonSummaryRow(`${totalPrefix} 유선 인원`, voiceRange);
+            return result;
+          }
+          const start = ws.rowCount + 1;
+          groupStaff.forEach(addStaffRow);
+          return { sumRow: addPersonSummaryRow(`${totalPrefix} ${singleTypeLabel} 인원`, { start, end: ws.rowCount }) };
+        }
+
+        if (adminStaff.length === 0 && dayStaff.length === 0 && nightStaff.length === 0) {
+          ws.getCell(4, 2).value = "등록된 인원이 없어요.";
+        } else {
+          if (adminStaff.length > 0) adminStaff.forEach(addStaffRow);
+          let dayRes = null, nightRes = null;
+          if (dayStaff.length > 0) dayRes = addGroupBlock("주간", dayStaff);
+          if (nightStaff.length > 0) nightRes = addGroupBlock("야간", nightStaff);
+          if (singleTypeLabel && dayRes && nightRes) {
+            addTotalRow(`주/야간 총 ${singleTypeLabel} 출근 인원`, [dayRes.sumRow, nightRes.sumRow]);
+          }
+        }
+
+        // 셀마다 색상·굵기 등은 이미 위에서 개별로 지정했으므로, 그 속성은 그대로 두고
+        // 폰트 크기만 기본 10으로 통일해준다.
+        ws.eachRow((row) => {
+          row.eachCell({ includeEmpty: true }, (cell) => {
+            cell.font = Object.assign({}, cell.font, { size: 8 });
+          });
         });
-        for (let c = 1; c <= totalCols; c++) {
-          const cell = row.getCell(c);
-          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR.summary } };
-          if (!cell.font) cell.font = { color: { argb: COLOR.summaryText } };
-          cell.alignment = { horizontal: "center", vertical: "middle" };
-          applyBorder(cell);
-        }
-        return row.number;
-      }
-      // 그룹(주간/야간)의 채팅·유선 필요인력 3행 묶음(필요인력/대비/인력 대비 편성)을 한 번에 만든다.
-      // chatSummaryRowNum·voiceSummaryRowNum은 위에서 이미 만든 "채팅 인원"/"유선 인원" 요약행 번호.
-      function addRequiredHeadcountBlock(groupKey, groupLabel, staffList, chatSummaryRowNum, voiceSummaryRowNum) {
-        const chatReqRow = addRequiredHeadcountRow(groupKey, "채팅", `${groupLabel} 채팅 필요인력`);
-        addRequiredDiffRow("대비", chatReqRow, chatSummaryRowNum);
-        addRequiredStatusRow("인력 대비 편성", groupKey, "채팅", staffList, chatReqRow, chatSummaryRowNum);
-        const voiceReqRow = addRequiredHeadcountRow(groupKey, "유선", `${groupLabel} 유선 필요인력`);
-        addRequiredDiffRow("대비", voiceReqRow, voiceSummaryRowNum);
-        addRequiredStatusRow("인력 대비 편성", groupKey, "유선", staffList, voiceReqRow, voiceSummaryRowNum);
       }
 
-      // staffList를 채팅/유선/미지정 순으로 나눠 행을 쓰고, 채팅·유선 각각의(연속된) 행
-      // 범위를 돌려준다. 요약행 수식이 이 범위를 그대로 참조하므로 화면 표와 항상 일치한다.
-      function addSubGroups(staffList) {
-        const { chat, voice, etc } = splitByType(staffList);
-        const ranges = {};
-        if (chat.length > 0) {
-          addLabelRow(`채팅 (${chat.length}명)`, "subgroup");
-          const start = ws.rowCount + 1;
-          chat.forEach(addStaffRow);
-          ranges.chat = { start, end: ws.rowCount };
-        }
-        if (voice.length > 0) {
-          addLabelRow(`유선 (${voice.length}명)`, "subgroup");
-          const start = ws.rowCount + 1;
-          voice.forEach(addStaffRow);
-          ranges.voice = { start, end: ws.rowCount };
-        }
-        if (etc.length > 0) {
-          addLabelRow(`업무 구분 미지정 (${etc.length}명)`, "subgroup");
-          etc.forEach(addStaffRow);
-        }
-        return ranges;
-      }
-
-      if (dayStaff.length === 0 && nightStaff.length === 0 && adminStaff.length === 0) {
-        addLabelRow("등록된 인원이 없어요.");
-      } else {
-        let dayChatSummaryRow = null, dayVoiceSummaryRow = null;
-        let nightChatSummaryRow = null, nightVoiceSummaryRow = null;
-
-        if (adminStaff.length > 0) {
-          addLabelRow(`관리자 (${adminStaff.length}명)`);
-          const start = ws.rowCount + 1;
-          adminStaff.forEach(addStaffRow);
-          addSummaryRow("관리자 인원", [{ start, end: ws.rowCount }]);
-        }
-        if (dayStaff.length > 0) {
-          addLabelRow(`아침조 / 주간 (${dayStaff.length}명)`);
-          const ranges = addSubGroups(dayStaff);
-          dayChatSummaryRow = addSummaryRow("채팅 인원", ranges.chat ? [ranges.chat] : []);
-          dayVoiceSummaryRow = addSummaryRow("유선 인원", ranges.voice ? [ranges.voice] : []);
-          addRequiredHeadcountBlock("DAY", "주간", dayStaff, dayChatSummaryRow, dayVoiceSummaryRow);
-        }
-        if (nightStaff.length > 0) {
-          addLabelRow(`야간조 (${nightStaff.length}명)`);
-          const ranges = addSubGroups(nightStaff);
-          nightChatSummaryRow = addSummaryRow("채팅 인원", ranges.chat ? [ranges.chat] : []);
-          nightVoiceSummaryRow = addSummaryRow("유선 인원", ranges.voice ? [ranges.voice] : []);
-          addRequiredHeadcountBlock("NIGHT", "야간", nightStaff, nightChatSummaryRow, nightVoiceSummaryRow);
-        }
-        if (dayStaff.length > 0 && nightStaff.length > 0) {
-          addTotalRow("주/야간 총 채팅 출근 인원", [dayChatSummaryRow, nightChatSummaryRow]);
-          addTotalRow("주/야간 총 유선 출근 인원", [dayVoiceSummaryRow, nightVoiceSummaryRow]);
-        }
-      }
-
-      // 셀마다 색상·굵기 등은 이미 위에서 개별로 지정했으므로, 그 속성은 그대로 두고
-      // 폰트 크기만 기본 10으로 통일해준다.
-      ws.eachRow((row) => {
-        row.eachCell({ includeEmpty: true }, (cell) => {
-          cell.font = Object.assign({}, cell.font, { size: 10 });
-        });
-      });
+      buildSheet("통합", monthStaff);
+      const chatStaff = monthStaff.filter((s) => (s.types || []).indexOf("채팅") !== -1);
+      const voiceStaff = monthStaff.filter((s) => (s.types || []).indexOf("유선") !== -1);
+      if (chatStaff.length > 0) buildSheet("채팅", chatStaff, "채팅");
+      if (voiceStaff.length > 0) buildSheet("유선", voiceStaff, "유선");
 
       const buffer = await wb.xlsx.writeBuffer();
       const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });

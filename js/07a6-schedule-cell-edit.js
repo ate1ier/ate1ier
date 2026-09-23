@@ -44,7 +44,7 @@
   }
   const SCHEDULE_STATUS_OPTIONS = [
     ["WORK", null, "근무"],
-    ["OFF", null, "오프"],
+    ["OFF", null, "휴일"],
     ["ANNUAL", null, "연차"],
     ["DAEHYU", null, "대휴"],
     ["HALF", null, "반차"],

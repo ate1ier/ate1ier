@@ -20,7 +20,7 @@
         <div class="schedule-bulk-panel">
           <div class="schedule-bulk-desc">
             한 줄에 <b>이름</b>을 쓰고 이어서 <b>1일부터 말일까지의 값</b>을 공백(탭도 가능)으로 구분해서 붙여넣으세요. 공백이 나올 때마다 다음 날짜로 넘어가요. 인원 여러 명은 줄바꿈으로 구분해서 한 번에 붙여넣을 수 있어요.<br>
-            인식되는 값: <b>1</b>(근무), <b>휴일 / 오프 / 휴무</b>(오프), <b>연차</b>, <b>대휴</b>, <b>반차</b>, <b>공휴</b>, <b>공가</b>, <b>육휴</b>, <b>특휴</b>, <b>교육</b>, <b>지각</b>, <b>결근</b>, <b>퇴사</b>. 값 개수가 이번 달 일수보다 적으면 앞에서부터만 반영되고, 많으면 초과분은 무시돼요.<br>
+            인식되는 값: <b>1</b>(근무), <b>휴일 / 오프 / 휴무</b>(휴일), <b>연차</b>, <b>대휴</b>, <b>반차</b>, <b>공휴</b>, <b>공가</b>, <b>육휴</b>, <b>특휴</b>, <b>교육</b>, <b>지각</b>, <b>결근</b>, <b>퇴사</b>. 값 개수가 이번 달 일수보다 적으면 앞에서부터만 반영되고, 많으면 초과분은 무시돼요.<br>
             <b>필요인력</b>도 같은 칸에 붙여넣을 수 있어요. 이름 대신 줄 맨 앞에 <b>주간 채팅 필요인력</b>(또는 주간 유선 / 야간 채팅 / 야간 유선)을 쓰고, 이어서 1일부터의 숫자를 넣으세요. 엑셀에서 복사할 때 이름표 칸부터 같이 복사하면 돼요. 빈 칸이나 <b>-</b>는 건너뛰어서 그 날짜의 기존 값이 그대로 남아요.
           </div>
           <textarea class="add-input schedule-bulk-textarea" id="sch-bulk-textarea" placeholder="이기욱	휴일	1	휴일	휴일	1	휴일	1	1	1	휴일	1	1	1	대휴	1	1	1	1	휴일	1	1	1	대휴	1	1	1	휴일	1	1	1"></textarea>
@@ -32,7 +32,7 @@
         </div>
       ` : ""}
       <div class="schedule-legend">
-        <span class="item"><span class="swatch" style="background:var(--blue);"></span>오프</span>
+        <span class="item"><span class="swatch" style="background:var(--blue);"></span>휴일</span>
         <span class="item"><span class="swatch" style="background:var(--orange);"></span>연차</span>
         <span class="item"><span class="swatch" style="background:var(--green);"></span>대휴</span>
         <span class="item"><span class="swatch" style="background:var(--salmon);"></span>반차</span>

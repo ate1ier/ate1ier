@@ -608,7 +608,7 @@
     { key: "hiredate", label: "입사일자", width: 92 },
     { key: "workhours", label: "근무시간", width: 92 },
     { key: "work", label: "근무", width: 48, summaryOnly: true },
-    { key: "off", label: "오프", width: 48, summaryOnly: true },
+    { key: "off", label: "휴일", width: 48, summaryOnly: true },
     { key: "annual", label: "연차", width: 48, summaryOnly: true },
     { key: "daehyu", label: "대휴", width: 48, summaryOnly: true },
     { key: "absent", label: "결근", width: 48, summaryOnly: true },

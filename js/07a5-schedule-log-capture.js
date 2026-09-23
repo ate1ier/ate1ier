@@ -178,7 +178,7 @@
       <div style="font-size:22px;margin-bottom:4px;color:${cText};">월별 스케줄${titleSuffix}</div>
       <div style="font-size:15px;color:${cTextDim};margin-bottom:16px;">${esc(scheduleMonthLabel())}${lockedTag} · 캡처일 ${esc(todayISO())}</div>
       <div class="schedule-legend" style="margin-bottom:14px;">
-        <span class="item"><span class="swatch" style="background:${cBlue};"></span>오프</span>
+        <span class="item"><span class="swatch" style="background:${cBlue};"></span>휴일</span>
         <span class="item"><span class="swatch" style="background:${cOrange};"></span>연차</span>
         <span class="item"><span class="swatch" style="background:${cGreen};"></span>대휴</span>
         <span class="item"><span class="swatch" style="background:${cSalmon};"></span>반차</span>
