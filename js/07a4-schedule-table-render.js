@@ -443,9 +443,9 @@
           views: [{ state: "frozen", xSplit: infoCols, ySplit: 3, showGridLines: false }],
         });
         ws.columns = [
-          { width: 6 }, { width: 11 }, { width: 8 }, { width: 10 }, { width: 10 }, { width: 11 },
-          { width: 6 }, { width: 6 }, { width: 6 }, { width: 6 }, { width: 6 },
-        ].concat(days.map(() => ({ width: 4.7 }))).concat([{ width: 9.5 }]);
+          { width: 5.7 }, { width: 9.2 }, { width: 7.2 }, { width: 8.5 }, { width: 9.0 }, { width: 8.9 },
+          { width: 4.4 }, { width: 13 }, { width: 13 }, { width: 13 }, { width: 13 },
+        ].concat(days.map(() => ({ width: 4.7 }))).concat([{ width: 9.4 }]);
 
         // 1행: 일(day) 숫자만 수식으로 표시 (=DAY(같은 열의 2행))
         const row1 = ws.addRow([]);
@@ -481,7 +481,7 @@
           const col = infoCols + 1 + i;
           row3.getCell(col).value = { formula: `TEXT(${scheduleColLetter(col)}2,"AAA")` };
         });
-        row3.getCell(anchorCol).value = new Date(Date.UTC(year, monthIndex, 1));
+        row3.getCell(anchorCol).value = new Date(year, monthIndex, 1);
         row3.getCell(anchorCol).numFmt = 'mm"월" dd"일"';
         applyBorder(row3.getCell(anchorCol));
         row3.getCell(anchorCol).alignment = { horizontal: "center", vertical: "middle" };
@@ -504,7 +504,7 @@
           const date = new Date(year, monthIndex, d);
           const dow = date.getDay();
           const isHoliday = !!getHoliday(scheduleDateKey(year, monthIndex, d));
-          const fontColor = dow === 6 && !isHoliday ? "FF0000FF" : (dow === 0 || isHoliday) ? "FFFF0000" : COLOR.headerText;
+          const fontColor = (dow === 0 || isHoliday) ? "FFFF0000" : (dow === 6 ? "FF0000FF" : "FF000000");
           [row2.getCell(col), row3.getCell(col)].forEach((cell) => {
             cell.font = Object.assign({}, cell.font, { color: { argb: fontColor }, bold: false });
           });

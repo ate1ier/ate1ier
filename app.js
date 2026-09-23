@@ -9792,7 +9792,7 @@
         summaryText: solid("000000"),
         total: solid("B3A2C7"),
         totalText: solid("000000"),
-        border: solid("DEE1E6"),
+        border: solid("000000"),
         nickname: solid("24262B"),
         groupLabel: solid("FF0000"),
         anchorBg: solid("FFC000"),
@@ -9839,9 +9839,9 @@
           views: [{ state: "frozen", xSplit: infoCols, ySplit: 3, showGridLines: false }],
         });
         ws.columns = [
-          { width: 6 }, { width: 11 }, { width: 8 }, { width: 10 }, { width: 10 }, { width: 11 },
-          { width: 6 }, { width: 6 }, { width: 6 }, { width: 6 }, { width: 6 },
-        ].concat(days.map(() => ({ width: 4.7 }))).concat([{ width: 9.5 }]);
+          { width: 5.7 }, { width: 9.2 }, { width: 7.2 }, { width: 8.5 }, { width: 9.0 }, { width: 8.9 },
+          { width: 4.4 }, { width: 13 }, { width: 13 }, { width: 13 }, { width: 13 },
+        ].concat(days.map(() => ({ width: 4.7 }))).concat([{ width: 9.4 }]);
 
         // 1행: 일(day) 숫자만 수식으로 표시 (=DAY(같은 열의 2행))
         const row1 = ws.addRow([]);
@@ -9863,7 +9863,7 @@
           const col = infoCols + 1 + i;
           const cell = row2.getCell(col);
           cell.value = { formula: i === 0 ? `${anchorColL}3` : `${scheduleColLetter(col - 1)}2+1` };
-          cell.numFmt = "mm/dd";
+          cell.numFmt = "m/d";
         });
         row2.getCell(anchorCol).value = "기준 월";
         row2.getCell(anchorCol).font = { bold: true };
@@ -9892,6 +9892,19 @@
           }
         });
         for (let c = 2; c <= infoCols; c++) ws.mergeCells(2, c, 3, c);
+
+        // 날짜 헤더: 토요일은 파란색, 일요일/공휴일은 빨간색으로 표시한다.
+        // 날짜(2행)와 요일(3행) 모두 같은 색을 적용하고, 회사 지정 공휴일은 평일이어도 빨간색이다.
+        days.forEach((d, i) => {
+          const col = infoCols + 1 + i;
+          const date = new Date(year, monthIndex, d);
+          const dow = date.getDay();
+          const isHoliday = !!getHoliday(scheduleDateKey(year, monthIndex, d));
+          const fontColor = (dow === 0 || isHoliday) ? "FFFF0000" : (dow === 6 ? "FF0000FF" : "FF000000");
+          [row2.getCell(col), row3.getCell(col)].forEach((cell) => {
+            cell.font = Object.assign({}, cell.font, { color: { argb: fontColor }, bold: false });
+          });
+        });
 
         function addStaffRow(s) {
           const row = ws.addRow([]);
