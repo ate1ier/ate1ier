@@ -377,13 +377,33 @@
   function clearTeamLoginMember() {
     try { localStorage.removeItem(TEAM_MEMBER_KEY); } catch (e) {}
   }
+  // 로그아웃할 때 앱 화면을 로그인 화면과 같은 배경으로 서서히 덮는다(0.38초).
+  // 이렇게 해야 새로고침되는 순간 화면이 툭 끊기지 않고, 새로고침 뒤 뜨는 로그인
+  // 화면과도 같은 배경으로 이어진다(body.html의 app:just-logged-out 처리 참고).
+  function fadeOutForLogout() {
+    return new Promise((resolve) => {
+      try {
+        if (document.getElementById("logout-cover")) { setTimeout(resolve, 380); return; }
+        const cover = document.createElement("div");
+        cover.id = "logout-cover";
+        document.body.appendChild(cover);
+        requestAnimationFrame(() => requestAnimationFrame(() => cover.classList.add("show")));
+        setTimeout(resolve, 380);
+      } catch (e) { resolve(); }
+    });
+  }
   async function logout() {
+    const fade = fadeOutForLogout();
     clearSession();
     clearMasterOrigin();
     clearLastActive();
     clearTeamLoginMember();
     await flushCloudWrites();
     if (cloud) { try { await cloud.auth.signOut(); } catch (e) {} }
+    await fade;
+    // 새로고침 뒤에는 "Loading..." 부팅 화면 대신, 글자 없이 로그인 배경만 덮었다가
+    // 로그인 화면이 그려지면 부드럽게 걷어낸다.
+    try { sessionStorage.setItem("app:just-logged-out", "1"); } catch (e) {}
     location.reload();
   }
 

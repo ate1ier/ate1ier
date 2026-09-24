@@ -3,6 +3,16 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>html.boot-handoff-pre { background: #060814; }</style>
+<script>
+// 로그인/로그아웃 직후 새로고침된 경우, 첫 화면이 그려지기 전에(본문이 파싱되기 전에)
+// 미리 표시해둬서 검은 "Loading..." 화면이 한 프레임이라도 비치지 않게 한다.
+try {
+  if (sessionStorage.getItem("app:just-logged-in") === "1" || sessionStorage.getItem("app:just-logged-out") === "1") {
+    document.documentElement.classList.add("boot-handoff-pre");
+  }
+} catch (e) {}
+</script>
 <title>업무 종합 관리</title>
 <link rel="icon" href="favicon.ico" sizes="any">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">

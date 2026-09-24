@@ -1,0 +1,54 @@
+  /* ---------- 초기 로딩(부팅) 화면 ----------
+     페이지가 열리자마자(앱 JS가 실행되기 전부터) 즉시 보이는 정적인 화면이다.
+     목업(ate1ier-macos-mockup)의 #bt 부팅 화면과 동일한 모습(검은 배경 + 흰
+     "Loading..." 문구 + 얇은 진행 바)으로, 최소 2초는 고정으로 노출된다
+     (실제 로딩이 더 걸리면 그만큼 더 보임 — body.html의 인라인 스크립트 +
+     window.__hideBootLoader가 시간을 계산한다). 테마(다크/라이트)와 무관하게
+     항상 검은 배경 + 흰 글자로 고정한다. */
+  /* 로그인 화면과 부팅 덮개가 같은 배경을 쓰도록 변수로 공유한다 */
+  :root {
+    --login-bg:
+      radial-gradient(48% 42% at 12% 10%, rgba(38, 74, 150, 0.30), transparent 70%),
+      radial-gradient(40% 38% at 88% 86%, rgba(30, 110, 120, 0.20), transparent 70%),
+      radial-gradient(34% 30% at 92% 12%, rgba(120, 50, 130, 0.16), transparent 70%),
+      radial-gradient(38% 30% at 30% 96%, rgba(150, 60, 90, 0.14), transparent 70%),
+      #060814;
+  }
+  #boot-loader {
+    position: fixed; inset: 0; z-index: 99999;
+    background: #000; color: #fff;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 26px;
+    transition: opacity 0.5s ease;
+  }
+  #boot-loader.boot-loader-hide { opacity: 0; pointer-events: none; }
+  #boot-loader b { font-size: 34px; font-weight: 400; letter-spacing: 0.02em; }
+  .boot-loader-bar { width: 170px; height: 4px; border-radius: 2px; background: rgba(255, 255, 255, 0.22); overflow: hidden; }
+  .boot-loader-bar i {
+    display: block; height: 100%; width: 0; background: #fff;
+    animation: boot-loader-progress 2s ease-in-out forwards;
+  }
+  @keyframes boot-loader-progress { from { width: 0; } to { width: 100%; } }
+
+  /* ---- 로그인 직후 전환: 글자·진행 바 없이 로그인 화면과 같은 배경만 덮었다가 부드럽게 걷어낸다 ---- */
+  #boot-loader.boot-handoff {
+    background: var(--login-bg);
+    transition: opacity 0.7s cubic-bezier(0.4, 0, 0.2, 1), transform 0.7s cubic-bezier(0.4, 0, 0.2, 1), filter 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  #boot-loader.boot-handoff.boot-loader-hide { opacity: 0; transform: scale(1.05); filter: blur(8px); }
+  /* 첫 페인트 전부터(head의 인라인 스크립트가 html에 표시) 덮개가 처음부터 로그인 배경으로 보이게 한다 */
+  html.boot-handoff-pre #boot-loader { background: var(--login-bg); }
+  html.boot-handoff-pre #boot-loader > * { display: none; }
+  /* 덮개가 걷히는 동안 아래의 앱 화면은 이미 100% 그려진 상태로 두어, 덮개와 앱이 직접
+     교차 페이드되게 한다(앱을 투명에서 따로 페이드인시키면 그 사이로 빈 배경이 비쳐 깜빡임). */
+  /* ---- 로그아웃 직후: 새로고침 전에 앱 화면을 로그인 배경으로 서서히 덮는 막 ---- */
+  #logout-cover {
+    position: fixed; inset: 0; z-index: 99998;
+    background: var(--login-bg);
+    opacity: 0; transition: opacity 0.38s ease;
+  }
+  #logout-cover.show { opacity: 1; }
+  @media (prefers-reduced-motion: reduce) {
+    #logout-cover { transition: opacity 0.15s linear; }
+    #boot-loader.boot-handoff { transition: opacity 0.2s linear; }
+    #boot-loader.boot-handoff.boot-loader-hide { transform: none; filter: none; }
+  }

@@ -17,6 +17,7 @@
   saveScheduleData();
 
   renderApp();
+  if (typeof window !== "undefined" && window.__hideBootLoader) window.__hideBootLoader();
 
   // 로그인/계정 생성 직후 딱 한 번, 홈 화면 위에 팝업을 살짝 늦게(화면이 먼저 자리
   // 잡은 뒤) 애니메이션과 함께 띄워준다. 지난달 마감(최종 스케줄/품질 관리 확정)이
