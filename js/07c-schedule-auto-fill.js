@@ -2212,7 +2212,6 @@
   }
 
   // 월별 스케줄 화면처럼, 미리보기 표가 팝업 폭에 딱 맞게 보이도록 축소한다(fitScheduleTable과 같은 방식).
-  // 모바일 폭에서는 축소하지 않고 가로 스크롤로 본다.
   function scheduleAutoFitPreview() {
     const area = document.getElementById("sch-auto-preview-area");
     const wrap = area ? area.querySelector(".sch-auto-table-wrap") : null;
@@ -2224,7 +2223,6 @@
     inner.style.height = "auto";
     wrap.style.height = "auto";
     wrap.style.overflowX = "";
-    if (window.innerWidth <= 720) return;
     const naturalW = table.offsetWidth;
     const naturalH = table.offsetHeight;
     const availW = wrap.clientWidth;

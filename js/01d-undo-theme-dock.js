@@ -4,8 +4,10 @@
   /* ===================== ↩️ 실행 취소(Undo) =====================
      스케줄 셀 상태 변경 · 일괄 적용 · 일괄 붙여넣기 · 일괄 삭제, 그리고 메모·폴더·
      상담사·면담일지·할일·캘린더 일정의 "삭제"처럼 되돌리기 어려운 조작을 하기 직전에
-     관련 localStorage 값을 스냅샷으로 남겨두고, Ctrl+Z(맥은 Cmd+Z) 또는 화면 오른쪽
-     아래 "되돌리기" 버튼으로 바로 직전 동작 하나를 되돌릴 수 있게 한다. 최근 30개까지
+     관련 localStorage 값을 스냅샷으로 남겨두고, Ctrl+Z(맥은 Cmd+Z) 또는 상단 상태표시줄
+     오른쪽의 "되돌리기"(↶) 버튼으로 바로 직전 동작 하나를 되돌릴 수 있게 한다
+     (예전엔 화면 오른쪽 아래 바로가기 메뉴에 있던 버튼을 옮겼다 —
+     js/01q-status-bar-refresh-undo.js 참고). 최근 30개까지
      기억한다. 메모 본문·셀 메모처럼 계속 타이핑하는 값은 스냅샷을 남기지 않는다 —
      글자 하나하나가 되돌리기 대상이 되면 오히려 불편하기 때문이다. */
   const UNDO_STACK_LIMIT = 30;
@@ -66,23 +68,24 @@
     e.preventDefault();
     performUndo();
   });
-  // 되돌리기 버튼: 테마·사용설명서 버튼과 같은 자리, 그 위에 항상 떠 있다.
+  // 되돌리기 버튼: 상단 상태표시줄의 ↶ 버튼(#status-bar-undo-btn, body.html)이다.
+  // 되돌릴 작업이 없으면 비활성화하고, 있으면 마지막 작업 이름을 툴팁으로 보여준다.
+  // 되돌리기 스택이 바뀔 때(recordUndo/performUndo)와 화면을 다시 그릴 때(renderNav)
+  // 호출된다. #undo-toggle-root에는 버튼 없이 결과 토스트(#undo-toast)만 남는다 —
+  // 토스트는 백업 복원 등 다른 안내 문구를 잠깐 띄울 때도 함께 쓴다(flashUndoToast).
   function renderUndoToggle() {
-    const root = document.getElementById("undo-toggle-root");
-    if (!root) return;
     const has = undoStack.length > 0;
     const lastLabel = has ? undoStack[undoStack.length - 1].label : "";
-    root.innerHTML = `
-      <div class="undo-toggle-wrap">
-        <button class="theme-picker-btn" id="nav-undo-toggle" type="button" ${has ? "" : "disabled"}
-          aria-label="되돌리기" title="${has ? `되돌리기 — ${esc(lastLabel)} (Ctrl+Z)` : "되돌릴 작업이 없어요"}">
-          ${ICON_UNDO}<span class="theme-picker-label">되돌리기</span>
-        </button>
-      </div>
-      <div class="undo-toast" id="undo-toast"></div>
-    `;
-    const btn = document.getElementById("nav-undo-toggle");
-    if (btn) btn.onclick = () => performUndo();
+    const btn = document.getElementById("status-bar-undo-btn");
+    if (btn) {
+      const title = has ? `되돌리기 — ${lastLabel} (Ctrl+Z)` : "되돌릴 작업이 없어요";
+      btn.disabled = !has;
+      btn.title = title;
+      btn.setAttribute("aria-label", title);
+    }
+    const root = document.getElementById("undo-toggle-root");
+    if (!root) return;
+    root.innerHTML = `<div class="undo-toast" id="undo-toast"></div>`;
   }
 
   /* ===================== 테마(다크/라이트/그레이/파스텔) ===================== */
@@ -112,9 +115,9 @@
   applyTheme(isValidTheme(getStoredTheme()) ? getStoredTheme() : "dark");
 
   /* ===================== 데스크톱 독(Dock) 펼치기/닫기 =====================
-     독 안에는 메뉴 카테고리(#nav) 말고도 전역 검색 바(#global-search-root)가
-     카테고리 바로 위에 함께 들어있으므로, 펼치기/접기 대상은 그 둘을 함께
-     감싸는 #nav-dock 전체다. */
+     독 안에는 메뉴 카테고리(#nav)가 들어있고, 펼치기/접기 대상은 그걸 감싸는
+     #nav-dock 전체다. (예전엔 전역 검색 바도 이 독 안, 카테고리 바로 위에 있었는데
+     상단 상태표시줄의 검색 버튼으로 옮겼다 — js/01r-status-bar-search.js 참고) */
   function isDockOpen() {
     const navDock = document.getElementById("nav-dock");
     return !!(navDock && navDock.classList.contains("dock-open"));
@@ -137,9 +140,6 @@
     if (navDock) navDock.classList.remove("dock-open");
     if (btn) { btn.classList.remove("open"); btn.setAttribute("aria-expanded", "false"); btn.title = "메뉴 열기"; btn.setAttribute("aria-label", "메뉴 열기"); }
     document.removeEventListener("mousedown", dockOutsideHandler, true);
-    // 독 안에는 전역 검색창도 함께 들어있으므로, 독을 닫을 때 검색했던 내용도
-    // 남아있지 않고 초기화되게 한다.
-    if (typeof resetGlobalSearchQuery === "function") resetGlobalSearchQuery();
   }
   function toggleDock() {
     if (isDockOpen()) closeDock(); else openDock();
@@ -149,70 +149,10 @@
     dockToggleBtn.onclick = (e) => { e.stopPropagation(); toggleDock(); };
   }
 
-  /* ===================== 오른쪽 하단 유틸리티 독(다크·사용설명서·백업·되돌리기·새로고침) 접기/펼치기 =====================
-     평소엔 펼치기 버튼만 보이고, 눌러야 5개 항목이 위로 펼쳐진다.
-     다른 곳을 클릭하면 자동으로 다시 접힌다. */
-  function isUtilityDockOpen() {
-    const root = document.getElementById("utility-dock-root");
-    return !!(root && root.classList.contains("open"));
-  }
-  function utilityDockOutsideHandler(e) {
-    const root = document.getElementById("utility-dock-root");
-    const settingsMenu = document.getElementById("settings-menu");
-    if (settingsMenu && settingsMenu.contains(e.target)) return; // 설정 목록 팝업 클릭은 독을 접지 않는다
-    if (root && !root.contains(e.target)) closeUtilityDock();
-  }
-  function openUtilityDock() {
-    const root = document.getElementById("utility-dock-root");
-    const btn = document.getElementById("utility-dock-toggle-btn");
-    if (root) root.classList.add("open");
-    if (btn) { btn.classList.add("open"); btn.setAttribute("aria-expanded", "true"); btn.title = "바로가기 메뉴 닫기"; btn.setAttribute("aria-label", "바로가기 메뉴 닫기"); }
-    setTimeout(() => document.addEventListener("mousedown", utilityDockOutsideHandler, true), 0);
-  }
-  function closeUtilityDock() {
-    const root = document.getElementById("utility-dock-root");
-    const btn = document.getElementById("utility-dock-toggle-btn");
-    if (root) root.classList.remove("open");
-    if (btn) { btn.classList.remove("open"); btn.setAttribute("aria-expanded", "false"); btn.title = "바로가기 메뉴 열기"; btn.setAttribute("aria-label", "바로가기 메뉴 열기"); }
-    document.removeEventListener("mousedown", utilityDockOutsideHandler, true);
-  }
-  function toggleUtilityDock() {
-    if (isUtilityDockOpen()) closeUtilityDock(); else openUtilityDock();
-  }
-  const utilityDockToggleBtn = document.getElementById("utility-dock-toggle-btn");
-  if (utilityDockToggleBtn) {
-    utilityDockToggleBtn.onclick = (e) => { e.stopPropagation(); toggleUtilityDock(); };
-  }
-
   // 일정/할일 알림을 공지하는 디스코드 서버 초대 링크. 만료되지 않는 링크로 만들어두면 됨.
   // (실제 알림 발송은 이 사이트가 아니라 Supabase Edge Function + pg_cron이 처리하고,
-  //  여기서는 그 알림이 올라오는 서버로 바로 이동할 수 있는 버튼만 설정 메뉴 안에 보여준다.)
+  //  여기서는 그 알림이 올라오는 서버로 바로 이동할 수 있는 상단 상태표시줄의 "디스코드" 버튼만 둔다 — js/01s-status-bar-discord.js.)
   const DISCORD_INVITE_URL = "https://discord.gg/QFpBnYMp4";
-
-  // 설정 버튼: 예전에는 테마·사용설명서·데이터 백업이 각각 독립된 버튼으로 오른쪽 아래에
-  // 따로따로 쌓여 있었는데, 항목이 많아질수록 화면이 복잡해 보여서(특히 모바일) 이 세 가지를
-  // "설정" 버튼 하나로 묶고, 그 안에서 목록으로 고르게 했다. 새로고침·되돌리기는 사용 빈도가
-  // 높아 그대로 독립 버튼으로 남겨둔다.
-  function renderSettingsToggle() {
-    const root = document.getElementById("settings-toggle-root");
-    if (!root) return;
-    root.innerHTML = `
-      <div class="manual-toggle-wrap">
-        <button class="theme-picker-btn" id="nav-settings-toggle" type="button" aria-haspopup="true" aria-expanded="false" aria-label="설정 메뉴 열기" title="설정 (테마 · 사용설명서 · 데이터 백업)">
-          ${ICON_SETTINGS}
-          <span class="theme-picker-label">설정</span>
-        </button>
-      </div>
-    `;
-    const settingsBtn = document.getElementById("nav-settings-toggle");
-    if (settingsBtn) {
-      settingsBtn.onclick = (e) => {
-        e.stopPropagation();
-        if (document.getElementById("settings-menu")) { closeSettingsMenu(); return; }
-        openSettingsMenu(settingsBtn);
-      };
-    }
-  }
 
   /* ===================== 데이터 백업/복원 =====================
      상담사 정보 · 스케줄 · 면담일지 · QA 점수 · 메모 · 캘린더처럼

@@ -2,19 +2,34 @@
     renderNav();
     const root = document.getElementById("page-inner");
     root.classList.toggle("wide", state.page === "schedule" || state.page === "home" || state.page === "calendar");
+    // 마스터 계정: 계정 관리 전용 화면 (바탕화면/창 없음, 기존 그대로)
+    if (state.page === "master") { renderMasterPage(root); return; }
+    // 일반 계정: 바탕화면 위젯(#home-root)은 항상 그리고, 열려 있는 페이지 창들은 각자의 창 안에
+    // js/09a-home-desktop.js의 renderHomeDesktopWindows()가 그린다(여러 창이 동시에 열려 있을 수 있음).
+    const homeRoot = document.getElementById("home-root");
+    if (homeRoot && typeof renderHomeDesktopWindows === "function") {
+      renderHomePage(homeRoot);
+      renderHomeDesktopWindows();
+      return;
+    }
+    // (#home-root/js/09a-home-desktop.js가 없는 경우를 대비한 안전망) 예전처럼 페이지 하나만 #page-inner에 그린다.
     if (state.page === "notes") renderNotesPage(root);
     else if (state.page === "agents") renderAgentsPage(root);
     else if (state.page === "qa") renderQAPage(root);
     else if (state.page === "interviews") renderInterviewsPage(root);
     else if (state.page === "schedule") renderSchedulePage(root);
     else if (state.page === "calendar") renderCalendarPage(root);
-    else if (state.page === "master") renderMasterPage(root);
     else renderHomePage(root);
   }
 
   // 앱을 처음 열 때도 월별 스케줄 인원 목록을 상담사 관리 목록과 맞춰준다.
   syncScheduleStaffFromAgents();
   saveScheduleData();
+
+  // 지난번 이 브라우저에서 열어뒀던 페이지 창들을(열림 순서·위치·크기·접힘/최대화 상태까지) renderApp()이
+  // 그 안의 내용을 채우기 전에 먼저 되살려둔다(js/09a-home-desktop.js). 저장만 되고 복원이 안 되어 있던
+  // 부분이라, 이 호출이 없으면 새로고침할 때마다 열어둔 창이 전부 사라진 채로 시작한다.
+  if (typeof hdRestoreOpenWindows === "function") hdRestoreOpenWindows();
 
   renderApp();
   if (typeof window !== "undefined" && window.__hideBootLoader) window.__hideBootLoader();
@@ -27,7 +42,7 @@
   if (_justLoggedIn && !CURRENT_ACCOUNT_IS_MASTER) {
     setTimeout(() => {
       if (shouldShowMonthClosePopup()) showMonthClosePopup();
-      else showTodayBriefPopup();
+      else showTodayBriefToast();
     }, 450);
   }
 

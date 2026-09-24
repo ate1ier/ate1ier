@@ -246,7 +246,7 @@
 
   // 드래그(또는 클릭)로 고른 열·행 선택은 머리글도, 접기 메뉴도 아닌 곳을 누르면 풀린다.
   // 표 안의 다른 칸뿐 아니라 표 밖(빈 배경, 상단 버튼, 다른 영역 등)을 눌러도 마찬가지다.
-  // click이 아니라 pointerdown을 쓰는 이유: 마우스와 터치(태블릿·모바일)를 한 번에 받고,
+  // click이 아니라 pointerdown을 쓰는 이유: 마우스와 터치를 한 번에 받고,
   // 터치에서는 빈 곳을 눌러도 click이 안 오는 경우가 있기 때문이다.
   // 머리글(다시 클릭해서 선택을 바꾸거나 우클릭 메뉴를 여는 동작)과 접기 메뉴(#sch-menu) 위에서는
   // 풀지 않는다 — 풀어버리면 "접기" 버튼을 누르기도 전에 선택이 사라진다.
@@ -364,7 +364,7 @@
       const { year, monthIndex } = scheduleUi;
       const hasMemo = !!getScheduleNameMemo(memoStaffId, year, monthIndex);
       if (scheduleIsMonthLocked(year, monthIndex)) {
-        // 잠긴 달은 수정은 막되, 이미 남겨둔 메모는 읽을 수 있게 한다(모바일엔 마우스 툴팁이 없으므로).
+        // 잠긴 달은 수정은 막되, 이미 남겨둔 메모는 읽을 수 있게 한다.
         if (hasMemo) memoHtml = `<button type="button" data-name-memo="1">${ICON_NOTE || ""} 메모 보기</button>`;
       } else {
         memoHtml = `<button type="button" data-name-memo="1">${ICON_NOTE || ""} ${hasMemo ? "메모 수정" : "메모 추가"}</button>`

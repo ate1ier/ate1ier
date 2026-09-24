@@ -270,6 +270,11 @@
     page: 1, // 면담일지 목록의 현재 페이지(10건씩)
   };
 
+  // renderInterviewsPage(root)가 그릴 때마다 그 root를 기억해둔다. 바탕화면 창 모드(js/09a-home-desktop.js)에서는
+  // 창마다 각자 다른 #page-inner 요소를 쓰므로, updateInterviewListArea()의 부분 갱신이 항상 이 페이지의
+  // 창을 정확히 찾도록 전역 선택자 대신 이 값을 쓴다.
+  let _interviewsPageRoot = null;
+
   const homeUi = {
     interviewAlertExpanded: false, // 홈 화면의 "면담 필요 알림" 목록을 펼쳐서 볼지 여부
   };
@@ -478,6 +483,7 @@
 
   /* ---- 독립 메뉴: 면담일지 페이지 ---- */
   function renderInterviewsPage(root) {
+    _interviewsPageRoot = root;
     const filtered = sortInterviews(
       interviewsData.filter((r) => interviewMatchesSearch(r, interviewsUi.searchQuery) && interviewMatchesType(r, interviewsUi.typeFilter))
     );
@@ -561,7 +567,9 @@
     );
     area.innerHTML = renderInterviewListAreaHtml(filtered);
     attachInterviewListAreaHandlers(area);
-    const summaryEl = document.querySelector("#page-inner .agent-summary");
+    const summaryEl = _interviewsPageRoot
+      ? _interviewsPageRoot.querySelector(".agent-summary")
+      : document.querySelector("#page-inner .agent-summary");
     if (summaryEl) {
       summaryEl.textContent = `전체 ${interviewsData.length}건${filtered.length !== interviewsData.length ? ` · 필터 결과 ${filtered.length}건` : ""}`;
     }

@@ -256,14 +256,14 @@
   };
 
 
-  // 화면 오른쪽 아래 "새로고침" 버튼을 누르면, 다른 사람/다른 기기에서 바뀐 내용을
+  // 상단 상태표시줄 오른쪽의 새로고침(↻) 버튼을 누르면, 다른 사람/다른 기기에서 바뀐 내용을
   // 서버에서 다시 받아오기 위해 페이지를 실제로 다시 불러온다(location.reload()).
   // 다만 이 경우에는 평소처럼 "홈"으로 돌아가지 않고, 누르기 직전에 보고 있던
   // 페이지를 그대로 유지해야 하므로, 새로고침 직전에 sessionStorage에 현재 페이지를
   // 잠깐 남겨두고 새로 불러온 뒤 한 번만 복원하고 지운다.
   // 방금 로그인/계정 생성으로 들어온 경우에만(=이 새로고침이 로그인 직후인 경우에만)
-  // "오늘의 브리핑" 히어로 팝업을 한 번 띄운다. 세션 유지 중 브라우저를 새로 열거나
-  // "새로고침" 버튼을 눌렀을 때는 뜨지 않는다.
+  // "오늘의 브리핑" 토스트(macOS 목업처럼 한 줄 요약이 잠깐 떴다가 사라짐)를 한 번
+  // 띄운다. 세션 유지 중 브라우저를 새로 열거나 "새로고침" 버튼을 눌렀을 때는 뜨지 않는다.
   let _justLoggedIn = false;
   try {
     if (sessionStorage.getItem("app:just-logged-in") === "1") {
@@ -319,10 +319,20 @@
   // opts.year / opts.monthIndex를 넘기면 "월별 스케줄"·"품질 관리" 페이지를 그 달로 열어준다
   // (예: 월마감 확인 팝업에서 지난달 항목을 눌렀을 때). 넘기지 않으면 기존과 동일하게
   // 항상 실시간 기준 당월을 보여준다.
+  // p가 "home"이 아니면: 그 페이지의 창을 "열거나 포커스"만 한다(js/09a-home-desktop.js의
+  // hdOpenOrFocusWindow) — 이미 다른 페이지 창이 열려 있어도 그대로 두고 새 창을 또 띄운다.
+  // 아이콘·독·홈 위젯 링크·전역 검색·오늘의 브리핑 등 이 함수를 부르는 모든 곳이 자동으로
+  // 이 동작을 따르게 된다.
   function setPage(p, opts) {
     // 마스터 계정은 계정 관리 페이지 외에는 이동하지 않는다.
     if (CURRENT_ACCOUNT_IS_MASTER) { state.page = "master"; renderApp(); return; }
-    if (p !== state.page) _resetExpandedStateForPage(state.page); // 떠나는 화면의 펼침 상태 초기화
+    if (p === "home") {
+      // 열려 있는 모든 창을 닫고 바탕화면만 보여준다(각 창을 닫을 때 그 페이지의 펼침 상태도 초기화됨).
+      if (typeof hdCloseAllWindows === "function") hdCloseAllWindows();
+      state.page = "home";
+      renderApp();
+      return;
+    }
     const hasTargetMonth = !!(opts && typeof opts.year === "number" && typeof opts.monthIndex === "number");
     // "월별 스케줄" 카테고리를 누르면 기본적으로 실시간 기준 당월 스케줄을 보여준다.
     if (p === "schedule" && typeof scheduleUi !== "undefined") {
@@ -336,6 +346,7 @@
     }
     // 이제 마지막으로 보던 페이지를 저장/복원하지 않으므로(항상 홈에서 시작),
     // localStorage에 따로 기록하지 않는다.
+    if (typeof hdOpenOrFocusWindow === "function") hdOpenOrFocusWindow(p); // 다른 창은 그대로 둔 채 이 페이지 창을 열거나 앞으로 가져온다 (js/09a-home-desktop.js)
     state.page = p;
     renderApp();
   }

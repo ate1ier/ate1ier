@@ -72,10 +72,6 @@
     inner.style.width = "auto";
     inner.style.height = "auto";
     wrap.style.height = "auto";
-    // 모바일 화면에서는 표를 억지로 축소해서 글씨를 읽을 수 없게 만드는 대신,
-    // 표를 원래 크기 그대로 두고 가로 스크롤(스크린 좌우로 넘기기)로 보게 한다.
-    // (고정된 인원 정보 열이 sticky로 남아있어 스크롤해도 어떤 상담사인지 계속 보임)
-    if (window.innerWidth <= 720) return;
     const naturalW = table.offsetWidth;
     const naturalH = table.offsetHeight;
     const availW = wrap.clientWidth;

@@ -169,53 +169,56 @@
     await Promise.allSettled(Array.from(_pendingCloudWrites));
   }
 
-  /* ---- 동기화 상태 토스트: 오른쪽 상단에 "동기화 중… / 저장됨 / 동기화 실패"를
-     잠깐 띄웠다가 자동으로 사라지게 한다. 저장이 연속으로 여러 번 일어나도
-     토스트가 여러 개 쌓이지 않도록 하나의 요소를 재사용한다. */
-  let _syncToastHideTimer = null;
-  let _syncToastSettleTimer = null;
+  /* ---- 동기화 상태 표시: 예전에는 화면 오른쪽 위에 별도 토스트 팝업이 잠깐 떴다가
+     사라지는 방식이었지만, 지금은 상단 상태표시줄 오른쪽의 동기화란(#status-bar-sync)
+     자체가 상태(동기화 중… / 동기화됨 / 동기화 실패)에 따라 점 색이 바뀌고 잠깐
+     하이라이트(테두리 밝아짐)되는 것으로 알려준다. 아무 일도 없을 때(평소)는
+     그냥 "동기화"라고만 보여준다. 상태별 문구 길이가 서로 달라도 라벨에 미리
+     고정 폭을 잡아뒀기 때문에(css/01a-status-bar.css .status-bar-sync-label)
+     문구가 바뀔 때 왼쪽 새로고침·되돌리기·검색 아이콘이 밀렸다 돌아오지 않는다.
+     저장이 연속으로 여러 번 일어나도 같은 요소를 재사용하므로 표시가 여러 개
+     쌓이지 않는다. */
+  let _syncBarResetTimer = null;
+  let _syncBarSettleTimer = null;
   let _syncHadError = false;
-  function _syncToastEl() {
-    let el = document.getElementById("cloud-sync-toast");
-    if (!el) {
-      el = document.createElement("div");
-      el.id = "cloud-sync-toast";
-      el.className = "cloud-sync-toast";
-      document.body.appendChild(el);
-    }
-    return el;
+  function _syncBarEls() {
+    const wrap = document.getElementById("status-bar-sync");
+    if (!wrap) return null;
+    return { wrap, label: document.getElementById("status-bar-sync-label") };
   }
-  function _showSyncToast(status) {
-    clearTimeout(_syncToastHideTimer);
-    const el = _syncToastEl();
-    el.classList.remove("syncing", "saved", "error");
-    el.classList.add(status, "visible");
-    const iconHtml = status === "syncing"
-      ? `<span class="cloud-sync-spinner"></span>`
-      : status === "saved"
-        ? ICON_CHECK
-        : `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="5.6"/><path d="M8 5.2v3.4"/><path d="M8 11v.1"/></svg>`;
-    const label = status === "syncing" ? "동기화 중…" : status === "saved" ? "저장됨" : "동기화 실패";
-    el.innerHTML = `${iconHtml}<span>${label}</span>`;
+  function _showSyncStatus(status) {
+    const els = _syncBarEls();
+    if (!els) return;
+    clearTimeout(_syncBarResetTimer);
+    const { wrap, label } = els;
+    wrap.classList.remove("syncing", "saved", "error", "highlight");
+    // 강제 리플로우: 같은 상태가 연달아 와도(예: 저장됨 → 저장됨) 하이라이트
+    // 애니메이션이 처음부터 다시 재생되도록 클래스를 뺐다가 다음 프레임에 다시 붙인다.
+    void wrap.offsetWidth;
+    wrap.classList.add(status, "highlight");
+    if (label) label.textContent = status === "syncing" ? "동기화 중…" : status === "saved" ? "동기화됨" : "동기화 실패";
     if (status !== "syncing") {
-      _syncToastHideTimer = setTimeout(() => { el.classList.remove("visible"); }, status === "error" ? 4000 : 1800);
+      _syncBarResetTimer = setTimeout(() => {
+        wrap.classList.remove("highlight", "syncing", "saved", "error");
+        if (label) label.textContent = "동기화";
+      }, status === "error" ? 4000 : 1800);
     }
   }
   // 클라우드 저장 요청이 시작될 때 호출: 즉시 "동기화 중…" 표시
   function notifyCloudSyncStart() {
     if (!cloud) return;
-    clearTimeout(_syncToastSettleTimer);
-    _showSyncToast("syncing");
+    clearTimeout(_syncBarSettleTimer);
+    _showSyncStatus("syncing");
   }
   // 클라우드 저장 요청이 끝날 때 호출: 다른 요청이 이어서 들어올 수 있으니 짧게
-  // 기다렸다가, 더 진행 중인 요청이 없으면 최종 결과(저장됨/실패)를 보여준다.
+  // 기다렸다가, 더 진행 중인 요청이 없으면 최종 결과(동기화됨/실패)를 상태표시줄에 반영한다.
   function notifyCloudSyncSettle(ok) {
     if (!cloud) return;
     if (!ok) _syncHadError = true;
-    clearTimeout(_syncToastSettleTimer);
-    _syncToastSettleTimer = setTimeout(() => {
+    clearTimeout(_syncBarSettleTimer);
+    _syncBarSettleTimer = setTimeout(() => {
       if (_pendingCloudWrites.size > 0) return;
-      _showSyncToast(_syncHadError ? "error" : "saved");
+      _showSyncStatus(_syncHadError ? "error" : "saved");
       _syncHadError = false;
     }, 300);
   }
@@ -370,7 +373,11 @@
       _origSetItem(key, mergedStr);
       let affectedPages = [];
       try { affectedPages = _applyRemoteChangeToMemory(key); } catch (e) {}
-      if (affectedPages.indexOf(state.page) !== -1 && !_hasActiveEditableFocus()) renderApp();
+      // 여러 페이지 창이 동시에 열려 있을 수 있으므로, 지금 포커스된 페이지뿐 아니라 열려 있는
+      // 창 중 하나라도 영향을 받았으면 다시 그린다(renderApp이 열려 있는 창을 전부 새로 그림).
+      const isAnyOpenPageAffected = affectedPages.some((p) => p === state.page || (typeof hdWin !== "undefined" && !!hdWin.state[p]));
+      if (isAnyOpenPageAffected && !_hasActiveEditableFocus()) renderApp();
+      else if (affectedPages.indexOf("home") !== -1 && typeof refreshHomeWidgetsBehindWindow === "function") refreshHomeWidgetsBehindWindow(); // 창 뒤 바탕화면 위젯만 갱신
       // 진짜로 겹친 지점이 일부 있었다면(그래도 저장 자체는 계속 진행됐다) 팝업으로
       // 막지 않고, 확인하면 사라지는 가벼운 알림 배너로만 알려준다.
       if (conflicts.length) _noteFieldConflicts(key, conflicts);

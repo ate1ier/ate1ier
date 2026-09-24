@@ -233,23 +233,9 @@
     return Object.values(byDate).sort((a, b) => b.date.localeCompare(a.date));
   }
 
-  // 새로고침 버튼: 백업 버튼이 있던 오른쪽 아래 자리에 항상 떠 있는 고정 버튼으로 표시.
-  // 다른 사람이 다른 기기/탭에서 저장한 내용을 서버에서 다시 받아오기 위한 용도로,
-  // 누른 시점에 보고 있던 페이지(홈/상담사 관리 등)는 그대로 유지된다.
-  function renderRefreshToggle() {
-    const root = document.getElementById("refresh-toggle-root");
-    if (!root) return;
-    root.innerHTML = `
-      <div class="manual-toggle-wrap">
-        <button class="theme-picker-btn" id="nav-refresh-toggle" type="button" aria-label="최신 내용으로 새로고침" title="최신 내용으로 새로고침">
-          ${ICON_REFRESH}
-          <span class="theme-picker-label">새로고침</span>
-        </button>
-      </div>
-    `;
-    const refreshBtn = document.getElementById("nav-refresh-toggle");
-    if (refreshBtn) refreshBtn.onclick = () => performServerRefresh();
-  }
+  // (예전에 여기 있던 renderRefreshToggle — 오른쪽 아래 "새로고침" 버튼 — 은 상단
+  //  상태표시줄의 ↻ 버튼으로 옮겼다. 동작 자체(performServerRefresh)는 그대로
+  //  js/01j-session-boot.js에 있고, 버튼 연결은 js/01q-status-bar-refresh-undo.js에 있다.)
   function closeBackupModal() {
     const existing = document.getElementById("backup-modal-overlay");
     if (existing) existing.remove();
@@ -270,6 +256,26 @@
         </div>
       </div>
     `;
+  }
+  // 선택한 백업 파일을 읽어서 확인창을 띄운 뒤 지금 계정에 덮어쓰고 새로고침한다.
+  // 백업/복원 창(openBackupModal)과 상태표시줄 "백업" 메뉴(js/01o-status-bar-backup.js)가
+  // 같이 쓰며, 진행 상황 문구를 어디에 보여줄지는 setStatus(msg, isError)로 받는다.
+  async function importBackupFromFile(file, restrict, setStatus) {
+    const restrictLabel = restrict
+      ? ((BACKUP_CATEGORIES.find((c) => c.key === restrict) || {}).label || restrict)
+      : "전체 데이터";
+    let payload;
+    try { payload = await readBackupFile(file); }
+    catch (e) { setStatus("파일을 읽을 수 없어요. 올바른 백업 JSON 파일인지 확인해주세요.", true); return; }
+    const proceed = window.confirm(
+      `"${restrictLabel}" 데이터를 이 백업 파일 내용으로 덮어쓸까요?\n(지금 로그인한 계정 "${CURRENT_ACCOUNT_NAME}"에만 적용되고, 다른 계정에는 영향이 없어요)`
+    );
+    if (!proceed) return;
+    setStatus("가져오는 중…");
+    const result = await applyBackupPayload(payload, restrict);
+    if (!result.ok) { setStatus(result.reason, true); return; }
+    setStatus(`${result.count}개 항목을 가져왔어요. 화면을 새로고침할게요…`);
+    setTimeout(() => location.reload(), 700);
   }
   // 파일 선택창을 열기 직전에 "이번 가져오기가 어느 카테고리 대상인지"를 여기에
   // 담아두고, 파일이 선택되면 이 값을 기준으로 어떤 키만 반영할지 정한다.
@@ -313,26 +319,11 @@
     document.getElementById("backup-modal-close-x").onclick = () => closeBackupModal();
 
     const fileInput = document.getElementById("backup-file-input");
-    fileInput.onchange = async () => {
+    fileInput.onchange = () => {
       const file = fileInput.files && fileInput.files[0];
       fileInput.value = "";
       if (!file) return;
-      const restrict = backupImportRestrict;
-      const restrictLabel = restrict
-        ? ((BACKUP_CATEGORIES.find((c) => c.key === restrict) || {}).label || restrict)
-        : "전체 데이터";
-      let payload;
-      try { payload = await readBackupFile(file); }
-      catch (e) { flashBackupStatus("파일을 읽을 수 없어요. 올바른 백업 JSON 파일인지 확인해주세요.", true); return; }
-      const proceed = window.confirm(
-        `"${restrictLabel}" 데이터를 이 백업 파일 내용으로 덮어쓸까요?\n(지금 로그인한 계정 "${CURRENT_ACCOUNT_NAME}"에만 적용되고, 다른 계정에는 영향이 없어요)`
-      );
-      if (!proceed) return;
-      flashBackupStatus("가져오는 중…");
-      const result = await applyBackupPayload(payload, restrict);
-      if (!result.ok) { flashBackupStatus(result.reason, true); return; }
-      flashBackupStatus(`${result.count}개 항목을 가져왔어요. 화면을 새로고침할게요…`);
-      setTimeout(() => location.reload(), 700);
+      importBackupFromFile(file, backupImportRestrict, flashBackupStatus);
     };
 
     document.getElementById("backup-export-all").onclick = () => downloadBackup("all");

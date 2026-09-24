@@ -113,7 +113,7 @@
         icon: ICON_BOOK,
         title: "사용설명서",
         subtitle: "업무 종합 관리, 이렇게 사용하세요",
-        desc: "왼쪽 메뉴에는 7가지 기능이 있어요. 이 사용설명서는 PPT처럼 옆으로 넘겨보면서 기능 하나하나를 확인할 수 있게 만들었어요. 위쪽 탭을 클릭하거나, 양옆 화살표 버튼, 키보드 ← → 방향키, 화면 스와이프로도 넘길 수 있어요. 메뉴 아래쪽에는 화면 테마 변경, 되돌리기(Ctrl+Z), 데이터 백업/복원, 새로고침 버튼도 있으니 참고하세요.",
+        desc: "왼쪽 메뉴에는 7가지 기능이 있어요. 이 사용설명서는 PPT처럼 옆으로 넘겨보면서 기능 하나하나를 확인할 수 있게 만들었어요. 위쪽 탭을 클릭하거나, 양옆 화살표 버튼, 키보드 ← → 방향키, 화면 스와이프로도 넘길 수 있어요. 맨 위 상태표시줄에는 화면 테마 변경(\"모드\"), 데이터 백업/복원(\"백업\"), 이 사용설명서(\"설명\")와 함께 오른쪽에 새로고침, 되돌리기(Ctrl+Z), 이름 통합 검색 버튼도 있으니 참고하세요.",
         intro: true,
         chips: [
           { icon: ICON_HOME, label: "홈" },
@@ -132,7 +132,7 @@
         subtitle: "로그인 후 가장 먼저 보이는 대시보드",
         desc: "오늘 하루를 시작할 때 필요한 정보를 한 화면에 모아서 보여줘요.",
         features: [
-          "로그인하면 '오늘의 브리핑' 팝업이 한 번 떠서, 오늘 근무 현황·일정·면담 필요 알림·할 일·고정 메모를 요약해서 보여줘요.",
+          "로그인하면 상단에 '오늘의 브리핑 · 근무 N명 · 일정 N건 · 면담 필요 N명' 토스트가 잠깐 떴다가(6초 후) 저절로 사라져요.",
           "오늘 근무 현황 — 월별 스케줄을 기준으로 오늘 근무 중인 인원과 지각·결근 여부를 바로 확인해요.",
           "오늘 일정 — 캘린더에 등록된 오늘 일정을 미리 보여줘요.",
           "면담 필요 알림 — 최근 21일 내 면담 기록이 없는 상담사를 놓치지 않도록 알려줘요.",
@@ -300,19 +300,6 @@
       const nextBtn = document.getElementById("manual-next");
       if (prevBtn) prevBtn.onclick = () => goTo(i - 1);
       if (nextBtn) nextBtn.onclick = () => goTo(i + 1);
-
-      // 터치 스와이프로도 슬라이드를 넘길 수 있게 지원
-      const viewport = root.querySelector(".manual-viewport");
-      if (viewport) {
-        let touchStartX = null;
-        viewport.ontouchstart = (e) => { touchStartX = e.touches[0].clientX; };
-        viewport.ontouchend = (e) => {
-          if (touchStartX === null) return;
-          const dx = e.changedTouches[0].clientX - touchStartX;
-          if (Math.abs(dx) > 40) goTo(dx < 0 ? i + 1 : i - 1);
-          touchStartX = null;
-        };
-      }
     }
 
     // 사용설명서 팝업이 열려 있을 때만 좌우 방향키(Esc 포함)로 조작할 수 있게 한다.

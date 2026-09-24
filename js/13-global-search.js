@@ -1,8 +1,11 @@
   /* ===================== 전역 검색 (상담사 · 메모 · 면담일지 통합) =====================
      상담사 관리 / 업무 정리 / 면담일지 페이지에 각각 따로 있는 검색을 한 곳에서
      "이 사람과 관련된 것 다 보여줘" 식으로 통합해서 찾아주는 기능.
-     - 위치: 하단 내비게이션 독의 카테고리 아이콘들 바로 위 (#nav-dock 안, #nav 앞)
-     - 결과: 새 페이지로 이동하지 않고, 검색 바로 위에 카드 목록(드롭다운)으로 떠서 보여줌
+     - 위치: 상단 상태표시줄 오른쪽의 검색(🔍) 버튼을 누르면 그 아래로 펼쳐지는 검색
+       패널 안 (#status-bar-search-panel 안의 #global-search-root — 열고 닫는 동작은
+       js/01r-status-bar-search.js). 예전에는 하단 내비게이션 독의 카테고리 아이콘들
+       바로 위에 있던 검색 바를 옮긴 것이다.
+     - 결과: 새 페이지로 이동하지 않고, 검색 바 아래에 카드 목록으로 보여줌
      - 카드를 클릭하면 해당 페이지로 이동해서 그 항목을 바로 펼쳐서 보여줌
 
      주의: 이 검색창은 renderNav()처럼 매번 innerHTML을 새로 그리지 않는다(앱 전체에서
@@ -182,8 +185,8 @@
     if (wrap) wrap.classList.remove("open");
   }
 
-  // 검색창 입력값 + 결과 패널을 비운다. 독을 닫을 때(closeDock)와 검색 결과 카드를
-  // 선택해 다른 페이지로 이동할 때 공통으로 쓴다.
+  // 검색창 입력값 + 결과 패널을 비운다. 상태표시줄 검색 패널을 닫을 때
+  // (closeStatusBarSearch)와 검색 결과 카드를 선택해 다른 페이지로 이동할 때 공통으로 쓴다.
   function resetGlobalSearchQuery() {
     globalSearchState.query = "";
     const input = document.getElementById("gs-input");
@@ -195,10 +198,10 @@
     closeGlobalSearchResults();
   }
 
-  // 검색 결과 카드를 선택해 다른 페이지로 이동한 뒤: 검색창을 비우고 독을 닫는다.
+  // 검색 결과 카드를 선택해 다른 페이지로 이동한 뒤: 검색창을 비우고 검색 패널을 닫는다.
   function resetGlobalSearchAfterNavigate() {
     resetGlobalSearchQuery();
-    if (typeof closeDock === "function") closeDock();
+    if (typeof closeStatusBarSearch === "function") closeStatusBarSearch();
   }
 
   function openAgentFromGlobalSearch(id) {
@@ -288,8 +291,14 @@
   function renderGlobalSearchShell() {
     const root = document.getElementById("global-search-root");
     if (!root) return;
-    // 마스터(관리자) 계정은 상담사·메모·면담일지 페이지 자체가 없으므로 검색도 숨긴다.
-    if (CURRENT_ACCOUNT_IS_MASTER) { root.innerHTML = ""; return; }
+    // 마스터(관리자) 계정은 상담사·메모·면담일지 페이지 자체가 없으므로 검색도 숨긴다
+    // (상태표시줄의 검색 버튼도 함께 숨김).
+    if (CURRENT_ACCOUNT_IS_MASTER) {
+      root.innerHTML = "";
+      const searchBtn = document.getElementById("status-bar-search-btn");
+      if (searchBtn) searchBtn.hidden = true;
+      return;
+    }
 
     root.innerHTML = `
       <div class="gs-wrap" id="gs-wrap">
@@ -315,6 +324,8 @@
     });
     input.addEventListener("keydown", (e) => {
       if (e.key === "Escape") {
+        // 검색 패널이 열려 있으면 패널째로 닫는다(입력값도 함께 초기화).
+        if (typeof closeStatusBarSearch === "function") closeStatusBarSearch();
         closeGlobalSearchResults();
         input.blur();
       } else if (e.key === "Enter") {

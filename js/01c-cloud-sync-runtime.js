@@ -7,6 +7,7 @@
     ["personal-interviews:data", "면담일지"],
     ["personal-agents:data", "상담사 관리"],
     ["personal-notes:data", "업무 정리(메모)"],
+    ["desktop-folders:data", "바탕화면 폴더"],
     ["personal-calendar:todos", "캘린더/할일"],
     ["personal-monthclose:data", "월마감 확인"],
     ["personal-app:accounts", "계정 목록"],
@@ -45,6 +46,11 @@
       undoRestoreObjectInPlace(notesData, loadNotesData());
       return ["notes", "home"];
     }
+    if (key.indexOf("desktop-folders:data") !== -1) {
+      undoRestoreObjectInPlace(desktopFoldersData, loadDesktopFoldersData());
+      // 바탕화면 아이콘은 "home"으로 갱신되고, 열려 있는 폴더 창은 창 id("folder:<id>")로 함께 알려 다시 그리게 한다.
+      return ["home"].concat(typeof hdWin !== "undefined" ? hdWin.order.filter((p) => p.indexOf("folder:") === 0) : []);
+    }
     if (key.indexOf("personal-agents:data") !== -1) {
       agentsData = loadAgentsData();
       return ["agents", "home", "interviews", "schedule", "qa"];
@@ -70,7 +76,7 @@
   // 지금 어딘가에 글자를 입력 중인지(텍스트칸에 커서가 가 있는지) 확인한다. 입력 중일 때
   // 화면을 억지로 다시 그리면 커서 위치나 아직 저장 안 된 입력 내용이 날아갈 수 있어서,
   // 그럴 때는 그 자리에서 바로 반영하지 않고 예전처럼 "새로고침" 배너로만 알린다.
-  // 예외: 하단 내비게이션의 "이름 통합 검색"(#global-search-root 안, #gs-input)은
+  // 예외: 상단 상태표시줄 검색 패널의 "이름 통합 검색"(#global-search-root 안, #gs-input)은
   // renderApp()이 다시 그리는 #page-inner 밖에 따로 떠 있고, 그 자체 로직도 renderApp()과
   // 무관하게 매번 자기 결과 패널만 갱신하도록 만들어져 있어서(13-global-search.js 상단 주석
   // 참고) — renderApp()이 실행돼도 이 입력창의 값이나 커서는 전혀 건드리지 않는다. 그런데도
@@ -350,7 +356,9 @@
           _origSetItem(row.key, row.value); // 로컬 저장소에는 언제나 즉시 최신 내용 반영 (탭이 안 보이는 동안에도 마찬가지)
           let affectedPages = [];
           try { affectedPages = _applyRemoteChangeToMemory(row.key); } catch (e) {}
-          const isCurrentPageAffected = affectedPages.indexOf(state.page) !== -1;
+          // 여러 페이지 창이 동시에 열려 있을 수 있으므로, 포커스된 페이지뿐 아니라 열려 있는
+          // 창 중 하나라도 영향을 받았으면 다시 그린다(renderApp이 열려 있는 창을 전부 새로 그림).
+          const isCurrentPageAffected = affectedPages.some((p) => p === state.page || (typeof hdWin !== "undefined" && !!hdWin.state[p]));
           // 화면(그림)을 다시 그리는 것만 "지금 이 탭이 실제로 보이고 있고 + 뭔가
           // 입력 중인 칸에 커서가 가 있지 않을 때"로 미룬다. 데이터 자체(메모리·로컬
           // 저장소)는 위에서 이미 최신 상태로 반영해뒀으니, 지금 당장 다시 그리지
@@ -361,6 +369,8 @@
           // 잡아내서 _renderFieldConflictBanner / _renderConflictBanner로 알려준다.
           if (isCurrentPageAffected && !_hasActiveEditableFocus() && _isTabVisible()) {
             renderApp();
+          } else if (affectedPages.indexOf("home") !== -1 && _isTabVisible() && typeof refreshHomeWidgetsBehindWindow === "function") {
+            refreshHomeWidgetsBehindWindow(); // 페이지 창은 그대로 두고, 그 뒤 바탕화면 위젯만 갱신
           }
         }
       )
