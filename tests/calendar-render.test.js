@@ -126,10 +126,10 @@ test("entryEditFormHtml: 상세 내용은 펼쳐져 있을 때만 textarea로 �
   assert.equal(expanded.includes("상세 내용 접기"), true);
 });
 
-test("entryEditFormHtml: 중요 표시 상태가 버튼의 active 클래스로 반영된다", () => {
+test("entryEditFormHtml: 수정 폼에서는 중요 버튼을 표시하지 않는다", () => {
   const m = loadCalendar();
-  m.cal.editPriority = false;
-  assert.equal(countMatches(m.entryEditFormHtml({ id: "e6", text: "a" }), `class="type-btn priority active"`), 0);
   m.cal.editPriority = true;
-  assert.equal(countMatches(m.entryEditFormHtml({ id: "e6", text: "a" }), `class="type-btn priority active"`), 1);
+  const html = m.entryEditFormHtml({ id: "e6", text: "a" });
+  assert.equal(countMatches(html, `id="btn-edit-priority"`), 0);
+  assert.equal(countMatches(html, `class="type-btn priority active"`), 0);
 });
