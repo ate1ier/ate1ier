@@ -1,0 +1,97 @@
+  /* ==================== 상태표시줄 시계 → "오늘의 브리핑" 사이드바 ====================
+     macOS 목업(ate1ier-macos-mockup)에서 메뉴바 오른쪽 날짜·시간(#ck)을 누르면 우측에서
+     스르륵 열리는 알림 센터(#nc)를 그대로 옮겨왔다. 계정 버튼(status-bar-account-btn)과
+     같은 방식으로 시계도 실제로 눌리는 button 태그로 바꾸고(js/14-briefing-sidebar.js),
+     안에 채우는 내용은 홈 화면 로그인 직후 뜨는 "오늘의 브리핑" 토스트와 같은 실제 데이터
+     (js/08-home.js의 computeTodayBrief())를 그대로 쓴다. */
+  button.status-bar-clock.status-bar-clock-btn {
+    background: none; border: none; font: inherit; letter-spacing: inherit; color: var(--text);
+    cursor: pointer; border-radius: 7px; transition: background 0.12s ease;
+  }
+  button.status-bar-clock.status-bar-clock-btn:hover,
+  button.status-bar-clock.status-bar-clock-btn.open {
+    background: var(--mac-vibrancy-hairline);
+  }
+
+  .briefing-sidebar {
+    position: fixed;
+    /* 위쪽은 상태표시줄 바로 아래(--briefing-top: JS가 실제 상태표시줄 하단 위치를 재서 넣음),
+       오른쪽·아래쪽은 화면 끝에 딱 붙인다(여백·테두리·둥근 모서리 없음). */
+    top: var(--briefing-top, 39px);
+    right: 0;
+    bottom: 0;
+    margin: 0;
+    border: 0;
+    width: min(372px, 100vw);
+    z-index: 500;
+    display: flex;
+    flex-direction: column;
+    border-radius: 0;
+    background: var(--mac-vibrancy);
+    box-shadow: -1px 0 0 var(--mac-vibrancy-hairline), var(--mac-shadow);
+    backdrop-filter: blur(50px) saturate(1.7);
+    -webkit-backdrop-filter: blur(50px) saturate(1.7);
+    overflow: hidden;
+    /* 목업(#nc)과 동일한 트랜지션: 열릴 땐 바로, 닫힐 땐 사라진 뒤(visibility) 정리 */
+    transform: translateX(100%);
+    opacity: 0;
+    visibility: hidden;
+    transition: transform 0.34s cubic-bezier(.2, .85, .25, 1), opacity 0.22s ease, visibility 0s linear 0.34s;
+  }
+  .briefing-sidebar.open {
+    transform: none; opacity: 1; visibility: visible; transition-delay: 0s;
+  }
+  .briefing-head {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+    padding: 18px 20px 8px; flex-shrink: 0;
+  }
+  .briefing-head b { font-size: 19px; font-weight: 600; color: var(--text); }
+  .briefing-head small { color: var(--text-faint); font-size: 12.5px; }
+  .briefing-body { flex: 1; min-height: 0; overflow: auto; padding: 4px 12px 16px; }
+
+  .briefing-row {
+    display: flex; align-items: center; gap: 11px; width: 100%; box-sizing: border-box;
+    padding: 11px 12px; margin-bottom: 8px; border-radius: 14px;
+    background: var(--hairline); border: none; color: inherit; font: inherit;
+    text-align: left; cursor: pointer; transition: background 0.15s ease;
+  }
+  .briefing-row:hover { background: var(--accent-dim); }
+  .briefing-row:active { transform: scale(0.99); }
+  .briefing-row-icon {
+    flex: none; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center;
+    border-radius: 9px; box-shadow: 0 2px 6px rgba(0, 0, 0, .28), inset 0 1px 0 rgba(255, 255, 255, .45);
+  }
+  .briefing-row-icon svg { display: block; }
+  .briefing-row-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+  .briefing-row-text b { font-size: 14px; font-weight: 500; color: var(--text); }
+  .briefing-row-text span {
+    font-size: 12.5px; color: var(--text-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  /* 목업(.ncn.warn::after)처럼, 확인이 필요한 항목엔 끝에 작은 점을 붙인다 */
+  .briefing-row.warn::after {
+    content: ""; flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--amber);
+  }
+
+  .briefing-group-head {
+    display: flex; justify-content: space-between; margin: 14px 6px 6px;
+    color: var(--text-faint); font-size: 12.5px; font-weight: 500;
+  }
+  .briefing-todo-list, .briefing-empty { padding: 2px 12px; border-radius: 14px; background: var(--hairline); }
+  .briefing-empty { padding: 14px 12px; color: var(--text-faint); font-size: 13px; }
+  .briefing-todo-row { display: flex; align-items: center; gap: 8px; padding: 9px 0; border-top: 1px solid var(--hairline-strong); }
+  .briefing-todo-row:first-child { border-top: none; }
+  .briefing-todo-row .check-btn { flex-shrink: 0; }
+  .briefing-todo-row .due { margin-left: auto; font-size: 12px; color: var(--text-faint); flex-shrink: 0; }
+  .briefing-todo-row .due.over { color: var(--red); }
+
+  
+
+  /* 패널이 열려 있는 동안엔 페이지 세로 스크롤바를 숨겨서, 패널이 스크롤바 폭만큼 안쪽에서
+     멈추지 않고 창 오른쪽 끝까지 붙게 한다. 스크롤바가 사라진 폭만큼 html에 오른쪽 안쪽 여백을
+     대신 채워서 뒤 화면이 옆으로 밀리지 않게 하고(--briefing-sbw는 JS가 열기 직전에 잰 스크롤바 폭),
+     상태표시줄만 그 폭만큼 오른쪽으로 늘려 시계 위치가 그대로 유지되게 한다. */
+  html.briefing-open { overflow: hidden; padding-right: var(--briefing-sbw, 0px); }
+  html.briefing-open #app-status-bar {
+    margin-right: calc(-1 * var(--briefing-sbw, 0px));
+    padding-right: calc(14px + var(--briefing-sbw, 0px));
+  }

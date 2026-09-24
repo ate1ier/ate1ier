@@ -81,10 +81,8 @@
   .schedule-table tr.sch-group-row td, .schedule-table tr.sch-subgroup-row td { cursor: default; }
   .schedule-table tr.sch-group-row td.sch-row-th, .schedule-table tr.sch-subgroup-row td.sch-row-th { cursor: pointer; }
 
-  .schedule-table-wrap { overflow: clip; -webkit-overflow-scrolling: touch; border: 1px solid var(--hairline); border-radius: 16px; width: 100%; background: var(--panel); }
-  @media (max-width: 720px) {
-    .schedule-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-  }
+  .schedule-table-wrap { overflow: clip; border: 1px solid var(--hairline); border-radius: 16px; width: 100%; background: var(--panel); }
+  
   .schedule-scale-inner { transform-origin: top left; }
   .schedule-table { border-collapse: collapse; font-size: 13.5px; white-space: nowrap; background: var(--panel); }
   .schedule-table th, .schedule-table td {
@@ -465,12 +463,7 @@
   }
   .sch-auto-exclude-remove:hover { background: var(--accent); color: var(--accent-text); }
   .sch-auto-excluded-note { font-size: 12.5px; color: var(--text-dim); margin-bottom: 10px; line-height: 1.6; }
-  @media (max-width: 720px) {
-    .sch-auto-conds { overflow-x: auto; }
-    .sch-auto-conds-head { min-width: max-content; }
-    .sch-auto-conds-actions { width: auto; justify-content: flex-end; }
-    .sch-auto-exclude-select { font-size: 16px; }
-  }
+  
 
   /* 인원별 선호 출근/오프 요일: 한 화면에서 월~일과 두 선호를 함께 편집 */
   .sch-auto-set-overlay { z-index: 81; }
@@ -511,23 +504,8 @@
   .sch-auto-pref-choice-btn:hover { color: var(--text); background: var(--elevated); }
   .sch-auto-pref-choice-btn--work.on { background: var(--blue); border-color: var(--blue); color: #fff; }
   .sch-auto-pref-choice-btn--off.on { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
-  @media (max-width: 720px) {
-    .sch-auto-set-overlay { padding: 10px; }
-    .sch-auto-set-box { width: 100%; }
-    .sch-auto-set-table thead th.sch-auto-set-name-th,
-    .sch-auto-set-table .sch-auto-set-name { width: 120px; }
-    .sch-auto-set-table th, .sch-auto-set-table td { padding: 3px 1px; }
-    .sch-auto-pref-pair { gap: 2px; }
-    .sch-auto-pref-choice-btn { width: 24px; height: 25px; font-size: 10px; }
-    .sch-auto-set-name .sch-adjust-nick { display: none; }
-    .sch-auto-set-excluded-tag { display: block; margin-left: 0; }
-  }
-  @media (max-width: 430px) {
-    .sch-auto-set-table thead th.sch-auto-set-name-th,
-    .sch-auto-set-table .sch-auto-set-name { width: 94px; }
-    .sch-auto-pref-choice-btn { width: 21px; height: 24px; font-size: 9px; }
-    .sch-auto-pref-pair { gap: 1px; }
-  }
+  
+  
 
   .sch-memo-box { width: min(420px, 92vw); }
   .sch-memo-body { display: block; }
@@ -586,29 +564,9 @@
   /* 캡처(이미지 저장) 시에는 "되돌리기" 버튼처럼 화면에서만 의미 있는 조작용 요소는 숨긴다. */
   .sch-capture-flatten .sch-log-clear { display: none !important; }
 
-  /* ---------- 월별 스케줄 페이지 모바일 대응 ----------
-     표 자체(.schedule-table-wrap)는 720px 이하에서 이미 축소 대신 가로 스크롤로
-     전환되도록 되어 있음(fitScheduleTable, 위 720px 블록 참고). 여기서는 표를
-     감싸는 상단 툴바·패널류를 좁은 화면에서 세로로 쌓아 정리한다. */
-  @media (max-width: 720px) {
-    .schedule-top { flex-direction: column; align-items: stretch; gap: 12px; }
-    .schedule-month-nav { justify-content: flex-start; gap: 6px; }
-    /* sch-lock-btn·sch-bulk-btn은 인라인 style="margin-left:8px"가 붙어 있어
-       (외부 CSS 클래스보다 우선순위가 높음) !important로 덮어써야 줄바꿈 시에도
-       다른 버튼들과 나란히 정렬된다. */
-    #sch-lock-btn, #sch-bulk-btn { margin-left: 0 !important; }
-    .schedule-table-toolbar { justify-content: flex-start; flex-wrap: wrap; }
-    .schedule-table-toolbar .agent-search-input { width: 100%; }
-    .schedule-bulk-panel, .schedule-colgroup-panel { padding: 12px 14px; }
-    .schedule-colgroup-form { align-items: stretch; }
-    .schedule-colgroup-form .add-input { flex: 1 1 80px; width: auto; }
-    .schedule-legend { gap: 8px 12px; font-size: 12px; }
-    .sch-log-item { flex-wrap: wrap; row-gap: 4px; }
-    .sch-log-item .sch-log-clear { margin-left: 0; width: 100%; text-align: right; }
-  }
+  
 
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
-
 
 /* AI 자동 배치: 구분별 최소 출근 인원 입력
    기존 임시 스타일의 --surface/--border가 이 앱의 테마 변수와 달라 다크모드에서
@@ -672,12 +630,6 @@
   opacity:.65;
 }
 html[data-theme="light"] .sch-auto-min-working-item input{background:var(--panel)}
-@media (max-width:720px){
-  .sch-auto-min-working-grid{grid-template-columns:repeat(2,minmax(120px,1fr))}
-}
-@media (max-width:420px){
-  .sch-auto-min-working-grid{grid-template-columns:1fr}
-}
 
   /* 인원별 선호 출근/오프 요일: 오프와 출근을 별도 화면에서 선택 */
   .sch-auto-settings-buttons { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
@@ -691,10 +643,7 @@ html[data-theme="light"] .sch-auto-min-working-item input{background:var(--panel
   .sch-auto-pref-choice-btn:hover { color: var(--text); background: var(--elevated); }
   .sch-auto-pref-choice-btn--work.on { background: var(--blue); border-color: var(--blue); color: #fff; }
   .sch-auto-pref-choice-btn--off.on { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
-  @media (max-width: 720px) {
-    .sch-auto-set-pref-cell { min-width: 62px; }
-    .sch-auto-pref-choice-btn { min-width: 48px; height: 28px; padding: 0 5px; font-size: 10px; }
-  }
+  
 
 /* 인원별 설정 팝업 상단 탭: 선호 오프 설정 / 선호 출근 설정을 같은 팝업 안에서 오간다. */
 .sch-auto-set-tabs {

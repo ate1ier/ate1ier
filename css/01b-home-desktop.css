@@ -1,0 +1,89 @@
+  /* ---------- 홈 화면: macOS 목업의 오른쪽 데스크톱 아이콘(#icons/.di) + 하단 독(#dock/.dk) ----------
+     ate1ier-macos-mockup의 CSS 값(크기·간격·그림자·hover 확대·툴팁·색)을 그대로 옮겼습니다.
+     일반 계정(body.home-desktop)에서는 항상 보이고, 예전 오른쪽 내비게이션 사이드바(#nav-dock)는 숨깁니다.
+     아이콘/독을 누르면 각 페이지가 바탕화면 위 창으로 열립니다(css/01c-app-window.css). 마스터 계정은 기존 그대로.
+     렌더링은 js/09a-home-desktop.js. */
+  #home-icons, #home-dock, #hd-snap-assist {
+    --hd-w2: rgba(40, 42, 52, 0.95);
+    --hd-t: #f5f5f7;
+    --hd-ln: rgba(255, 255, 255, 0.16);
+    --hd-bar: rgba(14, 15, 22, 0.66);
+    --hd-label: #fff;
+    --hd-label-shadow: 0 1px 4px rgba(0, 0, 0, 0.85);
+    --hd-hover: rgba(255, 255, 255, 0.16);
+  }
+  html[data-theme="light"] #home-icons, html[data-theme="light"] #home-dock, html[data-theme="light"] #hd-snap-assist {
+    --hd-w2: rgba(246, 246, 248, 0.95);
+    --hd-t: #1d1d1f;
+    --hd-ln: rgba(0, 0, 0, 0.12);
+    --hd-bar: rgba(255, 255, 255, 0.62);
+    /* 배경화면(home-wallpaper.jpg)이 라이트 모드에서도 어두워서, 바탕화면 아이콘 글씨는 목업처럼 흰색 그대로 둔다 */
+  }
+  #home-icons, #home-dock { display: none; }
+  body.home-desktop #home-icons { display: flex; }
+  body.home-desktop #home-dock { display: flex; }
+  body.home-desktop #nav-dock { display: none; }
+  /* 홈 화면 배경화면 — 목업 body의 background(center/cover no-repeat fixed)와 같은 방식.
+     홈 위젯(#wg)이 목업처럼 화면에 고정(fixed)되므로 홈에서는 페이지 스크롤도 목업처럼 잠근다. */
+  body.home-desktop {
+    background: #050813 url("home-wallpaper.jpg") center/cover no-repeat fixed;
+    overflow: hidden; height: 100vh; height: 100dvh;
+  }
+
+  /* 오른쪽 데스크톱 아이콘 (목업 #icons / .di) */
+  #home-icons {
+    position: fixed; top: 44px; right: 14px; z-index: 1;
+    flex-direction: column; flex-wrap: wrap-reverse; align-content: flex-start;
+    height: calc(100% - 150px); gap: 6px;
+  }
+  .hd-di {
+    display: block; width: 86px; padding: 5px 2px; margin: 0; border: 0; text-align: center;
+    background: none; font: inherit; font-size: 12px; font-weight: 300; line-height: 1.45; letter-spacing: normal;
+    color: var(--hd-label); text-shadow: var(--hd-label-shadow); border-radius: 8px; cursor: default;
+    transition: background 0.28s ease-out;
+  }
+  .hd-di:hover { background: var(--hd-hover); transition: background 0.28s ease-out; }
+  .hd-di:focus-visible, .hd-dk:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .hd-ic {
+    display: grid; place-items: center; width: 54px; height: 54px; border-radius: 13px;
+    background: var(--g); margin: 0 auto 3px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  }
+  .hd-ic svg {
+    width: 29px; height: 29px; stroke: #fff; fill: none; stroke-width: 1.8;
+    stroke-linecap: round; stroke-linejoin: round;
+  }
+
+  /* 하단 독 (목업 #dock / .dk) */
+  #home-dock {
+    position: fixed; left: 50%; bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+    transform: translateX(-50%); z-index: 59; /* 페이지 창들(여러 개 동시에 열릴 수 있어 z 50~55 사이에서 겹침)보다 위 — 최대화한 창 위로 독이 확대돼도 잘리지 않게. 모달(80+)·상태표시줄 메뉴(60)보다는 아래 */
+    align-items: flex-end; gap: 13px; padding: 8px 14px 10px; border-radius: 24px;
+    background: var(--hd-bar); border: 1px solid rgba(255, 255, 255, 0.35);
+    backdrop-filter: blur(30px) saturate(1.8); -webkit-backdrop-filter: blur(30px) saturate(1.8);
+  }
+  .hd-dk {
+    position: relative; display: block; padding: 0; margin: 0; border: 0; background: none;
+    font: inherit; font-size: 12px; font-weight: 300; color: var(--hd-t);
+    transform-origin: bottom; transition: transform 0.3s cubic-bezier(.22, 1, .36, 1); will-change: transform; cursor: default;
+  }
+  .hd-dk .hd-ic { width: 58px; height: 58px; margin: 0; border-radius: 15px; }
+  .hd-dk .hd-ic svg { width: 34px; height: 34px; }
+  .hd-dk:hover { transform: scale(1.42); }
+  .hd-dk:hover + .hd-dk, .hd-dk:has(+ .hd-dk:hover) { transform: scale(1.18); }
+  .hd-dk::before {
+    content: attr(data-n); position: absolute; bottom: 100%; left: 50%;
+    transform: translateX(-50%) scale(0.85) translateY(4px); margin-bottom: 8px; padding: 3px 10px; border-radius: 7px;
+    background: var(--hd-w2); box-shadow: 0 0 0 1px var(--hd-ln);
+    font-size: 12px; white-space: nowrap; color: var(--hd-t);
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.24s ease-out, transform 0.28s cubic-bezier(.22, 1, .36, 1);
+  }
+  .hd-dk:hover::before { opacity: 1; transform: translateX(-50%) scale(1) translateY(0); }
+
+  /* 좁은 화면(목업 max-width:700px): 오른쪽 아이콘은 숨기고 독 아이콘을 줄인다 */
+  @media (max-width: 700px) {
+    body.home-desktop #home-icons { display: none; }
+    .hd-dk .hd-ic { width: 38px; height: 38px; }
+    #home-dock { gap: 5px; padding: 5px 8px 7px; }
+  }

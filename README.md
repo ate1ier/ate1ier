@@ -12,6 +12,7 @@ counseling-app/
 ├── index.html          ← 실제로 여는 파일 (빌드 결과물, 뼈대 HTML만 있음)
 ├── app.js              ← 빌드 결과물: js/ 전체를 순서대로 이어붙인 파일
 ├── styles.min.css      ← 빌드 결과물: css/ 전체를 합치고 압축한 파일
+├── home-wallpaper.jpg  ← 홈 화면 배경화면 (css/01b-home-desktop.css의 body.home-desktop에서 사용)
 ├── build.js            ← css/js 파일들을 위 세 파일로 조합하는 스크립트
 ├── package.json        ← terser(JS 압축, 선택 사항) 설치 설정
 ├── tools/
@@ -20,8 +21,11 @@ counseling-app/
 ├── body.html             ← <body> 골격 (레이아웃 껍데기)
 ├── css/
 │   ├── 00-variables.css      공통 색상/여백 변수, 다크·라이트 테마
-│   ├── 01-shell-nav.css      좌측 내비게이션 독, 토스트, 모바일 공통
-│   ├── 02-home.css           홈 화면
+│   ├── 01-shell-nav.css      좌측 내비게이션 독, 토스트
+│   ├── 01b-home-desktop.css  홈 화면 오른쪽 데스크톱 아이콘 + 하단 독 + 배경화면 (macOS 목업 그대로)
+│   ├── 01c-app-window.css    아이콘/독을 누르면 페이지가 바탕화면 위 창(#page-area)으로 뜨는 스타일 (제목줄·닫기/내리기/최대화·크기 조절)
+│   ├── 01d-desktop-folders.css 바탕화면 폴더 아이콘(macOS 스타일)·이름 입력칸·우클릭 메뉴·Finder 스타일 폴더 창 (폴더 그라데이션 정의는 body.html 맨 위 숨김 svg)
+│   ├── 02-home.css           홈 위젯(#wg, macOS 목업의 위젯 CSS 그대로) + 오늘의 브리핑 토스트/월마감 팝업
 │   ├── 03-login.css          로그인 화면
 │   ├── 04-calendar.css       캘린더 페이지
 │   ├── 05-notes.css          업무 정리(메모) 페이지
@@ -64,8 +68,10 @@ counseling-app/
     ├── 07a8-schedule-render-page.js 스케줄: renderSchedulePage 진입점
     ├── 07a9-schedule-copy-paste.js  스케줄: 셀 복사(Ctrl+C)/붙여넣기(Ctrl+V), 메모 포함 (분할본이 아니라 새로 추가한 파일)
     ├── 07b-holiday-doc.js  휴일대체 확인서(.docx) 생성
-    ├── 08-home.js     홈 화면 렌더링
+    ├── 08-home.js     홈 위젯 렌더링 (목업 마크업 구조에 실제 데이터를 채움, 제목줄 드래그로 배치 변경)
     ├── 09-nav.js      좌측 내비게이션 렌더링
+    ├── 09a-home-desktop.js        바탕화면 아이콘·독 렌더링 + 페이지 창 제어(열기/닫기/내리기/최대화/이동), 상태표시줄 "마스터로 복귀" 버튼
+    ├── 09b-desktop-folders.js     바탕화면 폴더: 빈 바탕화면 우클릭 → "새 폴더", 이름 바꾸기·삭제·끌어서 옮기기, 누르면 macOS Finder 같은 폴더 창(09a의 창 시스템 재사용). 파일을 창/폴더 아이콘에 끌어다 놓으면 업로드(메모 첨부와 같은 Supabase 버킷 note-attachments의 <계정id>/desktop/ 경로), 아이콘 보기·이미지 썸네일·다운로드·삭제
     ├── 10-master.js   마스터(관리자) 모드
     ├── 11-manual.js   사용설명서 팝업
     ├── 12-init.js     앱 부팅(초기 렌더링 실행)

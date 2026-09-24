@@ -1,0 +1,226 @@
+  /* ---------- 바탕화면 위에 뜨는 페이지 창들 (macOS 목업의 .win / .tb / .tl) ----------
+     일반 계정(body.home-desktop)에서는 아이콘·독을 누르면 그 페이지가 #hd-windows 안에 새 창(.app-win)으로 뜬다.
+     이미 다른 창이 열려 있어도 그 창은 그대로 바탕화면 위에 남아 있고(진짜 macOS처럼 여러 창이 동시에 열림),
+     같은 아이콘을 다시 누르면 그 창만 앞으로 올라오거나(포커스) 내려가 있던 창이 복원된다. 창을 만들고
+     여닫는 로직은 js/09a-home-desktop.js.
+     창 크기·위치·최대화 값은 목업 .win을 따르되, 이 앱의 페이지(월별 스케줄 표 등)가 넓어서 기본 크기만 더 크게 잡았다.
+     기본 위치·크기는 js/09a-home-desktop.js가 만들 때 인라인 스타일로 넣어주고, 아래 값은 그게 없을 때의 안전망이다.
+     ※ 창 자체에는 backdrop-filter를 걸지 않는다 — 걸면 창 안의 position:fixed 메뉴·팝업 위치가 어긋난다.
+     열기 애니메이션(aw-pop)이 도는 잠깐 동안만 transform이 있다.
+     제목줄을 화면 좌/우 끝까지 끌면 그쪽 절반에 붙는 스냅(win-snap-l/r)과 반대편 페이지 고르기 패널(#hd-snap-assist)도 이 파일에 있다.
+     마스터 계정과 로그인 화면은 이 파일의 영향을 받지 않는다(옛 #page-area를 그대로 씀). */
+  #app-win-bar { display: none; }
+  body.home-desktop #page-area { display: none; }
+
+  .app-win {
+    display: flex; flex-direction: column; justify-content: flex-start; align-items: stretch;
+    position: fixed;
+    left: max(112px, calc((100vw - 1240px) / 2));
+    top: calc(52px + env(safe-area-inset-top, 0px));
+    width: min(1240px, calc(100vw - 224px));
+    height: calc(100% - 52px - 132px - env(safe-area-inset-top, 0px));
+    min-width: 340px; min-height: 240px;
+    padding: 0; border-radius: 12px;
+    background: var(--bg); color: var(--text);
+    box-shadow: 0 0 0 1px var(--hairline-strong), 0 24px 64px rgba(0, 0, 0, 0.6);
+    overflow: hidden; resize: both;
+    /* 접힌 창을 펼칠 때(win-min 클래스가 빠질 때)는 이 기본 규칙이 "돌아갈 목표 상태"가 되므로,
+       여기에도 transform/opacity 트랜지션을 넣어둬야 펼쳐지는 쪽도 접히는 쪽과 똑같이 부드럽다
+       (아래 .win-min 쪽에만 넣으면 펼칠 때는 트랜지션 없이 툭 돌아와버린다). visibility는 일부러
+       안 넣어서, 펼칠 때는 지연 없이 즉시 다시 보이기 시작한다(안 그러면 애니메이션이 끝날 때까지
+       안 보이는 상태로 있다가 마지막에 툭 나타나 보인다). */
+    transition: transform 0.5s cubic-bezier(.32, .72, 0, 1), opacity 0.3s ease-out;
+  }
+  html[data-theme="light"] .app-win {
+    box-shadow: 0 0 0 1px var(--hairline-strong), 0 24px 64px rgba(0, 0, 0, 0.28);
+  }
+  /* 부드러움 조정(2026-09): 모든 창 모션을 "처음엔 빠르게 → 끝에서 천천히 잦아드는" 감속 곡선(.32,.72,0,1 / expo-out)으로
+     통일하고, 시간을 조금씩 늘렸다(열기 .3→.42s, 접기/펴기 .32→.5s, 크게/작게 .32→.45s, 닫기 .16→.23s).
+     ※ 아래 닫기(.23s)·크게/작게(.45s) 시간은 js/09a-home-desktop.js의 setTimeout 값(230 / 500)과 짝이다 — 바꿀 땐 같이 바꿀 것. */
+  .app-win.aw-pop { animation: aw-pop 0.42s cubic-bezier(.16, 1, .3, 1); }
+  @keyframes aw-pop { from { transform: scale(0.94) translateY(14px); opacity: 0; } }
+  /* 닫기(빨강): 사라지는 순간도 훅 꺼지지 않고 살짝 작아지며 페이드아웃한 뒤(js가 이 시간만큼
+     기다렸다 DOM에서 실제로 제거) 사라진다. */
+  .app-win.aw-closing { animation: aw-close 0.23s cubic-bezier(.32, 0, .67, 0) forwards; pointer-events: none; }
+  @keyframes aw-close { to { transform: scale(0.95) translateY(6px); opacity: 0; } }
+
+  /* 내리기(노랑): 창만 숨김. 같은 아이콘을 다시 누르면 복원.
+     js/09a-home-desktop.js의 hdMinimizeWindow()가 내리기 직전에 그 페이지의 독 아이콘 위치를 재서
+     --mac-min-dx/--mac-min-dy(창 중심 → 독 아이콘 중심까지의 거리)와 --mac-min-scale(독 아이콘
+     크기에 맞춘 축소 비율)을 이 창에 인라인으로 세팅해준다. translate가 scale보다 오른쪽에 있어서
+     먼저 중심을 기준으로 축소된 뒤 그 거리만큼 옮겨가므로, 창이 정확히 그 아이콘 쪽으로 빨려들어가듯
+     작아진다(진짜 macOS 지니 효과). 독 아이콘을 못 찾은 경우(변수 미설정) 등을 대비해 기본값은
+     예전처럼 화면 아래 가운데로 작아지는 동작으로 안전망을 둔다.
+     여기서만 visibility를 트랜지션 목록에 넣고 그만큼(0.5s) 지연시켜서, 접히는 동안엔 계속
+     보이는 상태로 작아지다가 다 접힌 뒤에야(pointer-events도 그때부터) 실제로 감춰진다. */
+  .app-win.win-min {
+    transform: translate(var(--mac-min-dx, 0px), var(--mac-min-dy, 70vh)) scale(var(--mac-min-scale, 0.12));
+    opacity: 0; pointer-events: none; visibility: hidden;
+    /* 접히는 동안 처음엔 창이 또렷하게 보이다가(투명도 변화는 0.1s 늦게 시작) 독에 거의 닿을 즈음 사라진다 */
+    transition: transform 0.5s cubic-bezier(.32, .72, 0, 1), opacity 0.4s ease-in 0.1s, visibility 0s 0.5s;
+  }
+
+  /* 크게/작게(초록 버튼·제목줄 더블클릭) 전환 순간에만 위치·크기에도 트랜지션을 걸어서, 스냅되듯
+     바뀌는 대신 부드럽게 넘어가게 한다(js의 hdAnimateWindowResize가 전환 직전에만 이 클래스를
+     잠깐 붙였다 뗀다). 창을 끌어서 옮기거나 오른쪽 아래 모서리로 손수 크기를 바꿀 때는 이 클래스를
+     절대 붙이지 않는데, 그때도 걸려 있으면 매 프레임 바뀌는 좌표가 트랜지션 때문에 마우스보다
+     한 박자 늦게 쫓아와 뻑뻑하게 느껴지기 때문이다. */
+  .app-win.aw-resize-anim {
+    transition: transform 0.5s cubic-bezier(.32, .72, 0, 1), opacity 0.3s ease-out,
+      left 0.45s cubic-bezier(.32, .72, 0, 1), top 0.45s cubic-bezier(.32, .72, 0, 1),
+      width 0.45s cubic-bezier(.32, .72, 0, 1), height 0.45s cubic-bezier(.32, .72, 0, 1),
+      border-radius 0.35s ease-out;
+  }
+
+  /* 반쪽 붙이기(스냅): 창 제목줄을 화면 왼쪽/오른쪽 끝까지 끌었다 놓으면 그쪽 절반에 붙는다(js/09a-home-desktop.js의 hdSnapWindow).
+     위치·크기는 인라인이 아니라 이 클래스가 정하므로(!important) 화면 크기가 바뀌어도 알아서 맞고, 인라인 left/top/width/height에는
+     붙이기 전 값이 그대로 남아 있어서 스냅을 풀면(제목줄을 끌어내면) 원래 크기·위치로 돌아간다.
+     바깥 여백 8px / 두 창 사이 8px, 위는 상태표시줄 아래 8px, 아래는 최대화 창과 같이 독 위까지.
+     미리보기(#hd-snap-preview)와 반대편 고르기 패널(#hd-snap-assist)도 같은 값을 써서 창이 붙을 자리와 정확히 겹친다.
+     좁은 화면(700px 이하)은 아래 미디어쿼리처럼 창이 항상 전체 폭이라 적용하지 않는다. */
+  @media (min-width: 701px) {
+    .app-win.win-snap-l, .app-win.win-snap-r, #hd-snap-preview, #hd-snap-assist {
+      top: calc(47px + env(safe-area-inset-top, 0px)) !important;
+      width: calc(50% - 12px) !important;
+      height: calc(100% - 47px - 94px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) !important;
+    }
+    .app-win.win-snap-l, #hd-snap-preview[data-side="l"], #hd-snap-assist[data-side="l"] { left: 8px !important; }
+    .app-win.win-snap-r, #hd-snap-preview[data-side="r"], #hd-snap-assist[data-side="r"] { left: calc(50% + 4px) !important; }
+    .app-win.win-snap-l, .app-win.win-snap-r { resize: none; }
+  }
+
+  /* 스냅 전용 트랜지션(2026-09 부드럽게 조정): 끌던 자리에서 반쪽 자리까지는 이동 거리가 길어서 크게/작게(.45s)보다 조금 더 길게(.6s),
+     끝에서 아주 천천히 잦아드는 감속 곡선(.22,1,.36,1)으로 미끄러져 들어가게 한다. js/09a-home-desktop.js의 hdAnimateWindowResize(frame, "snap")가
+     붙였다 떼며(타이머 660ms — 이 시간과 짝), 붙은 창을 끌어내 스냅이 풀릴 때(aw-unsnap-anim)는 위치는 마우스에 바로 붙고 크기만 부드럽게 원래대로 커진다. */
+  .app-win.aw-snap-anim {
+    transition: transform 0.55s cubic-bezier(.22, 1, .36, 1), opacity 0.3s ease-out,
+      left 0.6s cubic-bezier(.22, 1, .36, 1), top 0.6s cubic-bezier(.22, 1, .36, 1),
+      width 0.6s cubic-bezier(.22, 1, .36, 1), height 0.6s cubic-bezier(.22, 1, .36, 1),
+      border-radius 0.4s ease-out;
+  }
+  .app-win.aw-unsnap-anim {
+    transition: transform 0.5s cubic-bezier(.32, .72, 0, 1), opacity 0.3s ease-out,
+      width 0.4s cubic-bezier(.22, 1, .36, 1), height 0.4s cubic-bezier(.22, 1, .36, 1);
+  }
+
+  /* 최대화(초록 / 제목줄 더블클릭): 맥 OS처럼 상단 상태표시줄(39px) 아래부터 하단 독 바로 위까지만 꽉 채운다.
+     독 높이(아이콘 58 + 여백 18 = 76px) + 독 아래 여백 8px + 독과 창 사이 틈 10px = 94px */
+  .app-win.win-max {
+    left: 0 !important; top: calc(39px + env(safe-area-inset-top, 0px)) !important;
+    width: 100% !important;
+    height: calc(100% - 39px - 94px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) !important;
+    border-radius: 0; resize: none;
+  }
+
+  /* 제목줄 */
+  .app-win .aw-tb {
+    display: flex; align-items: center; flex: none; height: 32px; padding: 0 14px;
+    border-bottom: 1px solid var(--hairline); background: var(--mac-vibrancy);
+    backdrop-filter: blur(30px) saturate(1.8); -webkit-backdrop-filter: blur(30px) saturate(1.8);
+    color: var(--text); cursor: default; user-select: none; -webkit-user-select: none; touch-action: none;
+  }
+  .aw-tl { display: flex; gap: 8px; width: 60px; }
+  .aw-tlb {
+    width: 12px; height: 12px; padding: 0; border: 0; border-radius: 50%; background: var(--c);
+    display: grid; place-items: center; cursor: default;
+    font: 700 8px/1 system-ui, sans-serif; color: rgba(0, 0, 0, 0.55);
+  }
+  .aw-tl:hover .aw-tlb::after { content: attr(data-g); }
+  .aw-tlb:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .aw-tt {
+    flex: 1; display: flex; align-items: center; justify-content: center; gap: 7px;
+    font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .aw-tr { width: 60px; }
+  .hd-ic.aw-ic { width: 18px; height: 18px; margin: 0; border-radius: 5px; box-shadow: none; flex: none; }
+  .hd-ic.aw-ic svg { width: 11px; height: 11px; }
+
+  /* 창 안 페이지 영역: 창 안에서만 스크롤. 페이지 레이아웃(max-width 1400/1800 가운데 정렬)은 창 폭에 맞춘다 */
+  .app-win .page-inner,
+  .app-win .page-inner.wide {
+    flex: 1 1 auto; min-height: 0; width: 100%; max-width: none;
+    overflow: auto; padding: 22px 24px 28px;
+  }
+
+  /* 실행 중인 앱 표시 (독 아이콘 아래 점 / 바탕화면 아이콘 선택 배경 — 목업 .dk.run / .di.on) */
+  .hd-dk.run::after {
+    content: ""; position: absolute; bottom: -6px; left: 50%; width: 4px; height: 4px; margin-left: -2px;
+    border-radius: 50%; background: var(--hd-t);
+    animation: hd-dot-in 0.35s cubic-bezier(.22, 1, .36, 1);
+  }
+  @keyframes hd-dot-in { from { transform: scale(0); opacity: 0; } }
+  .hd-di.on { background: var(--hd-hover); }
+
+  /* 스냅 미리보기: 창을 화면 좌/우 끝까지 끌면 붙게 될 절반 자리에 뜨는 반투명 틀(창 위에 겹쳐 보이므로 블러는 걸지 않는다) */
+  #hd-snap-preview {
+    position: fixed; z-index: 58; pointer-events: none; border-radius: 12px;
+    background: rgba(91, 143, 199, 0.16); background: color-mix(in srgb, var(--accent) 16%, transparent);
+    box-shadow: 0 0 0 1.5px rgba(91, 143, 199, 0.7), inset 0 0 0 1px rgba(255, 255, 255, 0.10);
+    box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--accent) 70%, transparent), inset 0 0 0 1px rgba(255, 255, 255, 0.10);
+    opacity: 0; transform: scale(0.96);
+    transition: opacity 0.3s ease-out, transform 0.5s cubic-bezier(.22, 1, .36, 1), left 0.5s cubic-bezier(.22, 1, .36, 1);
+  }
+  #hd-snap-preview.on { opacity: 1; transform: none; }
+
+  /* 스냅 어시스트: 한쪽 절반에 창을 붙인 직후 반대편 절반에 뜨는 "여기에 띄울 페이지" 고르기 패널.
+     독과 같은 유리 질감(--hd-bar + blur)에 바탕화면 아이콘과 같은 그라데이션 아이콘 카드로 구성 */
+  #hd-snap-assist {
+    position: fixed; z-index: 58; display: flex; flex-direction: column; padding: 84px 22px; /* 위아래 같은 여백 → 카드 묶음이 패널 정가운데에 온다(머리글은 아래에서 절대 위치) */
+    border-radius: 12px; overflow: auto; color: var(--hd-t);
+    background: var(--hd-bar); background: color-mix(in srgb, var(--hd-w2) 80%, transparent); /* 뒤에 비치는 바탕화면 아이콘이 어수선해 보이지 않게 독보다 조금 더 진하게 */
+    box-shadow: 0 0 0 1px var(--hd-ln), 0 24px 64px rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(30px) saturate(1.8); -webkit-backdrop-filter: blur(30px) saturate(1.8);
+    /* 창이 반쪽 자리로 미끄러져 들어가는 동안(.6s)에는 아직 안 보이다가, 거의 자리 잡을 즈음(.18s 뒤) 천천히 떠오른다 */
+    animation: hd-sa-in 0.55s cubic-bezier(.22, 1, .36, 1) 0.18s backwards;
+  }
+  #hd-snap-assist.out { animation: hd-sa-out 0.3s cubic-bezier(.4, 0, .6, 1) forwards; pointer-events: none; }
+  @keyframes hd-sa-in { from { opacity: 0; transform: scale(0.96) translateY(14px); } }
+  @keyframes hd-sa-out { to { opacity: 0; transform: scale(0.97) translateY(6px); } }
+  #hd-snap-assist .hd-sa-head { position: absolute; top: 20px; left: 22px; right: 22px; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+  #hd-snap-assist .hd-sa-tt b { display: block; font-size: 15px; font-weight: 500; }
+  #hd-snap-assist .hd-sa-tt small { display: block; margin-top: 2px; font-size: 12px; font-weight: 300; opacity: 0.68; }
+  #hd-snap-assist .hd-sa-skip {
+    flex: none; margin: 0; padding: 4px 10px; border: 0; border-radius: 7px; background: none;
+    font: inherit; font-size: 12px; color: var(--hd-t); opacity: 0.75; cursor: default;
+    transition: background 0.2s ease-out, opacity 0.2s ease-out;
+  }
+  #hd-snap-assist .hd-sa-skip:hover { background: var(--hd-hover); opacity: 1; }
+  #hd-snap-assist .hd-sa-grid {
+    display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; /* 카드는 가로·세로 모두 가운데 정렬(마지막 줄도 가운데) */
+    margin: auto;
+  }
+  #hd-snap-assist .hd-sa-item {
+    display: flex; flex-direction: column; align-items: center; gap: 9px; flex: none; width: 118px; margin: 0; padding: 18px 8px 14px;
+    border: 0; border-radius: 16px; background: rgba(128, 128, 128, 0.14); color: inherit;
+    font: inherit; font-size: 13px; font-weight: 400; text-align: center; cursor: default;
+    transition: background 0.3s ease-out, transform 0.4s cubic-bezier(.22, 1, .36, 1);
+    animation: hd-sa-item-in 0.55s cubic-bezier(.22, 1, .36, 1) backwards; animation-delay: calc(var(--i, 0) * 60ms + 300ms);
+  }
+  #hd-snap-assist .hd-sa-item:hover { background: var(--hd-hover); transform: translateY(-3px) scale(1.04); }
+  #hd-snap-assist .hd-sa-item:active { transform: scale(0.98); transition-duration: 0.1s; }
+  #hd-snap-assist .hd-sa-item:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  #hd-snap-assist .hd-sa-item .hd-ic { width: 60px; height: 60px; margin: 0; border-radius: 15px; }
+  #hd-snap-assist .hd-sa-item .hd-ic svg { width: 33px; height: 33px; }
+  #hd-snap-assist .hd-sa-run { font-style: normal; font-size: 10.5px; font-weight: 400; padding: 1px 8px; border-radius: 9px; background: var(--hd-hover); opacity: 0.85; }
+  @keyframes hd-sa-item-in { from { opacity: 0; transform: translateY(16px) scale(0.92); } }
+
+  /* 페이지 창이 하나라도 화면에 떠 있는 동안(접혀 내려간 창은 제외)에는 뒤 바탕화면의 홈 위젯(#wg .wd)에만
+     옅은 블러를 건다 — 창에 시선이 가도록 뒤쪽 위젯을 살짝 물러나 보이게 하는 효과. 바탕화면 아이콘(#home-icons)·독·배경화면은 그대로 둔다.
+     body.hd-win-open 클래스는 js/09a-home-desktop.js의 syncAppWindows()가 열림/내림/닫힘 때마다 맞춰준다:
+     창이 전부 닫히거나 내려가 바탕화면에 페이지가 없어지면 클래스가 빠지면서 서서히 원래대로 돌아온다.
+     ※ #wg 전체가 아니라 각 위젯(.wd)에 거는 이유: #wg에 filter를 걸면 그 안 위젯들의 backdrop-filter(유리 질감)가
+       배경화면을 못 보게 되어 위젯 모양이 바뀌어 버린다.
+     블러 세기는 --hd-widget-blur 값 하나로 조절(옅게: 2px ↔ 진하게: 6px). */
+  body.home-desktop #wg .wd { transition: filter 0.45s cubic-bezier(.32, .72, 0, 1); }
+  body.home-desktop.hd-win-open #wg .wd { filter: blur(var(--hd-widget-blur, 3px)); }
+
+  /* 좁은 화면(목업 max-width:700px): 창은 화면 전체 폭, 독 위까지 */
+  @media (max-width: 700px) {
+    .app-win {
+      left: 0 !important; top: calc(39px + env(safe-area-inset-top, 0px)) !important;
+      width: 100% !important; height: calc(100% - 39px - 66px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) !important;
+      border-radius: 0; resize: none;
+    }
+    .app-win .page-inner,
+    .app-win .page-inner.wide { padding: 14px 12px 22px; }
+  }

@@ -1,281 +1,149 @@
-  /* ---------- 홈(메인) 페이지 ---------- */
-  .home-grid {
-    display: grid;
-    grid-template-columns: 0.85fr 1fr 1fr;
-    gap: 20px;
-    align-items: start;
+  /* ---------- 홈 위젯: macOS 목업(ate1ier-macos-mockup)의 #wg 위젯 스택을 그대로 옮김 ----------
+     목업의 CSS 값(크기 공식·간격·색·블러·라운드·글자 크기)을 한 글자도 바꾸지 않고 옮겼고,
+     이 앱의 다른 화면과 충돌하지 않도록 선택자 앞에 #wg만 붙였습니다.
+     목업은 :root에 색 변수(--t, --t2, --ln, --ac, --sel, --bar, --w, --w2)를 두지만,
+     여기서는 #wg 안에서만 쓰이도록 #wg에 정의합니다(앱의 다른 색 변수를 건드리지 않게).
+     (예외 하나: 이 앱의 상단 상태표시줄은 39px로 목업의 28px보다 11px 높아서, 목업과 같은 간격이 되도록
+     위젯 위치만 top 34px → 45px로 11px 내렸습니다. js/08-home.js의 homeWidgetLift()의 44 → 55도 같은 이유.
+     그 뒤 위젯 전체를 조금 더 아래로 내려 달라는 요청으로 top 45px → 69px(+24px), homeWidgetLift()의 55 → 79도 같이 조정.)
+     마크업은 js/08-home.js의 renderHomePage()가 목업과 같은 구조(.wd/.wh/.hero/.st/.gl/.rw/.fl/.cb)로 그립니다. */
+  #wg {
+    --w: rgba(26, 27, 34, .92); --w2: rgba(40, 42, 52, .95); --t: #f5f5f7; --t2: #b4b6c0;
+    --ln: rgba(255, 255, 255, .16); --ac: #5eb0ff; --sel: rgba(94, 176, 255, .26); --bar: rgba(14, 15, 22, .66);
   }
-  @media (max-width: 1200px) {
-    .home-grid { grid-template-columns: 1fr 1fr; }
+  html[data-theme="light"] #wg {
+    --w: rgba(255, 255, 255, .88); --w2: rgba(246, 246, 248, .95); --t: #1d1d1f; --t2: #5f5f66;
+    --ln: rgba(0, 0, 0, .12); --ac: #0a6cff; --sel: rgba(10, 108, 255, .14); --bar: rgba(255, 255, 255, .62);
   }
+  #wg, #wg * { box-sizing: border-box; }
+  #wg {
+    --cw: clamp(250px, min(26vw, calc((100vw - 260px) / 3)), 420px);
+    --fs: clamp(14px, 1.15vw, 19px);
+    --fs2: clamp(12.5px, 1.03vw, 17px);
+    position: fixed; top: calc(69px + env(safe-area-inset-top, 0px)); left: 112px; right: 112px; bottom: 156px; z-index: 1;
+    display: flex; flex-direction: column; justify-content: safe center; align-items: center; gap: 16px;
+    pointer-events: none;
+    /* (이 앱 전용) 낮은 화면에서 위젯이 독 뒤로 잘려 못 보게 되지 않도록, 넘칠 때만 세로 스크롤 — 안 넘치면 목업과 똑같음 */
+    overflow-y: auto; overflow-x: hidden;
+    font: 300 13px/1.45 'KoPub Dotum', -apple-system, BlinkMacSystemFont, "SF Pro Text", "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif;
+    color: var(--t); user-select: none; -webkit-user-select: none;
+  }
+  #wg > * { pointer-events: auto; }
+  #wg .cols { display: flex; gap: 16px; align-items: flex-start; justify-content: center; }
+  #wg .col { display: flex; flex-direction: column; gap: 16px; width: var(--cw); }
+  @media (min-width: 901px) {
+    #wg .col:nth-child(1) { width: calc(var(--cw) * 3 * .85 / 2.85); }
+    #wg .col:nth-child(n+2) { width: calc(var(--cw) * 3 / 2.85); }
+  }
+  #wg button, #wg input { font-family: inherit; font-weight: inherit; }
+  #wg b, #wg strong { font-weight: 500; }
+  #wg p { margin: 8px 0; }
+  #wg .s { color: var(--t2); font-size: 12px; }
+  #wg .big { font-size: 22px; font-weight: 500; }
+  #wg .up { color: #5fdc8a; }
+  #wg .dn { color: #ff7a80; }
+  html[data-theme="light"] #wg .up { color: #248a3d; }
+  html[data-theme="light"] #wg .dn { color: #d1242f; }
+
+  #wg .wd {
+    position: relative; font-size: var(--fs); padding: .9em 1.05em; border-radius: 1.3em; background: var(--bar);
+    box-shadow: 0 0 0 1px var(--ln);
+    backdrop-filter: blur(30px) saturate(1.6); -webkit-backdrop-filter: blur(30px) saturate(1.6); cursor: default;
+  }
+  #wg .wd.dg { z-index: 5; box-shadow: 0 0 0 1px var(--ac), 0 18px 40px rgba(0, 0, 0, .5); }
+  #wg .wh { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 8px; font-weight: 500; cursor: default; }
+  #wg .wh button { border: 0; background: none; color: var(--ac); font: inherit; font-size: .88em; font-weight: 500; padding: 2px 5px; border-radius: 5px; cursor: default; }
+  #wg .wh button:hover { background: var(--sel); }
+  #wg .hero { width: calc(var(--cw) * 3 + 32px); }
+  #wg .hero .wh { flex-direction: column; align-items: flex-end; text-align: right; gap: 0; font-size: 1.4em; margin-bottom: 10px; }
+  #wg .hero .wh small { font-weight: 400; color: var(--t2); font-size: .62em; }
+  #wg .hero .wh span span { color: var(--t2); font-weight: 500; }
+  #wg .st { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+  #wg .st div { padding: 8px 10px; border-radius: 12px; background: rgba(128, 128, 128, .16); }
+  #wg .st b { display: block; font-size: 1.7em; line-height: 1.15; }
+  #wg .st small { color: var(--t2); font-size: .85em; }
+  #wg .st .ok b { color: #5fdc8a; }
+  #wg .st .warn b { color: #ffb454; }
+  #wg .st .ac b { color: var(--ac); }
+  #wg .gl { margin: 8px 0 3px; font-size: .85em; color: var(--t2); font-weight: 500; }
+  #wg .rw { display: flex; align-items: center; gap: 6px; padding: 5px 0; border-top: 1px solid var(--ln); }
+  #wg .rw small { color: var(--t2); font-size: .85em; }
+  #wg .rw i { flex: 1; }
+  #wg .fl { font-style: normal; font-size: .8em; padding: 1px 7px; border-radius: 9px; background: #ffb45433; color: #ffc98a; white-space: nowrap; }
+  #wg .fl.ab { background: #ff7a8033; color: #ff9aa0; }
+  #wg .cb { width: 1.1em; height: 1.1em; flex: none; border-radius: 50%; border: 1.5px solid var(--t2); background: none; padding: 0; }
+  #wg .cb.on { background: var(--ac); border-color: var(--ac); box-shadow: inset 0 0 0 3px var(--bar); }
+  #wg .cb.on + span { text-decoration: line-through; color: var(--t2); }
+  #wg [data-a].rw:hover { background: var(--sel); }
+  #wg .wd:not(.hero) { font-size: var(--fs2); }
+  /* QA 평균 점수 위젯의 6개월 추이 꺾은선 (목업 qaTrend()) */
+  #wg .qtb { margin-top: 10px; }
+  #wg .qtt { font-size: .85em; color: var(--t2); margin-bottom: 4px; }
+  #wg .qts { display: block; width: 100%; height: auto; }
+  #wg .qts text { font-family: inherit; text-anchor: middle; }
+  #wg .qv { font-size: 10.5px; font-weight: 700; fill: var(--t2); }
+  #wg .qm { font-size: 10.5px; fill: var(--t2); }
+  #wg .qm.cur { fill: var(--ac); font-weight: 700; }
+
+  /* 좁은 화면(목업의 @media): 목업 원본은 이 규칙이 뒤에 나오는 기본 규칙에 덮여 적용되지 않던 순서였는데,
+     의도대로 동작하도록 기본 규칙 뒤에 두었습니다(값은 목업 그대로). */
   @media (max-width: 900px) {
-    .home-grid { grid-template-columns: 1fr; }
+    #wg { overflow: auto; bottom: 96px; left: 12px; right: 112px; justify-content: flex-start; align-items: stretch; }
+    #wg .cols { flex-direction: column; }
+    #wg .col, #wg .hero { width: 100%; }
+    #wg .st { grid-template-columns: repeat(2, 1fr); }
   }
-  .home-col { display: flex; flex-direction: column; gap: 20px; min-height: 40px; }
-  .home-col:empty {
-    border: 1px dashed var(--hairline-strong); border-radius: var(--mac-radius-lg);
-    min-height: 90px;
-  }
-
-  /* 히어로는 컬러 그라디언트로 "타이틀" 느낌을, 아래 카드들은 무채색 텍스처만 얹어
-     "보조" 느낌을 주면서 같은 점무늬 언어로 통일감을 유지한다. */
-  .home-grid .card {
-    position: relative;
-    overflow: hidden;
-  }
-  .home-grid .card::before {
-    content: "";
-    position: absolute; inset: 0;
-    background-image: radial-gradient(var(--hairline) 1px, transparent 1px);
-    background-size: 13px 13px;
-    opacity: 0.5;
-    -webkit-mask-image: linear-gradient(160deg, #000 0%, transparent 75%);
-    mask-image: linear-gradient(160deg, #000 0%, transparent 75%);
-    pointer-events: none;
-  }
-  .home-grid .card > * { position: relative; z-index: 1; }
-  /* 위 규칙(.home-grid .card > *)이 클래스 2개라 .home-card-draghandle(클래스 1개)의
-     position:absolute를 밀어내고 position:relative로 덮어써버려서, 핸들이 카드 모서리에
-     고정되지 않고 콘텐츠 순서상 제목 바로 위에 흘러가는 문제가 있었다.
-     선택자 특이도를 더 높여서 absolute가 확실히 이기도록 한다. */
-  .home-grid .card > .home-card-draghandle { position: absolute; z-index: 2; }
-  .card.home-hero {
-    position: relative;
-    display: flex; flex-direction: column; gap: 0;
-    overflow: hidden;
-    background:
-      radial-gradient(circle at 88% -18%, var(--accent-dim) 0%, transparent 52%),
-      radial-gradient(circle at -6% 118%, var(--blue-dim) 0%, transparent 48%),
-      var(--panel);
-    border: 1px solid var(--hairline);
-    border-radius: var(--mac-radius-lg);
-    box-shadow: var(--mac-shadow-sm);
-    padding: 28px 30px 32px;
-  }
-  .card.home-hero::before {
-    content: "";
-    position: absolute; inset: 0;
-    background-image: radial-gradient(var(--hairline-strong) 1px, transparent 1px);
-    background-size: 20px 20px;
-    -webkit-mask-image: linear-gradient(180deg, #000 0%, transparent 65%);
-    mask-image: linear-gradient(180deg, #000 0%, transparent 65%);
-    opacity: 0.5;
-    pointer-events: none;
-  }
-  .home-hero-top, .home-hero-top ~ .stat-grid { position: relative; z-index: 1; }
-  .home-hero-top {
-    display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 14px;
-    padding-bottom: 26px; margin-bottom: 24px; border-bottom: 1px solid var(--hairline);
-  }
-  .home-hero-date {
-    font-family: Georgia, 'Apple Myungjo', 'AppleGothic', 'Batang', 'Nanum Myeongjo', serif;
-    font-size: 50px; font-weight: 700; letter-spacing: -0.01em;
-  }
-  .home-hero-date .wd {
-    margin-left: 12px; font-size: 19px; font-weight: 500; color: var(--text-faint);
-    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro KR', 'Apple SD Gothic Neo', 'Malgun Gothic', 'KoPub Dotum', system-ui, sans-serif;
-  }
-  .home-hero-sub { color: var(--text-faint); font-size: 14.5px; margin-top: 9px; }
-  .home-holiday-tag {
-    font-size: 13px; color: var(--accent); background: var(--accent-dim);
-    padding: 4px 12px; border-radius: 999px; white-space: nowrap;
-  }
-  .stat-grid {
-    display: flex; align-items: stretch; flex-wrap: wrap;
-  }
-  .stat-item {
-    flex: 1 1 0; min-width: 110px;
-    background: none; border: none; border-left: 1px solid var(--hairline);
-    border-radius: 0; padding: 6px 22px; text-align: left;
-  }
-  .stat-item:first-child { padding-left: 0; border-left: none; }
-  .stat-item .stat-num {
-    font-family: Georgia, 'Apple Myungjo', 'AppleGothic', 'Batang', 'Nanum Myeongjo', serif;
-    font-size: 33px; letter-spacing: -0.01em; color: var(--text);
-  }
-  .stat-item .stat-label { font-size: 14.5px; color: var(--text-faint); margin-top: 4px; }
-  .stat-item.accent .stat-num { color: var(--accent); }
   @media (max-width: 700px) {
-    .stat-item { flex: 1 1 40%; border-left: none; border-top: 1px solid var(--hairline); padding: 14px 0 0; }
-    .stat-item:first-child { border-top: none; padding-top: 2px; }
+    #wg { right: 12px; }
   }
 
-  .home-section-title {
-    display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;
-  }
-  .home-section-title h3 { font-size: 17px; font-weight: 400; margin: 0; }
-  .home-section-link {
-    background: none; border: none; color: var(--text-faint); font-size: 13px; cursor: pointer;
-    display: flex; align-items: center; gap: 3px; padding: 2px 0;
-  }
-  .home-section-link:hover { color: var(--accent); }
-
-  /* ---- 카드 드래그로 순서 바꾸기 ---- */
-  .home-card-draghandle {
-    position: absolute; top: 8px; left: 8px; z-index: 2;
-    display: flex; align-items: center; justify-content: center;
-    width: 18px; height: 18px; padding: 0;
-    background: none; border: none; box-shadow: none;
-    color: var(--text-faint); cursor: grab; touch-action: none;
-    opacity: 0; transition: opacity 0.15s ease, color 0.12s ease;
-  }
-  .home-grid .card:hover .home-card-draghandle,
-  .home-card-draghandle:focus-visible { opacity: 1; }
-  .home-card-draghandle:hover { color: var(--accent); }
-  .home-grid .card.dragging {
-    cursor: grabbing;
-    box-shadow: var(--mac-shadow-float);
-    opacity: 0.94;
-  }
-  .home-grid .card.dragging .home-card-draghandle { opacity: 1; cursor: grabbing; }
-  /* 모바일에서는 .card의 padding-top이 18px로 줄어들어 핸들(top:10px~30px)이
-     타이틀과 겹쳐 보인다. 홈 카드만 상단 여백을 넉넉히 줘서 핸들이 제목과
-     겹치지 않고 모서리 안쪽에 깔끔하게 자리잡게 한다. */
-  @media (max-width: 720px) {
-    .home-grid .card { padding-top: 34px; }
-  }
-  .home-card-placeholder {
-    border: 1px dashed var(--hairline-strong); border-radius: var(--mac-radius-lg);
-    background: var(--accent-dim-soft);
-  }
+  /* ---- 이 앱에만 있는 기능용 (목업에는 없음) ---- */
+  /* 카드를 끌어서 열/순서 바꾸기: 위젯 제목줄(.wh)을 잡고 끈다. 끄는 동안 빈 열도 놓을 수 있게 최소 높이를 준다 */
+  #wg .home-card-placeholder { border: 1px dashed var(--ln); border-radius: 1.3em; background: var(--sel); }
+  body.home-card-drag-active #wg .col { min-height: 90px; }
   body.home-card-drag-active { cursor: grabbing; }
   body.home-card-drag-active * { user-select: none; }
+  /* 면담 필요 알림의 "전체 N명 보기 ▾" — 목업 .wh button과 같은 모양 */
+  #wg .more { display: block; margin: 6px 0 0 auto; border: 0; background: none; color: var(--ac); font: inherit; font-size: .88em; font-weight: 500; padding: 2px 5px; border-radius: 5px; cursor: default; }
+  #wg .more:hover { background: var(--sel); }
 
-  .home-empty {
-    color: var(--text-faint); font-size: 13.5px; font-style: italic; padding: 16px 4px;
-    text-align: center; background: var(--elevated); border: 1px dashed var(--hairline-strong); border-radius: 14px;
+  /* ---------- 로그인 직후 뜨는 "오늘의 브리핑" 토스트 ----------
+     macOS 목업(ate1ier-macos-mockup)의 toast()/.tn/.ts를 그대로 따랐다: 상단
+     상태표시줄 바로 아래, 오른쪽 정렬로 뜨고, 위/가운데 정렬이 아니라 오른쪽에
+     붙는다. 애니메이션도 목업처럼 나타날 때만 살짝 아래에서 페이드인하고(4px),
+     사라질 때는 페이드아웃 없이 곧바로 없어진다(목업의 setTimeout(()=>n.remove())). */
+  .today-brief-toast {
+    position: fixed;
+    top: calc(38px + 12px);
+    right: 12px;
+    z-index: 110;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    border-radius: 12px;
+    background: var(--mac-vibrancy);
+    backdrop-filter: blur(30px) saturate(1.6);
+    -webkit-backdrop-filter: blur(30px) saturate(1.6);
+    border: 1px solid var(--mac-vibrancy-hairline);
+    box-shadow: var(--mac-shadow-float);
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: -0.1px;
+    white-space: nowrap;
+    opacity: 0;
+    transform: translateY(4px);
+    pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.2s ease;
   }
+  .today-brief-toast.visible { opacity: 1; transform: translateY(0); }
+  .today-brief-toast .icon-emo { color: var(--accent); flex-shrink: 0; }
+  
 
-  /* ---- 홈 QA 평균 점수 카드 ---- */
-  .home-qa-summary { padding: 10px 2px 4px; }
-  .home-qa-score {
-    font-family: Georgia, 'Apple Myungjo', 'AppleGothic', 'Batang', 'Nanum Myeongjo', serif;
-    font-size: 38px; font-weight: 700; letter-spacing: -0.01em; color: var(--text);
-  }
-  .home-qa-score-unit { font-size: 16px; font-weight: 500; color: var(--text-faint); margin-left: 3px; }
-  .home-qa-sub { font-size: 13px; color: var(--text-faint); margin-top: 6px; }
-  /* 홈 카드 안에서는 마지막 요소라 아래쪽 구분선/여백이 필요 없다 */
-  .home-qa-trend-block { margin: 10px 2px 0; padding-bottom: 0; border-bottom: none; }
-
-  .staff-group-label {
-    font-size: 12.5px; color: var(--text-faint); letter-spacing: 0.04em;
-    margin: 12px 0 8px; text-transform: uppercase;
-  }
-  .staff-group-label:first-child { margin-top: 0; }
-  .home-staff-list { display: flex; flex-direction: column; gap: 6px; }
-  .home-staff-row {
-    display: flex; align-items: center; gap: 8px; background: var(--elevated);
-    border: 1px solid var(--hairline); border-radius: 12px; padding: 9px 13px;
-  }
-  .home-staff-row .name { font-size: 14.5px; flex-shrink: 0; }
-  .home-staff-row .ldap { font-size: 12.5px; color: var(--text-faint); flex-shrink: 0; }
-  .home-staff-row .spacer { flex: 1; }
-  .home-staff-row .flag {
-    font-size: 11.5px; padding: 1px 8px; border-radius: 999px; white-space: nowrap;
-  }
-  .home-staff-row .flag.late { color: var(--amber); background: var(--amber-dim); }
-  .home-staff-row .flag.absent { color: var(--red); background: var(--red-dim); }
-  .home-staff-row .flag.off { color: var(--blue); background: var(--blue-dim); }
-  .home-staff-row.is-off { opacity: 0.6; }
-  .home-more-btn {
-    display: block; width: 100%; margin-top: 8px; padding: 7px 0;
-    background: none; border: 1px dashed var(--hairline); border-radius: 999px;
-    color: var(--text-faint); font-size: 12.5px; cursor: pointer;
-  }
-  .home-more-btn:hover { color: var(--accent); border-color: var(--accent); }
-
-  .home-entry-list { display: flex; flex-direction: column; gap: 8px; }
-  .home-entry-row {
-    display: flex; align-items: center; gap: 9px; background: var(--elevated);
-    border-left: 3px solid var(--accent); border-radius: 12px; padding: 9px 12px;
-  }
-  .home-entry-row.event { border-left-color: var(--green); }
-  .home-entry-row .time { font-size: 12px; color: var(--text-dim); flex-shrink: 0; }
-  .home-entry-row .text { font-size: 14.5px; flex: 1; min-width: 0; word-break: keep-all; overflow-wrap: break-word; }
-  .home-entry-row .star { color: var(--red); flex-shrink: 0; }
-
-  .home-todo-list { display: flex; flex-direction: column; gap: 6px; }
-  .home-todo-row {
-    display: flex; align-items: center; gap: 8px; background: var(--elevated);
-    border: 1px solid var(--hairline); border-radius: 12px; padding: 8px 12px; font-size: 14px;
-  }
-  .home-todo-row .due { margin-left: auto; font-size: 12px; color: var(--text-faint); flex-shrink: 0; }
-  .home-todo-row .due.over { color: var(--red); }
-  .home-todo-row .check-btn { flex-shrink: 0; }
-
-  .home-note-list { display: flex; flex-direction: column; gap: 6px; }
-  .home-note-row {
-    background: var(--elevated); border: 1px solid var(--hairline); border-radius: 12px;
-    padding: 9px 12px; font-size: 14px; cursor: pointer;
-  }
-  .home-note-row:hover { border-color: var(--accent); }
-  .home-note-row .snippet { font-size: 12.5px; color: var(--text-faint); margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
-  /* ---------- 홈 화면 진입 애니메이션 ---------- */
-  @keyframes home-card-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
-  @keyframes home-row-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
-  .card.home-hero, .home-grid .card {
-    opacity: 0; animation: home-card-in 0.5s cubic-bezier(.2,.9,.3,1) forwards;
-  }
-  .card.home-hero { animation-delay: 0s; }
-  .home-col:nth-child(1) .card:nth-child(1) { animation-delay: .07s; }
-  .home-col:nth-child(1) .card:nth-child(2) { animation-delay: .13s; }
-  .home-col:nth-child(2) .card:nth-child(1) { animation-delay: .11s; }
-  .home-col:nth-child(2) .card:nth-child(2) { animation-delay: .17s; }
-  .home-col:nth-child(3) .card:nth-child(1) { animation-delay: .15s; }
-  .home-col:nth-child(3) .card:nth-child(2) { animation-delay: .21s; }
-
-  .home-staff-row, .home-entry-row, .home-todo-row, .home-note-row {
-    opacity: 0; animation: home-row-in 0.36s ease forwards;
-    transition: border-color 0.12s ease, transform 0.12s ease;
-  }
-  .home-staff-row:hover, .home-entry-row:hover, .home-todo-row:hover { border-color: var(--hairline-strong); transform: translateX(2px); }
-  .home-staff-row:nth-child(1), .home-entry-row:nth-child(1), .home-todo-row:nth-child(1), .home-note-row:nth-child(1) { animation-delay: .22s; }
-  .home-staff-row:nth-child(2), .home-entry-row:nth-child(2), .home-todo-row:nth-child(2), .home-note-row:nth-child(2) { animation-delay: .26s; }
-  .home-staff-row:nth-child(3), .home-entry-row:nth-child(3), .home-todo-row:nth-child(3), .home-note-row:nth-child(3) { animation-delay: .30s; }
-  .home-staff-row:nth-child(4), .home-entry-row:nth-child(4), .home-todo-row:nth-child(4), .home-note-row:nth-child(4) { animation-delay: .34s; }
-  .home-staff-row:nth-child(5), .home-entry-row:nth-child(5), .home-todo-row:nth-child(5), .home-note-row:nth-child(5) { animation-delay: .38s; }
-  .home-staff-row:nth-child(6), .home-entry-row:nth-child(6), .home-todo-row:nth-child(6), .home-note-row:nth-child(6) { animation-delay: .42s; }
-  .home-staff-row:nth-child(n+7), .home-entry-row:nth-child(n+7), .home-todo-row:nth-child(n+7), .home-note-row:nth-child(n+7) { animation-delay: .46s; }
-
-  @media (prefers-reduced-motion: reduce) {
-    .card.home-hero, .home-grid .card, .home-staff-row, .home-entry-row, .home-todo-row, .home-note-row {
-      animation: none; opacity: 1;
-    }
-  }
-
-  /* ---------- 홈 화면 모바일 대응 ---------- */
-  @media (max-width: 720px) {
-    /* .card.home-hero는 클래스 2개짜리 선택자라 전역 모바일 규칙(.card{padding:18px 16px})보다
-       우선순위가 높아 그대로는 적용되지 않는다. 여기서 직접 좁혀준다. */
-    .card.home-hero { padding: 20px 18px 22px; }
-
-    /* 50px짜리 세리프 날짜가 좁은 화면에서 줄바꿈되며 요일 배지와 겹치는 문제를 막는다. */
-    .home-hero-top { padding-bottom: 20px; margin-bottom: 18px; }
-    .home-hero-date { font-size: 32px; }
-    .home-hero-date .wd { display: block; margin: 4px 0 0; font-size: 14px; }
-    .home-hero-sub { font-size: 13px; margin-top: 6px; }
-    .home-holiday-tag { font-size: 12px; padding: 3px 10px; }
-
-    .home-grid { gap: 14px; }
-    .home-col { gap: 14px; }
-    .home-section-title { flex-wrap: wrap; row-gap: 4px; margin-bottom: 10px; }
-    .home-section-title h3 { font-size: 15.5px; }
-    .home-section-link { font-size: 12.5px; white-space: nowrap; }
-
-    /* 뱃지·플래그가 많은 근무 현황 줄이 좁은 화면에서 한 줄에 안 들어가면
-       줄바꿈되게 해서 텍스트가 잘리거나 카드 밖으로 넘치지 않게 한다. */
-    .home-staff-row { flex-wrap: wrap; row-gap: 4px; }
-  }
-  @media (max-width: 480px) {
-    .home-hero-date { font-size: 27px; }
-    .stat-item { min-width: 0; }
-    .stat-item .stat-num { font-size: 27px; }
-    .stat-item .stat-label { font-size: 12.5px; }
-  }
-
-
-  /* ---------- 로그인 직후 뜨는 "오늘의 브리핑" 히어로 팝업 ---------- */
+  /* ---------- (예전) 로그인 직후 뜨는 "오늘의 브리핑" 히어로 팝업 ----------
+     이제 위 .today-brief-toast로 바뀌었지만, 아래 카드/오버레이 스타일은 "월마감 확인
+     팝업"(showMonthClosePopup 등, 이 파일 아래쪽)이 그대로 재사용하고 있어서 남겨둔다. */
   .today-brief-overlay {
     position: fixed; inset: 0; z-index: 120; background: #000000b3;
     display: flex; align-items: center; justify-content: center; padding: 20px;
@@ -387,10 +255,7 @@
   }
   .today-brief-cta:hover { filter: brightness(1.08); }
   .today-brief-cta:active { transform: scale(0.98); }
-  @media (max-width: 480px) {
-    .today-brief-card { padding: 22px 18px 18px; border-radius: 22px; }
-    .today-brief-date { font-size: 21px; }
-  }
+  
 
   /* ---- 월마감 확인 팝업: 카드/오버레이는 "오늘의 브리핑"(today-brief-*) 스타일을 그대로
      재사용하고, 항목의 완료 표시와 "앞으로 뜨지 않음" 체크박스 줄만 추가한다. */

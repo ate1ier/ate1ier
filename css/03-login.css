@@ -24,15 +24,15 @@
   .login-shell button:focus-visible, .login-shell input:focus-visible { outline: 2px solid rgba(255, 255, 255, 0.6); outline-offset: 2px; }
 
   /* ---- 우측 상단: 클라우드 연결 상태 ---- */
-  .login-cloud { position: absolute; top: calc(14px + env(safe-area-inset-top, 0px)); right: 18px; font-size: 12px; opacity: 0.8; display: flex; align-items: center; }
+  .login-cloud { position: absolute; top: 14px; right: 18px; font-size: 12px; opacity: 0.8; display: flex; align-items: center; }
   .login-cloud i { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #30d158; margin-right: 5px; }
   .login-cloud.off i { background: #8e8e93; }
 
   /* ---- 상단: 큰 시계 + 날짜 ---- */
-  .login-clock { flex: none; margin-top: calc(26vh + env(safe-area-inset-top, 0px)); text-align: center; text-shadow: 0 2px 12px rgba(0, 0, 0, 0.3); transition: margin-top 0.55s cubic-bezier(0.32, 0.72, 0, 1); }
+  .login-clock { flex: none; margin-top: 26vh; text-align: center; text-shadow: 0 2px 12px rgba(0, 0, 0, 0.3); transition: margin-top 0.55s cubic-bezier(0.32, 0.72, 0, 1); }
   .login-time { font-size: min(94px, 16.8vw); line-height: 1; transition: font-size 0.55s cubic-bezier(0.32, 0.72, 0, 1); }
   .login-date { font-size: 19px; margin-top: 8px; opacity: 0.9; transition: font-size 0.55s cubic-bezier(0.32, 0.72, 0, 1); }
-  .login-shell.signup .login-clock { margin-top: calc(6vh + env(safe-area-inset-top, 0px)); }
+  .login-shell.signup .login-clock { margin-top: 6vh; }
   .login-shell.signup .login-time { font-size: 42px; }
   .login-shell.signup .login-date { font-size: 14px; }
 
@@ -139,16 +139,15 @@
   .login-seg input:checked + span { background: rgba(255, 255, 255, 0.3); }
 
   /* ---- 하단: 로그인 / 계정 생성 탭 ---- */
-  .login-dock { transition: padding-bottom 0.55s cubic-bezier(0.32, 0.72, 0, 1); flex: none; display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 10px 16px calc(48px + env(safe-area-inset-bottom, 0px)); }
+  .login-dock { transition: padding-bottom 0.55s cubic-bezier(0.32, 0.72, 0, 1); flex: none; display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 10px 16px 48px; }
   /* 계정 생성 화면은 항목이 많아 화면을 거의 다 채우므로 하단 여백을 줄여 탭이 잘리지 않게 한다 */
-  .login-shell.signup .login-dock { padding-bottom: calc(22px + env(safe-area-inset-bottom, 0px)); }
+  .login-shell.signup .login-dock { padding-bottom: 22px; }
   .login-shell .login-tabs { display: flex; gap: 0; max-width: none; margin: 0; padding: 3px; background: rgba(255, 255, 255, 0.14); border-radius: 18px; }
   .login-shell .login-tab {
     border: 0; background: none; color: #fff; font-size: 13px; font-weight: 300; padding: 5px 18px; border-radius: 15px; box-shadow: none;
     transition: background-color 0.3s ease;
   }
   .login-shell .login-tab.active { background: rgba(255, 255, 255, 0.3); box-shadow: none; }
-
 
   .nav-account {
     padding: 0 22px 10px; font-size: 13px; color: var(--text-faint);
@@ -192,7 +191,6 @@
     transition: height 0.28s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease, transform 0.22s ease;
   }
 
-
   /* ---------- 마스터: 팀용 계정의 로그인 인원 관리 패널 ---------- */
   .master-members-panel { width: 100%; margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--hairline); }
   .master-members-list { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
@@ -209,21 +207,9 @@
   .master-member-form .add-input { flex: 1; }
   .master-member-form .login-submit { width: auto; padding: 0 18px; margin-top: 0; }
 
-
   /* 움직임 줄이기 설정을 켠 사용자에게는 애니메이션을 끈다 */
   @media (prefers-reduced-motion: reduce) {
     .login-shell *, .login-shell { animation: none !important; transition: none !important; }
   }
 
-  /* ---------- 로그인 화면 모바일 대응 ---------- */
-  @media (max-width: 720px) {
-    body.login-screen #page-area { padding: 0; }
-    body.login-screen #nav-dock { display: none; }
-    /* 손가락 탭 기준으로 입력·버튼 높이를 키우고, iOS 자동 확대를 막으려고 글씨는 16px */
-    .login-shell .login-pin { height: 44px; border-radius: 22px !important; font-size: 16px; }
-    .login-pill.has-go .login-pin { padding-right: 50px; }
-    .login-go { width: 34px; height: 34px; top: 4px; right: 5px; font-size: 20px; }
-    .login-shell .login-submit { height: 44px; border-radius: 22px; font-size: 15px; }
-    .login-shell .login-tab { padding: 8px 20px; }
-    .login-date { font-size: 17px; }
-  }
+  

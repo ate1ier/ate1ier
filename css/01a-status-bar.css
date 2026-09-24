@@ -1,0 +1,203 @@
+  /* ---------- 상단 상태표시줄 ----------
+     macOS 목업의 상단 바(#mb)를 참고해 만든 레이아웃입니다.
+     왼쪽의 계정 이름(#status-bar-account-btn)은 js/01n-status-bar-account.js에서,
+     "모드"(테마 라이트/다크)는 js/01m-status-bar-mode.js에서 실제로 동작하고,
+     "백업"은 js/01o-status-bar-backup.js에서, "설명"(사용설명서)은
+     js/01p-status-bar-help.js에서 실제로 동작하고,
+     새로고침/되돌리기는 js/01q-status-bar-refresh-undo.js에서,
+     검색은 js/01r-status-bar-search.js에서 실제로 동작합니다.
+     동기화 표시(js/01b-cloud-sync-core.js)는 저장 상태에 따라 점 색·문구가 바뀌고
+     잠깐 하이라이트된다. 상태별 문구 길이가 달라 폭이 바뀌면 왼쪽의 새로고침·
+     되돌리기·검색 아이콘이 옆으로 밀렸다 돌아오므로, 가장 긴 문구("동기화 실패")
+     기준으로 라벨에 min-width를 미리 잡아 폭이 항상 고정되게 한다(아래
+     .status-bar-sync-label). */
+  #app-status-bar {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    height: 38px;
+    padding: 0 14px 0;
+    box-sizing: content-box;
+    background: var(--mac-vibrancy);
+    border-bottom: 1px solid var(--mac-vibrancy-hairline);
+    backdrop-filter: blur(30px) saturate(1.8);
+    -webkit-backdrop-filter: blur(30px) saturate(1.8);
+    box-shadow: var(--mac-glass-highlight);
+    color: var(--text-dim);
+    font-size: 13px;
+    letter-spacing: -0.005em;
+    user-select: none;
+  }
+  #app-status-bar span { white-space: nowrap; }
+  .status-bar-brand {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 10px 3px 4px;
+    color: var(--text);
+  }
+  /* 계정 버튼은 실제로 눌리는 요소라 버튼 리셋 + 커서/hover/열림 상태를 준다
+     (button 태그를 써서 span이었을 때의 레이아웃은 그대로 유지). */
+  button.status-bar-brand.status-bar-account-btn {
+    background: none;
+    border: none;
+    font: inherit;
+    letter-spacing: inherit;
+    cursor: pointer;
+    border-radius: 7px;
+    transition: background 0.12s ease;
+  }
+  button.status-bar-brand.status-bar-account-btn:hover,
+  button.status-bar-brand.status-bar-account-btn.open {
+    background: var(--mac-vibrancy-hairline);
+  }
+  .status-bar-logo {
+    font-style: normal;
+    font-size: 13px;
+    color: var(--accent);
+  }
+  .status-bar-title { font-weight: 500; }
+  .status-bar-account-badge { margin-left: 2px; }
+  .status-bar-account-menu { min-width: 170px; }
+  .status-bar-menu-item {
+    padding: 4px 9px;
+    border-radius: 6px;
+    cursor: default;
+    transition: background 0.12s ease;
+    background: none;
+    border: none;
+    color: inherit;
+    font: inherit;
+    letter-spacing: inherit;
+  }
+  .status-bar-menu-item:hover { background: var(--mac-vibrancy-hairline); }
+  /* "모드"·"백업"·"설명"은 실제로 눌리는 버튼이라 포인터 커서 + 열림 상태 배경을 준다 */
+  button.status-bar-menu-item { cursor: pointer; }
+  button.status-bar-menu-item.open { background: var(--mac-vibrancy-hairline); }
+  .status-bar-spacer { flex: 1; }
+  .status-bar-master-return { background: var(--accent-dim); color: var(--accent); font-weight: 500; cursor: pointer; }
+  /* 새로고침(↻) · 되돌리기(↶) · 검색은 실제로 눌리는 버튼이라 버튼 리셋 + 포인터 커서를 준다
+     (크기·모양은 예전 정적 아이콘 그대로). 되돌리기는 되돌릴 작업이 없으면 비활성화되고,
+     검색은 패널이 열려 있는 동안 .open 배경을 유지한다. */
+  .status-bar-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border: none;
+    border-radius: 6px;
+    background: none;
+    color: inherit;
+    font: inherit;
+    letter-spacing: inherit;
+    cursor: pointer;
+    transition: background 0.12s ease, opacity 0.12s ease;
+  }
+  .status-bar-icon:hover:not(:disabled), .status-bar-icon.open { background: var(--mac-vibrancy-hairline); }
+  .status-bar-icon:disabled { opacity: 0.4; cursor: not-allowed; }
+  .status-bar-icon:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  /* 마스터 계정처럼 검색을 쓸 수 없는 경우엔 버튼 자체를 숨긴다 (display:flex가 hidden 속성을 이기지 않게) */
+  .status-bar-icon[hidden] { display: none; }
+  .status-bar-icon--svg svg { display: block; }
+  /* ---------- ☁️ 동기화 상태(오른쪽 상단 "동기화란"): 예전에는 화면 오른쪽 위에
+     별도 토스트 팝업이 잠깐 떴다가 사라지는 방식이었지만, 지금은 이 자리 자체가
+     상태에 따라 점 색이 바뀌고 잠깐 밝게 반짝여서(highlight) 알려준다
+     (js/01b-cloud-sync-core.js의 notifyCloudSyncStart/notifyCloudSyncSettle). */
+  .status-bar-sync {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 9px;
+    border-radius: var(--mac-radius-sm, 8px);
+    transition: background 0.2s ease;
+  }
+  .status-bar-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--text-faint);
+    flex-shrink: 0;
+    transition: background 0.15s ease;
+  }
+  /* 상태별 문구("동기화" / "동기화 중…" / "동기화됨" / "동기화 실패") 중 가장 긴
+     "동기화 실패" 기준으로 폭을 미리 고정해서, 문구가 바뀌어도 옆(왼쪽) 아이콘들이
+     밀렸다 돌아오지 않게 한다. */
+  .status-bar-sync-label {
+    display: inline-block;
+    min-width: 5.4em;
+    text-align: left;
+  }
+  .status-bar-sync.syncing .status-bar-dot {
+    background: var(--text-dim);
+    animation: status-bar-sync-pulse 0.9s ease-in-out infinite;
+  }
+  .status-bar-sync.error .status-bar-dot { background: var(--red); }
+  .status-bar-sync.saved .status-bar-dot { background: var(--green); }
+  @keyframes status-bar-sync-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+  /* 상태가 막 바뀐 순간 0.9초간 배경이 살짝 밝아졌다 가라앉으며 눈에 띄게 한다. */
+  .status-bar-sync.highlight { animation: status-bar-sync-flash 0.9s ease-out; }
+  @keyframes status-bar-sync-flash {
+    0% { background: var(--mac-vibrancy-hairline); }
+    100% { background: transparent; }
+  }
+  .status-bar-sync.error.highlight { animation-name: status-bar-sync-flash-error; }
+  @keyframes status-bar-sync-flash-error {
+    0% { background: var(--red-dim, var(--mac-vibrancy-hairline)); }
+    100% { background: transparent; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .status-bar-sync.syncing .status-bar-dot { animation: none; }
+    .status-bar-sync.highlight, .status-bar-sync.error.highlight { animation: none; }
+  }
+  .status-bar-clock {
+    padding: 4px 10px 4px 6px;
+    color: var(--text);
+  }
+
+  /* ---- 좁은 화면: 자리만 차지하는 메뉴 항목/동기화 문구는 숨기고 핵심만 남긴다.
+     "모드"·"백업"·"설명"은 실제로 쓰는 버튼(span이 아니라 button)이라 계속 보여준다.
+     새로고침·되돌리기·검색도 이제 실제로 쓰는 버튼이라 좁은 화면에서도 보여준다
+     (예전 자리표시 아이콘일 때는 숨겼음). ---- */
+  
+  /* ---- 폰 세로 화면(≈480px 이하): 아이콘 3개가 더 들어와야 해서 한 단계 더 줄인다.
+     자리만 차지하는 정적 "동기화됨" 점은 숨기고, 아이콘 폭을 줄이고, 계정 이름이 길면
+     말줄임으로 자른다(시계는 js/14-briefing-sidebar.js에서 이 폭에선 시간만 보여준다). ---- */
+  
+
+  /* ---------- 검색 패널 (상태표시줄 검색 아이콘을 누르면 아이콘 아래로 펼쳐짐) ----------
+     안에 들어가는 검색 바/결과 카드 모양은 css/12-global-search.css에 있다. 열고 닫는 동작은
+     js/01r-status-bar-search.js. 위치(top)는 열 때 JS가 상태표시줄 하단에 맞춘다. */
+  .status-bar-search-panel {
+    position: fixed;
+    top: var(--status-bar-search-top, 40px);
+    right: 14px;
+    z-index: 60;
+    box-sizing: border-box;
+    width: min(440px, calc(100vw - 16px));
+    padding: 10px;
+    border-radius: 18px;
+    border: 1px solid var(--mac-vibrancy-hairline);
+    background: rgba(41, 41, 46, 0.94);
+    backdrop-filter: blur(30px) saturate(2);
+    -webkit-backdrop-filter: blur(30px) saturate(2);
+    box-shadow: var(--mac-shadow-float);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-6px);
+    pointer-events: none;
+    transition: opacity 0.14s ease, transform 0.16s cubic-bezier(.2, 1.2, .4, 1), visibility 0s linear 0.16s;
+  }
+  html[data-theme="light"] .status-bar-search-panel { background: rgba(255, 255, 255, 0.94); }
+  .status-bar-search-panel.open {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+    pointer-events: auto;
+    transition: opacity 0.14s ease, transform 0.16s cubic-bezier(.2, 1.2, .4, 1), visibility 0s linear 0s;
+  }
