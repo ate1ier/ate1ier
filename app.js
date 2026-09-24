@@ -39,6 +39,8 @@
   const ICON_CLOCK = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="5.6"/><path d="M8 4.8V8l2.4 1.4"/></svg>`;
   const ICON_CLOSE_SM = `<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg>`;
   const ICON_CHEVRON_RIGHT = `<svg class="icon-emo" viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.4 10.6 8 6 12.6"/></svg>`;
+  // macOS 기본 캘린더 앱의 월 이동 화살표(SF Symbols chevron)와 같은 얇은 셰브런.
+  const ICON_CHEVRON_LEFT = `<svg class="icon-emo" viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.4 5.4 8 10 12.6"/></svg>`;
   const ICON_UNDO = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4.6v3.4h3.4"/><path d="M4.6 8A5 5 0 1 1 6 11.7"/></svg>`;
   const ICON_UPLOAD = `<svg class="icon-emo" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 9.7V2.5"/><path d="M5.2 5.3 8 2.5l2.8 2.8"/><path d="M3.2 13h9.6"/></svg>`;
   const ICON_PAPERCLIP = `<svg class="icon-emo" viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11.3 4.6 6.6 9.3a1.9 1.9 0 1 0 2.7 2.7l4.4-4.4a3.3 3.3 0 1 0-4.7-4.7L4.4 7.5a4.6 4.6 0 0 0 6.5 6.5"/></svg>`;
@@ -3676,6 +3678,7 @@
     selectedDay: today.getDate(),
     monthData: {},
     hideDone: false,
+    panel: null, // 툴바의 "일정 ＋"/"할 일 ＋" 버튼으로 여는 팝업: "event" | "todo" | null
     formType: "event",
     formPriority: false,
     rangeMode: false,
@@ -3691,6 +3694,8 @@
     editPriority: false, // 수정 폼의 중요 표시 상태
     editType: "memo", // 수정 폼의 메모/일정 선택 상태
     editDetailMode: false, // 수정 폼에서 상세 내용 입력칸을 펼쳐서 보고 있는지
+    miniYear: today.getFullYear(),
+    miniMonthIndex: today.getMonth(),
   };
 
   function monthKey(y, m) { return acctKey(`personal-calendar:${y}-${pad2(m + 1)}`); }
@@ -3858,29 +3863,59 @@
     return `
       <div class="entry entry-editing" data-id="${entry.id}">
         <div class="entry-edit-form">
-          <div class="type-row">
-            <button type="button" class="type-btn priority ${cal.editPriority ? "active" : ""}" id="btn-edit-priority">★ 중요</button>
-          </div>
-          ${isRange ? `
-          <div class="range-row">
-            <input type="date" class="date-input" id="edit-input-start" value="${entry.rangeStart}">
-            <span class="arrow">→</span>
-            <input type="date" class="date-input" id="edit-input-end" value="${entry.rangeEnd}">
-          </div>` : ""}
-          <div class="add-row">
-            ${isRange ? "" : `<input type="time" class="add-input time-input" id="edit-input-time" value="${esc(entry.time || "")}">`}
+          <div class="edit-main-row ${isRange ? "has-range" : "has-time"}">
+            ${isRange ? `
+            <div class="range-row edit-range-row">
+              <input type="date" class="date-input" id="edit-input-start" value="${entry.rangeStart}">
+              <span class="arrow">→</span>
+              <input type="date" class="date-input" id="edit-input-end" value="${entry.rangeEnd}">
+            </div>` : `<input type="time" class="add-input time-input" id="edit-input-time" value="${esc(entry.time || "")}">`}
             <input class="add-input text-input" id="edit-input-text" placeholder="제목을 입력하세요" autocomplete="off" value="${esc(entry.text)}">
           </div>
-          <button type="button" class="detail-toggle-link ${cal.editDetailMode ? "active" : ""}" id="btn-edit-detail-toggle">
-            ${ICON_NOTE} ${cal.editDetailMode ? "상세 내용 접기" : "상세 내용 추가"}
-          </button>
-          ${cal.editDetailMode ? `<textarea class="add-textarea" id="edit-input-detail" placeholder="상세 내용을 입력하세요 (선택)" rows="3">${esc(entry.detail || "")}</textarea>` : ""}
           <div class="entry-edit-actions">
-            <button type="button" class="ghost-btn" data-action="cancel-edit">취소</button>
-            <button type="button" class="submit-btn confirm-btn" data-action="save-edit" data-id="${entry.id}">저장</button>
+            <div class="edit-action-left">
+              <button type="button" class="detail-toggle-link ${cal.editDetailMode ? "active" : ""}" id="btn-edit-detail-toggle">
+                ${ICON_NOTE} ${cal.editDetailMode ? "상세 내용 접기" : "상세 내용 추가"}
+              </button>
+            </div>
+            <div class="edit-action-right">
+              <button type="button" class="ghost-btn" data-action="cancel-edit">취소</button>
+              <button type="button" class="submit-btn confirm-btn" data-action="save-edit" data-id="${entry.id}">저장</button>
+            </div>
           </div>
+          ${cal.editDetailMode ? `<textarea class="add-textarea" id="edit-input-detail" placeholder="상세 내용을 입력하세요 (선택)" rows="3">${esc(entry.detail || "")}</textarea>` : ""}
         </div>
       </div>`;
+  }
+
+  function getRecurringSidebarEntries() {
+    const prefix = `acct:${CURRENT_ACCOUNT_ID}:personal-calendar:`;
+    const series = new Map();
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (!key || !key.startsWith(prefix) || !/:\d{4}-\d{2}$/.test(key)) continue;
+        let data = {};
+        try { data = JSON.parse(localStorage.getItem(key) || "{}"); } catch (e) { data = {}; }
+        Object.values(data || {}).flat().forEach((entry) => {
+          if (!entry || !entry.repeatId) return;
+          const date = entry.rangeStart || entry.rangeEnd || "9999-12-31";
+          const current = series.get(entry.repeatId);
+          if (!current || date < current.date) {
+            series.set(entry.repeatId, {
+              id: entry.id,
+              text: entry.text || "",
+              repeatLabel: entry.repeatLabel || "반복",
+              date,
+            });
+          }
+        });
+      }
+    } catch (e) { /* localStorage 접근 불가 시 빈 목록 */ }
+    return [...series.values()].sort((a, b) => {
+      if (a.date !== b.date) return a.date.localeCompare(b.date);
+      return a.text.localeCompare(b.text);
+    });
   }
 
   function renderCalendarPage(root) {
@@ -4003,80 +4038,117 @@
       </div>`;
     }
 
-    root.innerHTML = `
-      <div class="calendar-page-header">
-        <div class="calendar-page-title">캘린더</div>
-      </div>
-      <div class="shell">
-        <div class="card">
-          <div class="cal-header">
-            <div class="cal-title"><span class="year">${cal.year}</span>${MONTH_NAMES[cal.monthIndex]}</div>
-            <div class="cal-nav">
-              <button class="today-btn" id="btn-today">오늘</button>
-              <button class="icon-btn" id="btn-prev" aria-label="이전 달">‹</button>
-              <button class="icon-btn" id="btn-next" aria-label="다음 달">›</button>
-            </div>
-          </div>
-          <div class="weekday-row">${WEEKDAYS.map((w) => `<span>${w}</span>`).join("")}</div>
-          <div class="grid">${gridHtml}</div>
-        </div>
+    const miniGrid = buildGrid(cal.miniYear, cal.miniMonthIndex);
+    const miniMonthData = readMonthRaw(cal.miniYear, cal.miniMonthIndex);
+    const miniCellsHtml = miniGrid.map((c, i) => {
+      if (!c.current) return `<span class="mini-day dim">${c.day}</span>`;
+      const iso = toISODate(cal.miniYear, cal.miniMonthIndex, c.day);
+      const has = (miniMonthData[pad2(c.day)] || []).length > 0;
+      const selected = cal.miniYear === cal.year && cal.miniMonthIndex === cal.monthIndex && c.day === cal.selectedDay;
+      const isToday = c.day === today.getDate() && cal.miniYear === today.getFullYear() && cal.miniMonthIndex === today.getMonth();
+      return `<span class="mini-day ${selected ? "sel" : ""} ${isToday ? "tod" : ""} ${has ? "has" : ""}" data-mini-day="${c.day}">${c.day}</span>`;
+    }).join("");
+    const eventCount = Object.values(cal.monthData).flat().filter((e) => e.type === "event" && !e.done).length;
+    const todoCount = todos.filter((t) => !t.done).length;
 
-        <div class="side-col">
-          <div class="card">
-            <div class="side-date">${cal.monthIndex + 1}월 ${cal.selectedDay}일 <span class="wd">${selectedWeekday}요일</span>${getHoliday(selectedISO) ? ` <span class="side-holiday">${esc(getHoliday(selectedISO))}</span>` : ""}</div>
-            <div class="status" id="cal-status"></div>
-            <div class="legend">
-              <span class="item"><span class="dot memo"></span>메모</span>
-              <span class="item"><span class="dot event"></span>일정</span>
-              <label class="hide-done">
-                <input type="checkbox" id="hide-done-check" ${cal.hideDone ? "checked" : ""}>
-                완료 항목 숨기기
-              </label>
+    root.innerHTML = `
+      <div class="mac-calendar-window">
+        <aside class="mac-calendar-sidebar">
+          <div class="cal-list" id="cal-list">
+            <div class="cal-list-title">나의 캘린더</div>
+            <label><span class="dot event"></span>일정<span class="cnt">${eventCount}</span></label>
+            ${(() => {
+              const recurring = getRecurringSidebarEntries();
+              return recurring.length ? `
+                <div class="sidebar-repeat-list" id="sidebar-repeat-list">
+                  ${recurring.map((r) => `
+                    <button type="button" class="sidebar-repeat-item" data-sidebar-repeat-id="${esc(r.id)}" title="반복 일정 수정">
+                      <span class="sidebar-repeat-bullet"></span>
+                      <span class="sidebar-repeat-main">
+                        <span class="sidebar-repeat-text">${esc(r.text)}</span>
+                        <span class="sidebar-repeat-rule">${esc(r.repeatLabel)} · ${formatTodoDue(r.date)}</span>
+                      </span>
+                    </button>
+                  `).join("")}
+                </div>` : "";
+            })()}
+            <label><span class="dot todo"></span>할 일<span class="cnt">${todoCount}</span></label>
+            <div class="sidebar-todo-list" id="sidebar-todo-list">
+              ${sortTodos(todos.filter((t) => !t.done)).length ? sortTodos(todos.filter((t) => !t.done)).map((t) => `
+                <button type="button" class="sidebar-todo-item ${t.due === todayISO() && !t.done ? "due-today" : ""}" data-sidebar-todo-id="${esc(t.id)}" title="할 일 수정">
+                  <span class="sidebar-todo-bullet"></span>
+                  <span class="sidebar-todo-main">
+                    <span class="sidebar-todo-text">${esc(t.text)}</span>
+                    ${t.due ? `<span class="sidebar-todo-due">${formatTodoDue(t.due)}</span>` : ""}
+                  </span>
+                </button>
+              `).join("") : `<div class="sidebar-todo-empty">등록된 할 일이 없습니다.</div>`}
             </div>
-            ${entriesHtml}
-            ${upcomingHtml}
-            <form class="add-form" id="add-form">
-              <div class="type-row">
-                <button type="button" class="type-btn priority ${cal.formPriority ? "active" : ""}" id="btn-priority">★ 중요</button>
-                <button type="button" class="type-btn rangetoggle ${cal.rangeMode ? "active" : ""}" id="btn-range">기간 설정</button>
-                <button type="button" class="type-btn repeattoggle ${cal.repeatMode ? "active" : ""}" id="btn-repeat">${ICON_REFRESH} 반복</button>
-              </div>
-              ${cal.rangeMode ? `
-              <div class="range-row">
-                <input type="date" class="date-input" id="input-start" value="${selectedISO}">
-                <span class="arrow">→</span>
-                <input type="date" class="date-input" id="input-end" value="${selectedISO}">
-              </div>` : ""}
-              ${cal.repeatMode ? `
-              <div class="repeat-row">
-                <select class="repeat-select" id="input-repeat-freq">
-                  <option value="weekly" ${cal.repeatFreq === "weekly" ? "selected" : ""}>매주</option>
-                  <option value="monthly" ${cal.repeatFreq === "monthly" ? "selected" : ""}>매월</option>
-                </select>
-                ${cal.repeatFreq === "monthly" ? `
-                <select class="repeat-select" id="input-repeat-monthday">
-                  ${Array.from({ length: 31 }, (_, i) => i + 1).map((d) => `<option value="${d}" ${d === repeatMonthDayValue ? "selected" : ""}>${d}일</option>`).join("")}
-                </select>` : `
-                <select class="repeat-select" id="input-repeat-weekday">
-                  ${WEEKDAYS.map((w, i) => `<option value="${i}" ${i === repeatWeekdayValue ? "selected" : ""}>${w}요일</option>`).join("")}
-                </select>`}
-              </div>
-              <div class="repeat-row">
-                <span class="repeat-until-label">종료일</span>
-                <input type="date" class="date-input" id="input-repeat-until" value="${repeatDefaultUntilISO}" min="${selectedISO}">
-              </div>` : ""}
-              <div class="add-row">
-                ${cal.rangeMode ? "" : `<input type="time" class="add-input time-input" id="input-time">`}
-                <input class="add-input text-input" id="input-text" placeholder="제목을 입력하세요" autocomplete="off">
-                <button type="submit" class="submit-btn" aria-label="추가">＋</button>
-              </div>
-              <button type="button" class="detail-toggle-link ${cal.formDetailMode ? "active" : ""}" id="btn-detail-toggle">
-                ${ICON_NOTE} ${cal.formDetailMode ? "상세 내용 접기" : "상세 내용 추가"}
-              </button>
-              ${cal.formDetailMode ? `<textarea class="add-textarea" id="input-detail" placeholder="상세 내용을 입력하세요 (선택)" rows="3"></textarea>` : ""}
-            </form>
           </div>
-          ${renderTodoCard()}
+          <div class="mini-cal">
+            <div class="mini-head"><span>${cal.miniYear}년 ${MONTH_NAMES[cal.miniMonthIndex]}</span><span class="mini-nav"><button id="mini-prev" aria-label="이전 달">${ICON_CHEVRON_LEFT}</button><button id="mini-next" aria-label="다음 달">${ICON_CHEVRON_RIGHT}</button></span></div>
+            <div class="mini-grid">${WEEKDAYS.map((w) => `<span class="mini-wd">${w}</span>`).join("")}${miniCellsHtml}</div>
+          </div>
+        </aside>
+        <div class="mac-calendar-body">
+          <div class="mac-calendar-toolbar">
+            <div class="tb-left">
+              <button type="button" class="btn add-btn ${cal.panel === "event" ? "active" : ""}" id="btn-open-event" aria-expanded="${cal.panel === "event"}">일정 ＋</button>
+              <button type="button" class="btn add-btn ${cal.panel === "todo" ? "active" : ""}" id="btn-open-todo" aria-expanded="${cal.panel === "todo"}">할 일 ＋</button>
+            </div>
+            <div class="tb-title">${cal.year}년 ${MONTH_NAMES[cal.monthIndex]}</div>
+            <div class="tb-right">
+              <span class="status-msg" id="cal-status"></span>
+              <label class="hidedone"><input type="checkbox" id="hide-done-check" ${cal.hideDone ? "checked" : ""}> 완료 숨기기</label>
+              <button class="btn" id="btn-today">오늘</button>
+              <div class="seg"><button id="btn-prev" aria-label="이전 달">${ICON_CHEVRON_LEFT}</button><button id="btn-next" aria-label="다음 달">${ICON_CHEVRON_RIGHT}</button></div>
+            </div>
+          </div>
+          <div class="mac-calendar-main">
+            <section class="grid-wrap">
+              <div class="weekdays">${WEEKDAYS.map((w) => `<span>${w}</span>`).join("")}</div>
+              <div class="grid">${gridHtml}</div>
+            </section>
+          </div>
+        </div>
+        <div class="cal-pop-overlay ${cal.panel ? "open" : ""}" id="cal-pop-overlay">
+          <div class="cal-pop cal-pop-event ${cal.panel === "event" ? "open" : ""}" id="cal-pop-event">
+            <div class="pop-titlebar">
+              <span class="pop-traffic"><span class="dot-red pop-close-dot" data-pop-close role="button" tabindex="0" aria-label="닫기"></span></span>
+              <span class="pop-title-wrap"><span class="pop-title-icon"><span class="pop-title-glyph">●</span></span><span class="pop-title">일정</span></span>
+
+            </div>
+            <div class="cal-pop-body">
+              <div class="card">
+                <div class="side-date">${cal.monthIndex + 1}월 ${cal.selectedDay}일 <span class="wd">${selectedWeekday}요일</span>${getHoliday(selectedISO) ? ` <span class="side-holiday">${esc(getHoliday(selectedISO))}</span>` : ""}</div>
+                <div class="legend"><span class="item">일정</span></div>
+                ${entriesHtml}
+                ${upcomingHtml}
+                <form class="add-form" id="add-form">
+                  <div class="type-row">
+                    <button type="button" class="type-btn priority ${cal.formPriority ? "active" : ""}" id="btn-priority">★ 중요</button>
+                    <button type="button" class="type-btn ${cal.rangeMode ? "active" : ""}" id="btn-range">기간 설정</button>
+                    <button type="button" class="type-btn ${cal.repeatMode ? "active" : ""}" id="btn-repeat">${ICON_REFRESH} 반복</button>
+                  </div>
+                  ${cal.rangeMode ? `<div class="range-row"><input type="date" class="date-input" id="input-start" value="${selectedISO}"><span class="arrow">→</span><input type="date" class="date-input" id="input-end" value="${selectedISO}"></div>` : ""}
+                  ${cal.repeatMode ? `<div class="repeat-row"><select class="repeat-select" id="input-repeat-freq"><option value="weekly" ${cal.repeatFreq === "weekly" ? "selected" : ""}>매주</option><option value="monthly" ${cal.repeatFreq === "monthly" ? "selected" : ""}>매월</option></select>${cal.repeatFreq === "monthly" ? `<select class="repeat-select" id="input-repeat-monthday">${Array.from({ length: 31 }, (_, i) => i + 1).map((d) => `<option value="${d}" ${d === repeatMonthDayValue ? "selected" : ""}>${d}일</option>`).join("")}</select>` : `<select class="repeat-select" id="input-repeat-weekday">${WEEKDAYS.map((w, i) => `<option value="${i}" ${i === repeatWeekdayValue ? "selected" : ""}>${w}요일</option>`).join("")}</select>`}<div class="repeat-until-field"><span class="repeat-until-label">종료일</span><input type="date" class="date-input" id="input-repeat-until" value="${repeatDefaultUntilISO}" min="${selectedISO}"></div></div>` : ""}
+                  <div class="add-row ${cal.rangeMode ? "range-title-row" : ""}">${cal.rangeMode ? "" : `<input type="time" class="add-input time-input" id="input-time">`}<input class="add-input text-input" id="input-text" placeholder="제목을 입력하세요" autocomplete="off"><button type="submit" class="submit-btn" aria-label="추가">＋</button></div>
+                  <button type="button" class="detail-toggle-link ${cal.formDetailMode ? "active" : ""}" id="btn-detail-toggle">${ICON_NOTE} ${cal.formDetailMode ? "상세 내용 접기" : "상세 내용 추가"}</button>
+                  ${cal.formDetailMode ? `<textarea class="add-textarea" id="input-detail" placeholder="상세 내용을 입력하세요 (선택)" rows="3"></textarea>` : ""}
+                </form>
+              </div>
+            </div>
+          </div>
+          <div class="cal-pop cal-pop-todo ${cal.panel === "todo" ? "open" : ""}" id="cal-pop-todo">
+            <div class="pop-titlebar">
+              <span class="pop-traffic"><span class="dot-red pop-close-dot" data-pop-close role="button" tabindex="0" aria-label="닫기"></span></span>
+              <span class="pop-title-wrap"><span class="pop-title-icon">${ICON_CHECK}</span><span class="pop-title">할 일</span></span>
+
+            </div>
+            <div class="cal-pop-body">
+              ${renderTodoCard()}
+            </div>
+          </div>
         </div>
       </div>
     `;
@@ -4085,23 +4157,118 @@
     attachTodoEvents();
   }
 
+  function resetTodoPopupState() {
+    todoUi.editingId = null;
+    todoUi.editDetailMode = false;
+    todoUi.expanded = {};
+  }
+
+  function closeCalendarPopup() {
+    resetTodoPopupState();
+    todoUi.formDetailMode = false;
+    cal.panel = null;
+    renderApp();
+  }
+
   function attachCalEvents() {
     document.querySelectorAll(".repeat-select").forEach((sel) => enhanceSelect(sel));
     document.querySelectorAll('input[type="date"]').forEach((inp) => enhanceDateInput(inp));
     document.querySelectorAll('input[type="time"]').forEach((inp) => enhanceTimeInput(inp));
+    const togglePanel = (name) => {
+      if (cal.panel === name) {
+        closeCalendarPopup();
+        return;
+      }
+      if (name === "todo") resetTodoPopupState();
+      cal.panel = name;
+      renderApp();
+    };
+    document.getElementById("btn-open-event").onclick = () => togglePanel("event");
+    document.getElementById("btn-open-todo").onclick = () => togglePanel("todo");
+    document.querySelectorAll("[data-sidebar-todo-id]").forEach((btn) => {
+      btn.onclick = () => {
+        const id = btn.getAttribute("data-sidebar-todo-id");
+        if (!todos.some((t) => t.id === id)) return;
+        resetTodoPopupState();
+        todoUi.editingId = id;
+        cal.panel = "todo";
+        renderApp();
+      };
+    });
+    document.querySelectorAll("[data-sidebar-repeat-id]").forEach((btn) => {
+      btn.onclick = () => {
+        const id = btn.getAttribute("data-sidebar-repeat-id");
+        let found = null;
+        try {
+          for (let i = 0; i < localStorage.length && !found; i++) {
+            const key = localStorage.key(i);
+            if (!key || !key.startsWith(`acct:${CURRENT_ACCOUNT_ID}:personal-calendar:`) || !/:\d{4}-\d{2}$/.test(key)) continue;
+            const data = JSON.parse(localStorage.getItem(key) || "{}");
+            for (const list of Object.values(data || {})) {
+              const hit = (Array.isArray(list) ? list : []).find((e) => e && e.id === id);
+              if (hit) { found = hit; break; }
+            }
+          }
+        } catch (e) { found = null; }
+        if (!found) return;
+        const targetISO = found.rangeStart || found.rangeEnd;
+        if (targetISO) {
+          const dt = parseISODate(targetISO);
+          cal.year = dt.getFullYear();
+          cal.monthIndex = dt.getMonth();
+          cal.selectedDay = dt.getDate();
+          cal.miniYear = cal.year;
+          cal.miniMonthIndex = cal.monthIndex;
+          loadMonth(cal.year, cal.monthIndex);
+        }
+        cal.editingEntryId = found.id;
+        cal.editDetailMode = false;
+        cal.panel = null;
+        renderApp();
+      };
+    });
+    document.querySelectorAll("[data-pop-close]").forEach((btn) => {
+      btn.onclick = () => closeCalendarPopup();
+      btn.onkeydown = (e) => {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); btn.click(); }
+      };
+    });
+    const popOverlay = document.getElementById("cal-pop-overlay");
+    if (popOverlay) {
+      popOverlay.onclick = (e) => { if (e.target === popOverlay) closeCalendarPopup(); };
+    }
     document.getElementById("btn-today").onclick = () => {
       cal.year = today.getFullYear();
       cal.monthIndex = today.getMonth();
       cal.selectedDay = today.getDate();
+      cal.miniYear = cal.year; cal.miniMonthIndex = cal.monthIndex;
       loadMonth(cal.year, cal.monthIndex);
       renderApp();
     };
     document.getElementById("btn-prev").onclick = () => goMonth(-1);
     document.getElementById("btn-next").onclick = () => goMonth(1);
+    document.getElementById("mini-prev").onclick = () => {
+      cal.miniMonthIndex--; if (cal.miniMonthIndex < 0) { cal.miniMonthIndex = 11; cal.miniYear--; }
+      renderApp();
+    };
+    document.getElementById("mini-next").onclick = () => {
+      cal.miniMonthIndex++; if (cal.miniMonthIndex > 11) { cal.miniMonthIndex = 0; cal.miniYear++; }
+      renderApp();
+    };
+    document.querySelectorAll("[data-mini-day]").forEach((el) => {
+      el.onclick = () => {
+        cal.year = cal.miniYear; cal.monthIndex = cal.miniMonthIndex;
+        const dim = new Date(cal.year, cal.monthIndex + 1, 0).getDate();
+        cal.selectedDay = Math.min(parseInt(el.getAttribute("data-mini-day"), 10), dim);
+        loadMonth(cal.year, cal.monthIndex);
+        renderApp();
+      };
+    });
 
     document.querySelectorAll(".cell[data-current='true']").forEach((cellEl) => {
       cellEl.onclick = () => {
         cal.selectedDay = parseInt(cellEl.getAttribute("data-day"), 10);
+        cal.panel = "event"; // 날짜를 누르면 그 날짜의 일정 팝업이 열림(예전 오른쪽 사이드바 역할)
         renderApp();
       };
       cellEl.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") cellEl.click(); };
@@ -4323,7 +4490,7 @@
     let y = cal.year;
     if (m < 0) { m = 11; y -= 1; }
     if (m > 11) { m = 0; y += 1; }
-    cal.monthIndex = m; cal.year = y; cal.selectedDay = 1;
+    cal.monthIndex = m; cal.year = y; cal.selectedDay = 1; cal.miniYear = y; cal.miniMonthIndex = m;
     loadMonth(y, m);
     renderApp();
   }
@@ -4566,6 +4733,15 @@
       return a.due.localeCompare(b.due);
     });
   }
+  // 완료된 할 일은 가장 최신 마감일이 위로 오도록 정렬한다.
+  function sortCompletedTodos(list) {
+    return [...list].sort((a, b) => {
+      if (!a.due && !b.due) return 0;
+      if (!a.due) return 1;
+      if (!b.due) return -1;
+      return b.due.localeCompare(a.due);
+    });
+  }
   function formatTodoDue(due) {
     // 마감일이 없거나 형식이 깨진 값이 들어오면 "NaN/NaN"이 화면에 그대로
     // 찍히므로, 그런 경우엔 빈 문자열을 돌려준다.
@@ -4578,27 +4754,29 @@
   function renderTodoCard() {
     const tISO = todayISO();
     const activeTodos = sortTodos(todos.filter((t) => !t.done));
-    const doneTodos = sortTodos(todos.filter((t) => t.done));
+    const doneTodos = sortCompletedTodos(todos.filter((t) => t.done));
     const remaining = activeTodos.length;
 
     function todoEditFormHtml(t) {
       return `
         <div class="todo-item todo-editing" data-id="${t.id}">
           <div class="todo-edit-form">
-            <div class="add-row">
+            <div class="edit-main-row todo-edit-main-row">
+              <input class="add-input todo-due-input" type="date" id="todo-edit-input-due" value="${esc(t.due || "")}">
               <input class="add-input text-input" id="todo-edit-input-text" placeholder="할 일 제목을 입력하세요" autocomplete="off" value="${esc(t.text)}">
             </div>
-            <div class="todo-add-row">
-              <input class="add-input todo-due-input" type="date" id="todo-edit-input-due" value="${esc(t.due || "")}">
-            </div>
-            <button type="button" class="detail-toggle-link ${todoUi.editDetailMode ? "active" : ""}" id="btn-todo-edit-detail-toggle">
-              ${ICON_NOTE} ${todoUi.editDetailMode ? "상세 내용 접기" : "상세 내용 추가"}
-            </button>
-            ${todoUi.editDetailMode ? `<textarea class="add-textarea" id="todo-edit-input-detail" placeholder="상세 내용을 입력하세요 (선택)" rows="3">${esc(t.detail || "")}</textarea>` : ""}
             <div class="entry-edit-actions">
-              <button type="button" class="ghost-btn" data-action="todo-cancel-edit">취소</button>
-              <button type="button" class="submit-btn confirm-btn" data-action="todo-save-edit" data-id="${t.id}">저장</button>
+              <div class="edit-action-left">
+                <button type="button" class="detail-toggle-link ${todoUi.editDetailMode ? "active" : ""}" id="btn-todo-edit-detail-toggle">
+                  ${ICON_NOTE} ${todoUi.editDetailMode ? "상세 내용 접기" : "상세 내용 추가"}
+                </button>
+              </div>
+              <div class="edit-action-right">
+                <button type="button" class="ghost-btn" data-action="todo-cancel-edit">취소</button>
+                <button type="button" class="submit-btn confirm-btn" data-action="todo-save-edit" data-id="${t.id}">저장</button>
+              </div>
             </div>
+            ${todoUi.editDetailMode ? `<textarea class="add-textarea" id="todo-edit-input-detail" placeholder="상세 내용을 입력하세요 (선택)" rows="3">${esc(t.detail || "")}</textarea>` : ""}
           </div>
         </div>`;
     }
@@ -4663,10 +4841,8 @@
         <form class="todo-add-form" id="todo-add-form">
           <div class="todo-add-row">
             <input class="add-input text-input" id="todo-input-text" placeholder="할 일 제목을 입력하세요" autocomplete="off">
-            <button type="submit" class="submit-btn" aria-label="추가">＋</button>
-          </div>
-          <div class="todo-add-row">
             <input class="add-input todo-due-input" type="date" id="todo-input-due" value="${todoUi.dueInput}">
+            <button type="submit" class="submit-btn" aria-label="추가">＋</button>
           </div>
           <button type="button" class="detail-toggle-link ${todoUi.formDetailMode ? "active" : ""}" id="btn-todo-detail-toggle">
             ${ICON_NOTE} ${todoUi.formDetailMode ? "상세 내용 접기" : "상세 내용 추가"}

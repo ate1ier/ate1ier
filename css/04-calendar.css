@@ -1,8 +1,4 @@
   /* ---------- 캘린더 페이지 ---------- */
-  .calendar-page-header {
-    margin-bottom: 24px;
-  }
-  .calendar-page-title { font-size: var(--page-title-size); font-weight: var(--page-title-weight); letter-spacing: -0.01em; }
   .shell {
     display: grid;
     grid-template-columns: 1.9fr 1fr;
@@ -505,3 +501,1786 @@
   .todo-add-row .app-date { flex: 0 0 auto; }
   
 
+
+
+
+/* Exact visual system from the supplied macOS calendar mockup, scoped to the calendar page. */
+.mac-calendar-window{
+  --bg-desktop-1:#4a6fa5; --bg-desktop-2:#8a5fb8;
+  --window-bg:#ececec; --titlebar-bg:rgba(246,246,246,.92); --toolbar-bg:rgba(250,250,250,.88);
+  --sidebar-bg:rgba(240,240,242,.9); --card-bg:#ffffff; --inspector-bg:rgba(247,247,248,.92);
+  --text:#1d1d1f; --text-2:#6e6e73; --text-3:#98989d; --border:rgba(0,0,0,.09);
+  --accent:#0a84ff; --event:#0a84ff; --priority:#ff9f0a; --todo:#30d158; --danger:#ff3b30;
+  --cell-hover:rgba(0,0,0,.035); --cell-sel:rgba(10,132,255,.13); --weekend:#ff3b30; --sat:#0a84ff;
+  --chip-event-bg:rgba(10,132,255,.14); --input-bg:#ffffff; --shadow:0 30px 70px rgba(0,0,0,.35);
+  width:100%; height:100%; min-height:0; background:var(--window-bg); color:var(--text);
+  border-radius:12px; overflow:hidden; display:flex; flex-direction:column; position:relative;
+  border:1px solid rgba(0,0,0,.2); font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",Arial,sans-serif;
+}
+/* 사이드바가 창 맨 위(툴바 높이)까지 올라오고, 툴바/그리드/인스펙터는 오른쪽 본문 열에 배치 */
+.mac-calendar-window{flex-direction:row}
+.mac-calendar-window .mac-calendar-body{flex:1;display:flex;flex-direction:column;min-width:0;min-height:0}
+html:not([data-theme="light"]) .mac-calendar-window{
+  --window-bg:#1e1e1e; --titlebar-bg:rgba(38,38,40,.92); --toolbar-bg:rgba(32,32,34,.88);
+  --sidebar-bg:rgba(28,28,30,.9); --card-bg:#2c2c2e; --inspector-bg:rgba(26,26,28,.92);
+  --text:#f5f5f7; --text-2:#98989d; --text-3:#6e6e73; --border:rgba(255,255,255,.09);
+  --cell-hover:rgba(255,255,255,.045); --cell-sel:rgba(10,132,255,.22); --chip-event-bg:rgba(10,132,255,.22);
+  --input-bg:#3a3a3c;
+}
+.mac-calendar-window *{box-sizing:border-box}
+.mac-calendar-window button,.mac-calendar-window input,.mac-calendar-window select,.mac-calendar-window textarea{font:inherit}
+.app-win[data-page="calendar"] .page-inner,.app-win[data-page="calendar"] .page-inner.wide{padding:0 !important;overflow:hidden}
+.mac-calendar-window .mac-calendar-toolbar{
+  height:42px; background:var(--toolbar-bg); backdrop-filter:blur(20px); display:flex; align-items:center;
+  gap:10px; padding:0 14px; border-bottom:1px solid var(--border); flex-shrink:0;
+}
+.mac-calendar-window .tb-left{display:flex;gap:8px;align-items:center}
+.mac-calendar-window .btn{
+  border:1px solid var(--border); background:var(--card-bg); color:var(--text); border-radius:7px;
+  padding:4px 11px; font-size:13px; cursor:pointer; font-weight:500;
+}
+.mac-calendar-window .btn:hover{background:var(--cell-hover)}
+.mac-calendar-window .seg{display:flex; border:1px solid var(--border); border-radius:7px; overflow:hidden}
+.mac-calendar-window .seg button{display:flex;align-items:center;justify-content:center;border:none;background:var(--card-bg);color:var(--text-2);padding:4px 9px;cursor:pointer;font-size:14px;line-height:0}
+.mac-calendar-window .seg button svg{display:block}
+.mac-calendar-window .seg button:hover{background:var(--cell-hover);color:var(--text)}
+.mac-calendar-window .seg button+button{border-left:1px solid var(--border)}
+.mac-calendar-window .tb-title{font-size:17px;font-weight:700;flex:1;text-align:center}
+.mac-calendar-window .tb-right{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--text-2)}
+.mac-calendar-window .hidedone{display:flex;align-items:center;gap:5px;cursor:pointer;user-select:none}
+.mac-calendar-window .status-msg{font-size:11px;color:var(--accent);min-width:44px;text-align:right}
+.mac-calendar-window .mac-calendar-main{flex:1;display:flex;min-height:0}
+.mac-calendar-window .mac-calendar-sidebar{
+  width:236px; display:flex; flex-direction:column; background:var(--sidebar-bg); backdrop-filter:blur(20px); border-right:1px solid var(--border);
+  padding:14px 12px; overflow-y:auto; flex-shrink:0;
+}
+.mac-calendar-window .mini-cal{margin-top:auto;padding-top:18px}
+.mac-calendar-window .mini-head{display:flex;align-items:center;justify-content:space-between;font-size:12px;font-weight:700;margin-bottom:6px;color:var(--text-2)}
+.mac-calendar-window .mini-nav{display:flex;gap:2px}
+.mac-calendar-window .mini-nav button{display:flex;align-items:center;justify-content:center;border:none;background:none;color:var(--text-2);cursor:pointer;padding:2px 4px;border-radius:4px;line-height:0}
+.mac-calendar-window .mini-nav button:hover{background:var(--cell-hover);color:var(--text)}
+.mac-calendar-window .mini-nav button svg{display:block}
+.mac-calendar-window .mini-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;text-align:center;font-size:10px}
+.mac-calendar-window .mini-wd{color:var(--text-3);padding-bottom:3px}
+.mac-calendar-window .mini-day{padding:3px 0;border-radius:50%;cursor:pointer;color:var(--text);position:relative}
+.mac-calendar-window .mini-day.dim{color:var(--text-3)}
+.mac-calendar-window .mini-day:hover{background:var(--cell-hover)}
+.mac-calendar-window .mini-day.sel{background:var(--accent);color:#fff;font-weight:700}
+.mac-calendar-window .mini-day.tod:not(.sel){color:var(--danger);font-weight:700}
+.mac-calendar-window .mini-day.has::after{content:"";position:absolute;bottom:0;left:50%;width:3px;height:3px;border-radius:50%;background:var(--accent);transform:translateX(-50%)}
+.mac-calendar-window .cal-list-title{font-size:11px;font-weight:700;color:var(--text-2);margin-bottom:6px;letter-spacing:.02em}
+.mac-calendar-window .cal-list label{display:flex;align-items:center;gap:7px;padding:4px 2px;font-size:13px;cursor:pointer}
+.mac-calendar-window .dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.mac-calendar-window .dot.event{background:var(--event)} .mac-calendar-window .dot.todo{background:var(--todo)}
+.mac-calendar-window .cal-list .cnt{margin-left:auto;color:var(--text-3);font-size:11px}
+.mac-calendar-window .grid-wrap{flex:1;display:flex;flex-direction:column;min-width:0;background:var(--card-bg)}
+.mac-calendar-window .weekdays{display:grid;grid-template-columns:repeat(7,1fr);border-bottom:1px solid var(--border);flex-shrink:0}
+.mac-calendar-window .weekdays span{text-align:center;font-size:11px;font-weight:700;color:var(--text-2);padding:8px 0}
+.mac-calendar-window .weekdays span:first-child{color:var(--weekend)} .mac-calendar-window .weekdays span:last-child{color:var(--sat)}
+.mac-calendar-window .grid{flex:1;display:grid;grid-template-columns:repeat(7,1fr);grid-template-rows:repeat(6,1fr);min-height:0}
+.mac-calendar-window .cell{border-right:1px solid var(--border);border-bottom:1px solid var(--border);padding:5px;overflow:hidden;cursor:pointer;position:relative;display:flex;flex-direction:column;gap:2px}
+.mac-calendar-window .cell:hover{background:var(--cell-hover)}
+.mac-calendar-window .cell.dim{color:var(--text-3)}
+.mac-calendar-window .cell.selected{background:var(--cell-sel)}
+.mac-calendar-window .day-num{font-size:12px;font-weight:600;width:20px;height:20px;display:flex;align-items:center;justify-content:center;border-radius:50%}
+.mac-calendar-window .cell.today .day-num{background:var(--danger);color:#fff}
+.mac-calendar-window .cell.weekend:nth-child(7n+1) .day-num{color:var(--weekend)}
+.mac-calendar-window .cell.weekend:nth-child(7n) .day-num{color:var(--sat)}
+.mac-calendar-window .holiday-label{font-size:9px;color:var(--danger);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mac-calendar-window .chip{font-size:10px;padding:1px 5px;border-radius:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:var(--chip-event-bg);color:var(--event)}
+.mac-calendar-window .chip.done{opacity:.4;text-decoration:line-through}
+.mac-calendar-window .chip.bridge-l{border-top-left-radius:0;border-bottom-left-radius:0;margin-left:-5px}
+.mac-calendar-window .chip.bridge-r{border-top-right-radius:0;border-bottom-right-radius:0;margin-right:-5px}
+.mac-calendar-window .chip-more{font-size:9px;color:var(--text-3)}
+/* 예전 오른쪽 사이드바(인스펙터)는 없애고, 툴바의 "일정 ＋"/"할 일 ＋" 버튼으로 여는 팝업으로 대체 */
+.mac-calendar-window .mac-calendar-main{position:relative}
+.mac-calendar-window .add-btn{font-weight:600}
+.mac-calendar-window .add-btn.active{background:var(--accent);border-color:var(--accent);color:#fff}
+.mac-calendar-window .tb-right{margin-left:auto}
+/* macOS 환경설정 창처럼: 캘린더 창 전체 가운데에 뜨는 독립된 미니 창 형태의 팝업 */
+.mac-calendar-window .cal-pop-overlay{
+  display:none; position:absolute; inset:0; z-index:30; background:rgba(0,0,0,.22);
+  align-items:center; justify-content:center; padding:24px;
+}
+.mac-calendar-window .cal-pop-overlay.open{display:flex}
+.mac-calendar-window .cal-pop{
+  display:none; position:relative; width:360px; max-width:100%; max-height:100%;
+  background:var(--window-bg); border:1px solid rgba(0,0,0,.22);
+  border-radius:11px; box-shadow:var(--shadow); overflow:hidden;
+  flex-direction:column;
+}
+.mac-calendar-window .cal-pop.open{display:flex}
+.mac-calendar-window .pop-titlebar{
+  flex-shrink:0; height:40px; display:flex; align-items:center; justify-content:center; position:relative;
+  background:var(--titlebar-bg); border-bottom:1px solid var(--border); -webkit-backdrop-filter:blur(20px); backdrop-filter:blur(20px);
+}
+.mac-calendar-window .pop-traffic{position:absolute; left:12px; top:50%; transform:translateY(-50%); display:flex; gap:8px}
+.mac-calendar-window .pop-traffic span{width:12px;height:12px;border-radius:50%;display:inline-block;background:#ddd}
+.mac-calendar-window .pop-close{
+  width:12px;height:12px;border-radius:50%;border:none;padding:0;cursor:pointer;background:#ff5f57;
+  display:flex;align-items:center;justify-content:center;color:transparent;font-size:8px;line-height:1;
+}
+.mac-calendar-window .pop-close:hover{color:#4d0000}
+.mac-calendar-window .pop-traffic .dot-yellow{background:#febc2e}
+.mac-calendar-window .pop-traffic .dot-green{background:#28c840}
+.mac-calendar-window .pop-title{font-size:13px;font-weight:600;color:var(--text)}
+.mac-calendar-window .cal-pop-body{overflow-y:auto; padding:14px 18px 2px}
+.mac-calendar-window .side-date{font-size:15px;font-weight:700;margin-bottom:2px}
+.mac-calendar-window .side-date .wd{font-weight:400;color:var(--text-2);font-size:13px}
+.mac-calendar-window .side-holiday{color:var(--danger);font-size:12px;margin-left:4px}
+.mac-calendar-window .legend{display:flex;align-items:center;gap:12px;font-size:11px;color:var(--text-2);margin:8px 0 10px;flex-wrap:wrap}
+.mac-calendar-window .legend .item{display:flex;align-items:center;gap:5px;font-size:13px;font-weight:700;color:var(--text)}
+.mac-calendar-window .hide-done{margin-left:auto;display:flex;align-items:center;gap:4px;cursor:pointer}
+.mac-calendar-window .card{margin-bottom:14px}
+.mac-calendar-window .section-divider{border-top:1px solid var(--border);margin:2px 0 16px}
+.mac-calendar-window .empty{font-size:12px;color:var(--text-3);text-align:center;padding:14px 0;line-height:1.5}
+.mac-calendar-window .entries{display:flex;flex-direction:column;gap:6px;margin-bottom:10px}
+.mac-calendar-window .entry{background:var(--card-bg);border:1px solid var(--border);border-radius:8px;padding:7px 8px;display:flex;align-items:flex-start;gap:7px}
+.mac-calendar-window .entry.done{opacity:.5}
+.mac-calendar-window .check-btn{width:16px;height:16px;border-radius:50%;border:1.4px solid var(--text-3);background:none;flex-shrink:0;margin-top:1px;cursor:pointer;font-size:10px;color:var(--accent);display:flex;align-items:center;justify-content:center;padding:0}
+.mac-calendar-window .entry.event .check-btn{border-color:var(--event)}
+.mac-calendar-window .body{flex:1;min-width:0}
+.mac-calendar-window .meta-row{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:10px;color:var(--text-2);margin-bottom:1px}
+.mac-calendar-window .range-badge,
+.mac-calendar-window .repeat-badge{background:var(--cell-hover);padding:1px 5px;border-radius:4px}
+.mac-calendar-window .repeat-clear-btn{border:none;background:none;color:var(--danger);font-size:10px;cursor:pointer;text-decoration:underline}
+.mac-calendar-window .priority-tag{color:var(--priority)}
+.mac-calendar-window .text,
+.mac-calendar-window .todo-text{font-size:13px;word-break:break-word}
+.mac-calendar-window .entry.done .text,
+.mac-calendar-window .todo-item.done .todo-text{text-decoration:line-through}
+.mac-calendar-window .entry-title-btn{display:flex;align-items:center;gap:4px;background:none;border:none;padding:0;cursor:pointer;color:var(--text);text-align:left;width:100%}
+.mac-calendar-window .expand-chevron{color:var(--text-3);transition:transform .15s}
+.mac-calendar-window .entry.expanded .expand-chevron,
+.mac-calendar-window .todo-item.expanded .expand-chevron{transform:rotate(90deg)}
+.mac-calendar-window .entry-detail-card,
+.mac-calendar-window .todo-detail-card{font-size:11.5px;color:var(--text-2);background:var(--cell-hover);border-radius:6px;padding:6px 8px;margin-top:4px;white-space:pre-wrap}
+.mac-calendar-window .icon-edit-btn,
+.mac-calendar-window .del{border:none;background:none;cursor:pointer;color:var(--text-3);font-size:12px;padding:2px;flex-shrink:0}
+.mac-calendar-window .icon-edit-btn:hover{color:var(--accent)} .mac-calendar-window .del:hover{color:var(--danger)}
+.mac-calendar-window .upcoming-title{font-size:11px;font-weight:700;color:var(--text-2);margin-bottom:6px}
+.mac-calendar-window .upcoming-item{display:flex;align-items:center;gap:6px;width:100%;background:none;border:none;padding:4px 2px;cursor:pointer;font-size:12px;color:var(--text);text-align:left;border-radius:6px}
+.mac-calendar-window .upcoming-item:hover{background:var(--cell-hover)}
+.mac-calendar-window .upcoming-day{color:var(--text-3);font-size:11px;min-width:38px}
+.mac-calendar-window .upcoming-star{color:var(--priority)}
+.mac-calendar-window .upcoming-toggle,
+.mac-calendar-window .todo-done-toggle{border:none;background:none;color:var(--accent);font-size:11.5px;cursor:pointer;padding:3px 2px}
+.mac-calendar-window .add-form,
+.mac-calendar-window .todo-add-form{border-top:1px solid var(--border);padding-top:10px;margin-top:6px;display:flex;flex-direction:column;gap:6px}
+.mac-calendar-window .type-row{display:flex;gap:6px;flex-wrap:wrap}
+.mac-calendar-window .type-btn{border:1px solid var(--border);background:var(--card-bg);color:var(--text-2);font-size:11px;padding:4px 9px;border-radius:6px;cursor:pointer}
+.mac-calendar-window .type-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.mac-calendar-window .type-btn.priority.active{background:var(--priority);border-color:var(--priority)}
+.mac-calendar-window .range-row{display:flex;align-items:center;gap:6px}
+.mac-calendar-window .repeat-row{display:flex;align-items:center;gap:5px;flex-wrap:nowrap;overflow-x:auto;padding-bottom:2px}
+.mac-calendar-window .repeat-row .repeat-select,
+.mac-calendar-window .repeat-row .date-input{flex-shrink:1;min-width:0}
+.mac-calendar-window .repeat-until-label{white-space:nowrap;flex-shrink:0}
+.mac-calendar-window .date-input,
+.mac-calendar-window .repeat-select,
+.mac-calendar-window .add-input{border:1px solid var(--border);background:var(--input-bg);color:var(--text);border-radius:6px;padding:5px 7px;font-size:12px;font-family:inherit}
+.mac-calendar-window .arrow{color:var(--text-3);font-size:11px}
+.mac-calendar-window .repeat-until-label{font-size:11px;color:var(--text-2)}
+.mac-calendar-window .add-row{display:flex;gap:6px}
+.mac-calendar-window .text-input{flex:1;min-width:0}
+.mac-calendar-window .time-input{width:88px;font-size:11px;color:#fff}
+.mac-calendar-window .due-wrap{position:relative;width:88px;flex-shrink:0;display:inline-block}
+.mac-calendar-window .todo-due-input{border:1px solid var(--border);background:var(--input-bg);border-radius:6px;padding:5px 7px;font-size:12px;font-family:inherit;width:100%;color:transparent;display:block}
+.mac-calendar-window .todo-due-input::-webkit-datetime-edit,
+.mac-calendar-window .todo-due-input::-webkit-datetime-edit-fields-wrapper,
+.mac-calendar-window .todo-due-input::-webkit-datetime-edit-text,
+.mac-calendar-window .todo-due-input::-webkit-datetime-edit-month-field,
+.mac-calendar-window .todo-due-input::-webkit-datetime-edit-day-field,
+.mac-calendar-window .todo-due-input::-webkit-datetime-edit-year-field{color:transparent}
+.mac-calendar-window .due-display{position:absolute;left:8px;right:20px;top:50%;transform:translateY(-50%);font-size:10px;font-weight:400;color:#fff;pointer-events:none;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:clip}
+.mac-calendar-window .due-display.placeholder{color:#fff}
+.mac-calendar-window .submit-btn{border:none;background:var(--accent);color:#fff;border-radius:6px;width:30px;font-size:16px;cursor:pointer;flex-shrink:0}
+.mac-calendar-window .submit-btn.confirm-btn{width:auto;padding:5px 12px;font-size:12px}
+.mac-calendar-window .ghost-btn{border:1px solid var(--border);background:none;color:var(--text-2);border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer}
+.mac-calendar-window .entry-edit-actions{display:flex;justify-content:flex-end;gap:6px}
+.mac-calendar-window .detail-toggle-link{border:none;background:none;color:var(--text-2);font-size:11.5px;cursor:pointer;display:flex;align-items:center;gap:4px;padding:2px 0;align-self:flex-start}
+.mac-calendar-window .detail-toggle-link.active{color:var(--accent)}
+.mac-calendar-window .add-textarea{border:1px solid var(--border);background:var(--input-bg);color:var(--text);border-radius:6px;padding:6px 8px;font-size:12px;font-family:inherit;resize:vertical}
+.mac-calendar-window .todo-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.mac-calendar-window .todo-title{font-size:13px;font-weight:700;display:flex;align-items:center;gap:5px}
+.mac-calendar-window .todo-count{font-size:11px;color:var(--text-3)}
+.mac-calendar-window .todo-list{display:flex;flex-direction:column;gap:6px}
+.mac-calendar-window .todo-item{background:var(--card-bg);border:1px solid var(--border);border-radius:8px;padding:7px 8px;display:flex;align-items:flex-start;gap:7px}
+.mac-calendar-window .todo-empty{font-size:12px;color:var(--text-3);text-align:center;padding:10px 0}
+.mac-calendar-window .todo-body{flex:1;min-width:0}
+.mac-calendar-window .todo-due{font-size:10px;color:var(--text-3);margin-left:6px}
+.mac-calendar-window .todo-due.today{color:#fff;background:var(--accent);font-weight:600}
+.mac-calendar-window .todo-due.over{color:var(--danger);font-weight:600}
+.mac-calendar-window .status{font-size:11px;color:var(--accent);height:14px;margin-bottom:2px}
+
+
+/* Calendar uses the mockup's 38px titlebar proportions while retaining the shared app-window drag/fullscreen logic. */
+.app-win[data-page="calendar"] .aw-tb{height:38px;padding:0 12px;}
+.app-win[data-page="calendar"] .aw-tl{gap:8px;width:60px;}
+.app-win[data-page="calendar"] .aw-tt{font-size:13px;font-weight:600;color:var(--text-dim);}
+.app-win[data-page="calendar"] .page-inner{min-height:0;}
+
+/* =========================================================
+   일정+/할 일+ 팝업 — macOS 설정(System Settings) 계열 UI
+   캘린더 창 내부의 정확한 중앙에 배치하며, 기존 기능/이벤트는 유지한다.
+   ========================================================= */
+.mac-calendar-window .cal-pop-overlay{
+  position:absolute;
+  inset:0;
+  z-index:100;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  padding:32px;
+  background:rgba(0,0,0,.20);
+  -webkit-backdrop-filter:blur(2px);
+  backdrop-filter:blur(2px);
+}
+.mac-calendar-window .cal-pop-overlay.open{display:flex}
+
+.mac-calendar-window .cal-pop{
+  display:none;
+  position:relative;
+  width:min(760px, calc(100% - 48px));
+  max-height:min(82vh, 760px);
+  margin:0;
+  flex-direction:column;
+  overflow:hidden;
+  background:var(--window-bg);
+  color:var(--text);
+  border:1px solid rgba(0,0,0,.18);
+  border-radius:14px;
+  box-shadow:0 24px 70px rgba(0,0,0,.28), 0 2px 8px rgba(0,0,0,.12);
+}
+.mac-calendar-window .cal-pop.cal-pop-todo{width:min(620px, calc(100% - 48px))}
+.mac-calendar-window .cal-pop.open{display:flex}
+
+.mac-calendar-window .pop-titlebar{
+  position:relative;
+  flex:0 0 52px;
+  height:52px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:0 56px;
+  background:var(--titlebar-bg);
+  border-bottom:1px solid var(--border);
+  -webkit-backdrop-filter:blur(22px) saturate(1.15);
+  backdrop-filter:blur(22px) saturate(1.15);
+}
+.mac-calendar-window .pop-traffic{
+  position:absolute;
+  left:17px;
+  top:50%;
+  transform:translateY(-50%);
+  display:flex;
+  align-items:center;
+  gap:7px;
+}
+.mac-calendar-window .pop-traffic span{
+  width:12px;
+  height:12px;
+  border-radius:50%;
+  display:block;
+  box-shadow:inset 0 0 0 1px rgba(0,0,0,.10);
+}
+.mac-calendar-window .pop-traffic .dot-red{background:#ff5f57}
+.mac-calendar-window .pop-traffic .dot-yellow{background:#febc2e}
+.mac-calendar-window .pop-traffic .dot-green{background:#28c840}
+.mac-calendar-window .pop-title-wrap{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:7px;
+  min-width:0;
+}
+.mac-calendar-window .pop-title-icon{
+  width:19px;
+  height:19px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  color:var(--accent);
+  font-size:13px;
+}
+.mac-calendar-window .pop-title-glyph{font-size:14px;line-height:1}
+.mac-calendar-window .pop-title{
+  font-size:13px;
+  line-height:1;
+  font-weight:600;
+  letter-spacing:-.01em;
+  color:var(--text);
+}
+.mac-calendar-window .pop-close{
+  position:absolute;
+  right:15px;
+  top:50%;
+  transform:translateY(-50%);
+  width:28px;
+  height:28px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border:0;
+  border-radius:7px;
+  padding:0;
+  background:transparent;
+  color:var(--text-2);
+  cursor:pointer;
+  font-size:22px;
+  font-weight:300;
+  line-height:1;
+}
+.mac-calendar-window .pop-close:hover{background:var(--cell-hover);color:var(--text)}
+
+.mac-calendar-window .cal-pop-body{
+  flex:1;
+  min-height:0;
+  overflow-y:auto;
+  padding:24px;
+  background:var(--window-bg);
+}
+.mac-calendar-window .cal-pop-body::-webkit-scrollbar{width:9px}
+.mac-calendar-window .cal-pop-body::-webkit-scrollbar-thumb{background:rgba(127,127,127,.28);border-radius:9px;border:2px solid transparent;background-clip:padding-box}
+
+/* 설정 화면처럼 내용이 명확한 섹션으로 보이도록 카드와 입력부를 정리 */
+.mac-calendar-window .cal-pop-body>.card{
+  margin:0;
+  padding:0;
+  border:0;
+  border-radius:0;
+  background:transparent;
+  box-shadow:none;
+}
+.mac-calendar-window .cal-pop-body .side-date{
+  margin:0 0 16px;
+  font-size:21px;
+  line-height:1.25;
+  font-weight:700;
+  letter-spacing:-.02em;
+}
+.mac-calendar-window .cal-pop-body .side-date .wd{font-size:14px;color:var(--text-2);font-weight:400}
+.mac-calendar-window .cal-pop-body .side-holiday{font-size:12px}
+.mac-calendar-window .cal-pop-body .legend{
+  margin:0 0 9px;
+  padding:0 2px;
+  font-size:11px;
+  color:var(--text-2);
+}
+.mac-calendar-window .cal-pop-body .legend .item{font-size:12px;color:var(--text-2);font-weight:600}
+
+.mac-calendar-window .cal-pop-body .entries{gap:8px;margin-bottom:20px}
+.mac-calendar-window .cal-pop-body .entry{
+  background:var(--card-bg);
+  border:1px solid var(--border);
+  border-radius:9px;
+  padding:11px 12px;
+  box-shadow:0 1px 2px rgba(0,0,0,.035);
+}
+.mac-calendar-window .cal-pop-body .entry:hover{border-color:rgba(10,132,255,.25)}
+.mac-calendar-window .cal-pop-body .entry .text{font-size:13.5px}
+
+.mac-calendar-window .cal-pop-body .add-form,
+.mac-calendar-window .cal-pop-body .todo-add-form{
+  margin-top:8px;
+  padding:18px 0 0;
+  border-top:1px solid var(--border);
+}
+.mac-calendar-window .cal-pop-body .type-row{
+  display:flex;
+  gap:7px;
+  justify-content:flex-start;
+  margin:0 0 10px;
+}
+.mac-calendar-window .cal-pop-body .type-btn{
+  flex:0 0 auto;
+  min-width:auto;
+  min-height:30px;
+  padding:5px 11px;
+  border-radius:7px;
+  background:var(--card-bg);
+  border:1px solid var(--border);
+  font-size:12px;
+}
+.mac-calendar-window .cal-pop-body .type-btn.active{box-shadow:0 0 0 1px currentColor inset}
+.mac-calendar-window .cal-pop-body .range-row,
+.mac-calendar-window .cal-pop-body .repeat-row{
+  margin-bottom:10px;
+  border-radius:8px;
+  background:var(--card-bg);
+  border:1px solid var(--border);
+}
+.mac-calendar-window .cal-pop-body .add-row{gap:8px}
+.mac-calendar-window .cal-pop-body .add-input,
+.mac-calendar-window .cal-pop-body .add-textarea{
+  background:var(--card-bg);
+  border:1px solid var(--border);
+  border-radius:8px;
+  font-size:13px;
+}
+.mac-calendar-window .cal-pop-body .add-input{height:36px;padding:8px 10px}
+.mac-calendar-window .cal-pop-body .submit-btn{
+  width:36px;
+  height:36px;
+  border-radius:8px;
+}
+.mac-calendar-window .cal-pop-body .detail-toggle-link{
+  margin-top:5px;
+  padding:6px 2px 0;
+  font-size:12px;
+}
+
+/* To-Do 팝업도 동일한 설정창 계열로 맞춤 */
+.mac-calendar-window .cal-pop-todo .todo-card{
+  margin:0;
+  padding:0;
+  border:0;
+  border-radius:0;
+  background:transparent;
+  box-shadow:none;
+}
+.mac-calendar-window .cal-pop-todo .todo-header{
+  padding:0 0 13px;
+  margin-bottom:0;
+  border-bottom:1px solid var(--border);
+}
+.mac-calendar-window .cal-pop-todo .todo-title{font-size:19px;font-weight:700;letter-spacing:-.02em}
+.mac-calendar-window .cal-pop-todo .todo-count{font-size:12px;color:var(--text-2)}
+.mac-calendar-window .cal-pop-todo .todo-list{padding-top:12px}
+.mac-calendar-window .cal-pop-todo .todo-item{
+  background:var(--card-bg);
+  border:1px solid var(--border);
+  border-radius:9px;
+  padding:10px 11px;
+}
+.mac-calendar-window .cal-pop-todo .todo-item+.todo-item{margin-top:7px}
+.mac-calendar-window .cal-pop-todo .todo-text{font-size:13.5px}
+.mac-calendar-window .cal-pop-todo .todo-add-form{margin-top:18px}
+.mac-calendar-window .cal-pop-todo .todo-add-row{gap:8px}
+.mac-calendar-window .cal-pop-todo .todo-add-row+.todo-add-row{margin-top:8px}
+.mac-calendar-window .cal-pop-todo .todo-due-input{height:36px}
+.mac-calendar-window .cal-pop-todo .todo-done-toggle{margin-top:10px}
+
+@media (max-width:700px){
+  .mac-calendar-window .cal-pop-overlay{padding:14px}
+  .mac-calendar-window .cal-pop,
+  .mac-calendar-window .cal-pop.cal-pop-todo{width:100%;max-height:88vh}
+  .mac-calendar-window .cal-pop-body{padding:18px}
+}
+
+/* ============================================================
+   Calendar add dialogs — final macOS centered sheet
+   ============================================================ */
+.mac-calendar-window .cal-pop-overlay{
+  position:fixed !important;
+  inset:0 !important;
+  z-index:99999 !important;
+  display:none;
+  align-items:center !important;
+  justify-content:center !important;
+  padding:32px !important;
+  background:rgba(0,0,0,.34) !important;
+  backdrop-filter:blur(3px) saturate(.9) !important;
+  -webkit-backdrop-filter:blur(3px) saturate(.9) !important;
+}
+.mac-calendar-window .cal-pop-overlay.open{display:flex !important}
+.mac-calendar-window .cal-pop,
+.mac-calendar-window .cal-pop.cal-pop-todo{
+  position:relative !important;
+  inset:auto !important;
+  display:none;
+  flex-direction:column;
+  width:min(680px, calc(100vw - 64px)) !important;
+  max-width:none !important;
+  max-height:min(820px, calc(100vh - 64px)) !important;
+  min-height:0;
+  margin:0 !important;
+  background:rgba(246,246,248,.96) !important;
+  color:#1d1d1f !important;
+  border:1px solid rgba(0,0,0,.22) !important;
+  border-radius:14px !important;
+  box-shadow:0 28px 90px rgba(0,0,0,.42), 0 2px 8px rgba(0,0,0,.16) !important;
+  overflow:hidden !important;
+  transform:none !important;
+}
+html:not([data-theme="light"]) .mac-calendar-window .cal-pop,
+html:not([data-theme="light"]) .mac-calendar-window .cal-pop.cal-pop-todo{
+  background:rgba(38,38,40,.97) !important;
+  color:#f5f5f7 !important;
+  border-color:rgba(255,255,255,.14) !important;
+}
+.mac-calendar-window .cal-pop.open{display:flex !important}
+.mac-calendar-window .cal-pop .pop-titlebar{
+  height:52px !important;
+  min-height:52px !important;
+  padding:0 18px !important;
+  background:rgba(246,246,248,.88) !important;
+  border-bottom:1px solid rgba(0,0,0,.10) !important;
+  position:relative !important;
+  flex-shrink:0 !important;
+  backdrop-filter:blur(22px) saturate(1.5) !important;
+  -webkit-backdrop-filter:blur(22px) saturate(1.5) !important;
+}
+html:not([data-theme="light"]) .mac-calendar-window .cal-pop .pop-titlebar{
+  background:rgba(44,44,46,.90) !important;
+  border-bottom-color:rgba(255,255,255,.10) !important;
+}
+.mac-calendar-window .cal-pop .pop-traffic{
+  left:17px !important;
+  top:50% !important;
+  transform:translateY(-50%) !important;
+  gap:7px !important;
+}
+.mac-calendar-window .cal-pop .pop-traffic span,
+.mac-calendar-window .cal-pop .pop-traffic .dot-red,
+.mac-calendar-window .cal-pop .pop-traffic .dot-yellow,
+.mac-calendar-window .cal-pop .pop-traffic .dot-green{
+  width:12px !important;height:12px !important;border-radius:50% !important;display:block !important;
+}
+.mac-calendar-window .cal-pop .pop-traffic .dot-red{background:#ff5f57 !important}
+.mac-calendar-window .cal-pop .pop-traffic .dot-yellow{background:#febc2e !important}
+.mac-calendar-window .cal-pop .pop-traffic .dot-green{background:#28c840 !important}
+.mac-calendar-window .cal-pop .pop-close{
+  position:absolute !important;
+  right:16px !important;
+  top:50% !important;
+  transform:translateY(-50%) !important;
+  width:28px !important;height:28px !important;
+  border-radius:7px !important;
+  background:transparent !important;
+  border:0 !important;
+  color:#6e6e73 !important;
+  font-size:22px !important;
+  line-height:24px !important;
+  cursor:pointer !important;
+}
+.mac-calendar-window .cal-pop .pop-close:hover{background:rgba(0,0,0,.08) !important;color:#1d1d1f !important}
+html:not([data-theme="light"]) .mac-calendar-window .cal-pop .pop-close{color:#98989d !important}
+html:not([data-theme="light"]) .mac-calendar-window .cal-pop .pop-close:hover{background:rgba(255,255,255,.08) !important;color:#f5f5f7 !important}
+.mac-calendar-window .cal-pop .pop-title-wrap{
+  display:flex !important;align-items:center !important;justify-content:center !important;gap:8px !important;
+  width:100% !important;
+}
+.mac-calendar-window .cal-pop .pop-title-icon{
+  width:22px !important;height:22px !important;border-radius:6px !important;
+  display:flex !important;align-items:center !important;justify-content:center !important;
+  background:#0a84ff !important;color:#fff !important;font-size:11px !important;
+}
+.mac-calendar-window .cal-pop .pop-title{font-size:14px !important;font-weight:650 !important;letter-spacing:-.01em !important}
+.mac-calendar-window .cal-pop .cal-pop-body{
+  flex:1 !important;min-height:0 !important;overflow-y:auto !important;
+  padding:0 !important;background:transparent !important;
+}
+.mac-calendar-window .cal-pop .cal-pop-body>.card,
+.mac-calendar-window .cal-pop .cal-pop-body>.todo-card{
+  margin:0 !important;padding:26px 30px 30px !important;
+  border:0 !important;border-radius:0 !important;background:transparent !important;box-shadow:none !important;
+}
+.mac-calendar-window .cal-pop .side-date{
+  font-size:23px !important;font-weight:700 !important;letter-spacing:-.025em !important;margin:0 0 4px !important;
+}
+.mac-calendar-window .cal-pop .side-date .wd{font-size:14px !important;font-weight:400 !important;color:#6e6e73 !important}
+.mac-calendar-window .cal-pop .side-holiday{font-size:12px !important}
+.mac-calendar-window .cal-pop .legend{
+  margin:0 0 20px !important;padding-bottom:15px !important;border-bottom:1px solid rgba(0,0,0,.09) !important;
+}
+html:not([data-theme="light"]) .mac-calendar-window .cal-pop .legend{border-bottom-color:rgba(255,255,255,.10) !important}
+.mac-calendar-window .cal-pop .legend .item{font-size:13px !important;font-weight:600 !important;color:#0a84ff !important}
+.mac-calendar-window .cal-pop .add-form,
+.mac-calendar-window .cal-pop .todo-add-form{
+  margin-top:18px !important;padding:18px 0 0 !important;
+  border-top:1px solid rgba(0,0,0,.10) !important;gap:10px !important;
+}
+html:not([data-theme="light"]) .mac-calendar-window .cal-pop .add-form,
+html:not([data-theme="light"]) .mac-calendar-window .cal-pop .todo-add-form{border-top-color:rgba(255,255,255,.10) !important}
+.mac-calendar-window .cal-pop .type-row{gap:7px !important;margin-bottom:2px !important}
+.mac-calendar-window .cal-pop .type-btn{
+  min-height:32px !important;padding:6px 12px !important;border-radius:8px !important;
+  background:rgba(118,118,128,.10) !important;border:1px solid rgba(0,0,0,.10) !important;color:#3a3a3c !important;
+  font-size:12.5px !important;font-weight:500 !important;
+}
+.mac-calendar-window .cal-pop .type-btn.active{background:rgba(10,132,255,.13) !important;border-color:#0a84ff !important;color:#0a84ff !important;box-shadow:none !important}
+html:not([data-theme="light"]) .mac-calendar-window .cal-pop .type-btn{background:rgba(118,118,128,.18) !important;border-color:rgba(255,255,255,.12) !important;color:#f5f5f7 !important}
+.mac-calendar-window .cal-pop .add-row{gap:8px !important}
+.mac-calendar-window .cal-pop .add-input,
+.mac-calendar-window .cal-pop .add-textarea,
+.mac-calendar-window .cal-pop .range-row,
+.mac-calendar-window .cal-pop .repeat-row{
+  background:#fff !important;border:1px solid rgba(0,0,0,.12) !important;border-radius:9px !important;
+}
+html:not([data-theme="light"]) .mac-calendar-window .cal-pop .add-input,
+html:not([data-theme="light"]) .mac-calendar-window .cal-pop .add-textarea,
+html:not([data-theme="light"]) .mac-calendar-window .cal-pop .range-row,
+html:not([data-theme="light"]) .mac-calendar-window .cal-pop .repeat-row{background:#2c2c2e !important;border-color:rgba(255,255,255,.13) !important}
+.mac-calendar-window .cal-pop .add-input{height:40px !important;padding:9px 11px !important;font-size:14px !important}
+.mac-calendar-window .cal-pop .submit-btn{width:40px !important;height:40px !important;border-radius:9px !important;background:#0a84ff !important;font-size:18px !important}
+.mac-calendar-window .cal-pop .detail-toggle-link{font-size:12.5px !important;padding:5px 2px 0 !important}
+.mac-calendar-window .cal-pop .entries{gap:7px !important}
+.mac-calendar-window .cal-pop .entry{border-radius:9px !important;padding:9px 10px !important;background:rgba(118,118,128,.08) !important}
+.mac-calendar-window .cal-pop .upcoming{margin-top:18px !important}
+.mac-calendar-window .cal-pop .todo-header{padding-bottom:18px !important}
+.mac-calendar-window .cal-pop .todo-title{font-size:23px !important;font-weight:700 !important;letter-spacing:-.025em !important}
+.mac-calendar-window .cal-pop .todo-count{font-size:12px !important}
+.mac-calendar-window .cal-pop .todo-item{border-radius:9px !important;padding:10px 11px !important;background:rgba(118,118,128,.08) !important}
+.mac-calendar-window .cal-pop .todo-text{font-size:14px !important}
+@media (max-width:700px){
+  .mac-calendar-window .cal-pop-overlay{padding:16px !important}
+  .mac-calendar-window .cal-pop,
+  .mac-calendar-window .cal-pop.cal-pop-todo{width:calc(100vw - 32px) !important;max-height:calc(100vh - 32px) !important}
+  .mac-calendar-window .cal-pop .cal-pop-body>.card,
+  .mac-calendar-window .cal-pop .cal-pop-body>.todo-card{padding:22px 20px 24px !important}
+}
+
+/* =========================================================
+   FINAL FIX — 팝업은 전체 데스크톱이 아니라 "현재 캘린더 창" 안에서만 동작
+   다른 페이지 창(상담관리/스케줄 등)은 그대로 보고 클릭할 수 있어야 한다.
+   ========================================================= */
+.mac-calendar-window .cal-pop-overlay{
+  position:absolute !important;
+  inset:0 !important;
+  z-index:1000 !important;
+  display:none !important;
+  align-items:center !important;
+  justify-content:center !important;
+  padding:32px !important;
+  background:rgba(0,0,0,.28) !important;
+  -webkit-backdrop-filter:blur(3px) saturate(.92) !important;
+  backdrop-filter:blur(3px) saturate(.92) !important;
+}
+.mac-calendar-window .cal-pop-overlay.open{
+  display:flex !important;
+}
+.mac-calendar-window .cal-pop,
+.mac-calendar-window .cal-pop.cal-pop-todo{
+  position:relative !important;
+  inset:auto !important;
+  width:min(760px, calc(100% - 48px)) !important;
+  max-width:100% !important;
+  max-height:min(82%, 760px) !important;
+  margin:0 !important;
+}
+.mac-calendar-window .cal-pop.cal-pop-todo{
+  width:min(620px, calc(100% - 48px)) !important;
+}
+@media (max-width:700px){
+  .mac-calendar-window .cal-pop-overlay{
+    padding:16px !important;
+  }
+  .mac-calendar-window .cal-pop,
+  .mac-calendar-window .cal-pop.cal-pop-todo{
+    width:100% !important;
+    max-width:100% !important;
+    max-height:calc(100% - 32px) !important;
+  }
+}
+
+/* =========================================================
+   macOS CALENDAR PANEL — final visual redesign
+   기능/DOM은 유지하고, 팝업의 시각적 계층만 macOS 계열로 전면 재구성.
+   ========================================================= */
+.mac-calendar-window .cal-pop-overlay{
+  background:rgba(0,0,0,.34) !important;
+  -webkit-backdrop-filter:blur(12px) saturate(.88) !important;
+  backdrop-filter:blur(12px) saturate(.88) !important;
+  padding:28px !important;
+}
+
+.mac-calendar-window .cal-pop,
+.mac-calendar-window .cal-pop.cal-pop-todo{
+  width:min(720px, calc(100% - 40px)) !important;
+  max-height:min(760px, calc(100% - 40px)) !important;
+  border-radius:16px !important;
+  border:1px solid rgba(255,255,255,.13) !important;
+  background:rgba(38,39,42,.96) !important;
+  box-shadow:0 28px 80px rgba(0,0,0,.48), 0 1px 0 rgba(255,255,255,.10) inset !important;
+  -webkit-backdrop-filter:blur(35px) saturate(1.35) !important;
+  backdrop-filter:blur(35px) saturate(1.35) !important;
+}
+html[data-theme="light"] .mac-calendar-window .cal-pop,
+html[data-theme="light"] .mac-calendar-window .cal-pop.cal-pop-todo{
+  background:rgba(246,246,248,.96) !important;
+  border-color:rgba(60,60,67,.16) !important;
+  box-shadow:0 24px 70px rgba(0,0,0,.18),0 1px 0 rgba(255,255,255,.9) inset !important;
+}
+
+/* Native-looking macOS titlebar */
+.mac-calendar-window .cal-pop .pop-titlebar{
+  height:58px !important;
+  flex-basis:58px !important;
+  padding:0 72px !important;
+  background:rgba(49,50,53,.72) !important;
+  border-bottom:1px solid rgba(255,255,255,.09) !important;
+  -webkit-backdrop-filter:blur(30px) saturate(1.35) !important;
+  backdrop-filter:blur(30px) saturate(1.35) !important;
+}
+html[data-theme="light"] .mac-calendar-window .cal-pop .pop-titlebar{
+  background:rgba(242,242,247,.78) !important;
+  border-bottom-color:rgba(60,60,67,.13) !important;
+}
+.mac-calendar-window .pop-traffic{
+  left:18px !important;
+  gap:8px !important;
+}
+.mac-calendar-window .pop-traffic span{
+  width:13px !important;
+  height:13px !important;
+  border:0 !important;
+  box-shadow:inset 0 0 0 .5px rgba(0,0,0,.25),0 1px 2px rgba(0,0,0,.20) !important;
+}
+.mac-calendar-window .pop-traffic .dot-red{background:#ff5f57 !important}
+.mac-calendar-window .pop-traffic .dot-yellow{background:#febc2e !important}
+.mac-calendar-window .pop-traffic .dot-green{background:#28c840 !important}
+.mac-calendar-window .pop-title-wrap{
+  display:flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  gap:8px !important;
+}
+.mac-calendar-window .pop-title-icon{
+  width:20px !important;
+  height:20px !important;
+  display:flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  color:var(--accent) !important;
+  font-size:12px !important;
+}
+.mac-calendar-window .pop-title-glyph{font-size:9px !important}
+.mac-calendar-window .pop-title{
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Apple SD Gothic Neo",sans-serif !important;
+  font-size:13px !important;
+  line-height:1 !important;
+  font-weight:600 !important;
+  letter-spacing:-.01em !important;
+}
+.mac-calendar-window .pop-close{
+  position:absolute !important;
+  right:17px !important;
+  left:auto !important;
+  top:50% !important;
+  transform:translateY(-50%) !important;
+  width:24px !important;
+  height:24px !important;
+  border-radius:7px !important;
+  background:transparent !important;
+  color:var(--text-3) !important;
+  font-size:17px !important;
+  font-weight:300 !important;
+  line-height:24px !important;
+  border:0 !important;
+}
+.mac-calendar-window .pop-close:hover{
+  background:rgba(127,127,127,.16) !important;
+  color:var(--text) !important;
+}
+
+/* Content becomes a macOS grouped-settings surface */
+.mac-calendar-window .cal-pop-body{
+  padding:24px !important;
+  overflow:auto !important;
+  background:transparent !important;
+}
+.mac-calendar-window .cal-pop-body>.card{
+  margin:0 !important;
+  padding:0 !important;
+  background:transparent !important;
+  border:0 !important;
+}
+.mac-calendar-window .cal-pop .side-date{
+  display:flex !important;
+  align-items:baseline !important;
+  gap:7px !important;
+  margin:0 2px 4px !important;
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Apple SD Gothic Neo",sans-serif !important;
+  font-size:24px !important;
+  line-height:1.25 !important;
+  font-weight:700 !important;
+  letter-spacing:-.035em !important;
+}
+.mac-calendar-window .cal-pop .side-date .wd{
+  font-size:14px !important;
+  font-weight:400 !important;
+  color:var(--text-3) !important;
+  letter-spacing:-.01em !important;
+}
+.mac-calendar-window .cal-pop .side-holiday{
+  font-size:12px !important;
+  font-weight:600 !important;
+  margin-left:3px !important;
+}
+.mac-calendar-window .cal-pop .legend{
+  margin:0 2px 18px !important;
+  padding-bottom:17px !important;
+  border-bottom:1px solid rgba(255,255,255,.08) !important;
+}
+html[data-theme="light"] .mac-calendar-window .cal-pop .legend{border-bottom-color:rgba(60,60,67,.12) !important}
+.mac-calendar-window .cal-pop .legend .item{
+  font-size:13px !important;
+  font-weight:600 !important;
+  color:var(--accent) !important;
+}
+
+/* Existing event list -> grouped macOS list */
+.mac-calendar-window .cal-pop .entries{
+  gap:1px !important;
+  margin:0 0 20px !important;
+  padding:4px 0 !important;
+  border:1px solid rgba(255,255,255,.08) !important;
+  border-radius:12px !important;
+  overflow:hidden !important;
+  background:rgba(118,118,128,.10) !important;
+}
+html[data-theme="light"] .mac-calendar-window .cal-pop .entries{
+  border-color:rgba(60,60,67,.12) !important;
+  background:rgba(118,118,128,.10) !important;
+}
+.mac-calendar-window .cal-pop .entry{
+  min-height:48px !important;
+  margin:0 !important;
+  padding:10px 13px !important;
+  border:0 !important;
+  border-radius:0 !important;
+  background:transparent !important;
+}
+.mac-calendar-window .cal-pop .entry+.entry{
+  border-top:1px solid rgba(255,255,255,.07) !important;
+}
+html[data-theme="light"] .mac-calendar-window .cal-pop .entry+.entry{border-top-color:rgba(60,60,67,.10) !important}
+.mac-calendar-window .cal-pop .entry:hover{background:rgba(118,118,128,.10) !important}
+.mac-calendar-window .cal-pop .entry .text{
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Apple SD Gothic Neo",sans-serif !important;
+  font-size:14px !important;
+  font-weight:500 !important;
+}
+.mac-calendar-window .cal-pop .meta-row{font-size:11px !important;color:var(--text-3) !important}
+.mac-calendar-window .cal-pop .check-btn{width:18px !important;height:18px !important}
+
+/* Empty state as a proper macOS inset panel */
+.mac-calendar-window .cal-pop .empty{
+  margin:0 0 18px !important;
+  padding:25px 18px !important;
+  border-radius:12px !important;
+  background:rgba(118,118,128,.11) !important;
+  border:1px solid rgba(255,255,255,.07) !important;
+  color:var(--text-3) !important;
+  font-size:12.5px !important;
+}
+html[data-theme="light"] .mac-calendar-window .cal-pop .empty{border-color:rgba(60,60,67,.10) !important}
+
+/* Form: controls resemble macOS grouped settings */
+.mac-calendar-window .cal-pop .add-form{
+  margin:0 !important;
+  padding:0 !important;
+  border:0 !important;
+  display:flex !important;
+  flex-direction:column !important;
+  gap:10px !important;
+}
+.mac-calendar-window .cal-pop .type-row{
+  order:1 !important;
+  display:flex !important;
+  gap:7px !important;
+  padding:4px !important;
+  margin:0 !important;
+  width:max-content !important;
+  max-width:100% !important;
+  border-radius:9px !important;
+  background:rgba(118,118,128,.13) !important;
+}
+.mac-calendar-window .cal-pop .type-btn{
+  height:30px !important;
+  padding:0 11px !important;
+  border:0 !important;
+  border-radius:7px !important;
+  background:transparent !important;
+  color:var(--text-2) !important;
+  font-size:12px !important;
+  font-weight:500 !important;
+}
+.mac-calendar-window .cal-pop .type-btn:hover{background:rgba(118,118,128,.12) !important}
+.mac-calendar-window .cal-pop .type-btn.active{
+  background:rgba(99,99,102,.46) !important;
+  color:var(--text) !important;
+  box-shadow:0 1px 3px rgba(0,0,0,.20) !important;
+}
+html[data-theme="light"] .mac-calendar-window .cal-pop .type-btn.active{
+  background:#fff !important;
+  color:var(--text) !important;
+  box-shadow:0 1px 3px rgba(0,0,0,.14) !important;
+}
+.mac-calendar-window .cal-pop .range-row,
+.mac-calendar-window .cal-pop .repeat-row{
+  order:2 !important;
+  display:flex !important;
+  align-items:center !important;
+  gap:0 !important;
+  min-height:42px !important;
+  margin:0 !important;
+  padding:0 11px !important;
+  border-radius:11px !important;
+  background:rgba(118,118,128,.11) !important;
+  border:1px solid rgba(255,255,255,.08) !important;
+}
+html[data-theme="light"] .mac-calendar-window .cal-pop .range-row,
+html[data-theme="light"] .mac-calendar-window .cal-pop .repeat-row{border-color:rgba(60,60,67,.12) !important}
+.mac-calendar-window .cal-pop .date-input,
+.mac-calendar-window .cal-pop .repeat-select{
+  border:0 !important;
+  background:transparent !important;
+  color:var(--text) !important;
+  border-radius:7px !important;
+  padding:7px 4px !important;
+  font-size:12.5px !important;
+}
+.mac-calendar-window .cal-pop .arrow{padding:0 7px !important;color:var(--text-3) !important}
+.mac-calendar-window .cal-pop .repeat-until-label{margin-left:auto !important;padding:0 6px !important;color:var(--text-3) !important}
+.mac-calendar-window .cal-pop .add-row{
+  order:3 !important;
+  display:grid !important;
+  grid-template-columns:110px minmax(0,1fr) 40px !important;
+  gap:8px !important;
+  align-items:center !important;
+}
+.mac-calendar-window .cal-pop .add-row .time-input{width:100% !important}
+.mac-calendar-window .cal-pop .add-input{
+  height:42px !important;
+  border-radius:11px !important;
+  border:1px solid rgba(255,255,255,.09) !important;
+  background:rgba(118,118,128,.11) !important;
+  color:var(--text) !important;
+  padding:0 12px !important;
+  font-size:13px !important;
+}
+html[data-theme="light"] .mac-calendar-window .cal-pop .add-input{border-color:rgba(60,60,67,.13) !important}
+.mac-calendar-window .cal-pop .add-input::placeholder{color:var(--text-3) !important}
+.mac-calendar-window .cal-pop .add-input:focus{
+  outline:0 !important;
+  border-color:var(--accent) !important;
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 18%,transparent) !important;
+}
+.mac-calendar-window .cal-pop .submit-btn{
+  width:40px !important;
+  height:40px !important;
+  border-radius:11px !important;
+  background:var(--accent) !important;
+  box-shadow:0 1px 3px rgba(0,0,0,.20) !important;
+  font-size:20px !important;
+}
+.mac-calendar-window .cal-pop .detail-toggle-link{
+  order:4 !important;
+  align-self:flex-start !important;
+  margin:0 !important;
+  padding:2px 3px !important;
+  color:var(--accent) !important;
+  font-size:12px !important;
+}
+.mac-calendar-window .cal-pop .add-textarea{
+  order:5 !important;
+  min-height:78px !important;
+  border-radius:11px !important;
+  border:1px solid rgba(255,255,255,.09) !important;
+  background:rgba(118,118,128,.11) !important;
+  padding:10px 12px !important;
+  font-size:13px !important;
+}
+
+/* Todo panel: Apple Reminders / System Settings-like grouped list */
+.mac-calendar-window .cal-pop-todo{
+  width:min(660px, calc(100% - 40px)) !important;
+}
+.mac-calendar-window .cal-pop-todo .cal-pop-body{padding:24px !important}
+.mac-calendar-window .cal-pop-todo .todo-card{background:transparent !important;padding:0 !important}
+.mac-calendar-window .cal-pop-todo .todo-header{
+  display:flex !important;
+  align-items:flex-end !important;
+  gap:12px !important;
+  padding:0 2px 18px !important;
+  margin:0 !important;
+  border:0 !important;
+}
+.mac-calendar-window .cal-pop-todo .todo-title{
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Apple SD Gothic Neo",sans-serif !important;
+  font-size:25px !important;
+  line-height:1.1 !important;
+  font-weight:700 !important;
+  letter-spacing:-.035em !important;
+}
+.mac-calendar-window .cal-pop-todo .todo-count{
+  font-size:12px !important;
+  color:var(--text-3) !important;
+  padding-bottom:2px !important;
+}
+.mac-calendar-window .cal-pop-todo .todo-list{
+  display:flex !important;
+  flex-direction:column !important;
+  gap:1px !important;
+  padding:4px 0 !important;
+  border-radius:12px !important;
+  overflow:hidden !important;
+  background:rgba(118,118,128,.10) !important;
+  border:1px solid rgba(255,255,255,.08) !important;
+}
+html[data-theme="light"] .mac-calendar-window .cal-pop-todo .todo-list{border-color:rgba(60,60,67,.12) !important}
+.mac-calendar-window .cal-pop-todo .todo-item{
+  min-height:54px !important;
+  display:flex !important;
+  align-items:center !important;
+  padding:10px 13px !important;
+  border:0 !important;
+  border-radius:0 !important;
+  background:transparent !important;
+}
+.mac-calendar-window .cal-pop-todo .todo-item+.todo-item{margin-top:0 !important;border-top:1px solid rgba(255,255,255,.07) !important}
+html[data-theme="light"] .mac-calendar-window .cal-pop-todo .todo-item+.todo-item{border-top-color:rgba(60,60,67,.10) !important}
+.mac-calendar-window .cal-pop-todo .todo-item:hover{background:rgba(118,118,128,.10) !important}
+.mac-calendar-window .cal-pop-todo .todo-text{font-size:14px !important;font-weight:500 !important}
+.mac-calendar-window .cal-pop-todo .todo-due{font-size:11px !important}
+.mac-calendar-window .cal-pop-todo .todo-add-form{
+  margin-top:18px !important;
+  padding:0 !important;
+  border:0 !important;
+}
+.mac-calendar-window .cal-pop-todo .todo-add-row{
+  display:grid !important;
+  grid-template-columns:minmax(0,1fr) 110px 40px !important;
+  gap:8px !important;
+}
+.mac-calendar-window .cal-pop-todo .todo-add-row+.todo-add-row{margin-top:8px !important}
+.mac-calendar-window .cal-pop-todo input,
+.mac-calendar-window .cal-pop-todo textarea,
+.mac-calendar-window .cal-pop-todo .todo-due-input{
+  min-height:40px !important;
+  border-radius:11px !important;
+  border:1px solid rgba(255,255,255,.09) !important;
+  background:rgba(118,118,128,.11) !important;
+}
+.mac-calendar-window .cal-pop-todo .todo-done-toggle{
+  margin-top:8px !important;
+  color:var(--accent) !important;
+}
+
+@media (max-width:700px){
+  .mac-calendar-window .cal-pop-overlay{padding:12px !important}
+  .mac-calendar-window .cal-pop,
+  .mac-calendar-window .cal-pop.cal-pop-todo{width:100% !important;max-height:calc(100% - 24px) !important}
+  .mac-calendar-window .cal-pop-body{padding:18px !important}
+  .mac-calendar-window .cal-pop-todo .todo-card{padding:22px 20px 24px !important}
+  .mac-calendar-window .cal-pop .add-row{grid-template-columns:1fr 40px !important}
+  .mac-calendar-window .cal-pop .add-row .time-input{grid-column:1 / -1}
+  .mac-calendar-window .cal-pop-todo .todo-add-row{grid-template-columns:1fr 40px !important}
+}
+
+/* v16 — 팝업 상단바를 실제 앱 페이지의 aw-tb(38px) 규격과 동일하게 맞춤 */
+.mac-calendar-window .cal-pop .pop-titlebar{
+  height:38px !important;
+  min-height:38px !important;
+  flex-basis:38px !important;
+  padding:0 12px !important;
+  background:var(--toolbar-bg) !important;
+  border-bottom:1px solid var(--border) !important;
+  box-shadow:none !important;
+  -webkit-backdrop-filter:blur(20px) saturate(1) !important;
+  backdrop-filter:blur(20px) saturate(1) !important;
+}
+html[data-theme="light"] .mac-calendar-window .cal-pop .pop-titlebar{
+  background:var(--toolbar-bg) !important;
+  border-bottom-color:var(--border) !important;
+}
+
+.mac-calendar-window .cal-pop .pop-traffic{
+  left:12px !important;
+  gap:8px !important;
+}
+.mac-calendar-window .cal-pop .pop-traffic span,
+.mac-calendar-window .cal-pop .pop-traffic .dot-red,
+.mac-calendar-window .cal-pop .pop-traffic .dot-yellow,
+.mac-calendar-window .cal-pop .pop-traffic .dot-green{
+  width:12px !important;
+  height:12px !important;
+  border-radius:50% !important;
+  box-shadow:none !important;
+}
+.mac-calendar-window .cal-pop .pop-close-dot{
+  display:block !important;
+  padding:0 !important;
+  border:0 !important;
+  margin:0 !important;
+  cursor:pointer !important;
+  outline:none !important;
+}
+.mac-calendar-window .cal-pop .pop-close-dot:hover{
+  filter:brightness(.92) !important;
+}
+.mac-calendar-window .cal-pop .pop-close-dot:focus-visible{
+  box-shadow:0 0 0 2px rgba(10,132,255,.5) !important;
+}
+
+.mac-calendar-window .cal-pop .pop-title-wrap{
+  gap:7px !important;
+}
+.mac-calendar-window .cal-pop .pop-title-icon{
+  width:18px !important;
+  height:18px !important;
+  border-radius:5px !important;
+  background:var(--accent) !important;
+  color:#fff !important;
+  box-shadow:none !important;
+  font-size:10px !important;
+}
+.mac-calendar-window .cal-pop .pop-title-glyph{
+  font-size:7px !important;
+}
+.mac-calendar-window .cal-pop .pop-title{
+  font-size:13px !important;
+  line-height:18px !important;
+  font-weight:500 !important;
+  letter-spacing:0 !important;
+  color:var(--text) !important;
+}
+
+.mac-calendar-window .cal-pop .pop-close{
+  right:10px !important;
+  width:24px !important;
+  height:24px !important;
+  border-radius:7px !important;
+  background:transparent !important;
+  color:var(--text-faint) !important;
+  font-size:17px !important;
+  font-weight:400 !important;
+  line-height:24px !important;
+}
+.mac-calendar-window .cal-pop .pop-close:hover{
+  background:var(--mac-vibrancy-hairline) !important;
+  color:var(--text) !important;
+}
+
+/* v17 — 캘린더 팝업 세부 레이아웃 정리 */
+/* 1. 날짜 아래의 '일정' 라벨 제거: 해당 영역을 통째로 없애 다음 콘텐츠를 위로 당긴다. */
+.mac-calendar-window .cal-pop-event .legend{
+  display:none !important;
+  margin:0 !important;
+  padding:0 !important;
+  border:0 !important;
+}
+.mac-calendar-window .cal-pop-event .side-date{
+  margin-bottom:18px !important;
+}
+
+/* 2. 중요 / 기간 설정 / 반복을 감싸던 넓은 옅은 배경 제거. 각 버튼 자체가 macOS segmented control 역할을 한다. */
+.mac-calendar-window .cal-pop-event .type-row{
+  width:max-content !important;
+  max-width:100% !important;
+  padding:2px !important;
+  margin:0 0 2px !important;
+  gap:2px !important;
+  border:0 !important;
+  background:transparent !important;
+  box-shadow:none !important;
+}
+.mac-calendar-window .cal-pop-event .type-btn{
+  min-height:34px !important;
+  height:34px !important;
+  padding:0 13px !important;
+  border:1px solid transparent !important;
+  border-radius:8px !important;
+  background:rgba(118,118,128,.14) !important;
+  color:var(--text-2) !important;
+  transition:background .12s ease, box-shadow .12s ease, transform .08s ease, color .12s ease !important;
+}
+.mac-calendar-window .cal-pop-event .type-btn:hover{
+  background:rgba(118,118,128,.22) !important;
+}
+.mac-calendar-window .cal-pop-event .type-btn:active{
+  transform:scale(.98) !important;
+  background:rgba(118,118,128,.30) !important;
+}
+.mac-calendar-window .cal-pop-event .type-btn.active{
+  background:rgba(255,255,255,.16) !important;
+  border-color:rgba(255,255,255,.08) !important;
+  color:var(--text) !important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.08), 0 1px 2px rgba(0,0,0,.22) !important;
+}
+html[data-theme="light"] .mac-calendar-window .cal-pop-event .type-btn{
+  background:rgba(118,118,128,.10) !important;
+  color:var(--text-2) !important;
+}
+html[data-theme="light"] .mac-calendar-window .cal-pop-event .type-btn:hover{
+  background:rgba(118,118,128,.16) !important;
+}
+html[data-theme="light"] .mac-calendar-window .cal-pop-event .type-btn:active{
+  background:rgba(118,118,128,.22) !important;
+}
+html[data-theme="light"] .mac-calendar-window .cal-pop-event .type-btn.active{
+  background:#fff !important;
+  border-color:rgba(60,60,67,.10) !important;
+  color:var(--text) !important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.9), 0 1px 3px rgba(0,0,0,.16) !important;
+}
+
+/* 3. 기간 설정 상태에서는 제목 입력행도 기간 설정행과 동일한 전체 폭을 사용한다. */
+.mac-calendar-window .cal-pop-event .add-row.range-title-row{
+  grid-template-columns:minmax(0,1fr) 40px !important;
+  width:100% !important;
+}
+.mac-calendar-window .cal-pop-event .add-row.range-title-row .text-input{
+  width:100% !important;
+  min-width:0 !important;
+}
+
+/* 4. 할 일: 상단바 → To-Do List 간격을 일정 팝업의 상단바 → 날짜 간격과 동일하게 */
+.mac-calendar-window .cal-pop-todo .cal-pop-body{
+  padding:16px 24px 24px !important;
+}
+.mac-calendar-window .cal-pop-todo .todo-header{
+  padding:0 2px 18px !important;
+  margin:0 !important;
+}
+
+/* 5. 할 일 입력: 제목 / 날짜 / 추가 버튼을 한 줄에 배치. 날짜는 상대적으로 좁게. */
+.mac-calendar-window .cal-pop-todo .todo-add-row{
+  display:grid !important;
+  grid-template-columns:minmax(0,1fr) 150px 40px !important;
+  gap:8px !important;
+  align-items:center !important;
+  width:100% !important;
+}
+.mac-calendar-window .cal-pop-todo .todo-add-row .text-input{
+  min-width:0 !important;
+  width:100% !important;
+}
+.mac-calendar-window .cal-pop-todo .todo-add-row .todo-due-input{
+  width:100% !important;
+  min-width:0 !important;
+}
+.mac-calendar-window .cal-pop-todo .todo-add-row .submit-btn{
+  width:40px !important;
+  height:40px !important;
+}
+
+/* v18 — 캘린더/할 일 팝업 미세 정렬 */
+/* 1. 일정: 중요 / 기간 설정 / 반복 버튼 사이 간격을 조금 넓힌다. */
+.mac-calendar-window .cal-pop-event .type-row{
+  gap:6px !important;
+}
+
+/* 2. 할 일: 팝업 내부의 상·하 여백을 일정 팝업과 동일한 24px 기준으로 맞춘다. */
+.mac-calendar-window .cal-pop-todo .cal-pop-body{
+  padding:24px !important;
+}
+.mac-calendar-window .cal-pop-todo .todo-header{
+  padding-top:0 !important;
+  margin-top:0 !important;
+}
+
+/* 3. 할 일 입력: 날짜를 왼쪽, 제목을 오른쪽에 배치한다. 날짜는 더 좁게. */
+.mac-calendar-window .cal-pop-todo .todo-add-row{
+  grid-template-columns:150px minmax(0,1fr) 40px !important;
+}
+.mac-calendar-window .cal-pop-todo .todo-add-row .todo-due-input{
+  order:1 !important;
+}
+.mac-calendar-window .cal-pop-todo .todo-add-row .text-input{
+  order:2 !important;
+}
+.mac-calendar-window .cal-pop-todo .todo-add-row .submit-btn{
+  order:3 !important;
+}
+
+/* v20 — 할 일 팝업의 불필요한 중복 안쪽 여백 제거
+   상위 공통 카드 규칙의 높은 specificity 때문에 남아 있던 26/30/30px 패딩을 무효화해
+   일정 팝업과 같은 본문 여백(24px)만 남긴다. */
+.mac-calendar-window .cal-pop-todo .cal-pop-body>.todo-card{
+  margin:0 !important;
+  padding:0 !important;
+  border:0 !important;
+  border-radius:0 !important;
+  background:transparent !important;
+  box-shadow:none !important;
+}
+.mac-calendar-window .cal-pop-todo .cal-pop-body{
+  padding:24px !important;
+}
+
+/* v19 — 할 일 날짜 선택 컨트롤 + 일정 선택 버튼의 macOS pressed state */
+/* 할 일 날짜 선택을 일정의 시간 선택 컨트롤과 동일한 한 줄형 컨트롤로 통일한다. */
+.mac-calendar-window .cal-pop-todo .todo-add-row .app-date{
+  display:block !important;
+  width:100% !important;
+  min-width:0 !important;
+  flex:0 0 auto !important;
+}
+.mac-calendar-window .cal-pop-todo .todo-add-row .app-date-trigger.todo-due-input{
+  display:flex !important;
+  flex-direction:row !important;
+  flex-wrap:nowrap !important;
+  align-items:center !important;
+  justify-content:space-between !important;
+  gap:8px !important;
+  width:100% !important;
+  height:42px !important;
+  min-height:42px !important;
+  margin:0 !important;
+  padding:0 12px !important;
+  box-sizing:border-box !important;
+  border:1px solid rgba(255,255,255,.09) !important;
+  border-radius:11px !important;
+  background:rgba(118,118,128,.11) !important;
+  color:var(--text) !important;
+  font-size:13px !important;
+  line-height:1 !important;
+}
+.mac-calendar-window .cal-pop-todo .todo-add-row .app-date-trigger.todo-due-input:hover{
+  background:rgba(118,118,128,.16) !important;
+}
+.mac-calendar-window .cal-pop-todo .todo-add-row .app-date-trigger.todo-due-input:focus,
+.mac-calendar-window .cal-pop-todo .todo-add-row .app-date-trigger.todo-due-input.open{
+  outline:0 !important;
+  border-color:var(--accent) !important;
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 16%,transparent) !important;
+}
+.mac-calendar-window .cal-pop-todo .todo-add-row .app-date-trigger.todo-due-input .app-date-trigger-text{
+  flex:1 1 auto !important;
+  min-width:0 !important;
+  overflow:hidden !important;
+  text-overflow:ellipsis !important;
+  white-space:nowrap !important;
+}
+.mac-calendar-window .cal-pop-todo .todo-add-row .app-date-trigger.todo-due-input .app-date-icon{
+  order:2 !important;
+  display:flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  flex:0 0 16px !important;
+  width:16px !important;
+  height:16px !important;
+  margin-left:auto !important;
+  color:var(--text-faint) !important;
+}
+.mac-calendar-window .cal-pop-todo .todo-add-row .app-date-trigger.todo-due-input.open .app-date-icon{
+  color:var(--accent) !important;
+}
+html[data-theme="light"] .mac-calendar-window .cal-pop-todo .todo-add-row .app-date-trigger.todo-due-input{
+  border-color:rgba(60,60,67,.13) !important;
+  background:rgba(118,118,128,.10) !important;
+}
+
+/* 일정의 중요 / 기간 설정 / 반복: 선택 상태가 명확하게 보이는 macOS control */
+.mac-calendar-window .cal-pop-event .type-btn{
+  position:relative !important;
+  -webkit-tap-highlight-color:transparent !important;
+}
+.mac-calendar-window .cal-pop-event .type-btn.active{
+  background:color-mix(in srgb,var(--accent) 18%,rgba(118,118,128,.12)) !important;
+  border-color:color-mix(in srgb,var(--accent) 48%,transparent) !important;
+  color:var(--text) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.13),
+    inset 0 -1px 0 rgba(0,0,0,.12),
+    0 1px 3px rgba(0,0,0,.18) !important;
+}
+.mac-calendar-window .cal-pop-event .type-btn.active::after{
+  content:"" !important;
+  position:absolute !important;
+  left:50% !important;
+  bottom:3px !important;
+  width:4px !important;
+  height:2px !important;
+  border-radius:2px !important;
+  transform:translateX(-50%) !important;
+  background:var(--accent) !important;
+  opacity:.9 !important;
+}
+.mac-calendar-window .cal-pop-event .type-btn.priority.active{
+  background:color-mix(in srgb,var(--red) 17%,rgba(118,118,128,.12)) !important;
+  border-color:color-mix(in srgb,var(--red) 48%,transparent) !important;
+}
+.mac-calendar-window .cal-pop-event .type-btn.priority.active::after{
+  background:var(--red) !important;
+}
+.mac-calendar-window .cal-pop-event .type-btn:active{
+  transform:scale(.97) !important;
+  box-shadow:inset 0 2px 4px rgba(0,0,0,.22) !important;
+}
+html[data-theme="light"] .mac-calendar-window .cal-pop-event .type-btn.active{
+  background:color-mix(in srgb,var(--accent) 11%,#fff) !important;
+  border-color:color-mix(in srgb,var(--accent) 35%,rgba(60,60,67,.12)) !important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.95),0 1px 3px rgba(0,0,0,.14) !important;
+}
+html[data-theme="light"] .mac-calendar-window .cal-pop-event .type-btn.priority.active{
+  background:color-mix(in srgb,var(--red) 10%,#fff) !important;
+  border-color:color-mix(in srgb,var(--red) 32%,rgba(60,60,67,.12)) !important;
+}
+
+/* v20: calendar readability and wider, square-proportioned sidebar mini calendar */
+.mac-calendar-window .mac-calendar-sidebar { width: 264px; }
+/* Keep the centered toolbar year/month title (.tb-title) unchanged. */
+.mac-calendar-window .weekdays span { font-size: 12px; }
+.mac-calendar-window .day-num { font-size: 13px; width: 22px; height: 22px; }
+.mac-calendar-window .chip { font-size: 11px; line-height: 1.35; }
+.mac-calendar-window .holiday-label { font-size: 10px; }
+.mac-calendar-window .chip-more { font-size: 10px; }
+.mac-calendar-window .cal-list-title { font-size: 12px; }
+.mac-calendar-window .cal-list label { font-size: 14px; }
+.mac-calendar-window .cal-list .cnt { font-size: 12px; }
+.mac-calendar-window .mini-cal { width: 100%; box-sizing: border-box; }
+.mac-calendar-window .mini-head { font-size: 13px; margin-bottom: 10px; }
+.mac-calendar-window .mini-grid { font-size: 11px; gap: 3px 1px; }
+.mac-calendar-window .mini-wd { display:flex; align-items:center; justify-content:center; aspect-ratio: 1; padding: 0; }
+.mac-calendar-window .mini-day { display:flex; align-items:center; justify-content:center; aspect-ratio: 1; padding: 0; }
+/* v21: one more step larger for registered schedule and to-do text in month cells only. */
+.mac-calendar-window .chip { font-size: 12px; line-height: 1.35; }
+
+/* v22: clearly legible registered schedule/to-do labels in month cells. */
+.mac-calendar-window .grid .cell .chip {
+  font-size: 14px;
+  line-height: 1.35;
+  min-height: 19px;
+  box-sizing: border-box;
+}
+
+/* v23: month-grid holiday names match registered schedule/to-do text size. */
+.mac-calendar-window .grid .cell .holiday-label {
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+/* v24: higher contrast for schedule/to-do chips; keep 14px typography. */
+.mac-calendar-window .grid .cell .chip {
+  color: #ffffff;
+  background: #27547e;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.35;
+  min-height: 21px;
+  text-shadow: none;
+}
+.mac-calendar-window .grid .cell .chip.done {
+  opacity: .72;
+}
+/* Weekday names Mon-Fri in white; retain Sunday/Saturday accent colors. */
+.mac-calendar-window .weekdays span:nth-child(n+2):nth-child(-n+6) {
+  color: #ffffff;
+}
+
+/* v25 — 기존 일정/할 일 수정 폼 정렬 수정
+   날짜/시간과 제목을 한 줄에 배치하고, 하단의 취소/저장 버튼을 오른쪽으로 통일한다. */
+.mac-calendar-window .entry-edit-form,
+.mac-calendar-window .todo-edit-form{
+  min-width:0;
+  width:100%;
+  gap:10px;
+}
+
+.mac-calendar-window .edit-main-row{
+  display:grid !important;
+  align-items:center !important;
+  gap:8px !important;
+  width:100% !important;
+  min-width:0 !important;
+}
+
+/* 일반 일정: 시간 + 제목 */
+.mac-calendar-window .entry-edit-form .edit-main-row.has-time{
+  grid-template-columns:110px minmax(0,1fr) !important;
+}
+.mac-calendar-window .entry-edit-form .edit-main-row.has-time .time-input{
+  width:100% !important;
+  min-width:0 !important;
+}
+
+/* 기간 일정: 시작일 → 종료일 + 제목을 한 줄로 */
+.mac-calendar-window .entry-edit-form .edit-main-row.has-range{
+  /* 기간 날짜(시작일 → 종료일)는 항상 왼쪽, 제목은 오른쪽 */
+  grid-template-columns:minmax(220px,1.35fr) minmax(0,1fr) !important;
+}
+.mac-calendar-window .entry-edit-form .edit-range-row{
+  min-width:0 !important;
+  width:100% !important;
+  height:40px !important;
+  margin:0 !important;
+  padding:0 9px !important;
+  gap:3px !important;
+  display:flex !important;
+  align-items:center !important;
+}
+.mac-calendar-window .entry-edit-form .edit-range-row .date-input{
+  min-width:0 !important;
+  flex:1 1 0 !important;
+  width:0 !important;
+  padding-left:2px !important;
+  padding-right:2px !important;
+}
+.mac-calendar-window .entry-edit-form .edit-range-row .arrow{
+  flex:0 0 auto !important;
+  padding:0 2px !important;
+}
+
+/* 할 일: 날짜 + 제목 */
+.mac-calendar-window .todo-edit-form .todo-edit-main-row{
+  grid-template-columns:150px minmax(0,1fr) !important;
+}
+.mac-calendar-window .todo-edit-form .todo-due-input{
+  width:100% !important;
+  min-width:0 !important;
+  height:40px !important;
+}
+.mac-calendar-window .todo-edit-form .text-input{
+  width:100% !important;
+  min-width:0 !important;
+}
+
+/* 상세 내용 아래에서 취소/저장을 항상 오른쪽 끝에 정렬 */
+.mac-calendar-window .entry-edit-form .entry-edit-actions,
+.mac-calendar-window .todo-edit-form .entry-edit-actions{
+  width:100% !important;
+  display:flex !important;
+  justify-content:flex-end !important;
+  align-items:center !important;
+  gap:8px !important;
+  margin-top:2px !important;
+  padding-top:2px !important;
+}
+
+/* 수정용 취소/저장 버튼의 글씨 크기와 높이를 동일 규격으로 통일 */
+.mac-calendar-window .entry-edit-form .entry-edit-actions .ghost-btn,
+.mac-calendar-window .todo-edit-form .entry-edit-actions .ghost-btn,
+.mac-calendar-window .entry-edit-form .entry-edit-actions .confirm-btn,
+.mac-calendar-window .todo-edit-form .entry-edit-actions .confirm-btn{
+  height:34px !important;
+  min-height:34px !important;
+  box-sizing:border-box !important;
+  display:inline-flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  padding:0 14px !important;
+  border-radius:8px !important;
+  font-size:13.5px !important;
+  line-height:1 !important;
+  font-weight:500 !important;
+  white-space:nowrap !important;
+}
+.mac-calendar-window .entry-edit-form .entry-edit-actions .confirm-btn,
+.mac-calendar-window .todo-edit-form .entry-edit-actions .confirm-btn{
+  min-width:60px !important;
+  border:0 !important;
+  background:#0a84ff !important;
+  color:#fff !important;
+}
+.mac-calendar-window .entry-edit-form .entry-edit-actions .confirm-btn:hover,
+.mac-calendar-window .todo-edit-form .entry-edit-actions .confirm-btn:hover{
+  filter:brightness(1.06) !important;
+}
+
+/* 수정 폼의 입력 높이도 저장/취소 버튼과 시각적으로 맞춘다. */
+.mac-calendar-window .entry-edit-form .edit-main-row .add-input,
+.mac-calendar-window .todo-edit-form .edit-main-row .add-input{
+  height:40px !important;
+  min-height:40px !important;
+}
+
+@media (max-width:700px){
+  .mac-calendar-window .entry-edit-form .edit-main-row.has-time,
+  .mac-calendar-window .entry-edit-form .edit-main-row.has-range,
+  .mac-calendar-window .todo-edit-form .todo-edit-main-row{
+    grid-template-columns:1fr !important;
+  }
+  .mac-calendar-window .entry-edit-form .edit-range-row{
+    width:100% !important;
+  }
+}
+
+/* v25b — 커스텀 날짜/시간 위젯도 수정 폼의 한 줄 레이아웃을 유지 */
+.mac-calendar-window .entry-edit-form .edit-main-row.has-time .app-time{
+  width:100% !important;
+  min-width:0 !important;
+}
+.mac-calendar-window .entry-edit-form .edit-main-row.has-time .app-time-trigger{
+  width:100% !important;
+  min-width:0 !important;
+}
+.mac-calendar-window .entry-edit-form .edit-main-row.has-range .app-date{
+  flex:1 1 0 !important;
+  min-width:0 !important;
+  width:0 !important;
+}
+.mac-calendar-window .entry-edit-form .edit-main-row.has-range .app-date-trigger{
+  width:100% !important;
+  min-width:0 !important;
+}
+.mac-calendar-window .todo-edit-form .todo-edit-main-row .app-date{
+  width:100% !important;
+  min-width:0 !important;
+}
+.mac-calendar-window .todo-edit-form .todo-edit-main-row .app-date-trigger{
+  width:100% !important;
+  min-width:0 !important;
+  height:40px !important;
+  min-height:40px !important;
+}
+
+
+/* v27 — 일정/할 일 수정 폼: 상세 내용 링크는 왼쪽 끝에 고정하고,
+   기간 일정은 날짜 영역을 왼쪽에 배치하며, 캘린더 등록 항목은 13px 일반 굵기로 표시한다. */
+.mac-calendar-window .entry-edit-form .entry-edit-actions,
+.mac-calendar-window .todo-edit-form .entry-edit-actions{
+  display:flex !important;
+  justify-content:flex-start !important;
+  align-items:center !important;
+  width:100% !important;
+  min-width:0 !important;
+  gap:8px !important;
+  margin-top:0 !important;
+  padding-top:0 !important;
+}
+.mac-calendar-window .entry-edit-form .entry-edit-actions .detail-toggle-link,
+.mac-calendar-window .todo-edit-form .entry-edit-actions .detail-toggle-link{
+  flex:0 0 auto !important;
+  align-self:center !important;
+  margin:0 auto 0 0 !important;
+  padding:0 2px !important;
+  white-space:nowrap !important;
+}
+.mac-calendar-window .entry-edit-form .entry-edit-actions .edit-action-spacer,
+.mac-calendar-window .todo-edit-form .entry-edit-actions .edit-action-spacer{
+  flex:1 1 auto !important;
+  min-width:0 !important;
+}
+.mac-calendar-window .todo-edit-form .todo-edit-main-row .app-date-trigger.todo-due-input{
+  display:flex !important;
+  flex-direction:row !important;
+  flex-wrap:nowrap !important;
+  align-items:center !important;
+  justify-content:space-between !important;
+  gap:8px !important;
+  width:100% !important;
+  min-width:0 !important;
+  height:40px !important;
+  min-height:40px !important;
+  padding:0 12px !important;
+  box-sizing:border-box !important;
+  overflow:hidden !important;
+}
+.mac-calendar-window .todo-edit-form .todo-edit-main-row .app-date-trigger.todo-due-input .app-date-trigger-text{
+  flex:1 1 auto !important;
+  min-width:0 !important;
+  overflow:hidden !important;
+  text-overflow:ellipsis !important;
+  white-space:nowrap !important;
+}
+.mac-calendar-window .todo-edit-form .todo-edit-main-row .app-date-trigger.todo-due-input .app-date-icon{
+  display:flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  flex:0 0 16px !important;
+  width:16px !important;
+  height:16px !important;
+  margin-left:auto !important;
+  color:var(--text-faint) !important;
+}
+.mac-calendar-window .todo-edit-form .todo-edit-main-row .app-date-trigger.todo-due-input.open .app-date-icon{
+  color:var(--accent) !important;
+}
+
+
+/* v28 — 수정 팝업 레이아웃을 DOM 구조로 고정한다.
+   상세 내용은 왼쪽, 취소/저장은 오른쪽. 기간 일정은 날짜를 왼쪽,
+   제목을 오른쪽에 둔다. 기존 규칙보다 마지막에 적용되도록 별도 final override. */
+.mac-calendar-window .entry-edit-form .entry-edit-actions,
+.mac-calendar-window .todo-edit-form .entry-edit-actions{
+  display:flex !important;
+  flex-direction:row !important;
+  align-items:center !important;
+  justify-content:space-between !important;
+  width:100% !important;
+  min-width:0 !important;
+  gap:12px !important;
+  margin:0 !important;
+  padding:0 !important;
+}
+.mac-calendar-window .entry-edit-form .edit-action-left,
+.mac-calendar-window .todo-edit-form .edit-action-left{
+  display:flex !important;
+  align-items:center !important;
+  justify-content:flex-start !important;
+  flex:1 1 auto !important;
+  min-width:0 !important;
+  margin:0 !important;
+}
+.mac-calendar-window .entry-edit-form .edit-action-right,
+.mac-calendar-window .todo-edit-form .edit-action-right{
+  display:flex !important;
+  align-items:center !important;
+  justify-content:flex-end !important;
+  flex:0 0 auto !important;
+  gap:8px !important;
+  margin:0 !important;
+}
+.mac-calendar-window .entry-edit-form .edit-action-left .detail-toggle-link,
+.mac-calendar-window .todo-edit-form .edit-action-left .detail-toggle-link{
+  display:inline-flex !important;
+  align-items:center !important;
+  justify-content:flex-start !important;
+  margin:0 !important;
+  padding:2px 0 !important;
+  align-self:center !important;
+  white-space:nowrap !important;
+}
+.mac-calendar-window .entry-edit-form .edit-action-spacer,
+.mac-calendar-window .todo-edit-form .edit-action-spacer{display:none !important;}
+
+/* 기간 수정: 날짜 묶음은 항상 첫 번째(왼쪽), 제목은 두 번째(오른쪽). */
+.mac-calendar-window .entry-edit-form .edit-main-row.has-range{
+  display:grid !important;
+  grid-template-columns:minmax(300px, 1.45fr) minmax(0, 1fr) !important;
+  align-items:center !important;
+  gap:10px !important;
+  width:100% !important;
+  min-width:0 !important;
+}
+.mac-calendar-window .entry-edit-form .edit-main-row.has-range .edit-range-row{
+  grid-column:1 !important;
+  grid-row:1 !important;
+  display:flex !important;
+  align-items:center !important;
+  min-width:0 !important;
+  width:100% !important;
+  margin:0 !important;
+}
+.mac-calendar-window .entry-edit-form .edit-main-row.has-range > .text-input{
+  grid-column:2 !important;
+  grid-row:1 !important;
+  width:100% !important;
+  min-width:0 !important;
+}
+
+/* 할 일 수정: 날짜 왼쪽, 제목 오른쪽. */
+.mac-calendar-window .todo-edit-form .todo-edit-main-row{
+  display:grid !important;
+  grid-template-columns:150px minmax(0,1fr) !important;
+  align-items:center !important;
+  gap:10px !important;
+}
+.mac-calendar-window .todo-edit-form .todo-edit-main-row > .todo-due-input,
+.mac-calendar-window .todo-edit-form .todo-edit-main-row > .app-date{
+  grid-column:1 !important;
+  grid-row:1 !important;
+}
+.mac-calendar-window .todo-edit-form .todo-edit-main-row > .text-input{
+  grid-column:2 !important;
+  grid-row:1 !important;
+}
+
+@media (max-width:700px){
+  .mac-calendar-window .entry-edit-form .edit-main-row.has-range,
+  .mac-calendar-window .todo-edit-form .todo-edit-main-row{
+    grid-template-columns:1fr !important;
+  }
+  .mac-calendar-window .entry-edit-form .edit-main-row.has-range .edit-range-row,
+  .mac-calendar-window .entry-edit-form .edit-main-row.has-range > .text-input,
+  .mac-calendar-window .todo-edit-form .todo-edit-main-row > .todo-due-input,
+  .mac-calendar-window .todo-edit-form .todo-edit-main-row > .app-date,
+  .mac-calendar-window .todo-edit-form .todo-edit-main-row > .text-input{
+    grid-column:1 !important;
+    grid-row:auto !important;
+  }
+}

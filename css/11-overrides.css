@@ -294,3 +294,372 @@
   .work-type-add-row input:focus { outline: none; border-color: var(--accent); }
   .work-type-add-error { color: var(--red); font-size: 12.5px; min-height: 16px; margin-top: 6px; }
   .work-type-hint { font-size: 12px; color: var(--text-faint); line-height: 1.55; margin-top: 8px; }
+
+/* v29: 캘린더 왼쪽 사이드바에 등록된 할 일을 항상 표시하고, 항목을 누르면 해당 할 일 수정 팝업을 연다. */
+.mac-calendar-window .sidebar-todo-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 6px 0 0 16px;
+  padding: 4px 0 2px;
+  border-left: 1px solid var(--border);
+}
+.mac-calendar-window .sidebar-todo-item {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  padding: 5px 6px 5px 9px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-2);
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+.mac-calendar-window .sidebar-todo-item:hover {
+  background: var(--cell-hover);
+  color: var(--text);
+}
+/* 오늘 마감 할 일은 팝업의 오늘 버튼과 같은 강조색으로 표시 */
+.mac-calendar-window .sidebar-todo-item.due-today {
+  background: var(--accent);
+  color: #fff;
+}
+.mac-calendar-window .sidebar-todo-item.due-today:hover {
+  background: var(--accent);
+  color: #fff;
+}
+.mac-calendar-window .sidebar-todo-item.due-today .sidebar-todo-due,
+.mac-calendar-window .sidebar-todo-item.due-today .sidebar-todo-text {
+  color: #fff;
+}
+.mac-calendar-window .sidebar-todo-bullet {
+  width: 6px;
+  height: 6px;
+  margin-top: 5px;
+  border-radius: 50%;
+  background: var(--todo);
+  flex: 0 0 auto;
+}
+.mac-calendar-window .sidebar-todo-item.due-today .sidebar-todo-bullet {
+  background: #fff;
+}
+.mac-calendar-window .sidebar-todo-main {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.mac-calendar-window .sidebar-todo-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  line-height: 1.35;
+}
+.mac-calendar-window .sidebar-todo-due {
+  color: var(--text-3);
+  font-size: 11.5px;
+  line-height: 1.2;
+}
+.mac-calendar-window .sidebar-todo-empty {
+  color: var(--text-3);
+  font-size: 11.5px;
+  line-height: 1.4;
+  padding: 5px 8px 5px 9px;
+}
+
+/* v33: 완료된 할 일은 최신 마감일 순으로, 반복 일정은 일정 항목 바로 아래에 표시 */
+.mac-calendar-window .sidebar-section-title {
+  display:flex;
+  align-items:center;
+  gap:7px;
+  margin:12px 0 3px 0;
+  padding:0 6px 0 0;
+  color:var(--text-faint);
+  font-size:12px;
+  line-height:1.4;
+}
+.mac-calendar-window .sidebar-section-title .cnt {
+  margin-left:auto;
+  font-size:10.5px;
+  color:var(--text-faint);
+}
+.mac-calendar-window .sidebar-repeat-list {
+  display:flex;
+  flex-direction:column;
+  gap:2px;
+  margin:4px 0 0 16px;
+  padding:4px 0 2px;
+  border-left:1px solid var(--border);
+}
+.mac-calendar-window .sidebar-repeat-item {
+  width:100%;
+  min-width:0;
+  display:flex;
+  align-items:flex-start;
+  gap:7px;
+  padding:5px 6px 5px 9px;
+  border:0;
+  border-radius:6px;
+  background:transparent;
+  color:var(--text-2);
+  text-align:left;
+  cursor:pointer;
+  font:inherit;
+}
+.mac-calendar-window .sidebar-repeat-item:hover { background:var(--cell-hover); color:var(--text); }
+.mac-calendar-window .sidebar-repeat-bullet {
+  width:6px;height:6px;margin-top:5px;border-radius:50%;background:var(--event);flex:0 0 auto;
+}
+.mac-calendar-window .sidebar-repeat-main { min-width:0;flex:1;display:flex;flex-direction:column;gap:1px; }
+.mac-calendar-window .sidebar-repeat-text { min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;line-height:1.35; }
+.mac-calendar-window .sidebar-repeat-rule { color:var(--text-3);font-size:11.5px;line-height:1.2; }
+
+/* 반복 설정 줄의 바깥 박스를 제거하고 세 입력 칸의 가로 폭을 통일 */
+.mac-calendar-window .cal-pop .repeat-row {
+  display:grid !important;
+  grid-template-columns:minmax(112px,1fr) minmax(112px,1fr) 52px minmax(130px,1fr) !important;
+  align-items:center !important;
+  gap:8px !important;
+  width:100% !important;
+  min-height:42px !important;
+  margin:0 !important;
+  padding:0 !important;
+  overflow:visible !important;
+  background:transparent !important;
+  border:0 !important;
+  border-radius:0 !important;
+}
+.mac-calendar-window .cal-pop .repeat-row .repeat-select,
+.mac-calendar-window .cal-pop .repeat-row .date-input,
+.mac-calendar-window .cal-pop .repeat-row .app-select,
+.mac-calendar-window .cal-pop .repeat-row .app-date {
+  width:100% !important;
+  min-width:0 !important;
+  flex:none !important;
+}
+.mac-calendar-window .cal-pop .repeat-row .repeat-until-label {
+  width:100%;
+  text-align:center;
+  white-space:nowrap;
+}
+
+/* v33: 반복 일정 입력 영역은 바깥 박스 없이 3개의 동일한 칸으로 정렬 */
+.mac-calendar-window .cal-pop .repeat-row {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  align-items: stretch !important;
+  gap: 8px !important;
+  width: 100% !important;
+  min-height: 42px !important;
+  margin: 0 0 10px !important;
+  padding: 0 !important;
+  overflow: visible !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+}
+.mac-calendar-window .cal-pop .repeat-row .repeat-select,
+.mac-calendar-window .cal-pop .repeat-row .repeat-until-field {
+  width: 100% !important;
+  min-width: 0 !important;
+  height: 42px !important;
+  box-sizing: border-box !important;
+  border: 1px solid rgba(0,0,0,.12) !important;
+  border-radius: 9px !important;
+  background: #fff !important;
+}
+html:not([data-theme="light"]) .mac-calendar-window .cal-pop .repeat-row .repeat-select,
+html:not([data-theme="light"]) .mac-calendar-window .cal-pop .repeat-row .repeat-until-field {
+  background: #2c2c2e !important;
+  border-color: rgba(255,255,255,.13) !important;
+}
+.mac-calendar-window .cal-pop .repeat-row .repeat-select {
+  flex: none !important;
+  padding: 8px 11px !important;
+}
+.mac-calendar-window .cal-pop .repeat-row .repeat-until-field {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  padding: 0 8px 0 11px !important;
+}
+.mac-calendar-window .cal-pop .repeat-row .repeat-until-label {
+  flex: 0 0 auto !important;
+  width: auto !important;
+  color: var(--text-faint) !important;
+  font-size: 12px !important;
+  white-space: nowrap !important;
+}
+.mac-calendar-window .cal-pop .repeat-row .repeat-until-field .date-input {
+  flex: 1 !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  height: 40px !important;
+  padding: 7px 2px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+}
+
+/* v33: 반복 일정은 "일정" 바로 아래에 표시하고 할 일과 같은 아이콘 크기를 사용 */
+.mac-calendar-window .sidebar-repeat-list {
+  display:flex;
+  flex-direction:column;
+  gap:2px;
+  margin:6px 0 0 16px;
+  padding:4px 0 2px;
+  border-left:1px solid var(--border);
+}
+.mac-calendar-window .sidebar-repeat-item {
+  width:100%;
+  min-width:0;
+  display:flex;
+  align-items:flex-start;
+  gap:7px;
+  padding:5px 6px 5px 9px;
+  border:0;
+  border-radius:6px;
+  background:transparent;
+  color:var(--text-2);
+  text-align:left;
+  cursor:pointer;
+  font:inherit;
+}
+.mac-calendar-window .sidebar-repeat-item:hover {
+  background:var(--cell-hover);
+  color:var(--text);
+}
+.mac-calendar-window .sidebar-repeat-bullet {
+  width:6px;
+  height:6px;
+  margin-top:5px;
+  border-radius:50%;
+  background:var(--event);
+  flex:0 0 auto;
+}
+.mac-calendar-window .sidebar-repeat-main {
+  min-width:0;
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  gap:1px;
+}
+.mac-calendar-window .sidebar-repeat-text {
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  font-size:14px;
+  line-height:1.35;
+}
+.mac-calendar-window .sidebar-repeat-rule {
+  color:var(--text-3);
+  font-size:11.5px;
+  line-height:1.2;
+}
+
+/* v37: 반복 설정은 3개 항목을 각각 박스로 표시하고 박스 사이 연결선은 제거 */
+.mac-calendar-window .cal-pop .repeat-row {
+  display:grid !important;
+  grid-template-columns:repeat(3,minmax(0,1fr)) !important;
+  align-items:stretch !important;
+  gap:8px !important;
+  width:100% !important;
+  min-height:42px !important;
+  margin:0 0 10px !important;
+  padding:0 !important;
+  overflow:visible !important;
+  background:transparent !important;
+  border:0 !important;
+  border-radius:0 !important;
+  box-shadow:none !important;
+}
+.mac-calendar-window .cal-pop .repeat-row .repeat-select,
+.mac-calendar-window .cal-pop .repeat-row .repeat-until-field {
+  width:100% !important;
+  min-width:0 !important;
+  height:42px !important;
+  box-sizing:border-box !important;
+  border:1px solid rgba(0,0,0,.12) !important;
+  border-radius:9px !important;
+  background:#fff !important;
+  box-shadow:none !important;
+}
+html:not([data-theme="light"]) .mac-calendar-window .cal-pop .repeat-row .repeat-select,
+html:not([data-theme="light"]) .mac-calendar-window .cal-pop .repeat-row .repeat-until-field {
+  background:#2c2c2e !important;
+  border-color:rgba(255,255,255,.13) !important;
+}
+.mac-calendar-window .cal-pop .repeat-row .repeat-select {
+  flex:none !important;
+  padding:8px 11px !important;
+}
+.mac-calendar-window .cal-pop .repeat-row .repeat-until-field {
+  display:flex !important;
+  align-items:center !important;
+  gap:6px !important;
+  padding:0 8px 0 11px !important;
+}
+.mac-calendar-window .cal-pop .repeat-row .repeat-until-label {
+  flex:0 0 auto !important;
+  width:auto !important;
+  margin:0 !important;
+  padding:0 !important;
+  color:var(--text-faint) !important;
+  font-size:12px !important;
+  white-space:nowrap !important;
+}
+.mac-calendar-window .cal-pop .repeat-row .repeat-until-field .date-input {
+  flex:1 !important;
+  width:100% !important;
+  min-width:0 !important;
+  height:40px !important;
+  padding:7px 2px !important;
+  border:0 !important;
+  border-radius:0 !important;
+  background:transparent !important;
+  box-shadow:none !important;
+}
+.mac-calendar-window .cal-pop .repeat-row .app-select,
+.mac-calendar-window .cal-pop .repeat-row .app-date {
+  width:100% !important;
+  min-width:0 !important;
+  flex:none !important;
+}
+.mac-calendar-window .cal-pop .repeat-row .app-select .app-select-trigger,
+.mac-calendar-window .cal-pop .repeat-row .app-date .app-date-trigger {
+  width:100% !important;
+  min-height:42px !important;
+  padding:8px 11px !important;
+  border:1px solid rgba(0,0,0,.12) !important;
+  border-radius:9px !important;
+  background:#fff !important;
+  box-shadow:none !important;
+  color:var(--text) !important;
+  box-sizing:border-box !important;
+}
+html:not([data-theme="light"]) .mac-calendar-window .cal-pop .repeat-row .app-select .app-select-trigger,
+html:not([data-theme="light"]) .mac-calendar-window .cal-pop .repeat-row .app-date .app-date-trigger {
+  background:#2c2c2e !important;
+  border-color:rgba(255,255,255,.13) !important;
+}
+/* v35: 일정/할 일 팝업 상단바를 각 앱 페이지의 공통 상단바(.aw-tb)와 동일한 규격으로 통일 */
+.mac-calendar-window .cal-pop .pop-titlebar{
+  width:100% !important;
+  height:38px !important;
+  min-height:38px !important;
+  flex:0 0 38px !important;
+  padding:0 12px !important;
+  background:var(--toolbar-bg) !important;
+  border-bottom:1px solid var(--border) !important;
+  box-shadow:none !important;
+  backdrop-filter:blur(20px) saturate(1) !important;
+  -webkit-backdrop-filter:blur(20px) saturate(1) !important;
+}
