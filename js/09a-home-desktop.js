@@ -28,6 +28,9 @@
   function homeDesktopIconHtml(app, small) {
     return `<span class="hd-ic${small ? " aw-ic" : ""}" style="--g:linear-gradient(160deg,${app[2]})"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${app[3]}"/></svg></span>`;
   }
+  // 품질 관리는 상담사 관리 → 전체 QA 점수에서 사용하므로 앱 정보는 유지하되,
+  // 바탕화면/하단 Dock의 독립 실행 아이콘에서는 제외한다.
+  const HOME_DESKTOP_LAUNCH_APPS = HOME_DESKTOP_APPS.filter((a) => a[0] !== "qa");
   const HOME_DESKTOP_APP_BY_ID = {};
   HOME_DESKTOP_APPS.forEach((a) => { HOME_DESKTOP_APP_BY_ID[a[0]] = a; });
   // 창으로 열 수 있는 대상의 정보([id, 이름, 그라데이션, 아이콘 path]). 기본 앱 6개 외에, 바탕화면에서 우클릭으로
@@ -179,6 +182,8 @@
         <div class="aw-tr"></div>
       </div>
       <div class="page-inner"></div>
+      <span class="aw-resize-handle aw-rz-n" data-resize="n"></span><span class="aw-resize-handle aw-rz-e" data-resize="e"></span><span class="aw-resize-handle aw-rz-s" data-resize="s"></span><span class="aw-resize-handle aw-rz-w" data-resize="w"></span>
+      <span class="aw-resize-handle aw-rz-ne" data-resize="ne"></span><span class="aw-resize-handle aw-rz-se" data-resize="se"></span><span class="aw-resize-handle aw-rz-sw" data-resize="sw"></span><span class="aw-resize-handle aw-rz-nw" data-resize="nw"></span>
     `;
     layer.appendChild(frame);
     hdWireWindowFrame(frame, page);
@@ -199,9 +204,132 @@
 
   function hdWireWindowFrame(frame, page) {
     const bar = frame.querySelector(".aw-tb");
+
+    // 우하단 대각선 리사이즈는 캡처 단계에서 직접 처리한다.
+    // page-inner/overflow 요소가 pointerdown을 가로채더라도 이 핸들 영역은 항상 창이 받도록 한다.
+    frame.addEventListener("pointerdown", (e) => {
+      const st = hdWin.state[page];
+      const r = frame.getBoundingClientRect();
+      const hit = e.clientX >= r.right - 28 && e.clientY >= r.bottom - 28;
+      if (!hit || !st || st.maximized || st.minimized || e.button !== 0) return;
+      if (st.snap) {
+        st.snap = null;
+        frame.classList.remove("win-snap-l", "win-snap-r", "aw-snap-anim", "aw-unsnap-anim");
+        hdHideSnapAssist(true);
+      }
+      e.preventDefault();
+      e.stopPropagation();
+      frame.classList.remove("aw-resize-anim", "aw-snap-anim", "aw-unsnap-anim");
+      const startX = e.clientX, startY = e.clientY;
+      const startW = r.width, startH = r.height;
+      const minW = 340, minH = 240;
+      const maxW = Math.max(minW, window.innerWidth - 16);
+      const maxH = Math.max(minH, window.innerHeight - 55);
+      frame.style.cursor = "nwse-resize";
+      try { frame.setPointerCapture?.(e.pointerId); } catch (_) {}
+      const move = (v) => {
+        const width = Math.min(maxW, Math.max(minW, startW + (v.clientX - startX)));
+        const height = Math.min(maxH, Math.max(minH, startH + (v.clientY - startY)));
+        frame.style.width = Math.round(width) + "px";
+        frame.style.height = Math.round(height) + "px";
+      };
+      const up = () => {
+        document.removeEventListener("pointermove", move, true);
+        document.removeEventListener("pointerup", up, true);
+        document.removeEventListener("pointercancel", up, true);
+        frame.style.cursor = "";
+        try { frame.releasePointerCapture?.(e.pointerId); } catch (_) {}
+        hdSaveOpenWindowsState();
+      };
+      document.addEventListener("pointermove", move, true);
+      document.addEventListener("pointerup", up, true);
+      document.addEventListener("pointercancel", up, true);
+    }, true);
     // 창 안 아무 곳이나 누르면(제목줄이든 본문이든) 이 창을 맨 앞으로 가져온다.
-    frame.addEventListener("pointerdown", () => hdBringToFront(page));
-    // 창 크기를 손으로 바꾼 뒤(오른쪽 아래 모서리, 네이티브 resize: both)에도 그 크기를 로컬에 남긴다.
+    frame.addEventListener("pointerdown", (e) => {
+      // 일부 페이지의 내부 스크롤/오버플로 요소가 우하단 핸들을 덮더라도
+      // 창 자체에서 우하단 모서리 드래그를 확실히 받을 수 있도록 보조 히트 테스트를 둔다.
+      // 별도 표시 없이 창의 실제 우하단 20px 영역만 감지한다.
+      const st = hdWin.state[page];
+      const r = frame.getBoundingClientRect();
+      const nearSE = e.clientX >= r.right - 20 && e.clientY >= r.bottom - 20;
+      if (nearSE && st && !st.maximized && !st.minimized && e.button === 0) {
+        if (st.snap) { st.snap = null; frame.classList.remove("win-snap-l", "win-snap-r", "aw-snap-anim", "aw-unsnap-anim"); hdHideSnapAssist(true); }
+        e.preventDefault();
+        e.stopPropagation();
+        frame.classList.remove("aw-resize-anim", "aw-snap-anim", "aw-unsnap-anim");
+        const startX = e.clientX, startY = e.clientY;
+        const startW = r.width, startH = r.height;
+        const minW = 340, minH = 240;
+        const maxW = Math.max(minW, window.innerWidth - 16);
+        const maxH = Math.max(minH, window.innerHeight - 55);
+        const moveSE = (v) => {
+          const width = Math.min(maxW, Math.max(minW, startW + (v.clientX - startX)));
+          const height = Math.min(maxH, Math.max(minH, startH + (v.clientY - startY)));
+          frame.style.width = Math.round(width) + "px";
+          frame.style.height = Math.round(height) + "px";
+        };
+        const upSE = () => {
+          document.removeEventListener("pointermove", moveSE);
+          document.removeEventListener("pointerup", upSE);
+          document.removeEventListener("pointercancel", upSE);
+          hdSaveOpenWindowsState();
+        };
+        document.addEventListener("pointermove", moveSE);
+        document.addEventListener("pointerup", upSE);
+        document.addEventListener("pointercancel", upSE);
+        try { frame.setPointerCapture?.(e.pointerId); } catch (_) {}
+        return;
+      }
+      hdBringToFront(page);
+    });
+    // 창의 상·하·좌·우 면과 네 모서리를 직접 드래그해 크기를 조절한다.
+    // 브라우저 기본 resize는 오른쪽 아래 모서리만 지원하므로 모든 방향을 동일한 방식으로 제공한다.
+    frame.querySelectorAll("[data-resize]").forEach((handle) => {
+      handle.addEventListener("pointerdown", (e) => {
+        const st = hdWin.state[page];
+        if (!st || st.maximized || st.minimized || e.button !== 0) return;
+        if (st.snap) { st.snap = null; frame.classList.remove("win-snap-l", "win-snap-r", "aw-snap-anim", "aw-unsnap-anim"); hdHideSnapAssist(true); }
+        e.preventDefault(); e.stopPropagation();
+        if (handle.setPointerCapture) { try { handle.setPointerCapture(e.pointerId); } catch (_) {} }
+        frame.classList.remove("aw-resize-anim", "aw-snap-anim", "aw-unsnap-anim");
+        const dir = handle.getAttribute("data-resize");
+        const start = frame.getBoundingClientRect();
+        const startX = e.clientX, startY = e.clientY;
+        const minW = 340, minH = 240;
+        const maxW = Math.max(minW, window.innerWidth - 16);
+        const maxH = Math.max(minH, window.innerHeight - 55);
+        const move = (v) => {
+          const dx = v.clientX - startX, dy = v.clientY - startY;
+          let left = start.left, top = start.top, width = start.width, height = start.height;
+          if (dir.includes("e")) width = Math.min(maxW, Math.max(minW, start.width + dx));
+          if (dir.includes("s")) height = Math.min(maxH, Math.max(minH, start.height + dy));
+          if (dir.includes("w")) {
+            const nextLeft = Math.max(0, Math.min(start.left + start.width - minW, start.left + dx));
+            left = nextLeft; width = start.width + (start.left - nextLeft);
+          }
+          if (dir.includes("n")) {
+            const nextTop = Math.max(39, Math.min(start.top + start.height - minH, start.top + dy));
+            top = nextTop; height = start.height + (start.top - nextTop);
+          }
+          width = Math.min(maxW, Math.max(minW, width));
+          height = Math.min(maxH, Math.max(minH, height));
+          frame.style.left = Math.round(left) + "px"; frame.style.top = Math.round(top) + "px";
+          frame.style.width = Math.round(width) + "px"; frame.style.height = Math.round(height) + "px";
+        };
+        const up = () => {
+          document.removeEventListener("pointermove", move);
+          document.removeEventListener("pointerup", up);
+          document.removeEventListener("pointercancel", up);
+          try { if (handle.releasePointerCapture) handle.releasePointerCapture(e.pointerId); } catch (_) {}
+          hdSaveOpenWindowsState();
+        };
+        document.addEventListener("pointermove", move);
+        document.addEventListener("pointerup", up);
+        document.addEventListener("pointercancel", up);
+      });
+    });
+    // 창 크기를 손으로 바꾼 뒤에도 그 크기를 로컬에 남긴다.
     if (window.ResizeObserver) {
       let resizeSaveTimer = null;
       new ResizeObserver(() => {
@@ -573,14 +701,19 @@
     if (!on) { hdCloseAllWindows(); return; }
     const icons = document.getElementById("home-icons");
     const dock = document.getElementById("home-dock");
+    // 독립 실행 아이콘으로는 품질 관리를 사용하지 않는다. 이미 렌더된 이전 아이콘도 즉시 제거한다.
+    [icons, dock].forEach((container) => {
+      if (!container) return;
+      container.querySelectorAll('[data-hd-page="qa"]').forEach((el) => el.remove());
+    });
     // 아이콘/독은 한 번만 그려둔다 — renderApp이 다시 불려도 hover 확대 상태가 끊기지 않게.
     // 누르면 setPage()를 통해 그 페이지의 창이 열리거나(이미 열려 있으면 앞으로/복원) — 다른 창은 그대로 둔다.
     if (icons && !icons.firstChild) {
-      icons.innerHTML = HOME_DESKTOP_APPS.map((a) => `<button type="button" class="hd-di" data-hd-page="${a[0]}">${homeDesktopIconHtml(a)}${a[1]}</button>`).join("");
+      icons.innerHTML = HOME_DESKTOP_LAUNCH_APPS.map((a) => `<button type="button" class="hd-di" data-hd-page="${a[0]}">${homeDesktopIconHtml(a)}${a[1]}</button>`).join("");
       icons.onclick = (e) => { const b = e.target.closest("[data-hd-page]"); if (b) setPage(b.getAttribute("data-hd-page")); };
     }
     if (dock && !dock.firstChild) {
-      dock.innerHTML = HOME_DESKTOP_APPS.map((a) => `<button type="button" class="hd-dk" data-hd-page="${a[0]}" data-n="${a[1]}" aria-label="${a[1]}">${homeDesktopIconHtml(a)}</button>`).join("");
+      dock.innerHTML = HOME_DESKTOP_LAUNCH_APPS.map((a) => `<button type="button" class="hd-dk" data-hd-page="${a[0]}" data-n="${a[1]}" aria-label="${a[1]}">${homeDesktopIconHtml(a)}</button>`).join("");
       dock.onclick = (e) => { const b = e.target.closest("[data-hd-page]"); if (b) hdDockClick(b.getAttribute("data-hd-page")); };
     }
     if (typeof renderDesktopFolders === "function") renderDesktopFolders(); // 바탕화면에 직접 만든 폴더 아이콘 (js/09b-desktop-folders.js)

@@ -28,16 +28,21 @@
   const PAGE_SIZE = 12; // 상담사 관리 / 면담일지 목록 페이지당 표시 개수
   // list 전체와 원하는 page(1부터 시작)를 넣으면, 범위를 벗어난 page는 알아서
   // 안쪽으로 보정해서 { items, page, totalPages }를 돌려준다.
-  function paginateList(list, page) {
-    const totalPages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
+  // pageSize를 생략하면(또는 0 이하면) 기본값 PAGE_SIZE를 쓴다 — 상담사 관리처럼
+  // 화면 높이에 맞춰 쪽당 개수를 동적으로 계산하는 화면에서만 값을 넘겨준다.
+  function paginateList(list, page, pageSize) {
+    const size = pageSize && pageSize > 0 ? pageSize : PAGE_SIZE;
+    const totalPages = Math.max(1, Math.ceil(list.length / size));
     const safePage = Math.min(Math.max(1, page || 1), totalPages);
-    const start = (safePage - 1) * PAGE_SIZE;
-    return { items: list.slice(start, start + PAGE_SIZE), page: safePage, totalPages };
+    const start = (safePage - 1) * size;
+    return { items: list.slice(start, start + size), page: safePage, totalPages };
   }
   // actionName은 클릭 시 data-page-action 값으로 붙어서, 각 화면에서 이 값으로
-  // 자기 목록의 페이지 상태를 구분해 처리한다.
-  function renderPaginationHtml(page, totalPages, actionName) {
-    if (totalPages <= 1) return "";
+  // 자기 목록의 페이지 상태를 구분해 처리한다. alwaysShow를 true로 주면 전체
+  // 페이지가 1개뿐이라 실제로 다음 페이지로 넘어갈 일이 없어도 "1 / 1페이지"
+  // 형태로 이전/다음 버튼(둘 다 비활성)과 함께 계속 표시한다.
+  function renderPaginationHtml(page, totalPages, actionName, alwaysShow) {
+    if (totalPages <= 1 && !alwaysShow) return "";
     return `
       <div class="page-nav" data-page-action="${actionName}">
         <button type="button" class="page-nav-btn" data-page-nav="prev" ${page <= 1 ? "disabled" : ""}>이전</button>

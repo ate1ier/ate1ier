@@ -78,7 +78,7 @@
     if (cur.length) segments.push(cur);
     const pathHtml = segments.map((seg) => {
       const d = seg.map((p, idx) => `${idx === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
-      return `<path d="${d}" fill="none" stroke="var(--accent)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>`;
+      return `<path d="${d}" fill="none" stroke="var(--accent)" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>`;
     }).join("");
 
     const dotHtml = months.map((m, i) => {

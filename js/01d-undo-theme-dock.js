@@ -112,7 +112,7 @@
     try { localStorage.setItem(THEME_KEY, mode); } catch (e) { /* 저장 실패해도 화면 전환은 그대로 동작 */ }
     renderNav();
   }
-  applyTheme(isValidTheme(getStoredTheme()) ? getStoredTheme() : "dark");
+  applyTheme(isValidTheme(getStoredTheme()) ? getStoredTheme() : "light");
 
   /* ===================== 데스크톱 독(Dock) 펼치기/닫기 =====================
      독 안에는 메뉴 카테고리(#nav)가 들어있고, 펼치기/접기 대상은 그걸 감싸는

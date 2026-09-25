@@ -240,6 +240,12 @@
     if (type === "퇴사") return "type-resign";
     return "type-adhoc"; // 비정기(과거 데이터의 "수시" 포함)
   }
+  // ISO 날짜(예: 2026-09-01)가 오늘로부터 며칠 전인지 계산한다. 미래 날짜면 음수가 나올 수 있다.
+  function daysAgoFromISO(iso) {
+    if (!iso) return null;
+    const diffMs = parseISODate(agentTodayStr()).getTime() - parseISODate(iso).getTime();
+    return Math.round(diffMs / 86400000);
+  }
   // 면담 기록을 최신 날짜순(같은 날짜면 최근 작성순)으로 정렬한다.
   function sortInterviews(list) {
     return [...list].sort((a, b) => {
@@ -660,80 +666,89 @@
   }
 
   /* ---- 상담사 상세 화면에 끼워 넣는 면담 이력 섹션 ---- */
-  function renderAgentInterviewSection(agent) {
-    const records = sortInterviews(interviewsData.filter((r) => r.agentId === agent.id));
-    let bodyHtml;
-    if (agentsUi.interviewMode === "add") {
-      bodyHtml = `
-        <form class="agent-form" id="agent-interview-form">
-          ${renderInterviewFormFields({ date: todayISO(), type: "정기" }, agent.id, "agent-interview")}
-          <div class="agent-form-actions">
-            <button type="submit" class="primary-btn">추가</button>
-            <button type="button" class="cancel-btn" id="agent-interview-cancel">취소</button>
-          </div>
-        </form>
-      `;
-    } else if (agentsUi.interviewMode === "edit") {
-      const editing = interviewsData.find((r) => r.id === agentsUi.interviewEditingId) || null;
-      bodyHtml = editing ? `
-        <form class="agent-form" id="agent-interview-form">
-          ${renderInterviewFormFields(editing, agent.id, "agent-interview")}
-          <div class="agent-form-actions">
-            <button type="submit" class="primary-btn">저장</button>
-            <button type="button" class="cancel-btn" id="agent-interview-cancel">취소</button>
-          </div>
-        </form>
-      ` : `<div class="agent-list-empty">기록을 찾을 수 없어요.</div>`;
-    } else {
-      bodyHtml = records.length === 0
-        ? `<div class="agent-list-empty">이 상담사와의 면담 기록이 없어요.</div>`
-        : `<div class="interview-list">${records.map((r) => renderInterviewRow(r, "agent")).join("")}</div>`;
+  // 상담사 상세의 면담 이력 섹션 전용: 유형 필터 + 면담 내용 검색으로 좁힌 목록을 돌려준다.
+  function agentInterviewFilteredList(agent) {
+    const all = sortInterviews(interviewsData.filter((r) => r.agentId === agent.id));
+    const typeFilter = agentsUi.interviewTypeFilter || "all";
+    const query = (agentsUi.interviewSearchQuery || "").trim().toLowerCase();
+    const filtered = all.filter((r) => (
+      interviewMatchesType(r, typeFilter)
+      && (!query || `${r.content || ""} ${r.followUp || ""}`.toLowerCase().indexOf(query) !== -1)
+    ));
+    return { all, filtered };
+  }
+
+  // 면담 이력 섹션의 목록 영역(툴바 아래)만 다시 그린다. 10건씩 페이지를 나눠서 보여준다.
+  function renderAgentInterviewListAreaHtml(agent, filtered) {
+    if (filtered.length === 0) {
+      return `<div class="mac-iv-empty">${agentInterviewFilteredList(agent).all.length === 0 ? "이 상담사와의 면담 기록이 없어요." : "검색 또는 필터 조건에 맞는 면담 기록이 없어요."}</div>`;
     }
+    const { items, page, totalPages } = paginateList(filtered, agentsUi.interviewListPage);
+    agentsUi.interviewListPage = page;
     return `
-      <div class="agent-interview-section">
-        <div class="agent-interview-header">
-          <div class="agent-interview-title">${ICON_CLIPBOARD} 면담 이력</div>
-          <div class="agent-interview-header-actions">
-            ${agentsUi.interviewMode === "list" ? `<button class="ghost-btn solid-accent-btn" id="btn-agent-interview-add">＋ 면담 기록 추가</button>` : ""}
-            <button class="ghost-btn" data-action="agent-goto-interviews" data-id="${agent.id}">${ICON_CHEVRON_RIGHT} 면담일지 전체보기</button>
+      <div class="mac-iv-list">${items.map((r) => renderMacInterviewRow(r)).join("")}</div>
+      ${renderPaginationHtml(page, totalPages, "agent-interview-list", true)}
+    `;
+  }
+
+  // 면담일지 팝오버 전용 행: macOS의 "인셋 그룹 리스트"(설정 앱·미리 알림 등)처럼
+  // 얇은 구분선 하나로만 나뉜 한 장의 카드 안에, 유형별 색 점 + 날짜 + 담당자를
+  // 보여준다. 누르면 그 자리에서 펼쳐져 전체 내용을 볼 수 있고(펼침 상태는 기존
+  // 면담 목록과 같은 interviewsUi.expandedIds를 공유), 구분선 아래 줄에는 왼쪽에
+  // 미리보기(내용 첫 줄만, 한 줄 넘으면 말줄임), 오른쪽에 액션 버튼(수정·다운로드·삭제)을
+  // 같이 배치해 토글 클릭과 헷갈리지 않는다.
+  function renderMacInterviewRow(rec) {
+    const manager = rec.managerId ? agentsData.find((a) => a.id === rec.managerId) : null;
+    const isExpanded = interviewsUi.expandedIds.has(rec.id);
+    const previewLine = (rec.content || "").split(/\r?\n/)[0].trim();
+    return `
+      <div class="mac-iv-row ${isExpanded ? "expanded" : ""}">
+        <div class="mac-iv-row-main" data-action="toggle-interview-row" data-id="${rec.id}">
+          <span class="mac-iv-dot ${interviewTypeBadgeClass(rec.type)}"></span>
+          <div class="mac-iv-row-center">
+            <div class="mac-iv-row-line1">
+              <span class="mac-iv-date">${esc(rec.date || "-")}</span>
+              <span class="mac-iv-type-label">${esc(rec.type || "비정기")}</span>
+              ${manager ? `<span class="mac-iv-manager">${ICON_SHIELD} ${esc(manager.name)}</span>` : ""}
+            </div>
+          </div>
+          <span class="mac-iv-chevron">${ICON_CHEVRON_RIGHT}</span>
+        </div>
+        <div class="mac-iv-row-footer">
+          <div class="mac-iv-preview">${!isExpanded && previewLine ? esc(previewLine) : ""}</div>
+          <div class="mac-iv-row-actions">
+            <button type="button" class="mac-iv-icon-btn" data-action="agent-edit-interview" data-id="${rec.id}" title="수정">✎</button>
+            <button type="button" class="mac-iv-icon-btn" data-action="agent-download-interview" data-id="${rec.id}" title="엑셀 다운로드">${ICON_DOWNLOAD}</button>
+            <button type="button" class="mac-iv-icon-btn danger" data-action="agent-delete-interview" data-id="${rec.id}" title="삭제">🗑</button>
           </div>
         </div>
-        ${bodyHtml}
+        ${isExpanded ? `
+          <div class="mac-iv-detail-divider"></div>
+          <div class="mac-iv-row-detail">
+            ${rec.content ? `<div class="mac-iv-detail-content">${esc(rec.content)}</div>` : ""}
+            <div class="mac-iv-detail-followup"><b>후속조치</b>${rec.followUp ? esc(rec.followUp) : "없음"}</div>
+          </div>
+        ` : ""}
       </div>
     `;
   }
 
-  function attachAgentInterviewEvents(root, agent) {
-    attachInterviewRowToggles(root, renderApp);
+  function updateAgentInterviewListArea(agent) {
+    const area = document.getElementById("agent-interview-list-area");
+    if (!area) return;
+    const { filtered } = agentInterviewFilteredList(agent);
+    area.innerHTML = renderAgentInterviewListAreaHtml(agent, filtered);
+    attachAgentInterviewListAreaHandlers(area, agent);
+  }
+
+  function attachAgentInterviewListAreaHandlers(root, agent) {
+    attachInterviewRowToggles(root, () => updateAgentInterviewListArea(agent));
+    attachPaginationHandlers(root, "agent-interview-list", (delta) => {
+      agentsUi.interviewListPage = agentsUi.interviewListPage + delta;
+      updateAgentInterviewListArea(agent);
+    });
     root.querySelectorAll("[data-action='agent-download-interview']").forEach((btn) => {
       btn.onclick = () => downloadSingleInterview(btn.getAttribute("data-id"));
-    });
-    const addBtn = document.getElementById("btn-agent-interview-add");
-    if (addBtn) {
-      addBtn.onclick = () => {
-        agentsUi.interviewMode = "add";
-        agentsUi.interviewEditingId = null;
-        renderApp();
-      };
-    }
-    // 상담사 상세 → 면담일지 전체 화면으로 이동하면서, 이 상담사 이름으로 미리 검색해둔다.
-    root.querySelectorAll("[data-action='agent-goto-interviews']").forEach((btn) => {
-      btn.onclick = () => {
-        interviewsUi.searchQuery = agent.name;
-        interviewsUi.typeFilter = "all";
-        interviewsUi.mode = "list";
-        interviewsUi.page = 1;
-        setPage("interviews");
-      };
-    });
-    // 상담사 상세 → 품질 관리 화면으로 이동하면서, 이 상담사가 있는 달로 맞춰준다.
-    root.querySelectorAll("[data-action='agent-goto-qa']").forEach((btn) => {
-      btn.onclick = () => {
-        qaUi.year = today.getFullYear();
-        qaUi.monthIndex = today.getMonth();
-        qaHighlightAgentId = agent.id;
-        setPage("qa");
-      };
     });
     root.querySelectorAll("[data-action='agent-edit-interview']").forEach((btn) => {
       btn.onclick = () => {
@@ -749,6 +764,137 @@
           deleteInterview(id);
           renderApp();
         }
+      };
+    });
+  }
+
+  // 상담사 팝오버 옆에 뜨는 "OOO님의 면담일지" 패널. macOS 시스템 팝오버(알림 센터·미리 알림
+  // 등)처럼 SF 서체·반투명 세그먼트 컨트롤·인셋 그룹 리스트·원형 툴바 아이콘으로 구성한다.
+  // (실제 표시용 클래스는 css/06-agents.css의 "면담일지 팝오버 — macOS 네이티브 느낌" 섹션 참고.)
+  function renderAgentInterviewMain(agent) {
+    const { all, filtered } = agentInterviewFilteredList(agent);
+    let bodyHtml;
+    if (agentsUi.interviewMode === "add") {
+      bodyHtml = `
+        <form class="agent-form mac-iv-form" id="agent-interview-form">
+          ${renderInterviewFormFields({ date: todayISO(), type: "정기" }, agent.id, "agent-interview")}
+          <div class="mac-iv-form-actions">
+            <button type="submit" class="mac-iv-btn mac-iv-btn-primary">추가</button>
+            <button type="button" class="mac-iv-btn" id="agent-interview-cancel">취소</button>
+          </div>
+        </form>
+      `;
+    } else if (agentsUi.interviewMode === "edit") {
+      const editing = interviewsData.find((r) => r.id === agentsUi.interviewEditingId) || null;
+      bodyHtml = editing ? `
+        <form class="agent-form mac-iv-form" id="agent-interview-form">
+          ${renderInterviewFormFields(editing, agent.id, "agent-interview")}
+          <div class="mac-iv-form-actions">
+            <button type="submit" class="mac-iv-btn mac-iv-btn-primary">저장</button>
+            <button type="button" class="mac-iv-btn" id="agent-interview-cancel">취소</button>
+          </div>
+        </form>
+      ` : `<div class="mac-iv-empty">기록을 찾을 수 없어요.</div>`;
+    } else {
+      const typeFilter = agentsUi.interviewTypeFilter || "all";
+      const segBtns = ["all", ...INTERVIEW_TYPES].map((t) => `
+        <button type="button" class="mac-iv-seg-btn ${typeFilter === t ? "on" : ""}" data-agent-interview-filter="${t}">${t === "all" ? "전체" : t}</button>
+      `).join("");
+      const last = all[0];
+      const ago = last ? daysAgoFromISO(last.date) : null;
+      const needsIv = agentNeedsInterview(agent);
+      const alertHtml = needsIv ? `
+        <div class="mac-iv-alert">
+          <span class="mac-iv-alert-icon">⚠️</span>
+          <span class="mac-iv-alert-text">${last ? `${ago}일 동안 면담이 없었어요. 면담이 필요해요.` : "아직 면담 기록이 없어요."}</span>
+        </div>
+      ` : "";
+      bodyHtml = `
+        ${alertHtml}
+        <div class="mac-iv-controls">
+          <div class="mac-iv-segmented">${segBtns}</div>
+          <div class="mac-iv-search">
+            <input type="text" class="mac-iv-search-field" id="agent-interview-search-input" placeholder="면담 내용 검색" value="${esc(agentsUi.interviewSearchQuery || "")}" autocomplete="off">
+            <span class="mac-iv-search-icon">${ICON_SEARCH_MINI}</span>
+          </div>
+        </div>
+        ${filtered.length !== all.length ? `<div class="mac-iv-filtered-note">필터 결과 ${filtered.length}건</div>` : ""}
+        <div id="agent-interview-list-area">${renderAgentInterviewListAreaHtml(agent, filtered)}</div>
+      `;
+    }
+    const last = all[0];
+    const ago = last ? daysAgoFromISO(last.date) : null;
+    const headerStatsText = last
+      ? `총 ${all.length}건 · 마지막 면담 ${esc(last.date)}${ago !== null ? ` (${ago}일 전)` : ""}`
+      : "면담 기록 없음";
+    return `
+      <div class="mac-iv-head">
+        <div class="mac-iv-titles">
+          <div class="mac-iv-title">${esc(agent.name)}${agent.ldap ? `<span class="mac-iv-title-ldap">${esc(agent.ldap)}</span>` : ""}의 면담일지</div>
+          ${agentsUi.interviewMode === "list" ? `<div class="mac-iv-subtitle">${headerStatsText}</div>` : ""}
+        </div>
+        ${agentsUi.interviewMode === "list" ? `
+          <div class="mac-iv-toolbar">
+            <button type="button" class="mac-iv-tool" id="agent-interview-ai-summary-btn"><span class="mac-iv-tool-icon">✦</span><span class="mac-iv-tool-label">AI 요약</span></button>
+            <button type="button" class="mac-iv-tool" id="agent-interview-export-btn"><span class="mac-iv-tool-icon">${ICON_DOWNLOAD}</span><span class="mac-iv-tool-label">엑셀</span></button>
+            <button type="button" class="mac-iv-tool mac-iv-tool-accent" id="btn-agent-interview-add"><span class="mac-iv-tool-icon">＋</span><span class="mac-iv-tool-label">면담 추가</span></button>
+          </div>
+        ` : ""}
+      </div>
+      <div class="mac-iv-body">${bodyHtml}</div>
+    `;
+  }
+
+  // 상담사 팝오버 옆에 뜨는 "면담일지" 카드.
+  // 예전엔 날짜+유형만 보이는 훨씬 단순한 목록이었지만, 이제는 renderAgentInterviewMain과
+  // 완전히 같은 내용(헤더의 AI 요약·엑셀 다운로드·면담 추가 버튼, 유형 필터,
+  // 면담 내용 검색, 상세 행)을 그대로 이 카드 안으로 옮겨와 보여준다. 오른쪽 큰 패널(agent-detail-card)은
+  // 더 이상 이 내용을 중복해서 그리지 않으므로, id가 겹치지 않고 이벤트도 이 카드 하나에서만 바인딩된다.
+  function renderAgentInterviewListPopover(agent) {
+    return `<div class="card agent-iv-popover">${renderAgentInterviewMain(agent)}</div>`;
+  }
+
+  // renderAgentInterviewMain과 동일한 내용이므로 이벤트도 attachAgentInterviewEvents를 그대로 재사용한다.
+  function attachAgentInterviewListPopoverEvents(root, agent) {
+    attachAgentInterviewEvents(root, agent);
+  }
+
+  function attachAgentInterviewEvents(root, agent) {
+    const aiSummaryBtn = document.getElementById("agent-interview-ai-summary-btn");
+    if (aiSummaryBtn) aiSummaryBtn.onclick = () => openInterviewAiModalForAgent(agent);
+    const exportBtn = document.getElementById("agent-interview-export-btn");
+    if (exportBtn) exportBtn.onclick = () => downloadInterviewsByAgent(agent.id);
+    attachAgentInterviewListAreaHandlers(root, agent);
+    const addBtn = document.getElementById("btn-agent-interview-add");
+    if (addBtn) {
+      addBtn.onclick = () => {
+        agentsUi.interviewMode = "add";
+        agentsUi.interviewEditingId = null;
+        renderApp();
+      };
+    }
+    root.querySelectorAll("[data-agent-interview-filter]").forEach((btn) => {
+      btn.onclick = () => {
+        agentsUi.interviewTypeFilter = btn.getAttribute("data-agent-interview-filter");
+        agentsUi.interviewListPage = 1;
+        renderApp();
+      };
+    });
+    const searchInput = document.getElementById("agent-interview-search-input");
+    if (searchInput) {
+      searchInput.oninput = (e) => {
+        agentsUi.interviewSearchQuery = e.target.value;
+        agentsUi.interviewListPage = 1;
+        updateAgentInterviewListArea(agent);
+      };
+    }
+    // 상담사 상세 → 품질 관리 화면으로 이동하면서, 이 상담사가 있는 달로 맞춰준다.
+    root.querySelectorAll("[data-action='agent-goto-qa']").forEach((btn) => {
+      btn.onclick = () => {
+        qaUi.year = today.getFullYear();
+        qaUi.monthIndex = today.getMonth();
+        qaHighlightAgentId = agent.id;
+        setPage("qa");
       };
     });
     const form = document.getElementById("agent-interview-form");
@@ -867,6 +1013,18 @@
     overlay.onclick = (e) => { if (e.target === overlay) closeInterviewAiModal(); };
     document.addEventListener("keydown", interviewAiEscHandler, true);
     renderInterviewAiAgentStep(overlay, "");
+  }
+  // 상담사 상세(면담일지 메인 패널)의 "AI 요약" 버튼용: 이미 어떤 상담사인지 알고 있으니
+  // 상담사 고르는 1단계를 건너뛰고 바로 요약 단계로 들어간다.
+  function openInterviewAiModalForAgent(agent) {
+    closeInterviewAiModal();
+    const overlay = document.createElement("div");
+    overlay.id = "interview-ai-overlay";
+    overlay.className = "sch-preview-overlay";
+    document.body.appendChild(overlay);
+    overlay.onclick = (e) => { if (e.target === overlay) closeInterviewAiModal(); };
+    document.addEventListener("keydown", interviewAiEscHandler, true);
+    runInterviewAiSummary(overlay, agent);
   }
 
   // 1단계: AI 요약을 돌릴 상담사를 검색해서 고르는 화면.
