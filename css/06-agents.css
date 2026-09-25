@@ -27,7 +27,7 @@
      600~700로 올려 쓰고 있었다. 상담사 관리 화면 전체를 KoPub 돋움체 Light(300)
      하나로 통일한다 — 다른 페이지(면담일지 등)는 이 셀렉터 밖이라 영향 없음. */
   .agent-shell, .agent-shell * {
-    font-family: 'KoPub Dotum', -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro KR', 'Apple SD Gothic Neo', 'Malgun Gothic', system-ui, sans-serif !important;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Apple SD Gothic Neo", "Helvetica Neue", Arial, sans-serif !important;
     font-weight: 300 !important;
   }
   .agent-shell {
@@ -125,17 +125,17 @@
     display: flex; align-items: center; justify-content: space-between;
     gap: 10px; padding: 0 2px 10px;
   }
-  .agent-sidebar-title { font-size: 19px; font-weight: 700; letter-spacing: -0.01em; }
+  .agent-sidebar-title { font-size: 19.5px; font-weight: 700; letter-spacing: -0.01em; }
   .agent-sidebar .agent-add-btn {
     background: var(--accent); color: var(--accent-text);
-    border-radius: 999px; padding: 6px 13px; font-size: 12px; font-weight: 600;
+    border-radius: 999px; padding: 6px 13px; font-size: 12.5px; font-weight: 600;
     box-shadow: 0 2px 6px var(--accent-dim); white-space: nowrap;
   }
   .agent-sidebar .status { padding: 0 2px; }
   .agent-sidebar .agent-list-header,
   .agent-sidebar .agent-summary { padding: 0 2px; }
   .agent-sidebar .agent-summary {
-    font-size: 10.5px; line-height: 1.6; white-space: normal; color: var(--text-faint);
+    font-size: 11px; line-height: 1.6; white-space: normal; color: var(--text-faint);
     margin-bottom: 8px;
   }
   .agent-sidebar .agent-controls { gap: 0; margin-bottom: 0; }
@@ -144,10 +144,10 @@
     flex-wrap: nowrap; justify-content: space-between; gap: 3px;
   }
   .agent-sidebar .agent-filter-row-single .agent-filter-btn {
-    flex: 1 1 auto; padding: 4px 4px; font-size: 10.5px; text-align: center;
+    flex: 1 1 auto; padding: 4px 4px; font-size: 11px; text-align: center;
   }
   .agent-sidebar .agent-filter-btn {
-    padding: 4px 9px; font-size: 11px; border-color: var(--hairline);
+    padding: 4px 9px; font-size: 11.5px; border-color: var(--hairline);
     background: var(--panel); white-space: nowrap; flex-shrink: 0;
   }
   .agent-sidebar .agent-filter-btn.active,
@@ -160,14 +160,14 @@
     width: auto; flex: 1; min-width: 0; padding: 6px 12px;
   }
   .agent-sidebar .agent-search-input-field {
-    width: 100%; background: none; border: none; padding: 0; font-size: 11px; color: var(--text);
+    width: 100%; background: none; border: none; padding: 0; font-size: 11.5px; color: var(--text);
   }
   .agent-sidebar .agent-search-input:focus-within {
     border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim);
   }
   .agent-sidebar .agent-sort-row { justify-content: stretch; }
   .agent-sidebar .agent-sort-select {
-    flex-shrink: 0; width: auto; max-width: 92px; font-size: 11px; padding: 6px 8px; border-radius: 8px;
+    flex-shrink: 0; width: auto; max-width: 92px; font-size: 11.5px; padding: 6px 8px; border-radius: 8px;
     background: var(--panel); border-color: var(--hairline-strong); color: var(--text);
   }
 
@@ -187,11 +187,11 @@
     border: none; background: none; border-radius: 0; padding: 0; margin-bottom: 4px;
   }
   .agent-sidebar .pinned-title {
-    font-size: 10.5px; font-weight: 700; color: var(--text-faint); letter-spacing: 0.3px;
+    font-size: 11px; font-weight: 700; color: var(--text-faint); letter-spacing: 0.3px;
     padding: 6px 8px 4px; margin-bottom: 0;
   }
   .agent-sidebar-section-lbl {
-    font-size: 10.5px; font-weight: 700; color: var(--text-faint); letter-spacing: 0.3px;
+    font-size: 11px; font-weight: 700; color: var(--text-faint); letter-spacing: 0.3px;
     padding: 6px 8px 4px;
   }
 
@@ -204,18 +204,18 @@
   .agent-avatar {
     width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
     display: flex; align-items: center; justify-content: center;
-    color: #fff; font-size: 11.5px; font-weight: 700;
+    color: #fff; font-size: 12px; font-weight: 700;
   }
   .agent-row-top { display: flex; align-items: baseline; gap: 5px; min-width: 0; }
   /* 아래 두 규칙에 flex/min-width를 명시하지 않으면, 더 낮은 우선순위의 전역
      .agent-row-name(밑에 320번째 줄 근처, flex:1)이 그대로 적용돼서 이름이
      가로로 늘어나며 LDAP을 오른쪽 끝까지 밀어버린다. 이름 옆에 딱 붙게
      "늘어나지 않도록" 여기서 명시적으로 눌러준다. */
-  .agent-row-top .agent-row-name { flex: 0 1 auto; min-width: 0; font-size: 12.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .agent-row-top .agent-row-ldap-inline { flex: 0 1 auto; min-width: 0; font-size: 10.5px; color: var(--text-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .agent-row-top .agent-row-name { flex: 0 1 auto; min-width: 0; font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .agent-row-top .agent-row-ldap-inline { flex: 0 1 auto; min-width: 0; font-size: 11px; color: var(--text-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .agent-row-badges-line { display: flex; gap: 3px; flex-wrap: wrap; align-items: center; }
   .agent-row-count {
-    font-size: 10.5px; color: var(--text-faint); display: flex; align-items: center; gap: 4px;
+    font-size: 11px; color: var(--text-faint); display: flex; align-items: center; gap: 4px;
     flex-shrink: 0; align-self: flex-start; margin-top: 2px;
   }
   .need-dot {
@@ -266,11 +266,11 @@
   /* 페이지네이션: 목업처럼 "‹ 이전  1 / 2  다음 ›" 한 줄로 옅게 */
   .agent-sidebar .page-nav {
     display: flex; justify-content: center; align-items: center; gap: 10px;
-    padding: 8px 0 2px; font-size: 11.5px; color: var(--text-dim);
+    padding: 8px 0 2px; font-size: 12px; color: var(--text-dim);
   }
   .agent-sidebar .page-nav-btn {
     border: 1px solid var(--hairline-strong); background: var(--panel); color: var(--text-dim);
-    border-radius: 6px; padding: 3px 9px; font-size: 11.5px; cursor: pointer;
+    border-radius: 6px; padding: 3px 9px; font-size: 12px; cursor: pointer;
   }
   .agent-sidebar .page-nav-btn:disabled { opacity: 0.35; cursor: default; }
   .agent-sidebar .page-nav-info { white-space: nowrap; }
@@ -288,7 +288,7 @@
     border-radius: 8px; padding: 2px; gap: 1px;
   }
   .agent-view-seg-btn {
-    border: none; background: none; font-size: 12px; font-weight: 500;
+    border: none; background: none; font-size: 12.5px; font-weight: 500;
     color: var(--text-dim); padding: 5px 13px; border-radius: 6px;
     cursor: pointer; transition: 0.12s;
   }
@@ -329,7 +329,7 @@
      아이콘 등 macOS 시스템 팝오버(알림 센터·미리 알림) 느낌의 레이아웃은 그대로 두되,
      서체는 상담사 관리 화면 전체(.agent-shell)와 통일해 KoPub 돋움체 Light(300)를 쓴다. */
   .agent-iv-popover, .agent-iv-popover * {
-    font-family: 'KoPub Dotum', -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro KR', 'Apple SD Gothic Neo', 'Malgun Gothic', system-ui, sans-serif !important;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Apple SD Gothic Neo", "Helvetica Neue", Arial, sans-serif !important;
     font-weight: 300 !important;
   }
   .agent-iv-popover {
@@ -342,13 +342,13 @@
      간격을 주려면 display: flex가 있어야 gap이 실제로 적용된다. */
   .agent-qa-popover { display: flex; flex-direction: column; padding: 32px 14px 14px; gap: 10px; }
   .agent-qa-popover-empty {
-    padding: 14px 4px; text-align: center; font-size: 12.5px; color: var(--text-faint);
+    padding: 14px 4px; text-align: center; font-size: 13px; color: var(--text-faint);
   }
   .agent-qa-popover-rounds { display: flex; flex-direction: column; gap: 4px; }
   .agent-qa-popover-round-row {
     display: flex; align-items: center; justify-content: space-between;
     padding: 7px 10px; border-radius: 8px; background: var(--elevated);
-    font-size: 12.5px;
+    font-size: 13px;
   }
   .agent-qa-popover-round-label { color: var(--text-dim); font-weight: 600; }
   .agent-qa-popover-round-score { font-weight: 700; }
@@ -365,9 +365,9 @@
   /* 같은 팝오버에서 "총 N건 · ..." 줄과 그 아래 본문(면담 필요 경고 카드가 있으면 그 카드,
      없으면 바로 유형 필터 줄) 사이 간격도 18px로 띄운다. */
   .agent-iv-popover .mac-iv-body { margin-top: 18px; }
-  .mac-iv-title { font-size: 17px; font-weight: 700 !important; letter-spacing: -0.01em; color: var(--text); }
-  .mac-iv-title-ldap { font-size: 12px !important; font-weight: 400 !important; color: var(--text-faint); }
-  .mac-iv-subtitle { font-size: 11.5px; color: var(--text-faint); }
+  .mac-iv-title { font-size: 17.5px; font-weight: 700 !important; letter-spacing: -0.01em; color: var(--text); }
+  .mac-iv-title-ldap { font-size: 12.5px !important; font-weight: 400 !important; color: var(--text-faint); }
+  .mac-iv-subtitle { font-size: 12px; color: var(--text-faint); }
   .mac-iv-toolbar {
     display: flex; flex-shrink: 0; gap: 1px;
     background: var(--mac-track); border-radius: 9px; padding: 2px;
@@ -381,9 +381,9 @@
   .mac-iv-tool:active { transform: scale(0.96); }
   .mac-iv-tool-icon {
     display: flex; align-items: center; justify-content: center;
-    color: var(--text-dim); font-size: 12px; font-style: normal;
+    color: var(--text-dim); font-size: 12.5px; font-style: normal;
   }
-  .mac-iv-tool-label { font-size: 11px !important; font-weight: 600 !important; color: var(--text-dim); white-space: nowrap; }
+  .mac-iv-tool-label { font-size: 11.5px !important; font-weight: 600 !important; color: var(--text-dim); white-space: nowrap; }
   .mac-iv-tool-accent .mac-iv-tool-icon,
   .mac-iv-tool-accent .mac-iv-tool-label { color: var(--accent); }
 
@@ -393,7 +393,7 @@
   .mac-iv-controls { display: flex; flex-direction: column; gap: 8px; }
   .mac-iv-segmented { display: flex; background: var(--mac-track); border-radius: 9px; padding: 2px; gap: 1px; }
   .mac-iv-seg-btn {
-    flex: 1; border: none; background: none; font-size: 11px !important; font-weight: 500 !important;
+    flex: 1; border: none; background: none; font-size: 11.5px !important; font-weight: 500 !important;
     color: var(--text-dim); padding: 5px 3px; border-radius: 7px; cursor: pointer; white-space: nowrap;
     transition: background 0.12s ease, color 0.12s ease;
   }
@@ -412,19 +412,19 @@
     border-radius: 999px; padding: 6px 12px;
   }
   .mac-iv-search-icon { color: var(--text-faint); display: flex; flex-shrink: 0; }
-  .mac-iv-search-field { border: none; background: none; flex: 1; font-size: 12px !important; color: var(--text); min-width: 0; }
+  .mac-iv-search-field { border: none; background: none; flex: 1; font-size: 12.5px !important; color: var(--text); min-width: 0; }
   .mac-iv-search-field::placeholder { color: var(--text-faint); }
   .mac-iv-search:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); }
-  .mac-iv-filtered-note { font-size: 11px; color: var(--text-faint); }
+  .mac-iv-filtered-note { font-size: 11.5px; color: var(--text-faint); }
 
   /* ---- 경고 배너 ---- */
   .mac-iv-alert {
     display: flex; align-items: center; gap: 8px; background: rgba(255, 69, 58, 0.12);
-    border-radius: 10px; padding: 9px 11px; font-size: 11.5px !important; color: var(--text);
+    border-radius: 10px; padding: 9px 11px; font-size: 12px !important; color: var(--text);
   }
   .mac-iv-alert-icon { flex-shrink: 0; }
   .mac-iv-alert-text { flex: 1; }
-  .mac-iv-btn-sm { font-size: 10.5px !important; padding: 4px 9px !important; }
+  .mac-iv-btn-sm { font-size: 11px !important; padding: 4px 9px !important; }
 
   /* ---- 리스트: macOS "인셋 그룹" 리스트(설정 앱·미리 알림 같은 카드 안 얇은 구분선) ---- */
   .mac-iv-list { background: var(--panel); border-radius: 12px; overflow: hidden; border: 1px solid var(--hairline); }
@@ -439,9 +439,9 @@
   .mac-iv-dot.type-resign { background: var(--purple); }
   .mac-iv-row-center { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
   .mac-iv-row-line1 { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
-  .mac-iv-date { font-size: 12.5px !important; font-weight: 600 !important; color: var(--text); }
-  .mac-iv-type-label { font-size: 11px !important; color: var(--text-dim); }
-  .mac-iv-manager { font-size: 10.5px !important; color: var(--text-faint); margin-left: auto; white-space: nowrap; }
+  .mac-iv-date { font-size: 13px !important; font-weight: 600 !important; color: var(--text); }
+  .mac-iv-type-label { font-size: 11.5px !important; color: var(--text-dim); }
+  .mac-iv-manager { font-size: 11px !important; color: var(--text-faint); margin-left: auto; white-space: nowrap; }
   .mac-iv-chevron { color: var(--text-faint); flex-shrink: 0; display: flex; transition: transform 0.18s ease; }
   .mac-iv-row.expanded .mac-iv-chevron { transform: rotate(90deg); }
 
@@ -453,13 +453,13 @@
     margin: 0 10px 8px; padding-top: 8px; border-top: 1px solid var(--hairline);
   }
   .mac-iv-preview {
-    flex: 1; min-width: 0; font-size: 11px !important; color: var(--text-faint);
+    flex: 1; min-width: 0; font-size: 11.5px !important; color: var(--text-faint);
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left;
   }
   .mac-iv-row-actions { display: flex; gap: 4px; flex-shrink: 0; }
   .mac-iv-icon-btn {
     width: 24px; height: 24px; border-radius: 7px; border: none; background: var(--mac-track);
-    color: var(--text-dim); font-size: 11px; display: flex; align-items: center; justify-content: center; cursor: pointer;
+    color: var(--text-dim); font-size: 11.5px; display: flex; align-items: center; justify-content: center; cursor: pointer;
   }
   .mac-iv-icon-btn:hover { background: var(--mac-track-strong); }
   .mac-iv-icon-btn.danger { color: var(--red); }
@@ -469,37 +469,37 @@
     margin: 8px 10px 10px 27px; padding: 9px 10px; background: var(--elevated); border-radius: 9px;
   }
   .mac-iv-detail-content {
-    font-size: 12px !important; color: var(--text); white-space: pre-wrap; line-height: 1.6;
+    font-size: 12.5px !important; color: var(--text); white-space: pre-wrap; line-height: 1.6;
     padding-bottom: 8px; margin-bottom: 8px !important; border-bottom: 1px solid var(--hairline);
   }
-  .mac-iv-detail-followup { font-size: 11px !important; color: var(--text-dim); }
+  .mac-iv-detail-followup { font-size: 11.5px !important; color: var(--text-dim); }
   .mac-iv-detail-followup b { font-weight: 600 !important; color: var(--text); margin-right: 4px; }
-  .mac-iv-empty { padding: 30px 12px; text-align: center; color: var(--text-faint); font-size: 12.5px !important; }
+  .mac-iv-empty { padding: 30px 12px; text-align: center; color: var(--text-faint); font-size: 13px !important; }
 
   /* 페이지네이션: 왼쪽 사이드바(#agent-list-pagination)의 "‹ 이전  1 / 2  다음 ›" 모양을
      그대로 옮겨온다. 위쪽 구분선은 공용 .page-nav(css/11-overrides.css)의
      border-top을 그대로 쓴다. */
   .agent-iv-popover .page-nav {
-    padding: 8px 0 2px; font-size: 11.5px !important; color: var(--text-dim);
+    padding: 8px 0 2px; font-size: 12px !important; color: var(--text-dim);
   }
   .agent-iv-popover .page-nav-btn {
     border: 1px solid var(--hairline-strong); background: var(--panel); color: var(--text-dim);
-    border-radius: 6px; padding: 3px 9px; font-size: 11.5px !important;
+    border-radius: 6px; padding: 3px 9px; font-size: 12px !important;
   }
   .agent-iv-popover .page-nav-btn:disabled { opacity: 0.35; cursor: default; }
   .agent-iv-popover .page-nav-info { white-space: nowrap; }
 
   /* ---- 추가/수정 폼: macOS 텍스트 필드처럼 얇은 테두리 + 포커스 링 ---- */
   .agent-iv-popover .add-input, .agent-iv-popover .interview-textarea {
-    border-radius: 9px; border: 1px solid var(--hairline-strong); background: var(--panel); font-size: 12.5px !important;
+    border-radius: 9px; border: 1px solid var(--hairline-strong); background: var(--panel); font-size: 13px !important;
   }
   .agent-iv-popover .add-input:focus, .agent-iv-popover .interview-textarea:focus {
     border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim);
   }
-  .agent-iv-popover .agent-form-label { font-size: 11.5px !important; color: var(--text-dim); font-weight: 600 !important; }
+  .agent-iv-popover .agent-form-label { font-size: 12px !important; color: var(--text-dim); font-weight: 600 !important; }
   .mac-iv-form-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; }
   .mac-iv-btn {
-    border-radius: 8px; padding: 7px 14px; font-size: 12px !important; font-weight: 600 !important;
+    border-radius: 8px; padding: 7px 14px; font-size: 12.5px !important; font-weight: 600 !important;
     border: 1px solid var(--hairline-strong); background: var(--panel); color: var(--text); cursor: pointer;
   }
   .mac-iv-btn:hover { background: var(--mac-track); }
@@ -512,29 +512,29 @@
   .agent-popover-avatar {
     width: 64px; height: 64px; border-radius: 50%; flex-shrink: 0;
     display: flex; align-items: center; justify-content: center;
-    color: #fff; font-size: 21px; font-weight: 700; margin: 0 auto 9px;
+    color: #fff; font-size: 21.5px; font-weight: 700; margin: 0 auto 9px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
   }
-  .agent-popover-name { font-size: 18px; font-weight: 700; letter-spacing: -0.01em; }
-  .agent-popover-ldap { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+  .agent-popover-name { font-size: 18.5px; font-weight: 700; letter-spacing: -0.01em; }
+  .agent-popover-ldap { font-size: 12.5px; color: var(--text-dim); margin-top: 2px; }
   .agent-popover-input {
     text-align: center; background: var(--panel); border: 1px solid var(--hairline-strong);
-    border-radius: 9px; padding: 6px 8px; font-size: 12.5px; color: var(--text); width: 100%;
+    border-radius: 9px; padding: 6px 8px; font-size: 13px; color: var(--text); width: 100%;
   }
   .agent-popover-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); }
-  .agent-popover-name-input { font-size: 14px; font-weight: 600; text-align: center; }
-  .agent-popover-ldap-input { font-size: 14px; font-weight: 600; text-align: center; margin-top: 4px; }
+  .agent-popover-name-input { font-size: 14.5px; font-weight: 600; text-align: center; }
+  .agent-popover-ldap-input { font-size: 14.5px; font-weight: 600; text-align: center; margin-top: 4px; }
   .agent-popover-badges { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; margin-top: 8px; }
   .agent-popover-edit-badges { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; margin-top: 8px; }
   .agent-popover-admin-pill {
-    display: inline-flex; align-items: center; gap: 5px; font-size: 10px; font-weight: 600; color: var(--text-dim);
+    display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; font-weight: 600; color: var(--text-dim);
     background: var(--panel); border: 1px solid var(--hairline-strong); border-radius: 999px; padding: 5px 10px 5px 9px; cursor: pointer;
   }
   .agent-popover-admin-pill input { accent-color: var(--accent); }
   .agent-popover-group-toggle { display: flex; gap: 4px; }
   .agent-popover-group-toggle button {
     border: 1px solid var(--hairline-strong); background: var(--panel); color: var(--text-dim);
-    border-radius: 999px; padding: 5px 10px; font-size: 10px; font-weight: 600; cursor: pointer;
+    border-radius: 999px; padding: 5px 10px; font-size: 10.5px; font-weight: 600; cursor: pointer;
   }
   .agent-popover-group-toggle button.on { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); font-weight: 700; }
   .agent-popover-worktype-edit { display: flex; justify-content: center; }
@@ -543,11 +543,11 @@
   .agent-popover-actions { display: flex; justify-content: center; gap: 14px; margin: 2px 0 2px; }
   .agent-popover-act {
     display: flex; flex-direction: column; align-items: center; gap: 4px;
-    font-size: 10.5px; color: var(--accent); background: none; border: none; cursor: pointer;
+    font-size: 11px; color: var(--accent); background: none; border: none; cursor: pointer;
   }
   .agent-popover-act b {
     width: 36px; height: 36px; border-radius: 50%; background: var(--accent-dim);
-    display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 400;
+    display: flex; align-items: center; justify-content: center; font-size: 15.5px; font-weight: 400;
   }
   .agent-popover-act:hover b { filter: brightness(1.08); }
   .agent-popover-act.dg { color: var(--red); }
@@ -559,16 +559,16 @@
   }
   .agent-popover-row {
     display: flex; align-items: center; justify-content: space-between; gap: 10px;
-    padding: 8px 12px; border-bottom: 1px solid var(--hairline); font-size: 12px;
+    padding: 8px 12px; border-bottom: 1px solid var(--hairline); font-size: 12.5px;
   }
   .agent-popover-row:last-child { border-bottom: none; }
   .agent-popover-row-label { color: var(--text-faint); flex-shrink: 0; }
   .agent-popover-row-value { color: var(--text); text-align: right; min-width: 0; font-weight: 500; }
   .agent-popover-row-value .agent-popover-input { width: 150px; max-width: 100%; }
-  .agent-popover-row-sub { display: block; font-size: 10px; color: var(--text-faint); font-weight: 400; }
+  .agent-popover-row-sub { display: block; font-size: 10.5px; color: var(--text-faint); font-weight: 400; }
   .agent-popover-need { color: var(--red); }
   .agent-popover-sec-title {
-    font-size: 11px; font-weight: 700; color: var(--text-faint); letter-spacing: 0.3px;
+    font-size: 11.5px; font-weight: 700; color: var(--text-faint); letter-spacing: 0.3px;
     margin: 2px 2px 0;
   }
   /* "면담 현황" 제목(.agent-popover 안쪽에서만 쓰는 .agent-popover-sec-title)은 위 18px ·
@@ -580,10 +580,10 @@
     background: var(--panel); border: 1px solid var(--hairline); border-radius: 10px;
     padding: 8px 4px; text-align: center;
   }
-  .agent-popover-qa-cell small { font-size: 10px; color: var(--text-faint); font-weight: 600; }
-  .agent-popover-qa-cell b { display: block; font-size: 16px; margin: 2px 0; }
-  .agent-popover-qa-none { font-size: 12px; color: var(--text-faint); font-weight: 400; }
-  .agent-popover-qa-cell em { font-style: normal; font-size: 10px; font-weight: 700; }
+  .agent-popover-qa-cell small { font-size: 10.5px; color: var(--text-faint); font-weight: 600; }
+  .agent-popover-qa-cell b { display: block; font-size: 16.5px; margin: 2px 0; }
+  .agent-popover-qa-none { font-size: 12.5px; color: var(--text-faint); font-weight: 400; }
+  .agent-popover-qa-cell em { font-style: normal; font-size: 10.5px; font-weight: 700; }
   .agent-popover-qa-up { color: var(--green); }
   .agent-popover-qa-down { color: var(--red); }
   .agent-popover-qa-flat { color: var(--text-faint); }
@@ -597,7 +597,7 @@
   .agent-popover-qa-trend .qa-trend-title { display: none; }
   /* 상담사 관리 > QA 점수 팝오버의 6개월 그래프 글씨 크기 */
   .agent-popover-qa-trend .qa-trend-value,
-  .agent-popover-qa-trend .qa-trend-month { font-size: 13px !important; }
+  .agent-popover-qa-trend .qa-trend-month { font-size: 13.5px !important; }
   .agent-popover-qa-trend .qa-trend-empty { margin-bottom: 0; padding-bottom: 0; border-bottom: none; text-align: center; }
   
   .agent-page-header {
@@ -609,10 +609,10 @@
     flex-wrap: wrap;
   }
   .agent-list-heading { display: flex; flex-direction: column; gap: 11px; }
-  .agent-list-title { font-size: var(--page-title-size); font-weight: var(--page-title-weight); letter-spacing: -0.01em; }
+  .agent-list-title { font-size: calc(var(--page-title-size) + 0.5px); font-weight: var(--page-title-weight); letter-spacing: -0.01em; }
   .agent-add-btn {
     background: var(--accent); border: none; color: #ffffff;
-    border-radius: 10px; padding: 10px 18px; font-size: 13.5px; font-weight: 600; cursor: pointer;
+    border-radius: 10px; padding: 10px 18px; font-size: 14px; font-weight: 600; cursor: pointer;
     white-space: nowrap; transition: filter 0.12s ease, transform 0.08s ease;
     box-shadow: 0 4px 14px var(--accent-dim);
   }
@@ -629,7 +629,7 @@
   }
   .agent-list { display: flex; flex-direction: column; }
   .agent-list-empty {
-    color: var(--text-faint); font-size: 14px; font-style: italic; padding: 34px 10px;
+    color: var(--text-faint); font-size: 14.5px; font-style: italic; padding: 34px 10px;
     text-align: center; background: var(--elevated); border: 1px dashed var(--hairline-strong); border-radius: 16px;
   }
   .agent-row {
@@ -650,12 +650,12 @@
     display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 10px;
     padding: 2px 4px;
   }
-  .agent-row-name { font-size: 15.5px; font-weight: 600; color: var(--text); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .agent-row-ldap-inline { font-size: 13px; font-weight: 400; color: var(--text-faint); }
+  .agent-row-name { font-size: 16px; font-weight: 600; color: var(--text); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .agent-row-ldap-inline { font-size: 13.5px; font-weight: 400; color: var(--text-faint); }
   .agent-row-meta { display: flex; gap: 4px; align-items: center; flex-wrap: nowrap; flex-shrink: 0; }
   /* 마스터 계정 관리 화면(10-master.js)이 함께 쓰는 클래스 — 상담사 목록과는 별도로 기존 카드형 모양을 유지 */
   .agent-row-badges { display: flex; gap: 4px; flex-shrink: 0; align-items: center; }
-  .agent-row-ldap { font-size: 14px; color: var(--text-dim); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .agent-row-ldap { font-size: 14.5px; color: var(--text-dim); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .master-account-row {
     background: var(--elevated); border-bottom: none; border-radius: 14px;
     padding: 10px 12px; margin-bottom: 8px; flex-wrap: wrap;
@@ -663,7 +663,7 @@
   .master-account-row .agent-row-main { flex-direction: column; align-items: flex-start; justify-content: flex-start; gap: 4px; padding: 0; }
   .master-account-row:hover { background: var(--elevated); }
 
-  .agent-summary { font-size: 13px; color: var(--text-dim); margin-bottom: 12px; white-space: nowrap; overflow-x: auto; }
+  .agent-summary { font-size: 13.5px; color: var(--text-dim); margin-bottom: 12px; white-space: nowrap; overflow-x: auto; }
   .agent-list-heading .agent-summary { margin-bottom: 0; color: var(--text-faint); }
   .agent-controls { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
   .agent-controls-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
@@ -672,14 +672,14 @@
   .agent-filter-row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
   .agent-filter-btn {
     background: transparent; border: 1px solid var(--hairline); color: var(--text-dim);
-    border-radius: 999px; padding: 7px 15px; font-size: 13px; cursor: pointer;
+    border-radius: 999px; padding: 7px 15px; font-size: 13.5px; cursor: pointer;
     transition: all 0.15s ease;
   }
   .agent-filter-btn:hover { color: var(--text); border-color: var(--hairline-strong); }
   .agent-filter-btn.active { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
   .agent-sort-select {
     background: var(--elevated); border: 1px solid var(--hairline); color: var(--text);
-    border-radius: 12px; padding: 6px 10px; font-size: 14px; cursor: pointer;
+    border-radius: 12px; padding: 6px 10px; font-size: 14.5px; cursor: pointer;
   }
   .master-reset-form {
     flex-basis: 100%; display: flex; flex-direction: row; flex-wrap: wrap; gap: 8px; align-items: flex-end;
@@ -690,12 +690,12 @@
   .master-reset-form .login-submit { flex-shrink: 0; }
   .master-reset-form .login-error { flex-basis: 100%; }
   .ghost-btn.active { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
-  .badge.sm { font-size: 11px; padding: 1px 7px; margin-right: 0; white-space: nowrap; }
+  .badge.sm { font-size: 11.5px; padding: 1px 7px; margin-right: 0; white-space: nowrap; }
   .drag-handle-disabled { opacity: 0.25; cursor: default; }
 
   .agent-detail-card { min-height: 260px; min-width: 0; overflow-y: auto; }
   .agent-detail-empty {
-    color: var(--text-faint); font-size: 14.5px; font-style: italic;
+    color: var(--text-faint); font-size: 15px; font-style: italic;
     text-align: center; padding: 70px 10px;
   }
   .agent-detail-header {
@@ -703,8 +703,8 @@
     gap: 10px; margin-bottom: 18px; flex-wrap: wrap;
   }
   .agent-detail-heading { display: flex; flex-direction: column; gap: 4px; }
-  .agent-detail-name { font-size: 24px; letter-spacing: -0.01em; }
-  .agent-detail-subtitle { font-size: 13px; color: var(--text-faint); }
+  .agent-detail-name { font-size: 24.5px; letter-spacing: -0.01em; }
+  .agent-detail-subtitle { font-size: 13.5px; color: var(--text-faint); }
   .agent-detail-actions { display: flex; gap: 8px; }
   .ghost-btn.danger:hover { border-color: var(--red); color: var(--red); }
   .agent-field {
@@ -712,10 +712,10 @@
     padding: 12px 0; border-bottom: 1px solid var(--hairline);
   }
   .agent-field:last-child { border-bottom: none; }
-  .agent-field-label { font-size: 13.5px; color: var(--text-faint); flex-shrink: 0; }
-  .agent-field-value { font-size: 15px; color: var(--text); text-align: right; }
+  .agent-field-label { font-size: 14px; color: var(--text-faint); flex-shrink: 0; }
+  .agent-field-value { font-size: 15.5px; color: var(--text); text-align: right; }
   .agent-field-empty { color: var(--text-faint); }
-  .badge { display: inline-flex; align-items: center; justify-content: center; line-height: 1.4; font-size: 12.5px; padding: 2px 10px; border-radius: 999px; margin-right: 6px; }
+  .badge { display: inline-flex; align-items: center; justify-content: center; line-height: 1.4; font-size: 13px; padding: 2px 10px; border-radius: 999px; margin-right: 6px; }
   .badge.voice { color: var(--green); background: var(--green-dim); }
   .badge.chat { color: var(--accent); background: var(--accent-dim); }
   .badge.day { color: var(--orange); background: var(--orange-dim); }
@@ -726,19 +726,19 @@
   .badge.working { color: var(--green); background: var(--green-dim); }
   /* 상담사 팝오버 상단의 상담사/관리자 배지: 상담사는 흰 배경, 관리자는 검은 배경으로
      구분한다(리스트 등 다른 곳에 쓰는 .badge.admin의 빨간 배지와는 별개). */
-  .agent-role-badge { border: 1px solid var(--hairline-strong); font-weight: 600; font-size: 13.5px; padding: 4px 14px; }
+  .agent-role-badge { border: 1px solid var(--hairline-strong); font-weight: 600; font-size: 14px; padding: 4px 14px; }
   .agent-role-badge.staff { background: #fff; color: #1d1d1f; }
   .agent-role-badge.admin { background: #1c1c1e; color: #fff; border-color: #1c1c1e; }
   /* 수정 모드에서만 배지 안쪽에 붙는 작은 화살표: "눌러서 바꿀 수 있다"는 표시 */
   button.agent-role-badge { cursor: pointer; font-family: inherit; }
-  .agent-role-trigger-arrow { font-size: 9px; margin-left: 5px; opacity: 0.65; }
+  .agent-role-trigger-arrow { font-size: 9.5px; margin-left: 5px; opacity: 0.65; }
   /* 수정 모드에서 "근무 조"/"업무 구분"/"상담사·관리자" 배지를 누르면 드롭다운이 뜬다는 걸
      보여주는 트리거 버튼(테두리 없이 배지 내용만 감싸고, 작은 화살표를 붙인다). */
   .agent-field-trigger {
     display: inline-flex; align-items: center; gap: 4px; background: none; border: none;
     padding: 0; margin: 0; cursor: pointer; font-family: inherit; line-height: 1;
   }
-  .agent-field-trigger::after { content: "▾"; font-size: 9px; color: var(--text-faint); }
+  .agent-field-trigger::after { content: "▾"; font-size: 9.5px; color: var(--text-faint); }
   .agent-field-trigger:hover { filter: brightness(1.06); }
   /* 근무 조/업무 구분/상담사·관리자 드롭다운 패널: body에 바로 붙는 앵커형 패널로,
      두번째 캡처(업무 구분 체크박스 목록)와 같은 모양을 공용으로 쓴다. */
@@ -750,13 +750,13 @@
   .agent-field-dropdown .afd-options { display: flex; flex-direction: column; }
   .agent-field-dropdown .afd-option {
     display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 9px;
-    cursor: pointer; font-size: 14px; color: #1d1d1f;
+    cursor: pointer; font-size: 14.5px; color: #1d1d1f;
   }
   .agent-field-dropdown .afd-option:hover { background: rgba(0, 0, 0, 0.045); }
   .agent-field-dropdown .afd-check {
     width: 18px; height: 18px; border-radius: 5px; flex: 0 0 auto;
     border: 1.5px solid rgba(0, 0, 0, 0.22); display: flex; align-items: center; justify-content: center;
-    font-size: 12px; color: #fff; line-height: 1;
+    font-size: 12.5px; color: #fff; line-height: 1;
   }
   .agent-field-dropdown .afd-option.checked .afd-check { background: #2f6fed; border-color: #2f6fed; }
   .agent-field-dropdown .afd-add-row {
@@ -764,22 +764,22 @@
   }
   .agent-field-dropdown .afd-add-row input {
     flex: 1; min-width: 0; border: 1px solid rgba(0, 0, 0, 0.16); border-radius: 8px;
-    padding: 6px 8px; font-size: 13px; color: #1d1d1f; background: #fff;
+    padding: 6px 8px; font-size: 13.5px; color: #1d1d1f; background: #fff;
   }
   .agent-field-dropdown .afd-add-row button {
-    border-radius: 8px; padding: 6px 11px; font-size: 12.5px; white-space: nowrap;
+    border-radius: 8px; padding: 6px 11px; font-size: 13px; white-space: nowrap;
   }
-  .agent-field-dropdown .afd-add-error { color: var(--red); font-size: 11.5px; padding: 4px 2px 0; }
+  .agent-field-dropdown .afd-add-error { color: var(--red); font-size: 12px; padding: 4px 2px 0; }
   /* 리스트에서 클릭 한 번으로 근무중/퇴사를 바로 전환하는 배지 버튼
      - 다른 상태 뱃지(유선/채팅/주간/야간)는 정보 표시용 "알약형" 뱃지
      - 이 버튼은 클릭 가능하다는 걸 알 수 있도록 각진 모양 + 테두리 + 토글 아이콘으로 구분 */
   .badge-btn {
     display: inline-flex; align-items: center; gap: 4px;
-    font-size: 12.5px; padding: 2px 9px; border-radius: 10px; margin-right: 6px;
+    font-size: 13px; padding: 2px 9px; border-radius: 10px; margin-right: 6px;
     border: 1px solid currentColor; cursor: pointer; font-family: inherit; line-height: 1.4;
     transition: filter 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
   }
-  .badge-btn.sm { font-size: 11px; padding: 1px 7px; margin-right: 0; white-space: nowrap; }
+  .badge-btn.sm { font-size: 11.5px; padding: 1px 7px; margin-right: 0; white-space: nowrap; }
   .badge-btn.working { color: var(--green); background: var(--green-dim); border-color: var(--green); }
   .badge-btn.resigned { color: var(--text-faint); background: var(--hairline); border-color: var(--text-faint); }
   .badge-btn::after {
@@ -788,22 +788,22 @@
   .badge-btn:hover { filter: brightness(1.3); box-shadow: 0 0 0 2px var(--accent-dim); }
   .badge-btn:active { filter: brightness(0.9); transform: scale(0.96); }
   .agent-radio-row { display: flex; gap: 16px; margin-top: 2px; }
-  .agent-radio { display: flex; align-items: center; gap: 6px; font-size: 14.5px; color: var(--text); cursor: pointer; }
+  .agent-radio { display: flex; align-items: center; gap: 6px; font-size: 15px; color: var(--text); cursor: pointer; }
   .agent-radio input { accent-color: var(--accent); width: 15px; height: 15px; cursor: pointer; }
 
-  .agent-form-title { font-size: 18px; margin-bottom: 16px; }
+  .agent-form-title { font-size: 18.5px; margin-bottom: 16px; }
   .agent-form { display: flex; flex-direction: column; gap: 13px; }
-  .agent-form-label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--text-dim); }
+  .agent-form-label { display: flex; flex-direction: column; gap: 6px; font-size: 13.5px; color: var(--text-dim); }
   .agent-form-label .add-input { width: 100%; }
-  .agent-form-hint { font-size: 12px; font-weight: 400; color: var(--text-faint); line-height: 1.4; }
+  .agent-form-hint { font-size: 12.5px; font-weight: 400; color: var(--text-faint); line-height: 1.4; }
   .agent-checkbox-row { display: flex; gap: 16px; margin-top: 2px; }
-  .agent-checkbox { display: flex; align-items: center; gap: 6px; font-size: 14.5px; color: var(--text); cursor: pointer; }
+  .agent-checkbox { display: flex; align-items: center; gap: 6px; font-size: 15px; color: var(--text); cursor: pointer; }
   .agent-checkbox input { accent-color: var(--accent); width: 15px; height: 15px; cursor: pointer; }
   .agent-form-actions { display: flex; gap: 8px; margin-top: 4px; justify-content: flex-end; }
 
   .primary-btn {
     background: var(--accent); border: none; color: var(--accent-text);
-    border-radius: 10px; padding: 9px 18px; font-size: 13.5px; font-weight: 500; cursor: pointer;
+    border-radius: 10px; padding: 9px 18px; font-size: 14px; font-weight: 500; cursor: pointer;
     transition: filter 0.12s ease, transform 0.08s ease, box-shadow 0.12s ease;
     box-shadow: 0 1px 2px rgba(0,0,0,0.12), 0 4px 12px var(--accent-dim);
   }
@@ -811,7 +811,7 @@
   .primary-btn:active { transform: scale(0.97); }
   .cancel-btn {
     background: var(--elevated); border: 1px solid var(--hairline); color: var(--text-dim);
-    border-radius: 10px; padding: 9px 16px; font-size: 13.5px; cursor: pointer;
+    border-radius: 10px; padding: 9px 16px; font-size: 14px; cursor: pointer;
     transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
   }
   .cancel-btn:hover { color: var(--text); background: var(--hairline); border-color: var(--hairline-strong); }

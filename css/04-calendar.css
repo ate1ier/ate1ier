@@ -515,7 +515,7 @@
   --chip-event-bg:rgba(10,132,255,.14); --input-bg:#ffffff; --shadow:0 30px 70px rgba(0,0,0,.35);
   width:100%; height:100%; min-height:0; background:var(--window-bg); color:var(--text);
   border-radius:12px; overflow:hidden; display:flex; flex-direction:column; position:relative;
-  border:1px solid rgba(0,0,0,.2); font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",Arial,sans-serif;
+  border:1px solid rgba(0,0,0,.2); font-family:-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Apple SD Gothic Neo", "Helvetica Neue", Arial, sans-serif;
 }
 /* 사이드바가 창 맨 위(툴바 높이)까지 올라오고, 툴바/그리드/인스펙터는 오른쪽 본문 열에 배치 */
 .mac-calendar-window{flex-direction:row}
@@ -1247,7 +1247,7 @@ html[data-theme="light"] .mac-calendar-window .cal-pop .pop-titlebar{
 }
 .mac-calendar-window .pop-title-glyph{font-size:9px !important}
 .mac-calendar-window .pop-title{
-  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Apple SD Gothic Neo",sans-serif !important;
+  font-family:-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Apple SD Gothic Neo", "Helvetica Neue", Arial, sans-serif !important;
   font-size:13px !important;
   line-height:1 !important;
   font-weight:600 !important;
@@ -1291,7 +1291,7 @@ html[data-theme="light"] .mac-calendar-window .cal-pop .pop-titlebar{
   align-items:baseline !important;
   gap:7px !important;
   margin:0 2px 4px !important;
-  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Apple SD Gothic Neo",sans-serif !important;
+  font-family:-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Apple SD Gothic Neo", "Helvetica Neue", Arial, sans-serif !important;
   font-size:24px !important;
   line-height:1.25 !important;
   font-weight:700 !important;
@@ -1348,7 +1348,7 @@ html[data-theme="light"] .mac-calendar-window .cal-pop .entries{
 html[data-theme="light"] .mac-calendar-window .cal-pop .entry+.entry{border-top-color:rgba(60,60,67,.10) !important}
 .mac-calendar-window .cal-pop .entry:hover{background:rgba(118,118,128,.10) !important}
 .mac-calendar-window .cal-pop .entry .text{
-  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Apple SD Gothic Neo",sans-serif !important;
+  font-family:-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Apple SD Gothic Neo", "Helvetica Neue", Arial, sans-serif !important;
   font-size:14px !important;
   font-weight:500 !important;
 }
@@ -1499,7 +1499,7 @@ html[data-theme="light"] .mac-calendar-window .cal-pop .add-input{border-color:r
   border:0 !important;
 }
 .mac-calendar-window .cal-pop-todo .todo-title{
-  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Apple SD Gothic Neo",sans-serif !important;
+  font-family:-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Apple SD Gothic Neo", "Helvetica Neue", Arial, sans-serif !important;
   font-size:25px !important;
   line-height:1.1 !important;
   font-weight:700 !important;

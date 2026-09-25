@@ -28,7 +28,7 @@
   }
   /* 통계 숫자·라벨은 페이지 제목과 같은 세리프 계열로 */
   .qa-stat-item .qa-stat-num, .qa-stat-item .qa-stat-label {
-    font-family: 'KoPub Batang', 'Apple Myungjo', 'AppleGothic', 'Batang', 'Nanum Myeongjo', serif;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Apple SD Gothic Neo", "Helvetica Neue", Arial, sans-serif;
   }
   .qa-stat-item .qa-stat-num { font-size: 30px; font-weight: 800; line-height: 1.15; letter-spacing: -0.02em; color: var(--text); }
   .qa-stat-item .qa-stat-num.empty {
@@ -47,7 +47,7 @@
   .qa-table-wrap { overflow-x: auto; border: 1px solid var(--hairline); border-radius: 16px; background: var(--panel); }
   .qa-table {
     border-collapse: collapse; width: 100%; white-space: nowrap;
-    font-family: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Apple SD Gothic Neo", "Helvetica Neue", Arial, sans-serif;
     font-size: 14px;
   }
   /* 이미지로 저장할 때는 표가 fit-content 래퍼 안에서 화면 너비만큼 억지로 늘어나면서

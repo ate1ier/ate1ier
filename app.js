@@ -8445,7 +8445,7 @@
     wrapper.style.top = "0";
     wrapper.style.background = cBg;
     wrapper.style.padding = "28px";
-    wrapper.style.fontFamily = "'KoPub Dotum', system-ui, sans-serif";
+    wrapper.style.fontFamily = '-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Apple SD Gothic Neo", "Helvetica Neue", Arial, sans-serif';
     wrapper.style.color = cText;
     wrapper.style.width = "fit-content";
     wrapper.style.maxWidth = "none";
@@ -11733,7 +11733,7 @@
     wrapper.style.top = "0";
     wrapper.style.background = cBg;
     wrapper.style.padding = "28px";
-    wrapper.style.fontFamily = "'KoPub Dotum', system-ui, sans-serif";
+    wrapper.style.fontFamily = '-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Apple SD Gothic Neo", "Helvetica Neue", Arial, sans-serif';
     wrapper.style.color = cText;
     wrapper.style.width = "fit-content";
     wrapper.style.maxWidth = "none";
@@ -16896,7 +16896,7 @@
       : staleInterviewAgents.slice(0, INTERVIEW_ALERT_VISIBLE);
     const staleInterviewHtml = staleInterviewAgents.length === 0
       ? `<p class="s">최근 ${NO_INTERVIEW_DAYS}일 내 면담 기록이 없는 상담사가 없어요.</p>`
-      : `${interviewAlertShown.map((x) => rw(x.agent.name, x.agent.ldap || "", x.lastDate ? `마지막 면담 ${x.lastDate}` : "면담 기록 없음")).join("")}${interviewAlertHasMore ? `<button class="more" id="btn-interview-alert-toggle" type="button">${homeUi.interviewAlertExpanded ? "접기 ▲" : `전체 ${staleInterviewAgents.length}명 보기 ▾`}</button>` : ""}<p class="s">최근 ${NO_INTERVIEW_DAYS}일 내 면담 기록이 없는 상담사예요.</p>`;
+      : `${interviewAlertShown.map((x) => rw(x.agent.name, x.agent.ldap || "", x.lastDate ? `마지막 면담 ${x.lastDate}` : "면담 기록 없음", !x.lastDate ? "interview-empty" : "")).join("")}${interviewAlertHasMore ? `<button class="more" id="btn-interview-alert-toggle" type="button">${homeUi.interviewAlertExpanded ? "접기 ▲" : `전체 ${staleInterviewAgents.length}명 보기 ▾`}</button>` : ""}<p class="s">최근 ${NO_INTERVIEW_DAYS}일 내 면담 기록이 없는 상담사예요.</p>`;
 
     /* ---- QA(품질 관리) 전체 평균 점수 ----
        이번 달 점수가 아직 입력 안 된 경우가 많으므로(달이 막 바뀐 시점 등),
@@ -17996,6 +17996,106 @@
     return { x: Math.round(nx), y: Math.round(ny) };
   }
 
+  // ---- 바탕화면 그리드(윈도우 "아이콘 정렬 → 그리드에 맞춤"과 같은 동작) ----
+  // 화면 오른쪽 위를 기준으로 가로 GRID_CELL_W, 세로 GRID_CELL_H 간격의 칸을 깔아두고, 0번째 열부터
+  // 왼쪽으로, 아래로 갈수록 다음 행으로 채운다. 폴더를 놓은 자리는 그 중 가장 가까운 칸으로 스냅된다.
+  // 모든 칸이 아이콘 크기(86×110)보다 넉넉해서, 칸 하나에 하나씩만 놓이는 한 아이콘끼리 절대 겹치지 않는다.
+  // 오른쪽 위에는 이미 앱 아이콘 세로줄(#home-icons — 캘린더·홈·일정 등, css/01b-home-desktop.css)이 떠 있으므로,
+  // 그 줄의 실제 위치(getBoundingClientRect)를 매번 재서 그 왼쪽에 GRID_RIGHT_GAP만큼 여백을 두고 0번째 열의
+  // 기준선을 잡는다 — 화면 크기·해상도·앱 아이콘 개수(줄바꿈)가 달라져도 겹치지 않는다.
+  // (아이콘 줄을 잴 수 없는 화면·테스트 환경에서는 기본 여백(GRID_RIGHT_MARGIN_FALLBACK)을 쓴다.)
+  const GRID_ORIGIN_Y = 50;
+  const GRID_CELL_W = 96;
+  const GRID_CELL_H = 112;
+  const GRID_ICON_W = 86; // 아이콘 가로 크기 — desktopFolderClampPos의 86과 같다.
+  const GRID_RIGHT_GAP = 24; // #home-icons 왼쪽 끝과 0번째 열 아이콘 오른쪽 끝 사이 여백 — 두 줄이 딱 붙어 보이지 않을 정도로 살짝 띄운다.
+  const GRID_RIGHT_MARGIN_FALLBACK = 124; // #home-icons를 잴 수 없을 때 쓰는 기본 오른쪽 여백(오른쪽 14 + 아이콘 86 + 여백 24)
+  // 화면 오른쪽 기준선(0번째 열 아이콘의 오른쪽 끝이 닿는 x좌표)을 구한다.
+  function desktopFolderGridRightEdge(vw) {
+    const W = vw == null ? window.innerWidth : vw;
+    let reserved = GRID_RIGHT_MARGIN_FALLBACK;
+    try {
+      const el = typeof document !== "undefined" ? document.getElementById("home-icons") : null;
+      if (el && typeof el.getBoundingClientRect === "function") {
+        const rect = el.getBoundingClientRect();
+        if (rect && rect.width > 0) reserved = Math.max(GRID_RIGHT_MARGIN_FALLBACK, W - rect.left + GRID_RIGHT_GAP);
+      }
+    } catch (e) { /* 못 재면 기본 여백 사용 */ }
+    return W - reserved;
+  }
+  // 화면 임의의 좌표(x,y) → 그 좌표가 속한 그리드 칸의 [열, 행] 인덱스. 열은 오른쪽 기준선에서 왼쪽으로 셀수록 커진다.
+  function desktopFolderGridCell(x, y, vw) {
+    const rightEdge = desktopFolderGridRightEdge(vw);
+    const col = Math.round((rightEdge - GRID_ICON_W - Number(x)) / GRID_CELL_W);
+    const row = Math.round((Number(y) - GRID_ORIGIN_Y) / GRID_CELL_H);
+    return { col: Math.max(0, col), row: Math.max(0, row) };
+  }
+  // 그리드 칸의 [열, 행] 인덱스 → 그 칸의 화면 좌표(화면 밖으로 나가지 않게 desktopFolderClampPos로 한 번 더 누른다).
+  function desktopFolderCellToPos(col, row, vw, vh) {
+    const rightEdge = desktopFolderGridRightEdge(vw);
+    const x = rightEdge - GRID_ICON_W - col * GRID_CELL_W;
+    const y = GRID_ORIGIN_Y + row * GRID_CELL_H;
+    return desktopFolderClampPos(x, y, vw, vh);
+  }
+  // 놓은 자리(x,y)를 가장 가까운 그리드 칸의 좌표로 스냅한다. 드래그를 끝낼 때(끌기 up)와
+  // 새 폴더를 만들 때 이 함수를 거치므로, 저장되는 좌표는 항상 그리드 위의 값이 된다.
+  function desktopFolderSnapToGrid(x, y, vw, vh) {
+    const c = desktopFolderGridCell(x, y, vw);
+    return desktopFolderCellToPos(c.col, c.row, vw, vh);
+  }
+
+  // ---- 그리드 칸 겹침 방지: 목표 칸이 이미 다른 폴더로 차 있으면 가장 가까운 빈 칸을 대신 찾는다 ----
+  // 화면 크기로부터 유효한 열/행의 최대 인덱스를 구한다(desktopFolderClampPos가 허용하는 범위와 같은 기준).
+  function desktopFolderGridBounds(vw, vh) {
+    const W = vw == null ? window.innerWidth : vw;
+    const H = vh == null ? window.innerHeight : vh;
+    const rightEdge = desktopFolderGridRightEdge(W);
+    const maxCol = Math.max(0, Math.round((rightEdge - GRID_ICON_W) / GRID_CELL_W));
+    const maxRow = Math.max(0, Math.round((Math.max(42, H - 110) - GRID_ORIGIN_Y) / GRID_CELL_H));
+    return { maxCol, maxRow };
+  }
+  function desktopFolderCellKey(col, row) { return col + "," + row; }
+  // 지금 옮기는 폴더(excludeId) 말고, 나머지 폴더들이 차지하고 있는 칸의 집합.
+  // (저장된 x,y는 항상 스냅된 값이므로 그대로 칸으로 되돌려도 정확히 들어맞는다.)
+  function desktopFolderOccupiedCells(folders, excludeId, vw) {
+    const set = new Set();
+    Object.values(folders || {}).forEach((f) => {
+      if (!f || f.id === excludeId) return;
+      const c = desktopFolderGridCell(f.x, f.y, vw);
+      set.add(desktopFolderCellKey(c.col, c.row));
+    });
+    return set;
+  }
+  // 목표 칸(col,row)이 비어 있으면 그대로, 차 있으면 그 칸을 중심으로 한 칸씩 반지름을 넓혀가며
+  // (동서남북·대각선을 두른 "링" 순서로) 가장 가까운 빈 칸을 찾는다. 화면을 벗어나는 칸은 건너뛴다.
+  // 화면 전체가 꽉 찬 극단적인 경우엔 어쩔 수 없이 화면 범위 안으로 눌러준 원래 칸을 돌려준다.
+  function desktopFolderNearestFreeCell(col, row, occupied, maxCol, maxRow) {
+    const c0 = Math.max(0, Math.min(maxCol, col));
+    const r0 = Math.max(0, Math.min(maxRow, row));
+    const inBounds = (c, r) => c >= 0 && r >= 0 && c <= maxCol && r <= maxRow;
+    if (inBounds(col, row) && !occupied.has(desktopFolderCellKey(col, row))) return { col, row };
+    const maxRadius = maxCol + maxRow + 2;
+    for (let rad = 1; rad <= maxRadius; rad++) {
+      for (let r = row - rad; r <= row + rad; r++) {
+        for (let c = col - rad; c <= col + rad; c++) {
+          if (Math.max(Math.abs(c - col), Math.abs(r - row)) !== rad) continue; // 링 테두리 칸만
+          if (!inBounds(c, r)) continue;
+          if (!occupied.has(desktopFolderCellKey(c, r))) return { col: c, row: r };
+        }
+      }
+    }
+    return { col: c0, row: r0 }; // 화면 전체가 꽉 찬 경우
+  }
+  // 놓은 자리(x,y)를 "다른 폴더와 겹치지 않는" 가장 가까운 그리드 칸의 좌표로 맞춘다.
+  // folders는 desktopFoldersData.folders, excludeId는 지금 옮기거나 새로 만드는 폴더 자신의 id(있으면 그 칸은 비교 대상에서 뺀다).
+  function desktopFolderSnapToFreeGrid(x, y, folders, excludeId, vw, vh) {
+    const target = desktopFolderGridCell(x, y, vw);
+    const bounds = desktopFolderGridBounds(vw, vh);
+    const occupied = desktopFolderOccupiedCells(folders, excludeId, vw);
+    const free = desktopFolderNearestFreeCell(target.col, target.row, occupied, bounds.maxCol, bounds.maxRow);
+    return desktopFolderCellToPos(free.col, free.row, vw, vh);
+  }
+
   const dfUi = { renamingId: null, dragging: false, suppressClickUntil: 0, menuEl: null, menuCleanup: null };
   // 폴더 창 안 화면 상태(저장하지 않는 화면 상태): 선택된 파일, 업로드 중인 파일, 이미지 썸네일 주소 캐시.
   const dfState = { selected: {}, uploading: {}, lastClicked: {}, thumbs: new Map() };
@@ -18038,7 +18138,7 @@
   function createDesktopFolder(clientX, clientY) {
     const id = genId();
     const names = Object.values(desktopFoldersData.folders).map((f) => f.name);
-    const pos = desktopFolderClampPos(clientX - 43, clientY - 30);
+    const pos = desktopFolderSnapToFreeGrid(clientX - 43, clientY - 30, desktopFoldersData.folders, id);
     desktopFoldersData.folders[id] = {
       id, name: desktopFolderUniqueName("새 폴더", names), x: pos.x, y: pos.y, createdAt: new Date().toISOString(), files: [],
     };
@@ -18221,17 +18321,23 @@
         dfUi.dragging = false;
         dfUi.suppressClickUntil = Date.now() + 120; // 끌기를 끝낸 직후 따라오는 click이 "열기"로 처리되지 않게
         el.classList.remove("dragging");
-        f.x = parseFloat(el.style.left) || 0;
-        f.y = parseFloat(el.style.top) || 0;
+        const dropX = parseFloat(el.style.left) || 0;
+        const dropY = parseFloat(el.style.top) || 0;
+        const snapped = desktopFolderSnapToFreeGrid(dropX, dropY, desktopFoldersData.folders, id); // 놓은 자리를 다른 폴더와 안 겹치는 가까운 칸으로 맞춘다
+        el.style.left = snapped.x + "px";
+        el.style.top = snapped.y + "px";
+        f.x = snapped.x;
+        f.y = snapped.y;
         saveDesktopFoldersData();
       };
       document.addEventListener("pointermove", move);
       document.addEventListener("pointerup", up);
       document.addEventListener("pointercancel", up);
     });
-    layer.addEventListener("click", (e) => {
+    layer.addEventListener("dblclick", (e) => {
       const el = e.target.closest(".hd-fld");
       if (!el || dfUi.renamingId || Date.now() < dfUi.suppressClickUntil) return;
+      e.preventDefault();
       setPage(dfPage(el.getAttribute("data-fld-id")));
     });
     // 내 컴퓨터의 파일을 바탕화면 폴더 아이콘 위에 바로 놓아도 그 폴더로 올라간다.
@@ -18491,13 +18597,26 @@
   // 창 HTML만 만드는 순수 함수(테스트용). files는 이미 정렬된 배열, pending은 업로드 중인 임시 항목들.
   function desktopFolderWindowHtml(f, folderId, files, pending, selected) {
     const sel = selected || new Set();
-    const tiles = files.map((a) => {
+    const rows = files.map((a) => {
       const k = desktopFileKind(a.name);
       const url = k.isImage && a.path && a.size <= DF_THUMB_MAX_BYTES ? dfCachedThumb(a.path) : "";
       const wantThumb = k.isImage && a.path && a.size <= DF_THUMB_MAX_BYTES;
       const ico = url ? `<img class="dfw-thumb" alt="" draggable="false" src="${esc(url)}">` : desktopFileIconSvg(a.name);
-      return `<div class="dfw-item${sel.has(a.id) ? " sel" : ""}${url ? " has-thumb" : ""}" data-fid="${esc(a.id)}"${wantThumb ? ' data-thumb="1"' : ""} title="${esc(a.name)} · ${esc(formatAttachmentSize(a.size))}"><div class="dfw-ico">${ico}</div><div class="dfw-nm">${esc(a.name)}</div></div>`;
-    }).concat((pending || []).map((p) => `<div class="dfw-item pending" data-fid="${esc(p.id)}" title="${esc(p.name)} 업로드 중"><div class="dfw-ico">${desktopFileIconSvg(p.name)}<i class="dfw-spin"></i></div><div class="dfw-nm">${esc(p.name)}</div></div>`));
+      const ext = k.ext ? `.${k.ext}` : "—";
+      return `<div class="dfw-item${sel.has(a.id) ? " sel" : ""}${url ? " has-thumb" : ""}" data-fid="${esc(a.id)}"${wantThumb ? ' data-thumb="1"' : ""} title="${esc(a.name)} · ${esc(formatAttachmentSize(a.size))}">
+        <div class="dfw-col-name"><div class="dfw-ico">${ico}</div><div class="dfw-nm">${esc(a.name)}</div></div>
+        <div class="dfw-col-ext">${esc(ext)}</div>
+        <div class="dfw-col-size">${esc(formatAttachmentSize(a.size))}</div>
+      </div>`;
+    }).concat((pending || []).map((p) => {
+      const k = desktopFileKind(p.name);
+      const ext = k.ext ? `.${k.ext}` : "—";
+      return `<div class="dfw-item pending" data-fid="${esc(p.id)}" title="${esc(p.name)} 업로드 중">
+        <div class="dfw-col-name"><div class="dfw-ico">${desktopFileIconSvg(p.name)}<i class="dfw-spin"></i></div><div class="dfw-nm">${esc(p.name)}</div></div>
+        <div class="dfw-col-ext">${esc(ext)}</div>
+        <div class="dfw-col-size">업로드 중…</div>
+      </div>`;
+    }));
     const selBytes = files.filter((a) => sel.has(a.id)).reduce((n, a) => n + (Number(a.size) || 0), 0);
     return `
       <div class="dfw" tabindex="0" data-dfw-folder="${esc(folderId)}">
@@ -18508,7 +18627,10 @@
           <input type="file" multiple hidden data-dfw-input>
         </div>
         <div class="dfw-body">
-          ${tiles.length ? `<div class="dfw-grid">${tiles.join("")}</div>` : `<div class="dfw-empty">${DESKTOP_FOLDER_SVG}<b>이 폴더는 비어 있어요</b><small>내 컴퓨터의 파일을 이 창으로 끌어다 놓으면 올라가요</small></div>`}
+          ${rows.length ? `<div class="dfw-list">
+            <div class="dfw-list-head"><div>이름</div><div>확장자</div><div>크기</div></div>
+            ${rows.join("")}
+          </div>` : `<div class="dfw-empty">${DESKTOP_FOLDER_SVG}<b>이 폴더는 비어 있어요</b><small>내 컴퓨터의 파일을 이 창으로 끌어다 놓으면 올라가요</small></div>`}
           <div class="dfw-drop"><b>여기에 놓아서 업로드</b></div>
         </div>
         <div class="dfw-status">${esc(desktopFolderStatusText(files.length, sel.size, selBytes, (pending || []).length))}</div>
@@ -18533,7 +18655,14 @@
     if (!f) { inner.innerHTML = ""; return; }
     const oldBody = inner.querySelector && inner.querySelector(".dfw-body");
     const scrollTop = oldBody ? oldBody.scrollTop : 0;
-    const files = dfFolderFiles(f).slice().sort((a, b) => String(a.name).localeCompare(String(b.name), "ko", { numeric: true }));
+    const files = dfFolderFiles(f).slice().sort((a, b) => {
+      const at = Date.parse(String(a.uploadedAt || ""));
+      const bt = Date.parse(String(b.uploadedAt || ""));
+      if (Number.isFinite(at) && Number.isFinite(bt) && at !== bt) return bt - at;
+      if (Number.isFinite(at) && !Number.isFinite(bt)) return -1;
+      if (!Number.isFinite(at) && Number.isFinite(bt)) return 1;
+      return 0;
+    });
     const sel = dfSelSet(folderId);
     Array.from(sel).forEach((id) => { if (!files.some((a) => a.id === id)) sel.delete(id); }); // 다른 기기에서 지워진 파일은 선택에서 뺀다
     inner.innerHTML = desktopFolderWindowHtml(f, folderId, files, dfState.uploading[folderId] || [], sel);
