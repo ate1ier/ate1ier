@@ -237,7 +237,7 @@
       : staleInterviewAgents.slice(0, INTERVIEW_ALERT_VISIBLE);
     const staleInterviewHtml = staleInterviewAgents.length === 0
       ? `<p class="s">최근 ${NO_INTERVIEW_DAYS}일 내 면담 기록이 없는 상담사가 없어요.</p>`
-      : `${interviewAlertShown.map((x) => rw(x.agent.name, x.agent.ldap || "", x.lastDate ? `마지막 면담 ${x.lastDate}` : "면담 기록 없음")).join("")}${interviewAlertHasMore ? `<button class="more" id="btn-interview-alert-toggle" type="button">${homeUi.interviewAlertExpanded ? "접기 ▲" : `전체 ${staleInterviewAgents.length}명 보기 ▾`}</button>` : ""}<p class="s">최근 ${NO_INTERVIEW_DAYS}일 내 면담 기록이 없는 상담사예요.</p>`;
+      : `${interviewAlertShown.map((x) => rw(x.agent.name, x.agent.ldap || "", x.lastDate ? `마지막 면담 ${x.lastDate}` : "면담 기록 없음", !x.lastDate ? "interview-empty" : "")).join("")}${interviewAlertHasMore ? `<button class="more" id="btn-interview-alert-toggle" type="button">${homeUi.interviewAlertExpanded ? "접기 ▲" : `전체 ${staleInterviewAgents.length}명 보기 ▾`}</button>` : ""}<p class="s">최근 ${NO_INTERVIEW_DAYS}일 내 면담 기록이 없는 상담사예요.</p>`;
 
     /* ---- QA(품질 관리) 전체 평균 점수 ----
        이번 달 점수가 아직 입력 안 된 경우가 많으므로(달이 막 바뀐 시점 등),

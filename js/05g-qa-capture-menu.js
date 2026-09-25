@@ -142,7 +142,7 @@
     wrapper.style.top = "0";
     wrapper.style.background = cBg;
     wrapper.style.padding = "28px";
-    wrapper.style.fontFamily = "'KoPub Dotum', system-ui, sans-serif";
+    wrapper.style.fontFamily = '-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Apple SD Gothic Neo", "Helvetica Neue", Arial, sans-serif';
     wrapper.style.color = cText;
     wrapper.style.width = "fit-content";
     wrapper.style.maxWidth = "none";

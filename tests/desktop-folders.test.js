@@ -39,6 +39,57 @@ test("desktopFolderClampPos: 화면 밖·상태표시줄 밑 좌표를 안쪽으
   assert.deepEqual(toPlain(m.desktopFolderClampPos("abc", undefined, 1200, 800)), { x: 0, y: 42 });
 });
 
+// 테스트 환경(가짜 document)에서는 #home-icons를 잴 수 없어 항상 기본 여백(GRID_RIGHT_MARGIN_FALLBACK=124)을
+// 쓴다. 화면 1200px 기준 0번째 열(col0,row0) 좌표는 1200-124-86 = 990, y는 그대로 50.
+const ORIGIN_X = 990;
+const ORIGIN_Y = 50;
+
+test("desktopFolderSnapToGrid: 놓은 자리를 가장 가까운 그리드 칸으로 맞춘다(우상단 기준)", () => {
+  const m = loadFolders();
+  // 원점 칸(990,50) 언저리는 그대로 원점으로 스냅된다
+  assert.deepEqual(toPlain(m.desktopFolderSnapToGrid(ORIGIN_X + 4, ORIGIN_Y + 5, 1200, 800)), { x: ORIGIN_X, y: ORIGIN_Y });
+  // 칸 절반을 넘어가면 다음 칸으로 스냅된다 (칸 크기 96×112) — 열은 오른쪽 기준이라 왼쪽으로 갈수록 커진다
+  assert.deepEqual(toPlain(m.desktopFolderSnapToGrid(ORIGIN_X - 50, ORIGIN_Y + 60, 1200, 800)), { x: ORIGIN_X - 96, y: ORIGIN_Y + 112 });
+  // 같은 칸 안 여러 좌표는 모두 같은 칸으로 스냅된다(겹치지 않는 일관된 규칙)
+  const a = m.desktopFolderSnapToGrid(300, 300, 1200, 800);
+  const b = m.desktopFolderSnapToGrid(320, 280, 1200, 800);
+  assert.deepEqual(toPlain(a), toPlain(b));
+  // 화면 왼쪽·아래 밖으로 나가는 칸은 화면 안으로 눌린다(열이 늘어나는 방향이라 왼쪽으로 갈수록 커진다)
+  assert.deepEqual(toPlain(m.desktopFolderSnapToGrid(-5000, 5000, 1200, 800)), toPlain(m.desktopFolderClampPos(-5000, 5000, 1200, 800)));
+  // 화면 오른쪽 밖으로 나가는 칸(=원점보다 더 오른쪽)은 0번째 열(원점)보다 더 오른쪽으로 가지 않는다
+  // — 그렇지 않으면 #home-icons와 겹치는 자리까지 밀려날 수 있다
+  assert.deepEqual(toPlain(m.desktopFolderSnapToGrid(5000, 5000, 1200, 800)), { x: ORIGIN_X, y: toPlain(m.desktopFolderClampPos(5000, 5000, 1200, 800)).y });
+});
+
+test("desktopFolderSnapToFreeGrid: 목표 칸이 비어 있으면 그대로, 차 있으면 가장 가까운 빈 칸으로 옮긴다", () => {
+  const m = loadFolders();
+  const folders = {
+    a: { id: "a", x: ORIGIN_X, y: ORIGIN_Y }, // (col0,row0) 칸을 이미 차지
+  };
+  // 다른 폴더(b)가 같은 칸에 놓이면 옆의 빈 칸(가까운 칸)으로 밀려난다
+  const p1 = m.desktopFolderSnapToFreeGrid(ORIGIN_X + 4, ORIGIN_Y + 5, folders, "b", 1200, 800);
+  assert.notDeepEqual(toPlain(p1), { x: ORIGIN_X, y: ORIGIN_Y });
+  // 자기 자신은 비교 대상에서 빠지므로, a를 그 자리에 다시 스냅하면 그대로 원래 칸에 남는다
+  const p2 = m.desktopFolderSnapToFreeGrid(ORIGIN_X + 4, ORIGIN_Y + 5, folders, "a", 1200, 800);
+  assert.deepEqual(toPlain(p2), { x: ORIGIN_X, y: ORIGIN_Y });
+  // 비어 있는 칸을 목표로 하면 그 칸 그대로 스냅된다(왼쪽으로 5칸, 아래로 5칸)
+  const p3 = m.desktopFolderSnapToFreeGrid(ORIGIN_X - 96 * 5, ORIGIN_Y + 112 * 5, folders, "b", 1200, 800);
+  assert.deepEqual(toPlain(p3), { x: ORIGIN_X - 96 * 5, y: ORIGIN_Y + 112 * 5 });
+});
+
+test("desktopFolderNearestFreeCell: 칸이 꽉 찬 경우 점점 넓혀가며 빈 칸을 찾고, 화면을 벗어나지 않는다", () => {
+  const m = loadFolders();
+  const occupied = new Set(["2,2"]);
+  assert.deepEqual(toPlain(m.desktopFolderNearestFreeCell(2, 2, occupied, 10, 10)), { col: 1, row: 1 });
+  // 목표 칸 자체가 비어 있으면 그대로
+  assert.deepEqual(toPlain(m.desktopFolderNearestFreeCell(5, 5, occupied, 10, 10)), { col: 5, row: 5 });
+  // 화면 가장자리(0,0)가 차 있어도 화면 밖(-1,-1)으로 나가지 않고 화면 안의 빈 칸을 찾는다
+  const edgeOccupied = new Set(["0,0"]);
+  const p = m.desktopFolderNearestFreeCell(0, 0, edgeOccupied, 10, 10);
+  assert.ok(p.col >= 0 && p.row >= 0);
+  assert.notDeepEqual(toPlain(p), { col: 0, row: 0 });
+});
+
 test("저장된 값이 없거나 깨져 있으면 빈 폴더 목록으로 시작한다", () => {
   assert.deepEqual(toPlain(loadFolders().desktopFoldersData), { folders: {} });
   assert.deepEqual(toPlain(loadFolders("이건 JSON이 아님").desktopFoldersData), { folders: {} });
