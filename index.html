@@ -31,7 +31,8 @@ try {
 (function () {
   try {
     var m = localStorage.getItem("app-theme-mode");
-    if (m && m !== "dark") document.documentElement.setAttribute("data-theme", m);
+    if (!m) document.documentElement.setAttribute("data-theme", "light");
+    else if (m !== "dark") document.documentElement.setAttribute("data-theme", m);
   } catch (e) {}
   window.__bootStart = Date.now();
   // 방금 로그인/계정 생성으로 들어온 경우(로그인 화면이 새로고침을 거쳐 앱으로 넘어가는 중)에는

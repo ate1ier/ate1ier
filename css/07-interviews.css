@@ -68,6 +68,19 @@
   .agent-interview-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
   .agent-interview-title { font-size: 15.5px; font-weight: 600; }
   .agent-interview-header-actions { display: flex; align-items: center; gap: 8px; }
+  .agent-interview-summary-line { font-size: 12.5px; color: var(--text-faint); margin-bottom: 10px; }
+  .agent-interview-alert {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    background: var(--red-dim); border: 1px solid var(--red); border-radius: 12px;
+    padding: 10px 14px; font-size: 13px; color: var(--text); margin-bottom: 12px;
+  }
+  .agent-interview-alert button { margin-left: auto; }
+  .agent-interview-toolbar {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    flex-wrap: wrap; margin-bottom: 10px;
+  }
+  .agent-interview-toolbar .agent-filter-row { margin: 0; }
+  .agent-interview-search { width: 220px; flex-shrink: 0; }
   .interview-summary-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
   .interview-summary-row .agent-summary { margin-bottom: 0; }
   .interview-summary-row .agent-search-input { width: 240px; flex-shrink: 0; }

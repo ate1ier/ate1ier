@@ -59,7 +59,7 @@
     font-size: 13px;
     color: var(--accent);
   }
-  .status-bar-title { font-weight: 500; }
+  .status-bar-title { font-weight: 700; }
   .status-bar-account-badge { margin-left: 2px; }
   .status-bar-account-menu { min-width: 170px; }
   .status-bar-menu-item {
@@ -158,6 +158,19 @@
   .status-bar-clock {
     padding: 4px 10px 4px 6px;
     color: var(--text);
+  }
+
+  /* 상단 상태표시줄 글씨를 라이트 모드에서만 검정색으로 고정 (다크 모드는 기존 색 그대로 유지).
+     로고·마스터 버튼처럼 강조색(var(--accent))을 쓰던 요소도 포함해서 라이트 모드에서는 전부 검정으로 덮는다. */
+  html[data-theme="light"] #app-status-bar,
+  html[data-theme="light"] #app-status-bar .status-bar-brand,
+  html[data-theme="light"] #app-status-bar .status-bar-logo,
+  html[data-theme="light"] #app-status-bar .status-bar-title,
+  html[data-theme="light"] #app-status-bar .status-bar-clock,
+  html[data-theme="light"] #app-status-bar .status-bar-master-return,
+  html[data-theme="light"] #app-status-bar .status-bar-menu-item,
+  html[data-theme="light"] #app-status-bar .status-bar-sync {
+    color: #000;
   }
 
   /* ---- 좁은 화면: 자리만 차지하는 메뉴 항목/동기화 문구는 숨기고 핵심만 남긴다.

@@ -12,6 +12,16 @@
   #app-win-bar { display: none; }
   body.home-desktop #page-area { display: none; }
 
+  /* 상하좌우 면과 네 모서리에서 창 크기를 직접 조절하는 핸들. 모든 페이지 창에 공통 적용. */
+  .app-win .aw-resize-handle { position:absolute; z-index:2147483000; touch-action:none; pointer-events:auto !important; display:block; background:transparent !important; border:0 !important; box-shadow:none !important; }
+  .app-win .aw-rz-n, .app-win .aw-rz-s { left:0; right:0; height:10px; }
+  .app-win .aw-rz-n { top:0; cursor:ns-resize; } .app-win .aw-rz-s { bottom:0; cursor:ns-resize; }
+  .app-win .aw-rz-e, .app-win .aw-rz-w { top:0; bottom:0; width:10px; }
+  .app-win .aw-rz-e { right:0; cursor:ew-resize; } .app-win .aw-rz-w { left:0; cursor:ew-resize; }
+  .app-win .aw-rz-ne, .app-win .aw-rz-sw, .app-win .aw-rz-nw { width:14px; height:14px; }
+  .app-win .aw-rz-ne { top:0; right:0; cursor:nesw-resize; }
+  .app-win .aw-rz-sw { left:0; bottom:0; cursor:nesw-resize; } .app-win .aw-rz-nw { left:0; top:0; cursor:nwse-resize; } .app-win .aw-rz-se { right:0; bottom:0; cursor:nwse-resize; }
+
   .app-win {
     display: flex; flex-direction: column; justify-content: flex-start; align-items: stretch;
     position: fixed;
@@ -23,7 +33,7 @@
     padding: 0; border-radius: 12px;
     background: var(--bg); color: var(--text);
     box-shadow: 0 0 0 1px var(--hairline-strong), 0 24px 64px rgba(0, 0, 0, 0.6);
-    overflow: hidden; resize: both;
+    overflow: hidden; resize: none;
     /* 접힌 창을 펼칠 때(win-min 클래스가 빠질 때)는 이 기본 규칙이 "돌아갈 목표 상태"가 되므로,
        여기에도 transform/opacity 트랜지션을 넣어둬야 펼쳐지는 쪽도 접히는 쪽과 똑같이 부드럽다
        (아래 .win-min 쪽에만 넣으면 펼칠 때는 트랜지션 없이 툭 돌아와버린다). visibility는 일부러
@@ -224,3 +234,7 @@
     .app-win .page-inner,
     .app-win .page-inner.wide { padding: 14px 12px 22px; }
   }
+  .app-win.win-max .aw-resize-handle,
+  .app-win.win-snap-l .aw-resize-handle,
+  .app-win.win-snap-r .aw-resize-handle,
+  .app-win.win-min .aw-resize-handle { display:none; }

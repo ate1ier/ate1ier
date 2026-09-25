@@ -17,7 +17,10 @@
     --hd-t: #1d1d1f;
     --hd-ln: rgba(0, 0, 0, 0.12);
     --hd-bar: rgba(255, 255, 255, 0.62);
-    /* 배경화면(home-wallpaper.jpg)이 라이트 모드에서도 어두워서, 바탕화면 아이콘 글씨는 목업처럼 흰색 그대로 둔다 */
+    /* 라이트 모드 배경화면(home-wallpaper-light.jpg)은 밝은 하늘/바다 사진이라, 바탕화면 아이콘 글씨를 어두운 색+옅은 그림자로 바꿔 가독성을 맞춘다 */
+    --hd-label: #1d1d1f;
+    --hd-label-shadow: 0 1px 3px rgba(255, 255, 255, 0.65);
+    --hd-hover: rgba(0, 0, 0, 0.08);
   }
   #home-icons, #home-dock { display: none; }
   body.home-desktop #home-icons { display: flex; }
@@ -28,6 +31,10 @@
   body.home-desktop {
     background: #050813 url("home-wallpaper.jpg") center/cover no-repeat fixed;
     overflow: hidden; height: 100vh; height: 100dvh;
+  }
+  /* 라이트 모드 바탕화면만 사용자가 준 사진으로 교체. 다크 모드는 위 기존 home-wallpaper.jpg 그대로 유지 */
+  html[data-theme="light"] body.home-desktop {
+    background: #eaf3fb url("home-wallpaper-light.jpg") center/cover no-repeat fixed;
   }
 
   /* 오른쪽 데스크톱 아이콘 (목업 #icons / .di) */
