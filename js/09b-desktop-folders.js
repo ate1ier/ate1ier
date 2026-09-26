@@ -364,36 +364,26 @@
       const r = el.getBoundingClientRect();
       const offX = startX - r.left, offY = startY - r.top;
       let moved = false;
-      // 성능 최적화(저사양 PC 버벅임 대응): left/top(레이아웃 재계산 유발) 대신 translate3d로
-      // 프레임당 한 번만(requestAnimationFrame) 옮기고, left/top은 손을 뗄 때 딱 한 번만 확정한다.
-      // .hd-fld.dragging엔 이미 transition:none이 있어 transform과 겹쳐 늦게 따라오는 문제는 없다.
-      const baseLeft = r.left, baseTop = r.top;
-      let lastX = baseLeft, lastY = baseTop;
-      let rafId = null;
-      const flush = () => {
-        rafId = null;
-        el.style.transform = `translate3d(${lastX - baseLeft}px, ${lastY - baseTop}px, 0)`;
-      };
       const move = (v) => {
         if (!moved && Math.abs(v.clientX - startX) < 5 && Math.abs(v.clientY - startY) < 5) return;
         moved = true;
         dfUi.dragging = true;
         el.classList.add("dragging");
         const p = desktopFolderClampPos(v.clientX - offX, v.clientY - offY);
-        lastX = p.x; lastY = p.y;
-        if (rafId == null) rafId = requestAnimationFrame(flush);
+        el.style.left = p.x + "px";
+        el.style.top = p.y + "px";
       };
       const up = () => {
         document.removeEventListener("pointermove", move);
         document.removeEventListener("pointerup", up);
         document.removeEventListener("pointercancel", up);
-        if (rafId != null) { cancelAnimationFrame(rafId); rafId = null; }
-        el.style.transform = "";
         if (!moved) return;
         dfUi.dragging = false;
         dfUi.suppressClickUntil = Date.now() + 120; // 끌기를 끝낸 직후 따라오는 click이 "열기"로 처리되지 않게
         el.classList.remove("dragging");
-        const snapped = desktopFolderSnapToFreeGrid(lastX, lastY, desktopFoldersData.folders, id); // 놓은 자리를 다른 폴더와 안 겹치는 가까운 칸으로 맞춘다
+        const dropX = parseFloat(el.style.left) || 0;
+        const dropY = parseFloat(el.style.top) || 0;
+        const snapped = desktopFolderSnapToFreeGrid(dropX, dropY, desktopFoldersData.folders, id); // 놓은 자리를 다른 폴더와 안 겹치는 가까운 칸으로 맞춘다
         el.style.left = snapped.x + "px";
         el.style.top = snapped.y + "px";
         f.x = snapped.x;

@@ -11,6 +11,44 @@
     return agentsList;
   }
 
+  // [macOS 스타일 재설계 4단계] 유형 필터 pill(qaUi.filterMode)과 검색어(qaUi.searchQuery)를
+  // 함께 적용해 화면(표/캡처 아님)에 보여줄 목록을 만든다. renderQAPage()/updateQATableArea()가
+  // 공통으로 쓴다.
+  function qaVisibleAgents() {
+    const modeFiltered = qaFilterAgentsByMode(qaWorkingAgents(), qaUi.filterMode);
+    return modeFiltered.filter((a) => qaAgentMatchesSearch(a, qaUi.searchQuery));
+  }
+
+  const QA_FILTER_PILLS = [
+    { mode: "ALL", label: "전체" },
+    { mode: "DAY", label: "주간" },
+    { mode: "NIGHT", label: "야간" },
+    { mode: "VOICE", label: "유선" },
+    { mode: "CHAT", label: "채팅" },
+  ];
+
+  function qaFilterRowHtml() {
+    const cur = qaUi.filterMode || "ALL";
+    return `
+      <div class="qa-filter-row">
+        <div class="qa-pill-filter">
+          ${QA_FILTER_PILLS.map((p) => `<button type="button" class="${p.mode === cur ? "on" : ""}" data-qa-filter-mode="${p.mode}">${p.label}</button>`).join("")}
+        </div>
+      </div>
+    `;
+  }
+
+  function attachQAFilterRowHandlers(root) {
+    root.querySelectorAll("[data-qa-filter-mode]").forEach((btn) => {
+      btn.onclick = () => {
+        const mode = btn.getAttribute("data-qa-filter-mode");
+        if (qaUi.filterMode === mode) return;
+        qaUi.filterMode = mode;
+        renderApp();
+      };
+    });
+  }
+
   // 화면에 보이는 표와 이미지 캡처용 표가 같은 마크업을 쓰도록 분리해뒀다.
   // forCapture가 true면 점수 입력칸 대신 텍스트로 값을 보여준다(캡처 이미지에 <input>이 그대로 찍히지 않도록).
   function buildQATableHtml(agentsList, year, monthIndex, forCapture) {
@@ -62,40 +100,13 @@
 
   // 검색창 자체는 다시 그리지 않고 표 영역만 갱신한다(agents/interviews 화면과 같은 방식).
   // IME(한글) 조합 중에도 입력이 끊기지 않고, 타이핑 즉시 결과가 반영된다.
-  // [성능 개선 계획 Phase 2] 검색 결과가 그대로(=행 개수가 그대로)라면, 표 전체를 새로 안 만들고
-  // domReconcileTable(js/01f-settings-menu-utils.js)로 실제로 달라진 칸만 그 자리에서 고쳐 쓴다 —
-  // 스케줄 표와 같은 방식. 검색으로 보이는 인원이 실제로 달라지면(행 개수가 바뀌면) 안전하게
-  // 표 전체를 새로 만든다.
   function updateQATableArea() {
     const tableArea = document.getElementById("qa-table-area");
     if (!tableArea) return;
     const { year, monthIndex } = qaUi;
-    const filteredList = qaWorkingAgents().filter((a) => qaAgentMatchesSearch(a, qaUi.searchQuery));
-    const newHtml = buildQATableHtml(filteredList, year, monthIndex, false);
-    const existingTable = tableArea.querySelector("table.qa-table");
-    const patched = existingTable && domReconcileTable(existingTable, newHtml);
-    if (!patched) {
-      tableArea.innerHTML = newHtml;
-      attachQATableAreaHandlers(tableArea, filteredList, year, monthIndex);
-    }
-    // patch에 성공했으면 칸 DOM을 그대로 재사용했으니(점수 입력칸 포함) 이벤트는 이미 다 붙어 있다.
-  }
-  // 점수 입력칸(.qa-score-input) 하나가 바뀌었을 때: 예전에는 페이지 전체를 다시 그렸지만(상단
-  // 툴바·검색창까지 통째로 다시 만드는 건 낭비), 이제 그 값이 실제로 영향을 주는 두 곳 —
-  // 표 영역(그 인원의 점수·전월 대비 칸)과 평균 통계칸 — 만 갱신한다.
-  function updateQAStatsArea() {
-    const grid = document.getElementById("qa-stat-grid");
-    if (!grid) return;
-    const { year, monthIndex } = qaUi;
-    const agentsList = qaWorkingAgents();
-    const stats = qaComputeStats(agentsList, year, monthIndex);
-    const prevYm = qaPrevMonth(year, monthIndex);
-    const prevStats = qaComputeStats(agentsList, prevYm.year, prevYm.monthIndex);
-    grid.innerHTML = qaStatGridInnerHtml(stats, prevStats);
-  }
-  function qaHandleScoreChanged() {
-    updateQATableArea();
-    updateQAStatsArea();
+    const filteredList = qaVisibleAgents();
+    tableArea.innerHTML = buildQATableHtml(filteredList, year, monthIndex, false);
+    attachQATableAreaHandlers(tableArea, filteredList, year, monthIndex);
   }
 
   function attachQATableAreaHandlers(root, agentsList, year, monthIndex) {
@@ -112,7 +123,7 @@
           year, monthIndex,
           input.value
         );
-        qaHandleScoreChanged();
+        renderApp();
       };
       // 엑셀처럼 Enter/Tab으로 다음(아래) 칸, Shift+Enter/Shift+Tab으로 이전(위) 칸으로
       // 바로 이동한다. blur()를 호출하면 값이 바뀐 경우 change 이벤트가 이 안에서
@@ -133,7 +144,7 @@
 
   function renderQAPage(root) {
     const agentsList = qaWorkingAgents();
-    const filteredList = agentsList.filter((a) => qaAgentMatchesSearch(a, qaUi.searchQuery));
+    const filteredList = qaVisibleAgents();
     const { year, monthIndex } = qaUi;
     // 통계(평균)는 검색어와 무관하게 항상 재직중인 전체 인원 기준으로 보여준다.
     const stats = qaComputeStats(agentsList, year, monthIndex);
@@ -143,15 +154,17 @@
 
     root.innerHTML = `
       <div class="qa-top">
-        <div class="qa-title">품질 관리</div>
-        <div class="schedule-month-nav">
-          <button class="schedule-month-btn" id="qa-prev-month">‹</button>
-          <div class="schedule-month-label">${qaMonthLabel()}${locked ? ` <span class="sch-locked-badge">${ICON_LOCK} 확정됨</span>` : ""}</div>
-          <button class="schedule-month-btn" id="qa-next-month">›</button>
-          <button class="ghost-btn sch-lock-toggle-btn ${locked ? "locked" : ""}" id="qa-lock-btn" style="margin-left:8px;">${locked ? `${ICON_UNLOCK} 잠금 해제` : `${ICON_LOCK} 이 달 잠그기`}</button>
-          <button class="ghost-btn" id="qa-excel-upload-btn">${ICON_UPLOAD} 엑셀 업로드</button>
-          <button class="ghost-btn qa-bulk-delete-btn" id="qa-bulk-delete-btn">${ICON_TRASH} 엑셀 일괄삭제</button>
-          <button class="ghost-btn" id="qa-capture-btn">${ICON_CAMERA} 이미지로 저장 ▾</button>
+        <div class="qa-toolbar-title">품질 관리<small>${qaMonthLabel()} · 전체 ${agentsList.length}명</small></div>
+        <div class="mac-seg schedule-month-nav">
+          <button id="qa-prev-month" aria-label="이전 달">‹</button>
+          <div class="month-label">${qaMonthLabel()}${locked ? ` <span class="sch-locked-badge">${ICON_LOCK} 확정됨</span>` : ""}</div>
+          <button id="qa-next-month" aria-label="다음 달">›</button>
+        </div>
+        <button class="lock-chip" id="qa-lock-btn">${locked ? `${ICON_UNLOCK} 잠금 해제` : `${ICON_LOCK} 이 달 잠그기`}</button>
+        <div class="mac-toolbar-group">
+          <button class="mac-tool" id="qa-excel-upload-btn">${ICON_UPLOAD} 엑셀 업로드</button>
+          <button class="mac-tool qa-bulk-delete-btn" id="qa-bulk-delete-btn">${ICON_TRASH} 일괄삭제</button>
+          <button class="mac-tool" id="qa-capture-btn">${ICON_CAMERA} 이미지로 저장 ▾</button>
         </div>
       </div>
       <div class="status" id="qa-status"></div>
@@ -160,8 +173,19 @@
           <input type="text" class="agent-search-input-field" id="qa-search-input" placeholder="이름 검색" title="상담사 검색 (이름/주간/야간/채팅/유선, 쉼표로 여러 개)" value="${esc(qaUi.searchQuery)}" autocomplete="off">
           ${ICON_SEARCH_MINI}
         </div>
-        <div class="qa-stat-grid" id="qa-stat-grid">${qaStatGridInnerHtml(stats, prevStats)}</div>
+        <div class="qa-stat-grid">
+          ${qaStatItemHtml("전체 평균", stats.total, prevStats.total, true)}
+          ${qaStatItemHtml("유선 점수 평균", stats.voice, prevStats.voice)}
+          ${qaStatItemHtml("채팅 점수 평균", stats.chat, prevStats.chat)}
+          ${qaStatItemHtml("주간 점수 평균", stats.day, prevStats.day)}
+          ${qaStatItemHtml("야간 점수 평균", stats.night, prevStats.night)}
+          ${qaStatItemHtml("주간 채팅 평균", stats.dayChat, prevStats.dayChat)}
+          ${qaStatItemHtml("주간 유선 평균", stats.dayVoice, prevStats.dayVoice)}
+          ${qaStatItemHtml("야간 채팅 평균", stats.nightChat, prevStats.nightChat)}
+          ${qaStatItemHtml("야간 유선 평균", stats.nightVoice, prevStats.nightVoice)}
+        </div>
       </div>
+      ${qaFilterRowHtml()}
       <div id="qa-table-area">${buildQATableHtml(filteredList, year, monthIndex, false)}</div>
     `;
 
@@ -189,6 +213,7 @@
       renderApp();
     };
     document.getElementById("qa-excel-upload-btn").onclick = () => openQAUploadModal();
+    attachQAFilterRowHandlers(root);
 
     const qaSearchInput = document.getElementById("qa-search-input");
     if (qaSearchInput) {

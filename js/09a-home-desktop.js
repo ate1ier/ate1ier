@@ -45,10 +45,7 @@
   // state[page] = { minimized, maximized, justOpened } — justOpened는 "방금 새로 연" 창에만 켜서(복원 때는
   // 켜지 않음) 팝 애니메이션을 돌리고 스크롤을 맨 위로 되돌린다. 복원(내려간 창을 다시 열기)은 이 플래그를
   // 켜지 않아서, 스크롤 위치 등 그 페이지 안에서 하던 작업 화면이 그대로 남아 있는다.
-  // dirty[page] = true — "포커스된(맨 앞) 창만 즉시 갱신" 최적화(성능 개선 계획 Phase 2)용 표시.
-  // 배경(포커스 아님)에 있는 동안 상태가 바뀌어 "다시 그려야 하는데 지금은 건너뛴" 창에만 true로
-  // 남겨두고, 그 창이 다시 앞으로 올 때(hdBringToFront) 그 시점에 한 번만 실제로 그린다.
-  const hdWin = { order: [], state: {}, dirty: {} };
+  const hdWin = { order: [], state: {} };
   // 화면 좌/우 절반 붙이기(스냅) 관련 임시 상태: 어시스트 패널 DOM과 그 패널을 닫기 위한 문서 이벤트 핸들러.
   const hdSnap = { assistEl: null, onDown: null, onKey: null };
 
@@ -156,23 +153,7 @@
       const frame = document.getElementById("app-win-" + p);
       if (frame) frame.style.zIndex = String(50 + i);
     });
-    hdRenderWindowIfDirty(page); // 배경에 있는 동안 밀려 있던(dirty) 최신 내용을, 막 앞으로 나오는 이 시점에 한 번만 그려준다.
     hdSaveOpenWindowsState();
-  }
-
-  // renderHomeDesktopWindows()가 "지금은 포커스가 아니라서" 건너뛰고 dirty만 표시해둔 창을,
-  // 그 창이 실제로 화면 맨 앞으로 나오는 순간(포커스) 한 번만 그린다. dirty가 아니면 아무 것도 하지 않는다
-  // (이미 최신 내용이 그려져 있거나, 애초에 한 번도 건너뛴 적이 없는 경우).
-  function hdRenderWindowIfDirty(page) {
-    if (!hdWin.dirty[page]) return;
-    const frame = document.getElementById("app-win-" + page);
-    const fn = hdPageRenderer(page);
-    if (!frame || !fn) return;
-    const inner = frame.querySelector(".page-inner");
-    if (!inner) return;
-    inner.classList.toggle("wide", page === "schedule" || page === "calendar");
-    fn(inner);
-    hdWin.dirty[page] = false;
   }
 
   // opts.minimized/opts.maximized를 넘기면(부팅 시 복원 전용) 그 상태로 접힌 채/최대화된 채
@@ -246,24 +227,16 @@
       const maxH = Math.max(minH, window.innerHeight - 55);
       frame.style.cursor = "nwse-resize";
       try { frame.setPointerCapture?.(e.pointerId); } catch (_) {}
-      // rAF로 묶어서 한 프레임당 한 번만 width/height를 반영한다(저사양 PC에서 리사이즈 중 버벅임 완화).
-      let pendingW = startW, pendingH = startH, rafId = null;
-      const flush = () => {
-        rafId = null;
-        frame.style.width = Math.round(pendingW) + "px";
-        frame.style.height = Math.round(pendingH) + "px";
-      };
       const move = (v) => {
-        pendingW = Math.min(maxW, Math.max(minW, startW + (v.clientX - startX)));
-        pendingH = Math.min(maxH, Math.max(minH, startH + (v.clientY - startY)));
-        if (rafId == null) rafId = requestAnimationFrame(flush);
+        const width = Math.min(maxW, Math.max(minW, startW + (v.clientX - startX)));
+        const height = Math.min(maxH, Math.max(minH, startH + (v.clientY - startY)));
+        frame.style.width = Math.round(width) + "px";
+        frame.style.height = Math.round(height) + "px";
       };
       const up = () => {
         document.removeEventListener("pointermove", move, true);
         document.removeEventListener("pointerup", up, true);
         document.removeEventListener("pointercancel", up, true);
-        if (rafId != null) { cancelAnimationFrame(rafId); rafId = null; }
-        flush();
         frame.style.cursor = "";
         try { frame.releasePointerCapture?.(e.pointerId); } catch (_) {}
         hdSaveOpenWindowsState();
@@ -290,24 +263,16 @@
         const minW = 340, minH = 240;
         const maxW = Math.max(minW, window.innerWidth - 16);
         const maxH = Math.max(minH, window.innerHeight - 55);
-        // rAF로 한 프레임당 한 번만 width/height를 반영한다(저사양 PC에서 리사이즈 중 버벅임 완화).
-        let pendingSE = null, rafIdSE = null;
-        const flushSE = () => {
-          rafIdSE = null;
-          if (pendingSE) { frame.style.width = pendingSE.w + "px"; frame.style.height = pendingSE.h + "px"; }
-        };
         const moveSE = (v) => {
           const width = Math.min(maxW, Math.max(minW, startW + (v.clientX - startX)));
           const height = Math.min(maxH, Math.max(minH, startH + (v.clientY - startY)));
-          pendingSE = { w: Math.round(width), h: Math.round(height) };
-          if (rafIdSE == null) rafIdSE = requestAnimationFrame(flushSE);
+          frame.style.width = Math.round(width) + "px";
+          frame.style.height = Math.round(height) + "px";
         };
         const upSE = () => {
           document.removeEventListener("pointermove", moveSE);
           document.removeEventListener("pointerup", upSE);
           document.removeEventListener("pointercancel", upSE);
-          if (rafIdSE != null) { cancelAnimationFrame(rafIdSE); rafIdSE = null; }
-          flushSE();
           hdSaveOpenWindowsState();
         };
         document.addEventListener("pointermove", moveSE);
@@ -349,25 +314,15 @@
           }
           width = Math.min(maxW, Math.max(minW, width));
           height = Math.min(maxH, Math.max(minH, height));
-          pending = { left: Math.round(left), top: Math.round(top), width: Math.round(width), height: Math.round(height) };
-          if (rafId == null) rafId = requestAnimationFrame(flush);
+          frame.style.left = Math.round(left) + "px"; frame.style.top = Math.round(top) + "px";
+          frame.style.width = Math.round(width) + "px"; frame.style.height = Math.round(height) + "px";
         };
         const up = () => {
           document.removeEventListener("pointermove", move);
           document.removeEventListener("pointerup", up);
           document.removeEventListener("pointercancel", up);
-          if (rafId != null) { cancelAnimationFrame(rafId); rafId = null; }
-          flush();
           try { if (handle.releasePointerCapture) handle.releasePointerCapture(e.pointerId); } catch (_) {}
           hdSaveOpenWindowsState();
-        };
-        // rAF로 한 프레임당 한 번만 left/top/width/height를 반영한다(저사양 PC에서 리사이즈 중 버벅임 완화).
-        let pending = null, rafId = null;
-        const flush = () => {
-          rafId = null;
-          if (!pending) return;
-          frame.style.left = pending.left + "px"; frame.style.top = pending.top + "px";
-          frame.style.width = pending.width + "px"; frame.style.height = pending.height + "px";
         };
         document.addEventListener("pointermove", move);
         document.addEventListener("pointerup", up);
@@ -422,20 +377,6 @@
       const origLeft = frame.style.left, origTop = frame.style.top;
       const topMin = 39;
       let side = null;
-      // 성능 최적화(저사양 PC 버벅임 대응): 끄는 동안엔 left/top(레이아웃 재계산 유발)을 매 이벤트마다
-      // 바로 쓰지 않고, translate3d(컴포지터에서만 처리되는 transform)로 마우스를 따라가게 한 뒤
-      // requestAnimationFrame으로 한 프레임당 한 번만 반영한다. left/top은 손을 놓는 순간(up)에
-      // 딱 한 번만 확정해서 쓴다. 창엔 backdrop-filter가 없어도 box-shadow가 있어서, 매 mousemove마다
-      // reflow를 일으키던 예전 방식보다 이 방식이 특히 저사양 통합그래픽에서 훨씬 부드럽다.
-      const baseLeft = parseFloat(frame.style.left) || r.left;
-      const baseTop = parseFloat(frame.style.top) || r.top;
-      let lastLeft = baseLeft, lastTop = baseTop;
-      let rafId = null;
-      const flush = () => {
-        rafId = null;
-        frame.style.transform = `translate3d(${lastLeft - baseLeft}px, ${lastTop - baseTop}px, 0)`;
-      };
-      frame.classList.add("aw-dragging"); // css: transition:none — transform 트랜지션과 겹쳐 마우스보다 늦게 따라오는 것 방지
       const move = (v) => {
         if (st.snap) {
           if (Math.abs(v.clientX - startX) < 6 && Math.abs(v.clientY - startY) < 6) return;
@@ -452,9 +393,8 @@
           frame._hdResizeAnimTimer = setTimeout(() => frame.classList.remove("aw-unsnap-anim"), 420);
           hdHideSnapAssist(true);
         }
-        lastLeft = Math.max(-width + 90, Math.min(window.innerWidth - 90, v.clientX - dx));
-        lastTop = Math.max(topMin, Math.min(window.innerHeight - 60, v.clientY - dy));
-        if (rafId == null) rafId = requestAnimationFrame(flush);
+        frame.style.left = Math.max(-width + 90, Math.min(window.innerWidth - 90, v.clientX - dx)) + "px";
+        frame.style.top = Math.max(topMin, Math.min(window.innerHeight - 60, v.clientY - dy)) + "px";
         const next = hdSnapSideAt(v.clientX);
         if (next !== side) { side = next; hdShowSnapPreview(side); }
       };
@@ -462,11 +402,6 @@
         document.removeEventListener("pointermove", move);
         document.removeEventListener("pointerup", up);
         document.removeEventListener("pointercancel", up);
-        if (rafId != null) { cancelAnimationFrame(rafId); rafId = null; }
-        frame.style.transform = "";
-        frame.style.left = lastLeft + "px";
-        frame.style.top = lastTop + "px";
-        frame.classList.remove("aw-dragging");
         hdShowSnapPreview(null);
         if (side && !st.snap && hdWin.state[page] === st) { hdSnapWindow(page, side, true, { left: origLeft, top: origTop }); return; }
         hdSaveOpenWindowsState(); // 끌기가 끝나면(놓았을 때) 바뀐 위치를 로컬에 남긴다.
@@ -550,7 +485,6 @@
       setTimeout(() => frame.remove(), 230);
     }
     delete hdWin.state[page];
-    delete hdWin.dirty[page];
     const idx = hdWin.order.indexOf(page);
     if (idx !== -1) hdWin.order.splice(idx, 1);
     if (typeof _resetExpandedStateForPage === "function") _resetExpandedStateForPage(page);
@@ -570,28 +504,15 @@
     });
     hdWin.order = [];
     hdWin.state = {};
-    hdWin.dirty = {};
     document.body.classList.remove("hd-win-open"); // 창이 하나도 없으니 바탕화면 위젯 블러도 해제
     hdSaveOpenWindowsState();
   }
 
-  // renderApp()이 홈 위젯을 그린 뒤 불린다.
-  // [성능 개선 계획 Phase 2] 예전에는 상태가 하나만 바뀌어도(스케줄 셀 하나 편집 등) 열려 있는 창을
-  // 전부 처음부터 다시 그렸다 — 멀티태스킹(여러 창을 동시에 띄워두는, 이 앱의 핵심 사용 패턴)을 할수록
-  // 그만큼 버벅임이 커지는 구조였다. 지금은 지금 실제로 눈에 보이는(=맨 앞으로 포커스된) 창만 즉시
-  // 다시 그리고, 그 뒤에 가려진 나머지 창은 dirty로만 표시해뒀다가 그 창이 실제로 앞으로 나올 때
-  // (hdBringToFront → hdRenderWindowIfDirty) 딱 한 번만 그린다 — 안 보이는 동안 여러 번 바뀌어도 그린 건 한 번뿐.
-  //   - 처음 만들어져 아직 한 번도 내용이 그려진 적 없는 창(hasContent === false)은 포커스 여부와 관계없이
-  //     바로 그린다 — 새로고침 복원 등으로 여러 창이 한꺼번에 열릴 때 텅 빈 창이 보이는 일이 없게.
-  //   - 화면을 절반씩 나눠 붙인(스냅) 창은 원래부터 "두 창을 동시에 보기 위한" 기능이라 포커스가 아니어도
-  //     항상 즉시 그린다 — 안 그러면 옆에 나란히 보이는 창이 눈에 띄게 오래된 내용으로 남을 수 있다.
-  //   - 그 밖의(가려져 있거나 최소화된) 배경 창은, 다른 기기 동기화처럼 "지금 당장 반영돼야 하는" 예외
-  //     경우에 한해 opts.forceAllWindows로 이 최적화를 건너뛰고 예전처럼 전부 다시 그릴 수 있다
-  //     (js/01c-cloud-sync-runtime.js 참고).
-  function renderHomeDesktopWindows(opts) {
+  // renderApp()이 홈 위젯을 그린 뒤 불린다: 열려 있는 모든 창 각각에 그 페이지를 새로 그려서, 여러 창이
+  // 동시에 열려 있어도(다른 기기 동기화 등으로) 전부 최신 내용을 보여주게 한다. 실제로 화면에 없던 창을
+  // 새로 열 때는 appWin 상태가 이미 09a-home-desktop.js 쪽에서 만들어져 있다.
+  function renderHomeDesktopWindows() {
     if (CURRENT_ACCOUNT_IS_MASTER) return;
-    const forceAll = !!(opts && opts.forceAllWindows);
-    const frontPage = hdWin.order.length ? hdWin.order[hdWin.order.length - 1] : null;
     hdWin.order.forEach((page) => {
       const frame = document.getElementById("app-win-" + page);
       const fn = hdPageRenderer(page);
@@ -599,15 +520,9 @@
       const inner = frame.querySelector(".page-inner");
       if (!inner) return;
       inner.classList.toggle("wide", page === "schedule" || page === "calendar");
+      fn(inner);
       const st = hdWin.state[page];
-      const hasContent = !!inner.firstChild;
-      if (forceAll || page === frontPage || !hasContent || (st && st.snap)) {
-        fn(inner);
-        hdWin.dirty[page] = false;
-        if (st && st.justOpened) inner.scrollTop = 0;
-      } else {
-        hdWin.dirty[page] = true; // 지금은 건너뛴다 — 이 창이 다시 포커스될 때 hdRenderWindowIfDirty가 그린다.
-      }
+      if (st && st.justOpened) inner.scrollTop = 0;
     });
     syncAppWindows();
   }
@@ -656,7 +571,9 @@
   // 딱 붙는다(win-snap-l / win-snap-r — 위치·크기는 css/01c-app-window.css가 정하므로 화면 크기가 바뀌어도 알아서 맞춰진다).
   // 붙인 직후 반대편 절반에는 "어떤 페이지를 띄울까요?" 패널(#hd-snap-assist)이 떠서, 앱 아이콘을 누르면 그 페이지가
   // 반대편에 붙어 열린다(이미 열려 있거나 내려가 있던 창이면 그 창이 옮겨 붙는다). 패널은 Esc·바깥 클릭·"건너뛰기"로 닫힌다.
+  // 좁은 화면(700px 이하)은 창이 항상 전체 폭이라 이 기능을 쓰지 않는다.
   function hdSnapSideAt(x) {
+    if (window.innerWidth <= 700) return null;
     if (x <= 16) return "l";
     if (x >= window.innerWidth - 16) return "r";
     return null;
@@ -688,7 +605,7 @@
   function hdSnapWindow(page, side, animate, restore) {
     const st = hdWin.state[page];
     const frame = document.getElementById("app-win-" + page);
-    if (!st || !frame) return;
+    if (!st || !frame || window.innerWidth <= 700) return;
     if (animate) hdAnimateWindowResize(frame, "snap");
     st.snap = side;
     st.maximized = false;
@@ -712,6 +629,7 @@
   // page 창을 side 쪽에 붙인 뒤, 반대편 절반 자리에 "여기에 띄울 페이지" 고르기 패널을 띄운다.
   function hdShowSnapAssist(page, side) {
     hdHideSnapAssist(true);
+    if (window.innerWidth <= 700) return;
     const other = side === "l" ? "r" : "l";
     // 반대편에 이미 붙어서 떠 있는 창이 있으면 그 자리는 이미 찼으므로 패널을 띄우지 않는다.
     if (hdWin.order.some((p) => p !== page && hdWin.state[p] && !hdWin.state[p].minimized && hdWin.state[p].snap === other)) return;

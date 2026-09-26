@@ -95,6 +95,81 @@
   }
   function qaDetailEscHandler(e) { if (e.key === "Escape") closeQADetailModal(); }
 
+  // 회차별 목록(날짜·상담ID가 포함된 한 줄 + "원문 보기" 눌러 펼치기) HTML을 만든다.
+  // 상담사 관리의 "면담일지" 리스트(macOS 인셋 그룹 리스트, .mac-iv-*)와 완전히 같은
+  // 레이아웃을 쓰되, 수정/다운로드/삭제 같은 개별 액션 버튼은 두지 않는다.
+  // QA 상세 모달과 상담사 관리의 QA 팝오버가 완전히 같은 마크업/동작을 쓰도록
+  // 공통 함수로 뽑아뒀다. idPrefix는 두 곳에서 DOM id가 서로 겹치지 않게 구분하는 용도.
+  function qaRoundCardsHtml(detail, idPrefix) {
+    if (!detail || !detail.rounds || !detail.rounds.length) return "";
+    const rows = detail.rounds.map((round, idx) => {
+      // itemCount가 없는 예전 데이터(이 필드가 생기기 전에 저장된 회차)는
+      // items 개수로 대신 판단한다. items도 없다면(정말 원문이 없는 경우) 0으로 취급.
+      const effectiveItemCount = (round.itemCount !== undefined && round.itemCount !== null)
+        ? round.itemCount
+        : (round.items ? round.items.length : 0);
+      const isPerfect = effectiveItemCount === 0;
+      const rawGone = !isPerfect && round.items && round.items.length === 0; // 원문 만료로 사라진 경우
+      const scoreText = (round.score === null || round.score === undefined) ? "-" : round.score;
+      return `
+      <div class="mac-iv-row">
+        <div class="mac-iv-row-main" data-qa-round-toggle="${idx}">
+          <span class="mac-iv-dot type-regular"></span>
+          <div class="mac-iv-row-center">
+            <div class="mac-iv-row-line1">
+              <span class="mac-iv-date">${esc(round.date || "-")}</span>
+              <span class="mac-iv-type-label">${esc(round.label)} · 총점 ${esc(String(scoreText))}</span>
+              ${round.consultId ? `<span class="mac-iv-manager">상담ID ${esc(round.consultId)}</span>` : ""}
+            </div>
+          </div>
+          <span class="mac-iv-chevron" id="${idPrefix}-chevron-${idx}">${ICON_CHEVRON_RIGHT}</span>
+        </div>
+        <div class="mac-iv-row-footer" id="${idPrefix}-footer-${idx}">
+          <div class="mac-iv-preview">원문 보기 &lt;</div>
+        </div>
+        <div class="mac-iv-detail-divider" id="${idPrefix}-divider-${idx}" style="display:none;"></div>
+        <div class="mac-iv-row-detail" id="${idPrefix}-detail-${idx}" style="display:none;"
+          data-qa-perfect="${isPerfect ? "1" : "0"}" data-qa-gone="${rawGone ? "1" : "0"}"></div>
+      </div>
+    `;
+    }).join("");
+    return `<div class="mac-iv-list">${rows}</div>`;
+  }
+
+  // 위 목록의 행을 누르면 그 자리에서 펼쳐져(면담일지 리스트와 같은 동작) 원문을 보여준다.
+  // container: 행들을 담고 있는 상위 엘리먼트(오버레이 전체 또는 팝오버 카드).
+  function attachQaRoundCardEvents(container, rounds, idPrefix) {
+    if (!container) return;
+    container.querySelectorAll("[data-qa-round-toggle]").forEach((head) => {
+      head.onclick = () => {
+        const idx = head.getAttribute("data-qa-round-toggle");
+        const row = head.closest(".mac-iv-row");
+        const footer = document.getElementById(`${idPrefix}-footer-${idx}`);
+        const divider = document.getElementById(`${idPrefix}-divider-${idx}`);
+        const detailBox = document.getElementById(`${idPrefix}-detail-${idx}`);
+        if (!detailBox) return;
+        const opening = detailBox.style.display === "none";
+        if (opening && !detailBox.dataset.filled) {
+          const round = rounds[idx];
+          const isPerfect = detailBox.getAttribute("data-qa-perfect") === "1";
+          const rawGone = detailBox.getAttribute("data-qa-gone") === "1";
+          if (isPerfect) {
+            detailBox.innerHTML = `<div class="mac-iv-detail-followup">감점/코멘트 항목이 없어요 (만점 처리된 차수예요).</div>`;
+          } else if (rawGone) {
+            detailBox.innerHTML = `<div class="mac-iv-detail-followup" style="color:var(--red);">원문이 ${QA_DETAIL_EXPIRY_MONTHS}개월 만료되어 삭제됐어요.</div>`;
+          } else {
+            detailBox.innerHTML = `<div class="mac-iv-detail-content">${qaFormatSummaryHtml(qaOrganizeItemsText(round.items))}</div>`;
+          }
+          detailBox.dataset.filled = "1";
+        }
+        if (row) row.classList.toggle("expanded", opening);
+        if (footer) footer.style.display = opening ? "none" : "";
+        if (divider) divider.style.display = opening ? "" : "none";
+        detailBox.style.display = opening ? "" : "none";
+      };
+    });
+  }
+
   function openQADetailModal(agentId) {
     closeQADetailModal();
     qaPurgeExpiredDetails();
@@ -117,39 +192,7 @@
       ? `<div class="qa-detail-empty">이번 달(${esc(qaMonthLabel())})에 업로드된 QA 평가 엑셀이 없어요.<br>상단 "${esc("엑셀 업로드")}" 버튼으로 이 상담사의 평가표를 올려주세요.</div>`
       : `
         <div class="qa-detail-meta">${metaText}</div>
-        <div class="qa-detail-rounds">
-          ${detail.rounds.map((round, idx) => {
-            // itemCount가 없는 예전 데이터(이 필드가 생기기 전에 저장된 회차)는
-            // items 개수로 대신 판단한다. items도 없다면(정말 원문이 없는 경우) 0으로 취급.
-            const effectiveItemCount = (round.itemCount !== undefined && round.itemCount !== null)
-              ? round.itemCount
-              : (round.items ? round.items.length : 0);
-            const isPerfect = effectiveItemCount === 0;
-            const rawGone = !isPerfect && round.items.length === 0; // 원문 만료로 사라진 경우
-            let bodyBlock;
-            if (isPerfect) {
-              bodyBlock = `<div class="qa-round-empty">감점/코멘트 항목이 없어요 (만점 처리된 차수예요).</div>`;
-            } else if (rawGone) {
-              bodyBlock = `<div class="qa-round-summary-box" id="qa-round-summary-${idx}"><span class="qa-round-hint" style="color:var(--red);">원문이 ${QA_DETAIL_EXPIRY_MONTHS}개월 만료되어 삭제됐어요.</span></div>`;
-            } else {
-              bodyBlock = `
-              <div class="qa-round-raw">
-                <button type="button" class="qa-round-raw-toggle" data-qa-raw-toggle="${idx}">원문 보기</button>
-                <div class="qa-round-raw-box" id="qa-round-raw-${idx}" style="display:none;"></div>
-              </div>`;
-            }
-            return `
-            <div class="qa-round-card">
-              <div class="qa-round-head" data-qa-round-toggle="${idx}">
-                <div class="qa-round-title"><span class="qa-round-chevron" id="qa-round-chevron-${idx}">▶</span>${qaRoundSummaryLine(round)}</div>
-              </div>
-              <div class="qa-round-body" id="qa-round-body-${idx}" style="display:none;">
-                ${bodyBlock}
-              </div>
-            </div>
-          `;
-          }).join("")}
-        </div>
+        ${qaRoundCardsHtml(detail, "qa-round")}
       `;
 
     const overlay = document.createElement("div");
@@ -183,37 +226,10 @@
       };
     }
 
-    // "원문 보기" 토글: 개별 버튼이 아니라 오버레이 전체에 위임해서 클릭을 잡는다.
-    // 기본은 접힌 상태(style="display:none")이고, 누를 때마다 펼치고/접는다.
-    overlay.addEventListener("click", (e) => {
-      const toggleBtn = e.target.closest && e.target.closest("[data-qa-raw-toggle]");
-      if (!toggleBtn) return;
-      e.stopPropagation();
-      const idx = Number(toggleBtn.getAttribute("data-qa-raw-toggle"));
-      const round = detail.rounds[idx];
-      const rawBox = document.getElementById(`qa-round-raw-${idx}`);
-      if (!round || !rawBox) return;
-      const opening = rawBox.style.display === "none";
-      if (opening && !rawBox.dataset.filled) {
-        rawBox.innerHTML = qaFormatSummaryHtml(qaOrganizeItemsText(round.items));
-        rawBox.dataset.filled = "1";
-      }
-      rawBox.style.display = opening ? "" : "none";
-      toggleBtn.textContent = opening ? "원문 접기" : "원문 보기";
-    });
-
-    // 회차 카드 헤드를 누르면 펼치기/접기 (버튼 클릭은 위에서 stopPropagation으로 분리됨)
-    overlay.querySelectorAll("[data-qa-round-toggle]").forEach((head) => {
-      head.onclick = () => {
-        const idx = head.getAttribute("data-qa-round-toggle");
-        const body = document.getElementById(`qa-round-body-${idx}`);
-        const chevron = document.getElementById(`qa-round-chevron-${idx}`);
-        if (!body) return;
-        const opening = body.style.display === "none";
-        body.style.display = opening ? "" : "none";
-        if (chevron) chevron.textContent = opening ? "▼" : "▶";
-      };
-    });
+    // "원문 보기" 토글 + 회차 카드 펼치기/접기 (모달·QA 팝오버가 공유하는 공통 동작)
+    if (detail && detail.rounds && detail.rounds.length) {
+      attachQaRoundCardEvents(overlay, detail.rounds, "qa-round");
+    }
 
     setTimeout(() => document.addEventListener("keydown", qaDetailEscHandler, true), 0);
   }
@@ -279,13 +295,18 @@
     return { cls: diff > 0 ? "up" : "down", sign: diff > 0 ? "▲" : "▼", abs: Math.abs(diff) };
   }
 
+  // [macOS 스타일 재설계 3단계] 테두리 없는 숫자 나열 대신, 위젯 카드 + 증감 배지로 바꿔서
+  // 오른 지표/내린 지표가 색으로 바로 들어오게 한다. qaComputeStats()가 주는 데이터는 그대로이고,
+  // 이 함수가 만들어내는 HTML(마크업)만 바뀐다 — renderQAPage()와 captureQAPage()(05g)가 이 함수를
+  // 그대로 재사용하므로 화면과 캡처 이미지가 항상 같은 카드 모양을 갖는다.
   function qaStatItemHtml(label, value, prevValue, accent) {
     const isEmpty = value === null;
     const d = qaStatDiff(value, prevValue);
-    const diffHtml = d ? ` <span class="qa-stat-diff ${d.cls}">${d.sign} ${d.abs.toFixed(1)}</span>` : "";
-    return `<div class="qa-stat-item${accent ? " accent" : ""}">
-      <div class="qa-stat-num${isEmpty ? " empty" : ""}">${isEmpty ? "데이터 없음" : value.toFixed(1)}</div>
-      <div class="qa-stat-label">${esc(label)}${diffHtml}</div>
+    const trendHtml = d ? `<span class="qa-stat-card-trend ${d.cls}">${d.sign} ${d.abs.toFixed(1)}</span>` : "";
+    return `<div class="qa-stat-card${accent ? " accent" : ""}">
+      <div class="qa-stat-card-label">${esc(label)}</div>
+      <div class="qa-stat-card-num${isEmpty ? " empty" : ""}">${isEmpty ? "데이터 없음" : value.toFixed(1)}</div>
+      ${trendHtml}
     </div>`;
   }
 

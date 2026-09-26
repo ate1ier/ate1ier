@@ -89,6 +89,9 @@
     year: today.getFullYear(),
     monthIndex: today.getMonth(), // 0-based. 실시간 기준 당월로 시작한다.
     searchQuery: "", // 상담사 검색어. 쉼표(,)로 여러 명을 한 번에 검색할 수 있다.
+    // [macOS 스타일 재설계 4단계] 유형 필터 pill(전체/주간/야간/유선/채팅)의 현재 선택 상태.
+    // qaFilterAgentsByMode()가 받는 mode 값과 동일한 키를 쓴다. 검색어와는 별개로 함께 적용된다.
+    filterMode: "ALL",
   };
 
   // ----- 상담사 검색 -----

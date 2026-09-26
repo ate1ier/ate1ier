@@ -1,8 +1,4 @@
-  // opts.forceAllWindows: true를 넘기면 배경(포커스 아님) 창까지 전부 지금 당장 다시 그린다(성능 개선
-  // 계획 Phase 2로 기본은 포커스된 창만 즉시 갱신하도록 바뀌었다 — js/09a-home-desktop.js의
-  // renderHomeDesktopWindows 참고). 다른 기기 실시간 동기화·탭 복귀 시 "밀린 내용 한꺼번에 반영"처럼
-  // 배경 창도 지금 당장 최신이어야 하는 드문 경우에만 이 옵션을 넘긴다.
-  function renderApp(opts) {
+  function renderApp() {
     renderNav();
     const root = document.getElementById("page-inner");
     root.classList.toggle("wide", state.page === "schedule" || state.page === "home" || state.page === "calendar");
@@ -13,7 +9,7 @@
     const homeRoot = document.getElementById("home-root");
     if (homeRoot && typeof renderHomeDesktopWindows === "function") {
       renderHomePage(homeRoot);
-      renderHomeDesktopWindows(opts);
+      renderHomeDesktopWindows();
       return;
     }
     // (#home-root/js/09a-home-desktop.js가 없는 경우를 대비한 안전망) 예전처럼 페이지 하나만 #page-inner에 그린다.
@@ -37,11 +33,6 @@
 
   renderApp();
   if (typeof window !== "undefined" && window.__hideBootLoader) window.__hideBootLoader();
-  // 이 브라우저(컴퓨터)에서 처음으로 사양이 낮아 보이면, "그래픽 효과 줄이기" 토글의
-  // 존재를 몰라서 못 쓰는 경우를 막기 위해 딱 한 번만 안내한다 (js/01d-undo-theme-dock.js).
-  if (!CURRENT_ACCOUNT_IS_MASTER && typeof maybeSuggestLowGraphicsMode === "function") {
-    setTimeout(maybeSuggestLowGraphicsMode, 600);
-  }
 
   // 로그인/계정 생성 직후 딱 한 번, 홈 화면 위에 팝업을 살짝 늦게(화면이 먼저 자리
   // 잡은 뒤) 애니메이션과 함께 띄워준다. 지난달 마감(최종 스케줄/품질 관리 확정)이

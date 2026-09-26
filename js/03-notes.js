@@ -152,38 +152,6 @@
     } catch (e) { flashNotesStatus("저장 실패"); }
   }
 
-  /* ---- 메모 내용 입력 debounce ----
-     예전엔 글자를 한 자 칠 때마다(oninput) saveNotesData()가 그대로 불려서
-     localStorage.setItem → (js/01c-cloud-sync-runtime.js가 가로채서) 매번
-     전체 메모 데이터를 JSON.stringify + Supabase 네트워크 전송까지 했다.
-     저사양 PC에서 타이핑이 밀리는 가장 큰 원인이라 실제 저장(및 네트워크 전송)만
-     debounce로 늦춘다. 화면에 보이는 값(note.content)은 updateNoteContent에서
-     이미 즉시 반영되므로, 그동안 다른 곳에서 메모 내용을 참조해도(목록 미리보기 등)
-     최신 글자 그대로 보인다 — 늦춰지는 건 "저장" 그 자체뿐이다. */
-  const NOTES_SAVE_DEBOUNCE_MS = 400;
-  let _notesSaveTimer = null;
-  function scheduleSaveNotesData() {
-    flashNotesStatus("저장 중…");
-    clearTimeout(_notesSaveTimer);
-    _notesSaveTimer = setTimeout(() => {
-      _notesSaveTimer = null;
-      saveNotesData();
-    }, NOTES_SAVE_DEBOUNCE_MS);
-  }
-  // 탭을 닫거나(beforeunload) 다른 탭/화면으로 넘어가기 전(visibilitychange)에는
-  // 미뤄둔 저장을 그 자리에서 바로 끝낸다 — 그렇지 않으면 debounce 시간(400ms)
-  // 안에 탭을 닫아버렸을 때 방금 친 글자가 저장되지 않고 사라질 수 있다.
-  function flushNotesSaveIfPending() {
-    if (_notesSaveTimer === null) return;
-    clearTimeout(_notesSaveTimer);
-    _notesSaveTimer = null;
-    saveNotesData();
-  }
-  window.addEventListener("beforeunload", flushNotesSaveIfPending);
-  document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "hidden") flushNotesSaveIfPending();
-  });
-
   const notesUi = {
     expanded: {},
     collapsedFolders: {},
@@ -255,8 +223,8 @@
   function updateNoteContent(id, content) {
     const note = notesData.notes[id];
     if (!note) return;
-    note.content = content; // 화면에 쓸 값은 즉시 반영, 실제 저장(및 네트워크 전송)만 debounce
-    scheduleSaveNotesData();
+    note.content = content;
+    saveNotesData();
   }
   function renameNote(id) {
     const note = notesData.notes[id];
@@ -570,9 +538,6 @@
     });
     root.querySelectorAll("[data-content-id]").forEach((ta) => {
       ta.addEventListener("input", (e) => { updateNoteContent(ta.getAttribute("data-content-id"), e.target.value); });
-      // 이 칸에서 포커스가 빠지면(다른 메모 클릭, 접기/펴기 등으로 이 textarea가
-      // 다시 그려져 사라지기 전) 미뤄둔 저장을 바로 끝낸다.
-      ta.addEventListener("blur", flushNotesSaveIfPending);
     });
 
     root.querySelectorAll("[data-action='attach-file']").forEach((btn) => {

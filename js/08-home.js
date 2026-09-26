@@ -38,10 +38,7 @@
         if (!card) return;
         const startX = e.clientX, startY = e.clientY;
         const wg = document.getElementById("wg");
-        let started = false, placeholder = null, baseX = 0, baseY = 0;
-        // rAF 배칭(저사양 PC 버벅임 완화): 위치 이동은 transform으로만 처리하고(레이아웃 재계산 없음),
-        // 카드 재배치를 위한 elementFromPoint/DOM 이동처럼 무거운 부분은 프레임당 한 번만 실행한다.
-        let pendingX = startX, pendingY = startY, rafId = null;
+        let started = false, placeholder = null, offsetX = 0, offsetY = 0, baseX = 0, baseY = 0;
 
         function begin() {
           started = true;
@@ -50,53 +47,48 @@
           const shifted = wg && getComputedStyle(wg).transform !== "none";
           const wgRect = shifted ? wg.getBoundingClientRect() : { left: 0, top: 0 };
           baseX = wgRect.left; baseY = wgRect.top;
+          offsetX = startX - rect.left; offsetY = startY - rect.top;
           placeholder = document.createElement("div");
           placeholder.className = "home-card-placeholder";
           placeholder.style.height = rect.height + "px";
           card.parentNode.insertBefore(placeholder, card.nextSibling);
           card.classList.add("dg");
-          // left/top은 드래그 시작 시점에 한 번만 고정하고, 이후엔 transform(translate3d)만 바꿔서 따라가게 한다.
           Object.assign(card.style, {
             position: "fixed", width: rect.width + "px", left: (rect.left - baseX) + "px", top: (rect.top - baseY) + "px",
           });
           document.body.classList.add("home-card-drag-active");
-        }
-        function flushMove() {
-          rafId = null;
-          card.style.transform = `translate3d(${pendingX - startX}px, ${pendingY - startY}px, 0)`;
-          card.style.pointerEvents = "none";
-          const elUnder = document.elementFromPoint(pendingX, pendingY);
-          card.style.pointerEvents = "";
-          if (!elUnder) return;
-          const overCard = elUnder.closest(".wd[data-home-card]");
-          const overCol = elUnder.closest(".col");
-          if (overCard && overCard !== card) {
-            const rectOver = overCard.getBoundingClientRect();
-            const before = (pendingY - rectOver.top) < rectOver.height / 2;
-            overCard.parentNode.insertBefore(placeholder, before ? overCard : overCard.nextSibling);
-          } else if (overCol && !overCard) {
-            overCol.appendChild(placeholder);
-          }
         }
         function onMove(ev) {
           if (!started) {
             if (Math.hypot(ev.clientX - startX, ev.clientY - startY) < 5) return;
             begin();
           }
-          pendingX = ev.clientX; pendingY = ev.clientY;
-          if (rafId == null) rafId = requestAnimationFrame(flushMove);
+          card.style.left = (ev.clientX - offsetX - baseX) + "px";
+          card.style.top = (ev.clientY - offsetY - baseY) + "px";
+          card.style.pointerEvents = "none";
+          const elUnder = document.elementFromPoint(ev.clientX, ev.clientY);
+          card.style.pointerEvents = "";
+          if (!elUnder) return;
+          const overCard = elUnder.closest(".wd[data-home-card]");
+          const overCol = elUnder.closest(".col");
+          if (overCard && overCard !== card) {
+            const rectOver = overCard.getBoundingClientRect();
+            const before = (ev.clientY - rectOver.top) < rectOver.height / 2;
+            overCard.parentNode.insertBefore(placeholder, before ? overCard : overCard.nextSibling);
+          } else if (overCol && !overCard) {
+            overCol.appendChild(placeholder);
+          }
         }
         function onUp() {
           document.removeEventListener("pointermove", onMove);
           document.removeEventListener("pointerup", onUp);
           document.removeEventListener("pointercancel", onUp);
-          if (rafId != null) { cancelAnimationFrame(rafId); rafId = null; }
           if (!started) return;
           document.body.classList.remove("home-card-drag-active");
           placeholder.parentNode.insertBefore(card, placeholder);
           placeholder.remove();
           card.classList.remove("dg");
-          Object.assign(card.style, { position: "", width: "", left: "", top: "", transform: "", pointerEvents: "" });
+          Object.assign(card.style, { position: "", width: "", left: "", top: "", pointerEvents: "" });
           const newLayout = Array.from(grid.querySelectorAll(".col")).map((col) =>
             Array.from(col.querySelectorAll(".wd[data-home-card]")).map((c) => c.getAttribute("data-home-card"))
           );
@@ -115,7 +107,7 @@
     if (!w) return;
     const h = w.firstElementChild;
     w.style.transform = "";
-    if (!h) return;
+    if (window.innerWidth <= 900 || !h) return;
     const t = h.getBoundingClientRect().top;
     w.style.transform = `translateY(${-Math.max(0, Math.min(100, t - 79))}px)`;
   }

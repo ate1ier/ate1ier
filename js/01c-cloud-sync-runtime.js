@@ -357,10 +357,7 @@
           let affectedPages = [];
           try { affectedPages = _applyRemoteChangeToMemory(row.key); } catch (e) {}
           // 여러 페이지 창이 동시에 열려 있을 수 있으므로, 포커스된 페이지뿐 아니라 열려 있는
-          // 창 중 하나라도 영향을 받았으면 다시 그린다. 성능 개선 계획 Phase 2로 renderApp()은 기본적으로
-          // 포커스된(맨 앞) 창만 즉시 그리므로, 다른 기기에서 온 변경처럼 "배경 창이라도 지금 당장
-          // 반영돼야 하는" 경우에는 아래에서 { forceAllWindows: true }를 넘겨 예전처럼 영향받은 배경
-          // 창까지 전부 그리게 한다(js/09a-home-desktop.js의 renderHomeDesktopWindows 참고).
+          // 창 중 하나라도 영향을 받았으면 다시 그린다(renderApp이 열려 있는 창을 전부 새로 그림).
           const isCurrentPageAffected = affectedPages.some((p) => p === state.page || (typeof hdWin !== "undefined" && !!hdWin.state[p]));
           // 화면(그림)을 다시 그리는 것만 "지금 이 탭이 실제로 보이고 있고 + 뭔가
           // 입력 중인 칸에 커서가 가 있지 않을 때"로 미룬다. 데이터 자체(메모리·로컬
@@ -371,7 +368,7 @@
           // 진짜로 같은 항목·같은 필드가 겹친 경우는 저장 시점의 3-way 병합이 정확하게
           // 잡아내서 _renderFieldConflictBanner / _renderConflictBanner로 알려준다.
           if (isCurrentPageAffected && !_hasActiveEditableFocus() && _isTabVisible()) {
-            renderApp({ forceAllWindows: true }); // 다른 기기에서 온 변경은 배경 창이라도 곧장 최신으로 보여준다.
+            renderApp();
           } else if (affectedPages.indexOf("home") !== -1 && _isTabVisible() && typeof refreshHomeWidgetsBehindWindow === "function") {
             refreshHomeWidgetsBehindWindow(); // 페이지 창은 그대로 두고, 그 뒤 바탕화면 위젯만 갱신
           }
@@ -387,10 +384,7 @@
   function _catchUpRenderIfSafe() {
     if (!_appBooted) return; // 로그인 화면에서는 아직 renderApp()이 참조하는 값들이 없으므로 건너뜀
     if (!_isTabVisible() || _hasActiveEditableFocus()) return;
-    // 탭이 안 보이는 동안 여러 창에 걸쳐 밀린 변경을 한꺼번에 따라잡는 자리라, 포커스된 창만이
-    // 아니라 배경 창까지 지금 당장 최신으로 보여준다(성능 개선 계획 Phase 2 — 기본 renderApp()은
-    // 포커스된 창만 즉시 그린다. js/09a-home-desktop.js의 renderHomeDesktopWindows 참고).
-    try { renderApp({ forceAllWindows: true }); } catch (e) {}
+    try { renderApp(); } catch (e) {}
   }
   document.addEventListener("visibilitychange", _catchUpRenderIfSafe);
   window.addEventListener("focus", _catchUpRenderIfSafe);
