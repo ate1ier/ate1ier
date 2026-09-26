@@ -196,7 +196,7 @@
 
     function cleanup(label) {
       if (wrapper.parentNode) document.body.removeChild(wrapper);
-      if (btn) { btn.disabled = false; btn.innerHTML = ICON_CAMERA + " 이미지로 저장 ▾"; }
+      if (btn) { btn.disabled = false; btn.innerHTML = ICON_CAMERA + " 이미지로 저장"; }
       if (label) flashScheduleStatus(label);
     }
 

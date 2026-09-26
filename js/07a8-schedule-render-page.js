@@ -1,18 +1,46 @@
   // 07a8-schedule-render-page.js — renderSchedulePage 진입점
   // (07-schedule.js를 기능 단위로 분할한 파일 중 하나. 실행 순서는 파일명 정렬로 유지됨)
+  // 툴바의 "···" 더보기 메뉴(#sch-more-menu)를 문서 아무 곳이나 클릭하면 닫는 핸들러.
+  // renderSchedulePage()가 다시 호출될 때마다 리스너가 중복으로 쌓이지 않도록,
+  // resize 핸들러(fitScheduleTable 등)와 같은 방식으로 이름 붙은 함수로 빼서
+  // 등록 전에 항상 먼저 제거한다.
+  function scheduleCloseMoreMenuOnOutsideClick() {
+    const menu = document.getElementById("sch-more-menu");
+    if (menu) menu.classList.remove("open");
+  }
   function renderSchedulePage(root) {
     root.innerHTML = `
       <div class="schedule-top">
-        <div class="schedule-title">월별 스케줄</div>
-        <div class="schedule-month-nav">
-          <button class="schedule-month-btn" id="sch-prev-month">‹</button>
-          <div class="schedule-month-label">${scheduleMonthLabel()}${scheduleIsMonthLocked(scheduleUi.year, scheduleUi.monthIndex) ? ` <span class="sch-locked-badge">${ICON_LOCK} 확정됨</span>` : ""}</div>
-          <button class="schedule-month-btn" id="sch-next-month">›</button>
-          <button class="ghost-btn sch-lock-toggle-btn ${scheduleIsMonthLocked(scheduleUi.year, scheduleUi.monthIndex) ? "locked" : ""}" id="sch-lock-btn" style="margin-left:8px;">${scheduleIsMonthLocked(scheduleUi.year, scheduleUi.monthIndex) ? `${ICON_UNLOCK} 잠금 해제` : `${ICON_LOCK} 이 달 잠그기`}</button>
-          <button class="ghost-btn ${scheduleBulkPasteOpen ? "active" : ""}" id="sch-bulk-btn" style="margin-left:8px;">${ICON_CLIPBOARD} 일괄 붙여넣기</button>
-          <button class="ghost-btn" id="sch-capture-btn">${ICON_CAMERA} 이미지로 저장 ▾</button>
-          <button class="ghost-btn" id="sch-excel-btn">${ICON_CHART} 엑셀로 다운로드</button>
-          <button class="ghost-btn" id="sch-holidaydoc-btn">${ICON_CLIPBOARD} 휴일대체 확인서</button>
+        <div class="sch-toolbar-title">월별 스케줄<small>${scheduleMonthLabel()} · 전체 ${getStaffListForMonth(scheduleUi.year, scheduleUi.monthIndex).length}명</small></div>
+
+        <div class="mac-seg">
+          <button id="sch-prev-month">‹</button>
+          <div class="month-label">${scheduleMonthLabel()}</div>
+          <button id="sch-next-month">›</button>
+        </div>
+
+        <button class="lock-chip" id="sch-lock-btn">${scheduleIsMonthLocked(scheduleUi.year, scheduleUi.monthIndex) ? `${ICON_LOCK} 확정됨` : `${ICON_UNLOCK} 이 달 잠그기`}</button>
+
+        <div class="mac-search">
+          <input type="text" id="sch-search-input" placeholder="이름 검색" title="상담사 검색 (이름/주간/야간/채팅/유선, 쉼표로 여러 개)" value="${esc(scheduleUi.searchQuery)}" autocomplete="off">
+          ${ICON_SEARCH_MINI}
+        </div>
+
+        <div class="mac-iv-toolbar">
+          <button type="button" class="mac-iv-tool ${scheduleBulkPasteOpen ? "mac-iv-tool-accent" : ""}" id="sch-bulk-btn" title="일괄 붙여넣기"><span class="mac-iv-tool-icon">${ICON_CLIPBOARD}</span><span class="mac-iv-tool-label">일괄 붙여넣기</span></button>
+          <button type="button" class="mac-iv-tool ${scheduleHiddenPanelOpen ? "mac-iv-tool-accent" : ""}" id="sch-hidden-btn" title="숨긴 열·행"><span class="mac-iv-tool-icon">${ICON_CALENDAR}</span><span class="mac-iv-tool-label">숨긴 열·행</span>${scheduleHiddenCount() > 0 ? `<span class="sch-more-badge">${scheduleHiddenCount()}</span>` : ""}</button>
+          <button type="button" class="mac-iv-tool danger" id="sch-delete-btn" title="일정 삭제"><span class="mac-iv-tool-icon">${ICON_TRASH}</span><span class="mac-iv-tool-label">일정 삭제</span></button>
+          <button type="button" class="mac-iv-tool" id="sch-auto-btn" title="AI 자동 배치"><span class="mac-iv-tool-icon">${ICON_SPARK}</span><span class="mac-iv-tool-label">자동 배치</span></button>
+          <button type="button" class="mac-iv-tool" id="sch-excel-btn" title="엑셀로 다운로드"><span class="mac-iv-tool-icon">${ICON_CHART}</span><span class="mac-iv-tool-label">엑셀</span></button>
+        </div>
+
+        <div class="sch-more-wrap">
+          <button type="button" class="sch-more-btn" id="sch-more-btn" title="더보기">···</button>
+          <div class="sch-more-menu" id="sch-more-menu">
+            <button type="button" id="sch-adjust-summary-btn">${ICON_CLIPBOARD} 가감점 취합</button>
+            <button type="button" id="sch-holidaydoc-btn">${ICON_CLIPBOARD} 휴일대체 확인서</button>
+            <button type="button" id="sch-capture-btn">${ICON_CAMERA} 이미지로 저장</button>
+          </div>
         </div>
       </div>
       <div class="status" id="schedule-status"></div>
@@ -43,16 +71,6 @@
         <span class="item"><span class="swatch" style="background:var(--amber);"></span>지각</span>
         <span class="item"><span class="swatch" style="background:var(--red);"></span>결근</span>
         <span class="item"><span class="swatch" style="background:var(--text-faint);"></span>퇴사</span>
-      </div>
-      <div class="schedule-table-toolbar">
-        <div class="agent-search-input">
-          <input type="text" class="agent-search-input-field" id="sch-search-input" placeholder="이름 검색" title="상담사 검색 (이름/주간/야간/채팅/유선, 쉼표로 여러 개)" value="${esc(scheduleUi.searchQuery)}" autocomplete="off">
-          ${ICON_SEARCH_MINI}
-        </div>
-        <button class="ghost-btn" id="sch-adjust-summary-btn">${ICON_CLIPBOARD} 가감점 취합</button>
-        <button class="ghost-btn" id="sch-auto-btn">자동 배치 ▾</button>
-        <button class="ghost-btn ${scheduleHiddenPanelOpen ? "active" : ""}" id="sch-hidden-btn">${ICON_CALENDAR} 숨긴 열/행${scheduleHiddenCount() > 0 ? ` (${scheduleHiddenCount()})` : ""} ▾</button>
-        <button class="ghost-btn sch-delete-btn-small" id="sch-delete-btn">${ICON_TRASH} 일정 삭제</button>
       </div>
       ${scheduleHiddenPanelOpen ? `
         <div class="schedule-colgroup-panel">
@@ -132,6 +150,19 @@
     };
     document.getElementById("sch-adjust-summary-btn").onclick = () => openScheduleAdjustModal();
     document.getElementById("sch-auto-btn").onclick = (e) => openScheduleAutoMenu(e.currentTarget);
+    const schMoreBtn = document.getElementById("sch-more-btn");
+    const schMoreMenu = document.getElementById("sch-more-menu");
+    if (schMoreBtn && schMoreMenu) {
+      // 목업과 동일한 동작: 버튼 클릭은 전파를 막고 메뉴만 토글하고,
+      // 메뉴 안 항목(가감점 취합/휴일대체 확인서/이미지로 저장) 클릭이나 그 외 바깥
+      // 클릭은 전파를 막지 않으므로 document 리스너가 그대로 메뉴를 닫아준다.
+      schMoreBtn.onclick = (e) => {
+        e.stopPropagation();
+        schMoreMenu.classList.toggle("open");
+      };
+    }
+    document.removeEventListener("click", scheduleCloseMoreMenuOnOutsideClick);
+    document.addEventListener("click", scheduleCloseMoreMenuOnOutsideClick);
     const schSearchInput = document.getElementById("sch-search-input");
     if (schSearchInput) {
       // 표 영역만 다시 그려서(전체 renderApp() 대신) 검색창의 IME 조합·포커스가 끊기지 않게 한다.

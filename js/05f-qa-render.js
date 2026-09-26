@@ -49,51 +49,101 @@
     });
   }
 
-  // 화면에 보이는 표와 이미지 캡처용 표가 같은 마크업을 쓰도록 분리해뒀다.
-  // forCapture가 true면 점수 입력칸 대신 텍스트로 값을 보여준다(캡처 이미지에 <input>이 그대로 찍히지 않도록).
+  // 이름(또는 사번)을 해시로 돌려서 아바타 배경색(css/10-qa.css의 .qa-avatar.pal-0~7,
+  // 1단계에서 이미 준비해둔 팔레트)을 안정적으로 골라준다. 같은 사람은 항상 같은 색.
+  // 퇴사자는 항상 pal-resigned(회색)로 고정해서 "더 이상 활동하지 않음"이 표시되게 한다.
+  function qaAvatarPaletteClass(agent) {
+    if (agent.status === "RESIGNED") return "pal-resigned";
+    const str = String(agent.id || agent.name || "");
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) hash = (hash * 31 + str.charCodeAt(i)) >>> 0;
+    return `pal-${hash % 8}`;
+  }
+
+  // [macOS 스타일 재설계 5단계] 화면용 표(<table>)를 macOS Mail/Finder 느낌의
+  // "인셋 그룹 리스트"(div 목록)로 바꾼다. 이미지 캡처(forCapture=true, 05g의
+  // captureQAPage())는 그대로 <table> 마크업을 쓰므로 그 경로는 손대지 않았다.
+  // 화면 쪽에서 계속 지켜야 하는 것들: data-qa-row-agent(강조 스크롤/CSS.escape 조회),
+  // 배지 클래스("badge sm night/day", "badge sm resigned"), 점수 입력칸의 blur/Enter
+  // 저장(.qa-score-input, data-qa-agent), 잠긴 달의 disabled, 퇴사자 취소선 스타일.
   function buildQATableHtml(agentsList, year, monthIndex, forCapture) {
+    if (forCapture) {
+      return `
+        <div class="qa-table-wrap">
+          <table class="qa-table">
+            <thead>
+              <tr>
+                <th>이름</th>
+                <th>LDAP</th>
+                <th>시간대</th>
+                <th>업무구분</th>
+                <th>조</th>
+                <th>점수</th>
+                <th>전월 대비</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${agentsList.length === 0 ? `
+                <tr><td class="qa-empty" colspan="7">해당하는 상담사가 없어요.</td></tr>
+              ` : agentsList.map((a) => {
+                const typeBadges = renderWorkTypeBadges(a.workTypes, "sm");
+                const groupBadge = `<span class="badge sm ${a.group === "night" ? "night" : "day"}">${a.group === "night" ? "야간" : "주간"}</span>`;
+                const val = getQAScore(a.id, year, monthIndex);
+                const isResigned = a.status === "RESIGNED";
+                const rowClass = isResigned ? "qa-row-resigned" : "";
+                const resignedBadge = isResigned ? ` <span class="badge sm resigned">퇴사</span>` : "";
+                return `
+                  <tr data-qa-row-agent="${a.id}" class="${rowClass}">
+                    <td class="qa-col-name">${esc(a.name)}${resignedBadge}</td>
+                    <td class="qa-col-ldap">${esc(a.ldap || "-")}</td>
+                    <td>${esc(a.timezone || "-")}</td>
+                    <td class="qa-col-badges">${typeBadges || "-"}</td>
+                    <td>${groupBadge}</td>
+                    <td>${val === null ? "-" : val.toFixed(1)}</td>
+                    <td>${qaDiffHtml(a, year, monthIndex)}</td>
+                  </tr>
+                `;
+              }).join("")}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
     return `
-      <div class="qa-table-wrap">
-        <table class="qa-table">
-          <thead>
-            <tr>
-              <th>이름</th>
-              <th>LDAP</th>
-              <th>시간대</th>
-              <th>업무구분</th>
-              <th>조</th>
-              <th>점수</th>
-              <th>전월 대비</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${agentsList.length === 0 ? `
-              <tr><td class="qa-empty" colspan="7">${forCapture ? "해당하는 상담사가 없어요." : `근무중인 상담사가 없어요. "상담사 관리"에서 인원을 등록해주세요.`}</td></tr>
-            ` : agentsList.map((a) => {
-              const typeBadges = renderWorkTypeBadges(a.workTypes, "sm");
-              const groupBadge = `<span class="badge sm ${a.group === "night" ? "night" : "day"}">${a.group === "night" ? "야간" : "주간"}</span>`;
-              const val = getQAScore(a.id, year, monthIndex);
-              const scoreCell = forCapture
-                ? `<td>${val === null ? "-" : val.toFixed(1)}</td>`
-                : qaScoreCellHtml(a, year, monthIndex);
-              const highlight = !forCapture && qaHighlightAgentId === a.id;
-              const isResigned = a.status === "RESIGNED";
-              const rowClass = `${highlight ? "qa-row-highlight " : ""}${isResigned ? "qa-row-resigned" : ""}`.trim();
-              const resignedBadge = isResigned ? ` <span class="badge sm resigned">퇴사</span>` : "";
-              return `
-                <tr data-qa-row-agent="${a.id}" class="${rowClass}">
-                  <td class="qa-col-name"${forCapture ? "" : ` data-qa-name-click="${a.id}"`}>${esc(a.name)}${resignedBadge}${forCapture ? "" : `<span class="qa-name-search-icon">${ICON_SEARCH_MINI}</span>`}</td>
-                  <td class="qa-col-ldap">${esc(a.ldap || "-")}</td>
-                  <td>${esc(a.timezone || "-")}</td>
-                  <td class="qa-col-badges">${typeBadges || "-"}</td>
-                  <td>${groupBadge}</td>
-                  ${scoreCell}
-                  <td>${qaDiffHtml(a, year, monthIndex)}</td>
-                </tr>
-              `;
-            }).join("")}
-          </tbody>
-        </table>
+      <div class="qa-list-wrap">
+        <div class="qa-list-head">
+          <span>이름</span><span>시간대</span><span>업무</span><span>조</span><span>점수</span><span>전월 대비</span>
+        </div>
+        ${agentsList.length === 0 ? `
+          <div class="qa-row qa-empty-row"><div class="qa-empty">근무중인 상담사가 없어요. "상담사 관리"에서 인원을 등록해주세요.</div></div>
+        ` : agentsList.map((a) => {
+          const typeBadges = renderWorkTypeBadges(a.workTypes, "sm");
+          const groupBadge = `<span class="badge sm ${a.group === "night" ? "night" : "day"}">${a.group === "night" ? "야간" : "주간"}</span>`;
+          const highlight = qaHighlightAgentId === a.id;
+          const isResigned = a.status === "RESIGNED";
+          const rowClass = ["qa-row", highlight ? "qa-row-highlight" : "", isResigned ? "qa-row-resigned" : ""].filter(Boolean).join(" ");
+          const resignedBadge = isResigned ? ` <span class="badge sm resigned">퇴사</span>` : "";
+          const ldapLine = a.ldap || "-";
+          const initial = esc(String(a.name || "-").charAt(0) || "-");
+          return `
+            <div class="${rowClass}" data-qa-row-agent="${a.id}">
+              <div class="qa-name-cell" data-qa-name-click="${a.id}">
+                <div class="qa-avatar ${qaAvatarPaletteClass(a)}">${initial}</div>
+                <div class="qa-name-text">
+                  <div class="qa-name-main">${esc(a.name)}${resignedBadge}</div>
+                  <div class="qa-name-ldap">${esc(ldapLine)}</div>
+                </div>
+                <span class="qa-name-search-icon">${ICON_SEARCH_MINI}</span>
+              </div>
+              <div class="qa-row-timezone">${esc(a.timezone || "-")}</div>
+              <div class="qa-badges">${typeBadges || "-"}</div>
+              <div class="qa-row-group">${groupBadge}</div>
+              <div class="qa-row-score">${qaScoreInputHtml(a, year, monthIndex)}</div>
+              <div class="qa-row-diff">${qaDiffHtml(a, year, monthIndex)}</div>
+            </div>
+          `;
+        }).join("")}
       </div>
     `;
   }
@@ -161,18 +211,18 @@
           <button id="qa-next-month" aria-label="다음 달">›</button>
         </div>
         <button class="lock-chip" id="qa-lock-btn">${locked ? `${ICON_UNLOCK} 잠금 해제` : `${ICON_LOCK} 이 달 잠그기`}</button>
-        <div class="mac-toolbar-group">
-          <button class="mac-tool" id="qa-excel-upload-btn">${ICON_UPLOAD} 엑셀 업로드</button>
-          <button class="mac-tool qa-bulk-delete-btn" id="qa-bulk-delete-btn">${ICON_TRASH} 일괄삭제</button>
-          <button class="mac-tool" id="qa-capture-btn">${ICON_CAMERA} 이미지로 저장 ▾</button>
+        <div class="agent-search-input interview-toolbar-search">
+          <input type="text" class="agent-search-input-field" id="qa-search-input" placeholder="이름 검색" title="상담사 검색 (이름/주간/야간/채팅/유선, 쉼표로 여러 개)" value="${esc(qaUi.searchQuery)}" autocomplete="off">
+          ${ICON_SEARCH_MINI}
+        </div>
+        <div class="mac-iv-toolbar">
+          <button type="button" class="mac-iv-tool" id="qa-excel-upload-btn"><span class="mac-iv-tool-icon">${ICON_UPLOAD}</span><span class="mac-iv-tool-label">엑셀 업로드</span></button>
+          <button type="button" class="mac-iv-tool qa-bulk-delete-btn" id="qa-bulk-delete-btn"><span class="mac-iv-tool-icon">${ICON_TRASH}</span><span class="mac-iv-tool-label">일괄삭제</span></button>
+          <button type="button" class="mac-iv-tool" id="qa-capture-btn"><span class="mac-iv-tool-icon">${ICON_CAMERA}</span><span class="mac-iv-tool-label">이미지로 저장 ▾</span></button>
         </div>
       </div>
       <div class="status" id="qa-status"></div>
       <div class="qa-stat-row">
-        <div class="agent-search-input">
-          <input type="text" class="agent-search-input-field" id="qa-search-input" placeholder="이름 검색" title="상담사 검색 (이름/주간/야간/채팅/유선, 쉼표로 여러 개)" value="${esc(qaUi.searchQuery)}" autocomplete="off">
-          ${ICON_SEARCH_MINI}
-        </div>
         <div class="qa-stat-grid">
           ${qaStatItemHtml("전체 평균", stats.total, prevStats.total, true)}
           ${qaStatItemHtml("유선 점수 평균", stats.voice, prevStats.voice)}

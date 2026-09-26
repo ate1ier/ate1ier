@@ -30,7 +30,10 @@
   }
   // 품질 관리는 상담사 관리 → 전체 QA 점수에서 사용하므로 앱 정보는 유지하되,
   // 바탕화면/하단 Dock의 독립 실행 아이콘에서는 제외한다.
-  const HOME_DESKTOP_LAUNCH_APPS = HOME_DESKTOP_APPS.filter((a) => a[0] !== "qa");
+  // 면담일지도 같은 이유로 제외한다: 상담사별 면담일지(agent-iv-popover)와 전역 검색에서
+  // setPage("interviews")로 페이지 자체는 계속 쓰이므로 앱 정보는 남겨두고, 독립 실행
+  // 아이콘(내비게이션 사이드바·바탕화면·하단 Dock)에서만 뺀다.
+  const HOME_DESKTOP_LAUNCH_APPS = HOME_DESKTOP_APPS.filter((a) => a[0] !== "qa" && a[0] !== "interviews");
   const HOME_DESKTOP_APP_BY_ID = {};
   HOME_DESKTOP_APPS.forEach((a) => { HOME_DESKTOP_APP_BY_ID[a[0]] = a; });
   // 창으로 열 수 있는 대상의 정보([id, 이름, 그라데이션, 아이콘 path]). 기본 앱 6개 외에, 바탕화면에서 우클릭으로

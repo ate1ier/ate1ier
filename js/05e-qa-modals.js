@@ -234,11 +234,31 @@
     setTimeout(() => document.addEventListener("keydown", qaDetailEscHandler, true), 0);
   }
 
-  function qaScoreCellHtml(agent, year, monthIndex) {
+  // [macOS 스타일 재설계 5단계] 점수 구간(90+/80대/70대/70미만/값없음)에 따라 칩 색
+  // 클래스(css/10-qa.css의 .qa-score-chip.s-*, 1단계에서 이미 준비해둔 토큰)를 골라준다.
+  // 인셋 리스트의 점수 입력칸(<input>)에 그대로 얹어서 "표"가 아니라 "색칠된 칩"처럼
+  // 보이게 하는 용도 — 값 자체는 여전히 input이라 클릭해서 바로 편집할 수 있다.
+  function qaScoreChipClass(val) {
+    if (val === null || val === undefined) return "s-empty";
+    if (val >= 90) return "s-high";
+    if (val >= 80) return "s-mid";
+    if (val >= 70) return "s-low";
+    return "s-bad";
+  }
+
+  // 점수 입력칸 자체(<input>)만 만든다. buildQATableHtml()의 화면용(인셋 리스트) 행은
+  // <td> 래퍼 없이 이 입력칸을 div 셀 안에 바로 넣는다.
+  function qaScoreInputHtml(agent, year, monthIndex) {
     const val = getQAScore(agent.id, year, monthIndex);
     const locked = qaIsMonthLocked(year, monthIndex);
-    return `<td><input type="number" class="qa-score-input" min="0" max="100" step="0.1" inputmode="decimal"
-      data-qa-agent="${agent.id}" value="${val === null ? "" : val.toFixed(1)}" placeholder="-" title="점수"${locked ? " disabled" : ""}></td>`;
+    return `<input type="number" class="qa-score-input ${qaScoreChipClass(val)}" min="0" max="100" step="0.1" inputmode="decimal"
+      data-qa-agent="${agent.id}" value="${val === null ? "" : val.toFixed(1)}" placeholder="-" title="점수"${locked ? " disabled" : ""}>`;
+  }
+
+  // <table> 캡처용 마크업(buildQATableHtml의 forCapture 경로)이 여전히 <td> 래퍼를
+  // 쓰므로 그대로 유지한다.
+  function qaScoreCellHtml(agent, year, monthIndex) {
+    return `<td>${qaScoreInputHtml(agent, year, monthIndex)}</td>`;
   }
 
   function qaDiffHtml(agent, year, monthIndex) {
