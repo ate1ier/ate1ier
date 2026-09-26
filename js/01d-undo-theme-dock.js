@@ -114,6 +114,29 @@
   }
   applyTheme(isValidTheme(getStoredTheme()) ? getStoredTheme() : "light");
 
+  /* ===================== 그래픽 효과(블러) 줄이기 =====================
+     사양이 낮은 컴퓨터에서 backdrop-filter 블러 계산 부담을 줄이기 위한 토글.
+     켜면 html[data-fx="reduced"]가 붙어 css/00-variables.css의 --fx-blur-scale이
+     0이 되고, 전체 backdrop-filter의 blur() 반경이 사실상 0으로 줄어든다
+     (레이아웃·색·모양은 그대로, 블러만 빠진다). 테마와 같은 방식으로 저장/적용한다. */
+  const FX_KEY = "app-fx-reduced";
+  function getStoredFxReduced() {
+    try { return localStorage.getItem(FX_KEY) === "1"; } catch (e) { return false; }
+  }
+  function applyFxReduced(on) {
+    if (on) document.documentElement.setAttribute("data-fx", "reduced");
+    else document.documentElement.removeAttribute("data-fx");
+  }
+  function isFxReduced() {
+    return document.documentElement.getAttribute("data-fx") === "reduced";
+  }
+  function setFxReduced(on) {
+    applyFxReduced(on);
+    try { localStorage.setItem(FX_KEY, on ? "1" : "0"); } catch (e) { /* 저장 실패해도 화면 전환은 그대로 동작 */ }
+    renderNav();
+  }
+  applyFxReduced(getStoredFxReduced());
+
   /* ===================== 데스크톱 독(Dock) 펼치기/닫기 =====================
      독 안에는 메뉴 카테고리(#nav)가 들어있고, 펼치기/접기 대상은 그걸 감싸는
      #nav-dock 전체다. (예전엔 전역 검색 바도 이 독 안, 카테고리 바로 위에 있었는데

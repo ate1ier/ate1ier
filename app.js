@@ -1038,6 +1038,29 @@
   }
   applyTheme(isValidTheme(getStoredTheme()) ? getStoredTheme() : "light");
 
+  /* ===================== 그래픽 효과(블러) 줄이기 =====================
+     사양이 낮은 컴퓨터에서 backdrop-filter 블러 계산 부담을 줄이기 위한 토글.
+     켜면 html[data-fx="reduced"]가 붙어 css/00-variables.css의 --fx-blur-scale이
+     0이 되고, 전체 backdrop-filter의 blur() 반경이 사실상 0으로 줄어든다
+     (레이아웃·색·모양은 그대로, 블러만 빠진다). 테마와 같은 방식으로 저장/적용한다. */
+  const FX_KEY = "app-fx-reduced";
+  function getStoredFxReduced() {
+    try { return localStorage.getItem(FX_KEY) === "1"; } catch (e) { return false; }
+  }
+  function applyFxReduced(on) {
+    if (on) document.documentElement.setAttribute("data-fx", "reduced");
+    else document.documentElement.removeAttribute("data-fx");
+  }
+  function isFxReduced() {
+    return document.documentElement.getAttribute("data-fx") === "reduced";
+  }
+  function setFxReduced(on) {
+    applyFxReduced(on);
+    try { localStorage.setItem(FX_KEY, on ? "1" : "0"); } catch (e) { /* 저장 실패해도 화면 전환은 그대로 동작 */ }
+    renderNav();
+  }
+  applyFxReduced(getStoredFxReduced());
+
   /* ===================== 데스크톱 독(Dock) 펼치기/닫기 =====================
      독 안에는 메뉴 카테고리(#nav)가 들어있고, 펼치기/접기 대상은 그걸 감싸는
      #nav-dock 전체다. (예전엔 전역 검색 바도 이 독 안, 카테고리 바로 위에 있었는데
@@ -3352,16 +3375,26 @@
     anchorEl.setAttribute("aria-expanded", "true");
     const rect = anchorEl.getBoundingClientRect();
     const current = getCurrentTheme();
-    const menu = document.createElement("div");
-    menu.id = "status-bar-mode-menu";
-    menu.className = "theme-menu";
-    menu.innerHTML = THEME_LIST.map((t) => `
+    const fxOn = isFxReduced();
+    const themeItemsHtml = THEME_LIST.map((t) => `
       <button type="button" class="theme-menu-item ${t.id === current ? "active" : ""}" data-theme-id="${t.id}">
         <span class="theme-menu-dot" style="background:${t.bg};"></span>
         <span class="theme-menu-name">${t.label}</span>
         ${t.id === current ? '<span class="theme-menu-check">✓</span>' : ""}
       </button>
     `).join("");
+    // "그래픽 효과 줄이기": 사양이 낮은 컴퓨터에서 배경 블러를 끄는 토글(js/01d-undo-theme-dock.js의 setFxReduced)
+    const fxToggleHtml = `
+      <div class="settings-menu-divider"></div>
+      <button type="button" class="theme-menu-item theme-menu-fx-item" data-fx-toggle="1" title="배경 블러를 줄여서 저사양 컴퓨터에서 더 가볍게 동작하게 합니다">
+        <span class="theme-menu-name">그래픽 효과 줄이기</span>
+        <span class="theme-menu-fx-switch ${fxOn ? "on" : ""}" aria-hidden="true"></span>
+      </button>
+    `;
+    const menu = document.createElement("div");
+    menu.id = "status-bar-mode-menu";
+    menu.className = "theme-menu";
+    menu.innerHTML = themeItemsHtml + fxToggleHtml;
     document.body.appendChild(menu);
     // 상태표시줄은 화면 맨 위에 있으니, 목업처럼 버튼 "아래"로 펼친다
     // (설정 메뉴처럼 버튼 위쪽에 띄우면 화면 밖으로 넘어가버림).
@@ -3376,6 +3409,17 @@
         closeStatusBarModeMenu();
       };
     });
+    // 효과 줄이기 토글은 테마 선택과 달리 눌러도 메뉴를 닫지 않고 스위치만 바꿔서,
+    // 켜고 끄며 바로 화면(블러) 변화를 확인해볼 수 있게 한다.
+    const fxToggleBtn = menu.querySelector("[data-fx-toggle]");
+    if (fxToggleBtn) {
+      fxToggleBtn.onclick = (e) => {
+        e.stopPropagation();
+        setFxReduced(!isFxReduced());
+        const sw = fxToggleBtn.querySelector(".theme-menu-fx-switch");
+        if (sw) sw.classList.toggle("on", isFxReduced());
+      };
+    }
     setTimeout(() => document.addEventListener("mousedown", statusBarModeMenuOutsideHandler, true), 0);
   }
   const statusBarModeBtn = document.getElementById("status-bar-mode-btn");
@@ -6082,58 +6126,6 @@
         </div>
         <div class="agent-row-count">${needsIv ? '<span class="need-dot" title="면담 필요"></span>' : ""}${ivCount ? `<span class="agent-row-count-num">${ivCount}건</span>` : ""}</div>
       </div>
-    `;
-  }
-
-  function renderAgentDetail(agent) {
-    return `
-      <div class="agent-detail-header">
-        <div class="agent-detail-heading">
-          <div class="agent-detail-name">${esc(agent.name)}</div>
-        </div>
-        <div class="agent-detail-actions">
-          <button class="ghost-btn" data-action="edit-agent" data-id="${agent.id}">수정</button>
-          <button class="ghost-btn danger" data-action="delete-agent" data-id="${agent.id}">삭제</button>
-        </div>
-      </div>
-      <div class="agent-field">
-        <span class="agent-field-label">LDAP 이름</span>
-        <span class="agent-field-value">${esc(agent.ldap)}</span>
-      </div>
-      <div class="agent-field">
-        <span class="agent-field-label">사번</span>
-        <span class="agent-field-value">${agent.empNo ? esc(agent.empNo) : '<span class="agent-field-empty">-</span>'}</span>
-      </div>
-      <div class="agent-field">
-        <span class="agent-field-label">입사일자</span>
-        <span class="agent-field-value">${agent.hireDate ? esc(agent.hireDate) : '<span class="agent-field-empty">-</span>'}</span>
-      </div>
-      <div class="agent-field">
-        <span class="agent-field-label">연락처</span>
-        <span class="agent-field-value">${agent.contact ? esc(agent.contact) : '<span class="agent-field-empty">-</span>'}</span>
-      </div>
-      <div class="agent-field">
-        <span class="agent-field-label">업무 구분</span>
-        <span class="agent-field-value">${workTypeBadgesHtml(agent.workTypes)}</span>
-      </div>
-      <div class="agent-field">
-        <span class="agent-field-label">근무 조</span>
-        <span class="agent-field-value">${scheduleGroupBadgeHtml(agent.group)}</span>
-      </div>
-      <div class="agent-field">
-        <span class="agent-field-label">시간대</span>
-        <span class="agent-field-value">${agent.timezone ? esc(agent.timezone) : '<span class="agent-field-empty">-</span>'}</span>
-      </div>
-      <div class="agent-field">
-        <span class="agent-field-label">권한</span>
-        <span class="agent-field-value">${agent.isAdmin ? '<span class="badge admin">관리자</span>' : '<span class="agent-field-empty">일반</span>'}</span>
-      </div>
-      <div class="agent-field">
-        <span class="agent-field-label">재직 상태</span>
-        <span class="agent-field-value">${agent.status === "RESIGNED" ? '<span class="badge resigned">퇴사</span>' : '<span class="badge working">근무중</span>'}${isAgentScheduledResign(agent) ? ` <span class="agent-field-empty">(${esc(agent.resignDate)}부터 자동 퇴사 예정, 월별 스케줄엔 이미 반영됨)</span>` : ""}</span>
-      </div>
-      ${renderAgentQAPreview(agent)}
-      ${renderAgentInterviewSection(agent)}
     `;
   }
 
@@ -13654,6 +13646,22 @@
   const SCHEDULE_AUTO_HYBRID_CANDIDATE_COUNT = 6;
   let scheduleAutoHybridRequestId = 0;
 
+  // scheduleAutoBuildPlan(제약조건 탐색/백트래킹) 자체는 여전히 동기 함수라 한 번 호출될 때는
+  // 여전히 무겁지만, 후보를 6개 연달아 만들 때(scheduleAutoBuildHybridPlan) 이 사이사이에
+  // 브라우저에게 한 번씩 제어권을 돌려줘서(화면을 그릴 틈을 줘서) "화면이 통째로 멈추는" 것처럼
+  // 보이지 않게 한다. rAF로 다음 페인트 시점까지 기다린 뒤 setTimeout(0)까지 한 번 더 거쳐서,
+  // 실제로 한 프레임이 화면에 그려진 뒤에 다음 계산을 이어가도록 보장한다(계산 로직 자체는 그대로 둠).
+  // requestAnimationFrame은 "다음 화면을 그리기 직전"에 딱 한 번 호출되므로, 여기서 await로 한 번
+  // 걸어두면(async 함수가 일시 정지하며 호출 스택을 비움) 그 사이에 브라우저가 지금 프레임을 그릴 틈이
+  // 생긴다 — setTimeout까지 얹지 않아도 이 정도로 "화면이 멈춘 것처럼 안 보이게" 하기엔 충분하다.
+  // rAF가 없는 환경(예: 테스트의 순수 Node 샌드박스)에서는 실제로 그릴 화면이 없으므로 그냥 즉시 진행한다.
+  function scheduleAutoYieldToUi() {
+    if (typeof requestAnimationFrame === "function") {
+      return new Promise((resolve) => requestAnimationFrame(() => resolve()));
+    }
+    return Promise.resolve();
+  }
+
   // 이 일수를 넘는 연속 근무(=6일째부터)는 만들지 않는다.
   const SCHEDULE_AUTO_MAX_WORK_STREAK = 5;
   // 새로 배정하는 오프가 기존 휴무(필휴 포함)와 연결되어 연속 휴무가 4일 이상 생기지 않게 한다.
@@ -16386,11 +16394,28 @@
     };
   }
 
-  async function scheduleAutoBuildHybridPlan(year, monthIndex, options) {
+  // isStale: 계산 도중 이 요청이 이미 낡은 요청이 됐는지 확인하는 함수(예: 그 사이 사용자가 조건을
+  //   또 바꿔서 새 미리보기 요청이 시작됐는지). 매 후보 계산 전에 확인해서, 낡았으면 남은 후보는
+  //   계산하지 않고 그때까지 만든 후보만으로 즉시 끝낸다(화면에 반영되지도 않을 계산을 계속 붙잡지 않기 위함).
+  // onProgress(i, total): 후보를 하나 만들 때마다 호출되는 선택적 콜백. 미리보기 로딩 문구 갱신용.
+  async function scheduleAutoBuildHybridPlan(year, monthIndex, options, isStale, onProgress) {
     const baseOptions = Object.assign({}, options || {});
     const candidates = [];
     for (let i = 0; i < SCHEDULE_AUTO_HYBRID_CANDIDATE_COUNT; i++) {
+      // 매 후보 계산 직전에 브라우저에 제어권을 한 번 돌려준다(6번 연달아 도는 대신 사이사이 화면 갱신 틈 확보).
+      await scheduleAutoYieldToUi();
+      if (typeof isStale === "function" && isStale()) break;
       candidates.push(scheduleAutoBuildPlan(year, monthIndex, Object.assign({}, baseOptions, { variant: i })));
+      if (typeof onProgress === "function") onProgress(candidates.length, SCHEDULE_AUTO_HYBRID_CANDIDATE_COUNT);
+    }
+    // 낡은 요청이라 후보 계산을 중간에 멈췄으면, 이후 로직(메트릭 비교·Groq 호출 등)도 의미가 없으므로
+    // 지금까지 만든 후보 중 첫 번째(또는 하나도 없으면 기준 옵션으로 즉시 하나) 것만으로 간단히 마무리한다.
+    // 호출부(scheduleAutoRefreshPreview)가 requestId를 다시 확인해서 이 결과를 화면에 쓰지 않고 버린다.
+    if (typeof isStale === "function" && isStale()) {
+      if (candidates.length === 0) candidates.push(scheduleAutoBuildPlan(year, monthIndex, Object.assign({}, baseOptions, { variant: 0 })));
+      const fallback = candidates[0];
+      fallback.hybrid = { improve: null, enabled: false, candidateCount: candidates.length, allowedCandidateCount: 1, selectedCandidate: 0, metrics: scheduleAutoPlanMetrics(fallback), groqStatus: "stale", groqModel: null, groqUsage: null, groqRequestId: null, groqError: null };
+      return fallback;
     }
     const metricsList = candidates.map(scheduleAutoPlanMetrics);
     const baseMetrics = metricsList[0];
@@ -16439,8 +16464,15 @@
   async function scheduleAutoRefreshPreview() {
     const requestId = ++scheduleAutoHybridRequestId;
     const area = document.getElementById("sch-auto-preview-area");
-    if (area) area.innerHTML = `<div class="sch-auto-none">조건을 확인하고 배치 후보를 최적화하는 중...</div>`;
-    const plan = await scheduleAutoBuildHybridPlan(scheduleUi.year, scheduleUi.monthIndex, { excludeStaffIds: scheduleAutoExcludedIds, minWorkingByGroup: scheduleAutoMinWorkingByGroup });
+    const isStale = () => requestId !== scheduleAutoHybridRequestId || !document.getElementById("sch-auto-overlay");
+    const setLoadingText = (text) => { if (!isStale()) { const a = document.getElementById("sch-auto-preview-area"); if (a) a.innerHTML = `<div class="sch-auto-none">${text}</div>`; } };
+    setLoadingText("조건을 확인하고 배치 후보를 최적화하는 중...");
+    const plan = await scheduleAutoBuildHybridPlan(
+      scheduleUi.year, scheduleUi.monthIndex,
+      { excludeStaffIds: scheduleAutoExcludedIds, minWorkingByGroup: scheduleAutoMinWorkingByGroup },
+      isStale,
+      (done, total) => setLoadingText(`배치 후보를 계산하는 중... (${done}/${total})`)
+    );
     if (requestId !== scheduleAutoHybridRequestId || !document.getElementById("sch-auto-overlay")) return;
     scheduleAutoPlan = plan;
     if (area) area.innerHTML = scheduleAutoPreviewHtml(scheduleAutoPlan);
@@ -16697,7 +16729,10 @@
         if (!card) return;
         const startX = e.clientX, startY = e.clientY;
         const wg = document.getElementById("wg");
-        let started = false, placeholder = null, offsetX = 0, offsetY = 0, baseX = 0, baseY = 0;
+        let started = false, placeholder = null, baseX = 0, baseY = 0;
+        // rAF 배칭(저사양 PC 버벅임 완화): 위치 이동은 transform으로만 처리하고(레이아웃 재계산 없음),
+        // 카드 재배치를 위한 elementFromPoint/DOM 이동처럼 무거운 부분은 프레임당 한 번만 실행한다.
+        let pendingX = startX, pendingY = startY, rafId = null;
 
         function begin() {
           started = true;
@@ -16706,48 +16741,53 @@
           const shifted = wg && getComputedStyle(wg).transform !== "none";
           const wgRect = shifted ? wg.getBoundingClientRect() : { left: 0, top: 0 };
           baseX = wgRect.left; baseY = wgRect.top;
-          offsetX = startX - rect.left; offsetY = startY - rect.top;
           placeholder = document.createElement("div");
           placeholder.className = "home-card-placeholder";
           placeholder.style.height = rect.height + "px";
           card.parentNode.insertBefore(placeholder, card.nextSibling);
           card.classList.add("dg");
+          // left/top은 드래그 시작 시점에 한 번만 고정하고, 이후엔 transform(translate3d)만 바꿔서 따라가게 한다.
           Object.assign(card.style, {
             position: "fixed", width: rect.width + "px", left: (rect.left - baseX) + "px", top: (rect.top - baseY) + "px",
           });
           document.body.classList.add("home-card-drag-active");
         }
-        function onMove(ev) {
-          if (!started) {
-            if (Math.hypot(ev.clientX - startX, ev.clientY - startY) < 5) return;
-            begin();
-          }
-          card.style.left = (ev.clientX - offsetX - baseX) + "px";
-          card.style.top = (ev.clientY - offsetY - baseY) + "px";
+        function flushMove() {
+          rafId = null;
+          card.style.transform = `translate3d(${pendingX - startX}px, ${pendingY - startY}px, 0)`;
           card.style.pointerEvents = "none";
-          const elUnder = document.elementFromPoint(ev.clientX, ev.clientY);
+          const elUnder = document.elementFromPoint(pendingX, pendingY);
           card.style.pointerEvents = "";
           if (!elUnder) return;
           const overCard = elUnder.closest(".wd[data-home-card]");
           const overCol = elUnder.closest(".col");
           if (overCard && overCard !== card) {
             const rectOver = overCard.getBoundingClientRect();
-            const before = (ev.clientY - rectOver.top) < rectOver.height / 2;
+            const before = (pendingY - rectOver.top) < rectOver.height / 2;
             overCard.parentNode.insertBefore(placeholder, before ? overCard : overCard.nextSibling);
           } else if (overCol && !overCard) {
             overCol.appendChild(placeholder);
           }
         }
+        function onMove(ev) {
+          if (!started) {
+            if (Math.hypot(ev.clientX - startX, ev.clientY - startY) < 5) return;
+            begin();
+          }
+          pendingX = ev.clientX; pendingY = ev.clientY;
+          if (rafId == null) rafId = requestAnimationFrame(flushMove);
+        }
         function onUp() {
           document.removeEventListener("pointermove", onMove);
           document.removeEventListener("pointerup", onUp);
           document.removeEventListener("pointercancel", onUp);
+          if (rafId != null) { cancelAnimationFrame(rafId); rafId = null; }
           if (!started) return;
           document.body.classList.remove("home-card-drag-active");
           placeholder.parentNode.insertBefore(card, placeholder);
           placeholder.remove();
           card.classList.remove("dg");
-          Object.assign(card.style, { position: "", width: "", left: "", top: "", pointerEvents: "" });
+          Object.assign(card.style, { position: "", width: "", left: "", top: "", transform: "", pointerEvents: "" });
           const newLayout = Array.from(grid.querySelectorAll(".col")).map((col) =>
             Array.from(col.querySelectorAll(".wd[data-home-card]")).map((c) => c.getAttribute("data-home-card"))
           );
@@ -16766,7 +16806,7 @@
     if (!w) return;
     const h = w.firstElementChild;
     w.style.transform = "";
-    if (window.innerWidth <= 900 || !h) return;
+    if (!h) return;
     const t = h.getBoundingClientRect().top;
     w.style.transform = `translateY(${-Math.max(0, Math.min(100, t - 79))}px)`;
   }
@@ -17437,16 +17477,24 @@
       const maxH = Math.max(minH, window.innerHeight - 55);
       frame.style.cursor = "nwse-resize";
       try { frame.setPointerCapture?.(e.pointerId); } catch (_) {}
+      // rAF로 묶어서 한 프레임당 한 번만 width/height를 반영한다(저사양 PC에서 리사이즈 중 버벅임 완화).
+      let pendingW = startW, pendingH = startH, rafId = null;
+      const flush = () => {
+        rafId = null;
+        frame.style.width = Math.round(pendingW) + "px";
+        frame.style.height = Math.round(pendingH) + "px";
+      };
       const move = (v) => {
-        const width = Math.min(maxW, Math.max(minW, startW + (v.clientX - startX)));
-        const height = Math.min(maxH, Math.max(minH, startH + (v.clientY - startY)));
-        frame.style.width = Math.round(width) + "px";
-        frame.style.height = Math.round(height) + "px";
+        pendingW = Math.min(maxW, Math.max(minW, startW + (v.clientX - startX)));
+        pendingH = Math.min(maxH, Math.max(minH, startH + (v.clientY - startY)));
+        if (rafId == null) rafId = requestAnimationFrame(flush);
       };
       const up = () => {
         document.removeEventListener("pointermove", move, true);
         document.removeEventListener("pointerup", up, true);
         document.removeEventListener("pointercancel", up, true);
+        if (rafId != null) { cancelAnimationFrame(rafId); rafId = null; }
+        flush();
         frame.style.cursor = "";
         try { frame.releasePointerCapture?.(e.pointerId); } catch (_) {}
         hdSaveOpenWindowsState();
@@ -17473,16 +17521,24 @@
         const minW = 340, minH = 240;
         const maxW = Math.max(minW, window.innerWidth - 16);
         const maxH = Math.max(minH, window.innerHeight - 55);
+        // rAF로 한 프레임당 한 번만 width/height를 반영한다(저사양 PC에서 리사이즈 중 버벅임 완화).
+        let pendingSE = null, rafIdSE = null;
+        const flushSE = () => {
+          rafIdSE = null;
+          if (pendingSE) { frame.style.width = pendingSE.w + "px"; frame.style.height = pendingSE.h + "px"; }
+        };
         const moveSE = (v) => {
           const width = Math.min(maxW, Math.max(minW, startW + (v.clientX - startX)));
           const height = Math.min(maxH, Math.max(minH, startH + (v.clientY - startY)));
-          frame.style.width = Math.round(width) + "px";
-          frame.style.height = Math.round(height) + "px";
+          pendingSE = { w: Math.round(width), h: Math.round(height) };
+          if (rafIdSE == null) rafIdSE = requestAnimationFrame(flushSE);
         };
         const upSE = () => {
           document.removeEventListener("pointermove", moveSE);
           document.removeEventListener("pointerup", upSE);
           document.removeEventListener("pointercancel", upSE);
+          if (rafIdSE != null) { cancelAnimationFrame(rafIdSE); rafIdSE = null; }
+          flushSE();
           hdSaveOpenWindowsState();
         };
         document.addEventListener("pointermove", moveSE);
@@ -17524,15 +17580,25 @@
           }
           width = Math.min(maxW, Math.max(minW, width));
           height = Math.min(maxH, Math.max(minH, height));
-          frame.style.left = Math.round(left) + "px"; frame.style.top = Math.round(top) + "px";
-          frame.style.width = Math.round(width) + "px"; frame.style.height = Math.round(height) + "px";
+          pending = { left: Math.round(left), top: Math.round(top), width: Math.round(width), height: Math.round(height) };
+          if (rafId == null) rafId = requestAnimationFrame(flush);
         };
         const up = () => {
           document.removeEventListener("pointermove", move);
           document.removeEventListener("pointerup", up);
           document.removeEventListener("pointercancel", up);
+          if (rafId != null) { cancelAnimationFrame(rafId); rafId = null; }
+          flush();
           try { if (handle.releasePointerCapture) handle.releasePointerCapture(e.pointerId); } catch (_) {}
           hdSaveOpenWindowsState();
+        };
+        // rAF로 한 프레임당 한 번만 left/top/width/height를 반영한다(저사양 PC에서 리사이즈 중 버벅임 완화).
+        let pending = null, rafId = null;
+        const flush = () => {
+          rafId = null;
+          if (!pending) return;
+          frame.style.left = pending.left + "px"; frame.style.top = pending.top + "px";
+          frame.style.width = pending.width + "px"; frame.style.height = pending.height + "px";
         };
         document.addEventListener("pointermove", move);
         document.addEventListener("pointerup", up);
@@ -17587,6 +17653,20 @@
       const origLeft = frame.style.left, origTop = frame.style.top;
       const topMin = 39;
       let side = null;
+      // 성능 최적화(저사양 PC 버벅임 대응): 끄는 동안엔 left/top(레이아웃 재계산 유발)을 매 이벤트마다
+      // 바로 쓰지 않고, translate3d(컴포지터에서만 처리되는 transform)로 마우스를 따라가게 한 뒤
+      // requestAnimationFrame으로 한 프레임당 한 번만 반영한다. left/top은 손을 놓는 순간(up)에
+      // 딱 한 번만 확정해서 쓴다. 창엔 backdrop-filter가 없어도 box-shadow가 있어서, 매 mousemove마다
+      // reflow를 일으키던 예전 방식보다 이 방식이 특히 저사양 통합그래픽에서 훨씬 부드럽다.
+      const baseLeft = parseFloat(frame.style.left) || r.left;
+      const baseTop = parseFloat(frame.style.top) || r.top;
+      let lastLeft = baseLeft, lastTop = baseTop;
+      let rafId = null;
+      const flush = () => {
+        rafId = null;
+        frame.style.transform = `translate3d(${lastLeft - baseLeft}px, ${lastTop - baseTop}px, 0)`;
+      };
+      frame.classList.add("aw-dragging"); // css: transition:none — transform 트랜지션과 겹쳐 마우스보다 늦게 따라오는 것 방지
       const move = (v) => {
         if (st.snap) {
           if (Math.abs(v.clientX - startX) < 6 && Math.abs(v.clientY - startY) < 6) return;
@@ -17603,8 +17683,9 @@
           frame._hdResizeAnimTimer = setTimeout(() => frame.classList.remove("aw-unsnap-anim"), 420);
           hdHideSnapAssist(true);
         }
-        frame.style.left = Math.max(-width + 90, Math.min(window.innerWidth - 90, v.clientX - dx)) + "px";
-        frame.style.top = Math.max(topMin, Math.min(window.innerHeight - 60, v.clientY - dy)) + "px";
+        lastLeft = Math.max(-width + 90, Math.min(window.innerWidth - 90, v.clientX - dx));
+        lastTop = Math.max(topMin, Math.min(window.innerHeight - 60, v.clientY - dy));
+        if (rafId == null) rafId = requestAnimationFrame(flush);
         const next = hdSnapSideAt(v.clientX);
         if (next !== side) { side = next; hdShowSnapPreview(side); }
       };
@@ -17612,6 +17693,11 @@
         document.removeEventListener("pointermove", move);
         document.removeEventListener("pointerup", up);
         document.removeEventListener("pointercancel", up);
+        if (rafId != null) { cancelAnimationFrame(rafId); rafId = null; }
+        frame.style.transform = "";
+        frame.style.left = lastLeft + "px";
+        frame.style.top = lastTop + "px";
+        frame.classList.remove("aw-dragging");
         hdShowSnapPreview(null);
         if (side && !st.snap && hdWin.state[page] === st) { hdSnapWindow(page, side, true, { left: origLeft, top: origTop }); return; }
         hdSaveOpenWindowsState(); // 끌기가 끝나면(놓았을 때) 바뀐 위치를 로컬에 남긴다.
@@ -17781,9 +17867,7 @@
   // 딱 붙는다(win-snap-l / win-snap-r — 위치·크기는 css/01c-app-window.css가 정하므로 화면 크기가 바뀌어도 알아서 맞춰진다).
   // 붙인 직후 반대편 절반에는 "어떤 페이지를 띄울까요?" 패널(#hd-snap-assist)이 떠서, 앱 아이콘을 누르면 그 페이지가
   // 반대편에 붙어 열린다(이미 열려 있거나 내려가 있던 창이면 그 창이 옮겨 붙는다). 패널은 Esc·바깥 클릭·"건너뛰기"로 닫힌다.
-  // 좁은 화면(700px 이하)은 창이 항상 전체 폭이라 이 기능을 쓰지 않는다.
   function hdSnapSideAt(x) {
-    if (window.innerWidth <= 700) return null;
     if (x <= 16) return "l";
     if (x >= window.innerWidth - 16) return "r";
     return null;
@@ -17815,7 +17899,7 @@
   function hdSnapWindow(page, side, animate, restore) {
     const st = hdWin.state[page];
     const frame = document.getElementById("app-win-" + page);
-    if (!st || !frame || window.innerWidth <= 700) return;
+    if (!st || !frame) return;
     if (animate) hdAnimateWindowResize(frame, "snap");
     st.snap = side;
     st.maximized = false;
@@ -17839,7 +17923,6 @@
   // page 창을 side 쪽에 붙인 뒤, 반대편 절반 자리에 "여기에 띄울 페이지" 고르기 패널을 띄운다.
   function hdShowSnapAssist(page, side) {
     hdHideSnapAssist(true);
-    if (window.innerWidth <= 700) return;
     const other = side === "l" ? "r" : "l";
     // 반대편에 이미 붙어서 떠 있는 창이 있으면 그 자리는 이미 찼으므로 패널을 띄우지 않는다.
     if (hdWin.order.some((p) => p !== page && hdWin.state[p] && !hdWin.state[p].minimized && hdWin.state[p].snap === other)) return;
@@ -18304,26 +18387,36 @@
       const r = el.getBoundingClientRect();
       const offX = startX - r.left, offY = startY - r.top;
       let moved = false;
+      // 성능 최적화(저사양 PC 버벅임 대응): left/top(레이아웃 재계산 유발) 대신 translate3d로
+      // 프레임당 한 번만(requestAnimationFrame) 옮기고, left/top은 손을 뗄 때 딱 한 번만 확정한다.
+      // .hd-fld.dragging엔 이미 transition:none이 있어 transform과 겹쳐 늦게 따라오는 문제는 없다.
+      const baseLeft = r.left, baseTop = r.top;
+      let lastX = baseLeft, lastY = baseTop;
+      let rafId = null;
+      const flush = () => {
+        rafId = null;
+        el.style.transform = `translate3d(${lastX - baseLeft}px, ${lastY - baseTop}px, 0)`;
+      };
       const move = (v) => {
         if (!moved && Math.abs(v.clientX - startX) < 5 && Math.abs(v.clientY - startY) < 5) return;
         moved = true;
         dfUi.dragging = true;
         el.classList.add("dragging");
         const p = desktopFolderClampPos(v.clientX - offX, v.clientY - offY);
-        el.style.left = p.x + "px";
-        el.style.top = p.y + "px";
+        lastX = p.x; lastY = p.y;
+        if (rafId == null) rafId = requestAnimationFrame(flush);
       };
       const up = () => {
         document.removeEventListener("pointermove", move);
         document.removeEventListener("pointerup", up);
         document.removeEventListener("pointercancel", up);
+        if (rafId != null) { cancelAnimationFrame(rafId); rafId = null; }
+        el.style.transform = "";
         if (!moved) return;
         dfUi.dragging = false;
         dfUi.suppressClickUntil = Date.now() + 120; // 끌기를 끝낸 직후 따라오는 click이 "열기"로 처리되지 않게
         el.classList.remove("dragging");
-        const dropX = parseFloat(el.style.left) || 0;
-        const dropY = parseFloat(el.style.top) || 0;
-        const snapped = desktopFolderSnapToFreeGrid(dropX, dropY, desktopFoldersData.folders, id); // 놓은 자리를 다른 폴더와 안 겹치는 가까운 칸으로 맞춘다
+        const snapped = desktopFolderSnapToFreeGrid(lastX, lastY, desktopFoldersData.folders, id); // 놓은 자리를 다른 폴더와 안 겹치는 가까운 칸으로 맞춘다
         el.style.left = snapped.x + "px";
         el.style.top = snapped.y + "px";
         f.x = snapped.x;

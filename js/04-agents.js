@@ -531,58 +531,6 @@
     `;
   }
 
-  function renderAgentDetail(agent) {
-    return `
-      <div class="agent-detail-header">
-        <div class="agent-detail-heading">
-          <div class="agent-detail-name">${esc(agent.name)}</div>
-        </div>
-        <div class="agent-detail-actions">
-          <button class="ghost-btn" data-action="edit-agent" data-id="${agent.id}">수정</button>
-          <button class="ghost-btn danger" data-action="delete-agent" data-id="${agent.id}">삭제</button>
-        </div>
-      </div>
-      <div class="agent-field">
-        <span class="agent-field-label">LDAP 이름</span>
-        <span class="agent-field-value">${esc(agent.ldap)}</span>
-      </div>
-      <div class="agent-field">
-        <span class="agent-field-label">사번</span>
-        <span class="agent-field-value">${agent.empNo ? esc(agent.empNo) : '<span class="agent-field-empty">-</span>'}</span>
-      </div>
-      <div class="agent-field">
-        <span class="agent-field-label">입사일자</span>
-        <span class="agent-field-value">${agent.hireDate ? esc(agent.hireDate) : '<span class="agent-field-empty">-</span>'}</span>
-      </div>
-      <div class="agent-field">
-        <span class="agent-field-label">연락처</span>
-        <span class="agent-field-value">${agent.contact ? esc(agent.contact) : '<span class="agent-field-empty">-</span>'}</span>
-      </div>
-      <div class="agent-field">
-        <span class="agent-field-label">업무 구분</span>
-        <span class="agent-field-value">${workTypeBadgesHtml(agent.workTypes)}</span>
-      </div>
-      <div class="agent-field">
-        <span class="agent-field-label">근무 조</span>
-        <span class="agent-field-value">${scheduleGroupBadgeHtml(agent.group)}</span>
-      </div>
-      <div class="agent-field">
-        <span class="agent-field-label">시간대</span>
-        <span class="agent-field-value">${agent.timezone ? esc(agent.timezone) : '<span class="agent-field-empty">-</span>'}</span>
-      </div>
-      <div class="agent-field">
-        <span class="agent-field-label">권한</span>
-        <span class="agent-field-value">${agent.isAdmin ? '<span class="badge admin">관리자</span>' : '<span class="agent-field-empty">일반</span>'}</span>
-      </div>
-      <div class="agent-field">
-        <span class="agent-field-label">재직 상태</span>
-        <span class="agent-field-value">${agent.status === "RESIGNED" ? '<span class="badge resigned">퇴사</span>' : '<span class="badge working">근무중</span>'}${isAgentScheduledResign(agent) ? ` <span class="agent-field-empty">(${esc(agent.resignDate)}부터 자동 퇴사 예정, 월별 스케줄엔 이미 반영됨)</span>` : ""}</span>
-      </div>
-      ${renderAgentQAPreview(agent)}
-      ${renderAgentInterviewSection(agent)}
-    `;
-  }
-
   function renderAgentForm(agent) {
     const isEdit = !!agent;
     const v = agent || { name: "", ldap: "", empNo: "", hireDate: "", contact: "", workTypes: [], timezone: "", group: "day", isAdmin: false, status: "WORKING", resignDate: "" };

@@ -31,10 +31,10 @@
   #wg > * { pointer-events: auto; }
   #wg .cols { display: flex; gap: 16px; align-items: flex-start; justify-content: center; }
   #wg .col { display: flex; flex-direction: column; gap: 16px; width: var(--cw); }
-  @media (min-width: 901px) {
+  
     #wg .col:nth-child(1) { width: calc(var(--cw) * 3 * .85 / 2.85); }
     #wg .col:nth-child(n+2) { width: calc(var(--cw) * 3 / 2.85); }
-  }
+  
   #wg button, #wg input { font-family: inherit; font-weight: inherit; }
   #wg b, #wg strong { font-weight: 500; }
   #wg p { margin: 8px 0; }
@@ -48,7 +48,7 @@
   #wg .wd {
     position: relative; font-size: var(--fs); padding: .9em 1.05em; border-radius: 1.3em; background: var(--bar);
     box-shadow: 0 0 0 1px var(--ln);
-    backdrop-filter: blur(30px) saturate(1.6); -webkit-backdrop-filter: blur(30px) saturate(1.6); cursor: default;
+    backdrop-filter: blur(var(--fx-blur-lg)) saturate(1.6); -webkit-backdrop-filter: blur(var(--fx-blur-lg)) saturate(1.6); cursor: default;
   }
   #wg .wd.dg { z-index: 5; box-shadow: 0 0 0 1px var(--ac), 0 18px 40px rgba(0, 0, 0, .5); }
   #wg .wh { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 8px; font-weight: 500; cursor: default; }
@@ -87,17 +87,8 @@
   #wg .qm { font-size: 10.5px; fill: var(--t2); }
   #wg .qm.cur { fill: var(--ac); font-weight: 700; }
 
-  /* 좁은 화면(목업의 @media): 목업 원본은 이 규칙이 뒤에 나오는 기본 규칙에 덮여 적용되지 않던 순서였는데,
-     의도대로 동작하도록 기본 규칙 뒤에 두었습니다(값은 목업 그대로). */
-  @media (max-width: 900px) {
-    #wg { overflow: auto; bottom: 96px; left: 12px; right: 112px; justify-content: flex-start; align-items: stretch; }
-    #wg .cols { flex-direction: column; }
-    #wg .col, #wg .hero { width: 100%; }
-    #wg .st { grid-template-columns: repeat(2, 1fr); }
-  }
-  @media (max-width: 700px) {
-    #wg { right: 12px; }
-  }
+  /* 좁은 화면(목업의 
+  
 
   /* ---- 이 앱에만 있는 기능용 (목업에는 없음) ---- */
   /* 카드를 끌어서 열/순서 바꾸기: 위젯 제목줄(.wh)을 잡고 끈다. 끄는 동안 빈 열도 놓을 수 있게 최소 높이를 준다 */
@@ -125,8 +116,8 @@
     padding: 10px 14px;
     border-radius: 12px;
     background: var(--mac-vibrancy);
-    backdrop-filter: blur(30px) saturate(1.6);
-    -webkit-backdrop-filter: blur(30px) saturate(1.6);
+    backdrop-filter: blur(var(--fx-blur-lg)) saturate(1.6);
+    -webkit-backdrop-filter: blur(var(--fx-blur-lg)) saturate(1.6);
     border: 1px solid var(--mac-vibrancy-hairline);
     box-shadow: var(--mac-shadow-float);
     color: var(--text);
@@ -165,8 +156,8 @@
     background: var(--mac-vibrancy);
     border: 1px solid var(--mac-vibrancy-hairline);
     border-radius: 26px;
-    backdrop-filter: blur(30px) saturate(2);
-    -webkit-backdrop-filter: blur(30px) saturate(2);
+    backdrop-filter: blur(var(--fx-blur-lg)) saturate(2);
+    -webkit-backdrop-filter: blur(var(--fx-blur-lg)) saturate(2);
     box-shadow: 0 24px 70px #00000066, 0 1px 0 rgba(255,255,255,0.08) inset;
     padding: 26px 24px 22px;
     animation: today-brief-pop-in 0.42s cubic-bezier(.2, 1.15, .3, 1);

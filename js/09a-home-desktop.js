@@ -227,16 +227,24 @@
       const maxH = Math.max(minH, window.innerHeight - 55);
       frame.style.cursor = "nwse-resize";
       try { frame.setPointerCapture?.(e.pointerId); } catch (_) {}
+      // rAF로 묶어서 한 프레임당 한 번만 width/height를 반영한다(저사양 PC에서 리사이즈 중 버벅임 완화).
+      let pendingW = startW, pendingH = startH, rafId = null;
+      const flush = () => {
+        rafId = null;
+        frame.style.width = Math.round(pendingW) + "px";
+        frame.style.height = Math.round(pendingH) + "px";
+      };
       const move = (v) => {
-        const width = Math.min(maxW, Math.max(minW, startW + (v.clientX - startX)));
-        const height = Math.min(maxH, Math.max(minH, startH + (v.clientY - startY)));
-        frame.style.width = Math.round(width) + "px";
-        frame.style.height = Math.round(height) + "px";
+        pendingW = Math.min(maxW, Math.max(minW, startW + (v.clientX - startX)));
+        pendingH = Math.min(maxH, Math.max(minH, startH + (v.clientY - startY)));
+        if (rafId == null) rafId = requestAnimationFrame(flush);
       };
       const up = () => {
         document.removeEventListener("pointermove", move, true);
         document.removeEventListener("pointerup", up, true);
         document.removeEventListener("pointercancel", up, true);
+        if (rafId != null) { cancelAnimationFrame(rafId); rafId = null; }
+        flush();
         frame.style.cursor = "";
         try { frame.releasePointerCapture?.(e.pointerId); } catch (_) {}
         hdSaveOpenWindowsState();
@@ -263,16 +271,24 @@
         const minW = 340, minH = 240;
         const maxW = Math.max(minW, window.innerWidth - 16);
         const maxH = Math.max(minH, window.innerHeight - 55);
+        // rAF로 한 프레임당 한 번만 width/height를 반영한다(저사양 PC에서 리사이즈 중 버벅임 완화).
+        let pendingSE = null, rafIdSE = null;
+        const flushSE = () => {
+          rafIdSE = null;
+          if (pendingSE) { frame.style.width = pendingSE.w + "px"; frame.style.height = pendingSE.h + "px"; }
+        };
         const moveSE = (v) => {
           const width = Math.min(maxW, Math.max(minW, startW + (v.clientX - startX)));
           const height = Math.min(maxH, Math.max(minH, startH + (v.clientY - startY)));
-          frame.style.width = Math.round(width) + "px";
-          frame.style.height = Math.round(height) + "px";
+          pendingSE = { w: Math.round(width), h: Math.round(height) };
+          if (rafIdSE == null) rafIdSE = requestAnimationFrame(flushSE);
         };
         const upSE = () => {
           document.removeEventListener("pointermove", moveSE);
           document.removeEventListener("pointerup", upSE);
           document.removeEventListener("pointercancel", upSE);
+          if (rafIdSE != null) { cancelAnimationFrame(rafIdSE); rafIdSE = null; }
+          flushSE();
           hdSaveOpenWindowsState();
         };
         document.addEventListener("pointermove", moveSE);
@@ -314,15 +330,25 @@
           }
           width = Math.min(maxW, Math.max(minW, width));
           height = Math.min(maxH, Math.max(minH, height));
-          frame.style.left = Math.round(left) + "px"; frame.style.top = Math.round(top) + "px";
-          frame.style.width = Math.round(width) + "px"; frame.style.height = Math.round(height) + "px";
+          pending = { left: Math.round(left), top: Math.round(top), width: Math.round(width), height: Math.round(height) };
+          if (rafId == null) rafId = requestAnimationFrame(flush);
         };
         const up = () => {
           document.removeEventListener("pointermove", move);
           document.removeEventListener("pointerup", up);
           document.removeEventListener("pointercancel", up);
+          if (rafId != null) { cancelAnimationFrame(rafId); rafId = null; }
+          flush();
           try { if (handle.releasePointerCapture) handle.releasePointerCapture(e.pointerId); } catch (_) {}
           hdSaveOpenWindowsState();
+        };
+        // rAF로 한 프레임당 한 번만 left/top/width/height를 반영한다(저사양 PC에서 리사이즈 중 버벅임 완화).
+        let pending = null, rafId = null;
+        const flush = () => {
+          rafId = null;
+          if (!pending) return;
+          frame.style.left = pending.left + "px"; frame.style.top = pending.top + "px";
+          frame.style.width = pending.width + "px"; frame.style.height = pending.height + "px";
         };
         document.addEventListener("pointermove", move);
         document.addEventListener("pointerup", up);
@@ -377,6 +403,20 @@
       const origLeft = frame.style.left, origTop = frame.style.top;
       const topMin = 39;
       let side = null;
+      // 성능 최적화(저사양 PC 버벅임 대응): 끄는 동안엔 left/top(레이아웃 재계산 유발)을 매 이벤트마다
+      // 바로 쓰지 않고, translate3d(컴포지터에서만 처리되는 transform)로 마우스를 따라가게 한 뒤
+      // requestAnimationFrame으로 한 프레임당 한 번만 반영한다. left/top은 손을 놓는 순간(up)에
+      // 딱 한 번만 확정해서 쓴다. 창엔 backdrop-filter가 없어도 box-shadow가 있어서, 매 mousemove마다
+      // reflow를 일으키던 예전 방식보다 이 방식이 특히 저사양 통합그래픽에서 훨씬 부드럽다.
+      const baseLeft = parseFloat(frame.style.left) || r.left;
+      const baseTop = parseFloat(frame.style.top) || r.top;
+      let lastLeft = baseLeft, lastTop = baseTop;
+      let rafId = null;
+      const flush = () => {
+        rafId = null;
+        frame.style.transform = `translate3d(${lastLeft - baseLeft}px, ${lastTop - baseTop}px, 0)`;
+      };
+      frame.classList.add("aw-dragging"); // css: transition:none — transform 트랜지션과 겹쳐 마우스보다 늦게 따라오는 것 방지
       const move = (v) => {
         if (st.snap) {
           if (Math.abs(v.clientX - startX) < 6 && Math.abs(v.clientY - startY) < 6) return;
@@ -393,8 +433,9 @@
           frame._hdResizeAnimTimer = setTimeout(() => frame.classList.remove("aw-unsnap-anim"), 420);
           hdHideSnapAssist(true);
         }
-        frame.style.left = Math.max(-width + 90, Math.min(window.innerWidth - 90, v.clientX - dx)) + "px";
-        frame.style.top = Math.max(topMin, Math.min(window.innerHeight - 60, v.clientY - dy)) + "px";
+        lastLeft = Math.max(-width + 90, Math.min(window.innerWidth - 90, v.clientX - dx));
+        lastTop = Math.max(topMin, Math.min(window.innerHeight - 60, v.clientY - dy));
+        if (rafId == null) rafId = requestAnimationFrame(flush);
         const next = hdSnapSideAt(v.clientX);
         if (next !== side) { side = next; hdShowSnapPreview(side); }
       };
@@ -402,6 +443,11 @@
         document.removeEventListener("pointermove", move);
         document.removeEventListener("pointerup", up);
         document.removeEventListener("pointercancel", up);
+        if (rafId != null) { cancelAnimationFrame(rafId); rafId = null; }
+        frame.style.transform = "";
+        frame.style.left = lastLeft + "px";
+        frame.style.top = lastTop + "px";
+        frame.classList.remove("aw-dragging");
         hdShowSnapPreview(null);
         if (side && !st.snap && hdWin.state[page] === st) { hdSnapWindow(page, side, true, { left: origLeft, top: origTop }); return; }
         hdSaveOpenWindowsState(); // 끌기가 끝나면(놓았을 때) 바뀐 위치를 로컬에 남긴다.
@@ -571,9 +617,7 @@
   // 딱 붙는다(win-snap-l / win-snap-r — 위치·크기는 css/01c-app-window.css가 정하므로 화면 크기가 바뀌어도 알아서 맞춰진다).
   // 붙인 직후 반대편 절반에는 "어떤 페이지를 띄울까요?" 패널(#hd-snap-assist)이 떠서, 앱 아이콘을 누르면 그 페이지가
   // 반대편에 붙어 열린다(이미 열려 있거나 내려가 있던 창이면 그 창이 옮겨 붙는다). 패널은 Esc·바깥 클릭·"건너뛰기"로 닫힌다.
-  // 좁은 화면(700px 이하)은 창이 항상 전체 폭이라 이 기능을 쓰지 않는다.
   function hdSnapSideAt(x) {
-    if (window.innerWidth <= 700) return null;
     if (x <= 16) return "l";
     if (x >= window.innerWidth - 16) return "r";
     return null;
@@ -605,7 +649,7 @@
   function hdSnapWindow(page, side, animate, restore) {
     const st = hdWin.state[page];
     const frame = document.getElementById("app-win-" + page);
-    if (!st || !frame || window.innerWidth <= 700) return;
+    if (!st || !frame) return;
     if (animate) hdAnimateWindowResize(frame, "snap");
     st.snap = side;
     st.maximized = false;
@@ -629,7 +673,6 @@
   // page 창을 side 쪽에 붙인 뒤, 반대편 절반 자리에 "여기에 띄울 페이지" 고르기 패널을 띄운다.
   function hdShowSnapAssist(page, side) {
     hdHideSnapAssist(true);
-    if (window.innerWidth <= 700) return;
     const other = side === "l" ? "r" : "l";
     // 반대편에 이미 붙어서 떠 있는 창이 있으면 그 자리는 이미 찼으므로 패널을 띄우지 않는다.
     if (hdWin.order.some((p) => p !== page && hdWin.state[p] && !hdWin.state[p].minimized && hdWin.state[p].snap === other)) return;

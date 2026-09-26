@@ -88,11 +88,16 @@ async function main() {
   }
   fs.writeFileSync(path.join(ROOT, "app.js"), finalAppJs, "utf8");
 
+  // app.js도 head의 4개 라이브러리 스크립트와 마찬가지로 defer를 붙인다.
+  // defer 스크립트들은 "문서에 나온 순서 그대로" 파싱이 끝난 뒤 실행되므로,
+  // html2canvas → exceljs → jszip → supabase-js → app.js 순서(=예전과 동일한 실행 순서)가
+  // 그대로 보장된다. (app.js는 원래도 body 맨 끝에 있어 파싱 차단 영향은 거의 없었지만,
+  // head 스크립트들을 defer로 바꾼 이상 순서 보장을 위해 app.js도 함께 defer가 필요하다.)
   const out = `${headTop}
 <link rel="stylesheet" href="styles.min.css">
 </head>
 ${bodyHtml}
-<script src="app.js"></script>
+<script defer src="app.js"></script>
 </body>
 </html>
 `;

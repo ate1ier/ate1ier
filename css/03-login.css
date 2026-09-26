@@ -109,7 +109,7 @@
   body.login-screen .app-select-menu {
     z-index: 400; border-radius: 12px; padding: 4px; gap: 0;
     background: rgba(44, 46, 58, 0.96); border: 1px solid rgba(255, 255, 255, 0.2);
-    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); color: #fff;
+    backdrop-filter: blur(var(--fx-blur-md)); -webkit-backdrop-filter: blur(var(--fx-blur-md)); color: #fff;
   }
   body.login-screen .app-select-menu button { color: #fff; font-size: 13px; padding: 6px 12px; border-radius: 7px; }
   body.login-screen .app-select-menu button:hover,

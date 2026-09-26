@@ -7,6 +7,11 @@
     if (!m) document.documentElement.setAttribute("data-theme", "light");
     else if (m !== "dark") document.documentElement.setAttribute("data-theme", m);
   } catch (e) {}
+  // "그래픽 효과 줄이기"도 테마처럼 첫 페인트 전에 미리 반영해서, 켜둔 사람 화면에
+  // 블러가 있는 채로 한 프레임 그려졌다가 바로 꺼지는 깜빡임이 없게 한다.
+  try {
+    if (localStorage.getItem("app-fx-reduced") === "1") document.documentElement.setAttribute("data-fx", "reduced");
+  } catch (e) {}
   window.__bootStart = Date.now();
   // 방금 로그인/계정 생성으로 들어온 경우(로그인 화면이 새로고침을 거쳐 앱으로 넘어가는 중)에는
   // "Loading..." 문구 없이 로그인 화면과 같은 배경만 잠깐 덮어뒀다가, 앱이 준비되면 곧바로
@@ -64,7 +69,7 @@
     <i class="status-bar-logo" aria-hidden="true">◆</i>
     <b class="status-bar-title" id="status-bar-account-name">업무 종합 관리</b>
   </button>
-  <button type="button" id="status-bar-mode-btn" class="status-bar-menu-item" aria-haspopup="true" aria-expanded="false" title="모드 (테마 · 라이트/다크)">모드</button>
+  <button type="button" id="status-bar-mode-btn" class="status-bar-menu-item" aria-haspopup="true" aria-expanded="false" title="모드 (테마 · 라이트/다크 · 그래픽 효과)">모드</button>
   <button type="button" id="status-bar-backup-btn" class="status-bar-menu-item" aria-haspopup="true" aria-expanded="false" title="백업">백업</button>
   <button type="button" id="status-bar-help-btn" class="status-bar-menu-item" title="사용설명서">설명</button>
   <button type="button" id="status-bar-discord-btn" class="status-bar-menu-item" title="디스코드 채널 (새 탭에서 열림)">디스코드</button>

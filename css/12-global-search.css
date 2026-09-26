@@ -67,8 +67,8 @@
     border-radius: 20px;
     border: 1px solid var(--mac-vibrancy-hairline);
     background: var(--gs-results-bg, var(--mac-vibrancy));
-    backdrop-filter: blur(30px) saturate(2);
-    -webkit-backdrop-filter: blur(30px) saturate(2);
+    backdrop-filter: blur(var(--fx-blur-lg)) saturate(2);
+    -webkit-backdrop-filter: blur(var(--fx-blur-lg)) saturate(2);
     box-shadow: var(--mac-shadow-float);
     padding: 10px;
     opacity: 0;
