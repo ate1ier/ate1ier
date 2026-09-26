@@ -21,10 +21,10 @@
     height: 38px;
     padding: 0 14px 0;
     box-sizing: content-box;
-    /* 항상 화면 맨 위에 떠 있는 요소라 블러 대신 반투명 단색 배경만 쓴다(저사양 컴퓨터에서
-       스크롤/창 이동마다 블러를 다시 계산하지 않아도 되어 훨씬 가볍다) — --chrome-bg 참고 */
-    background: var(--chrome-bg);
+    background: var(--mac-vibrancy);
     border-bottom: 1px solid var(--mac-vibrancy-hairline);
+    backdrop-filter: blur(30px) saturate(1.8);
+    -webkit-backdrop-filter: blur(30px) saturate(1.8);
     box-shadow: var(--mac-glass-highlight);
     color: var(--text-dim);
     font-size: 13px;
@@ -197,8 +197,8 @@
     border-radius: 18px;
     border: 1px solid var(--mac-vibrancy-hairline);
     background: rgba(41, 41, 46, 0.94);
-    backdrop-filter: blur(var(--fx-blur-lg)) saturate(2);
-    -webkit-backdrop-filter: blur(var(--fx-blur-lg)) saturate(2);
+    backdrop-filter: blur(30px) saturate(2);
+    -webkit-backdrop-filter: blur(30px) saturate(2);
     box-shadow: var(--mac-shadow-float);
     opacity: 0;
     visibility: hidden;

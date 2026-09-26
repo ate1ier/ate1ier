@@ -279,7 +279,7 @@
 
   .sch-menu {
     position: fixed; z-index: 50; background: var(--mac-vibrancy); border: 1px solid var(--mac-vibrancy-hairline);
-    backdrop-filter: blur(var(--fx-blur-lg)) saturate(2); -webkit-backdrop-filter: blur(var(--fx-blur-lg)) saturate(2);
+    backdrop-filter: blur(28px) saturate(2); -webkit-backdrop-filter: blur(28px) saturate(2);
     border-radius: 16px; padding: 6px; display: flex; flex-direction: column; gap: 2px;
     box-shadow: var(--mac-shadow-float); min-width: 108px;
   }
@@ -303,7 +303,7 @@
   }
   .sch-preview-box {
     background: var(--mac-vibrancy); border: 1px solid var(--mac-vibrancy-hairline); border-radius: 20px;
-    backdrop-filter: blur(var(--fx-blur-lg)) saturate(2); -webkit-backdrop-filter: blur(var(--fx-blur-lg)) saturate(2);
+    backdrop-filter: blur(28px) saturate(2); -webkit-backdrop-filter: blur(28px) saturate(2);
     /* 예전에는 항상 고정 너비(최대 1100px)로 떠서, 캡처된 이미지가 그보다 좁으면
        양옆에 불필요한 빈 공간이 생겼다. width를 fit-content로 바꿔서 실제 이미지
        크기에 맞게 미리보기 박스도 함께 줄어들게 한다. */

@@ -660,6 +660,6 @@ html:not([data-theme="light"]) .mac-calendar-window .cal-pop .repeat-row .app-da
   background:var(--toolbar-bg) !important;
   border-bottom:1px solid var(--border) !important;
   box-shadow:none !important;
-  backdrop-filter:blur(var(--fx-blur-md)) saturate(1) !important;
-  -webkit-backdrop-filter:blur(var(--fx-blur-md)) saturate(1) !important;
+  backdrop-filter:blur(20px) saturate(1) !important;
+  -webkit-backdrop-filter:blur(20px) saturate(1) !important;
 }

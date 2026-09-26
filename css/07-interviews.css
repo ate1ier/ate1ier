@@ -81,9 +81,190 @@
   }
   .agent-interview-toolbar .agent-filter-row { margin: 0; }
   .agent-interview-search { width: 220px; flex-shrink: 0; }
-  .interview-summary-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
-  .interview-summary-row .agent-summary { margin-bottom: 0; }
-  .interview-summary-row .agent-search-input { width: 240px; flex-shrink: 0; }
+  /* ---- (1단계) 목록/상세 2단 레이아웃 뼈대 ---- */
+  .interview-split { display: flex; align-items: stretch; gap: 0; min-height: 0; }
+  /* (0단계) 목록 칸을 세로 flex 컨테이너로 만들어, 안의 #interview-list-area(스크롤 영역)와
+     #interview-list-pagination(항상 하단 고정)이 서로 다른 영역으로 분리되게 한다. 이 화면이
+     실제로 높이가 정해진 상자 안에 있을 때만(전체 면담일지 임베드, css/06-agents.css 참고)
+     의미가 생기고, 독립 면담일지 페이지처럼 높이가 정해지지 않은 곳에서는 예전처럼 내용만큼
+     자연스럽게 늘어나므로 안전하다. */
+  .interview-split-list {
+    flex: 1 1 43%; min-width: 0; min-height: 0; border-right: 1px solid var(--hairline); padding-right: 16px;
+    display: flex; flex-direction: column;
+  }
+  #interview-list-area { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; }
+  #interview-list-pagination { flex-shrink: 0; }
+  #interview-list-pagination:empty { display: none; }
+  /* 상세 패널이 세로 스크롤 컨테이너가 되면서(0단계) 왼쪽에만 있던 padding-left만으로는
+     상단/오른쪽 여백이 0이 되어, 다운로드·수정·삭제 아이콘 버튼의 box-shadow(테두리 역할)가
+     스크롤 컨테이너 경계에서 살짝 잘려 보였다. 네 방향 모두 여백을 줘서 그림자가 잘리지 않게 하고,
+     overflow-x는 hidden으로 고정해 가로 스크롤이 생기지 않게 한다. */
+  .interview-split-detail {
+    flex: 1 1 57%; min-width: 0; min-height: 0;
+    padding: 6px 16px 16px 16px; overflow-y: auto; overflow-x: hidden;
+  }
+  /* ---- (3단계) 상세(오른쪽 리딩 페인) 디자인: 아바타/이름/배지 헤더 + 툴바, 정보 그리드,
+     면담 내용, 후속조치 강조 박스. 목업(interview-mockup)의 .d-* 구조를 그대로 옮기되,
+     클래스명은 이 프로젝트 접두사(interview-detail-)에 맞췄다. */
+  .interview-detail-empty {
+    height: 100%; min-height: 220px; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 10px; text-align: center; padding: 40px 12px; color: var(--text-faint);
+  }
+  .interview-detail-empty svg { width: 42px; height: 42px; opacity: 0.35; }
+  .interview-detail-empty div { font-size: 13px; line-height: 1.6; }
+
+  .interview-detail-header { display: flex; align-items: flex-start; gap: 13px; margin-bottom: 16px; }
+  .interview-detail-avatar {
+    width: 46px; height: 46px; border-radius: 50%; flex: none;
+    display: flex; align-items: center; justify-content: center; color: #fff; font-size: 16px; font-weight: 700;
+  }
+  .interview-detail-head-main { flex: 1; min-width: 0; }
+  .interview-detail-name-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .interview-detail-name { font-size: 17px; font-weight: 700; color: var(--text); letter-spacing: -0.01em; }
+  .interview-detail-ldap { font-size: 12.5px; color: var(--text-faint); }
+  .interview-detail-badges { display: flex; gap: 6px; margin-top: 7px; flex-wrap: wrap; }
+  .interview-detail-tools { display: flex; gap: 6px; flex: none; }
+
+  .interview-detail-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+    background: var(--elevated); border: 1px solid var(--hairline); border-radius: 12px;
+    padding: 12px 15px; margin-bottom: 18px;
+  }
+  .interview-detail-grid-item { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .interview-detail-grid-label { font-size: 10.5px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-faint); }
+  .interview-detail-grid-value { font-size: 13px; color: var(--text); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .interview-detail-section-label { font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-faint); margin-bottom: 7px; }
+  .interview-detail-content-box {
+    font-size: 14px; line-height: 1.8; color: var(--text); white-space: pre-wrap;
+    padding-bottom: 20px; margin-bottom: 20px; border-bottom: 1px solid var(--hairline);
+  }
+  /* ---- (6단계) 오른쪽 패널 자리에 뜨는 추가/수정 폼: 상세 헤더와 같은 톤으로,
+     좁은 화면에서만 보이는 "‹" 뒤로가기(.interview-detail-back-btn 재사용) + 제목. ---- */
+  .interview-form-pane-header { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .interview-form-pane-title { margin: 0; }
+  /* ---- (6단계) 패널 내용이 바뀔 때마다(선택한 기록 변경, 상세↔폼 전환) 살짝 떠오르며 들어오는
+     전환 효과. innerHTML 교체로 매번 새 DOM 노드가 생기므로 애니메이션이 자연히 다시 재생된다. ---- */
+  @keyframes iv-fade-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+  .iv-fade-in { animation: iv-fade-in 0.16s ease; }
+  @media (prefers-reduced-motion: reduce) {
+    .iv-fade-in { animation: none; }
+  }
+  /* 폼이 좁은 오른쪽 패널(45% 컬럼)에 들어가면 "대상 상담사 / 면담 관리자"처럼 2열로 짜인
+     필드가 답답해지므로, 창이 넉넉히 넓지 않은 한 세로로 쌓는다(오버레이로 뜨는 좁은 화면은
+     어차피 전체 폭이라 영향 없음). */
+  @media (max-width: 1100px) {
+    .interview-form-pane .agent-form-row-2:not(.agent-form-row-2-date-type) { grid-template-columns: 1fr; }
+  }
+  .interview-detail-followup-box {
+    font-size: 13.5px; line-height: 1.75; color: var(--text); background: var(--accent-dim-soft);
+    border: 1px solid var(--accent-dim); border-radius: 12px; padding: 13px 15px; margin-bottom: 18px;
+  }
+
+  /* ---- (2단계) 목록 행 디자인: 유형별 색상 바 + 아바타 + 이름/LDAP/날짜 + 배지 + 내용 미리보기 2줄.
+     .interview-row/-top/-chevron 등 옛 클래스는 마스터 활동 로그(js/10-master.js)가 그대로 쓰고
+     있으므로 건드리지 않고, 이 화면 전용으로 iv- 접두사 클래스를 쓴다. */
+  .iv-month-label {
+    position: sticky; top: 0; z-index: 2; padding: 7px 6px; margin: 0 -4px 2px;
+    font-size: 11.5px; font-weight: 700; letter-spacing: 0.03em; color: var(--text-faint);
+    background: color-mix(in srgb, var(--panel) 88%, transparent);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--hairline);
+  }
+  .iv-row { border-bottom: 1px solid var(--hairline); }
+  .interview-list .iv-row:last-child { border-bottom: none; }
+  .iv-row-top {
+    display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px 10px 6px; cursor: pointer;
+    position: relative; border-radius: 10px; transition: background 0.12s ease;
+  }
+  .iv-row:hover .iv-row-top { background: var(--hairline); }
+  .iv-row.selected .iv-row-top { background: var(--accent-dim); box-shadow: inset 2px 0 0 var(--accent); }
+  .iv-row-bar { width: 3px; align-self: stretch; border-radius: 3px; flex: none; background: var(--blue); }
+  .iv-row.type-regular .iv-row-bar { background: var(--blue); }
+  .iv-row.type-adhoc .iv-row-bar { background: var(--green); }
+  .iv-row.type-warning .iv-row-bar { background: var(--red); }
+  .iv-row.type-resign .iv-row-bar { background: var(--purple); }
+  .iv-row-avatar {
+    width: 34px; height: 34px; border-radius: 50%; flex: none; margin-top: 1px;
+    display: flex; align-items: center; justify-content: center; color: #fff; font-size: 13px; font-weight: 700;
+  }
+  .iv-row-avatar-empty { background: var(--hairline-strong); color: var(--text-faint); }
+  .iv-row-main { min-width: 0; flex: 1; }
+  .iv-row-line1 { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
+  .iv-row-name { font-size: 14px; font-weight: 700; color: var(--text); }
+  .iv-row-ldap { font-size: 11.5px; color: var(--text-faint); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .iv-row-date { font-size: 11.5px; color: var(--text-faint); flex: none; }
+  .iv-row.selected .iv-row-date { color: var(--accent); font-weight: 600; }
+  .iv-row-badges { display: flex; gap: 4px; margin: 4px 0; flex-wrap: wrap; }
+  .iv-row-snippet {
+    font-size: 12.5px; color: var(--text-dim); line-height: 1.4;
+    overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  }
+  /* 다운로드/수정/삭제 아이콘 버튼: 원래 행 위에 호버로 뜨는 액션이었으나 3단계부터
+     상세 패널 툴바(.interview-detail-tools)에서만 쓰인다. 위치는 그 상위 컨테이너가 결정한다. */
+  .iv-row-icon-btn {
+    width: 26px; height: 26px; border-radius: 7px; border: none; flex: none;
+    display: flex; align-items: center; justify-content: center; cursor: pointer;
+    background: var(--panel); box-shadow: 0 1px 3px rgba(0,0,0,0.14), 0 0 0 1px var(--hairline-strong);
+    color: var(--text-dim);
+  }
+  .iv-row-icon-btn:hover { color: var(--accent); }
+  .iv-row-icon-btn.danger:hover { color: var(--red); }
+  .iv-row-icon-btn svg { width: 13px; height: 13px; }
+  /* ---- (5단계) 반응형: 목록/상세를 나란히 둘 자리가 없을 만큼 좁아지면(실제 창/컨테이너
+     폭 기준 — js/06-interviews.js의 attachInterviewSplitResponsive가 iv-compact를 붙였다 뗀다)
+     "메일 앱" 패턴으로 바꾼다. 목록은 전체 폭으로 보이고, 행을 클릭하면 상세가 오른쪽에서
+     미끄러져 들어와 전체를 덮으며, 상세의 "‹" 버튼으로 다시 목록으로 돌아간다. */
+  .interview-split.iv-compact { position: relative; overflow: hidden; }
+  .interview-split.iv-compact .interview-split-list {
+    width: 100%; flex: 1 1 auto; border-right: none; padding-right: 0; padding-bottom: 0;
+  }
+  .interview-split.iv-compact .interview-split-detail {
+    position: absolute; inset: 0; left: 100%; width: 100%; z-index: 3;
+    padding: 16px; border-radius: 12px;
+    background: var(--panel);
+    transition: left 0.28s cubic-bezier(.32, .72, 0, 1);
+    overflow-y: auto;
+  }
+  .interview-split.iv-compact.detail-open .interview-split-detail { left: 0; }
+  .interview-detail-back-btn {
+    display: none; align-items: center; justify-content: center; flex: none;
+    width: 28px; height: 28px; margin-top: 1px; border-radius: 8px; border: none; cursor: pointer;
+    background: var(--panel); box-shadow: 0 1px 3px rgba(0,0,0,0.14), 0 0 0 1px var(--hairline-strong);
+    color: var(--text-dim);
+  }
+  .interview-split.iv-compact .interview-detail-back-btn { display: flex; }
+  .interview-detail-back-btn:hover { color: var(--accent); }
+  /* ---- (4단계) 상단 툴바 재구성: 제목/통계를 왼쪽에 고정하고(margin-right:auto),
+     유형 필터(알약형) · 검색창(사이드바와 통일된 라운드 스타일) · 액션 버튼을 목업의
+     main-toolbar처럼 한 줄에 배치한다. 폭이 좁아지면 flex-wrap으로 자연스럽게 줄바꿈. */
+  .interview-toolbar { align-items: center; justify-content: flex-start; row-gap: 10px; }
+  .interview-toolbar-title-block { display: flex; flex-direction: column; gap: 2px; margin-right: auto; min-width: 0; }
+  .interview-toolbar-title-block .agent-list-title { margin: 0; }
+  .interview-toolbar-summary { margin-bottom: 0 !important; white-space: nowrap; }
+  /* 상담사 개별 면담일지(.mac-iv-search)와 같은 규격(낮은 높이, 작은 글씨)으로 맞추고,
+     가로 폭은 이 화면의 검색 문구("상담사 이름 또는 LDAP 검색")가 잘리지 않는 선에서
+     딱 맞춘다. 뒤에 로드되는 css/11-overrides.css의 .agent-search-input 규칙보다
+     우선하도록 클래스 두 개를 겹쳐 써서(.interview-toolbar-search.agent-search-input)
+     명시도를 높인다. */
+  .interview-toolbar-search.agent-search-input { width: 230px; flex-shrink: 0; padding: 6px 12px; }
+  .interview-toolbar-search .agent-search-input-field { font-size: 12.5px; }
+  .interview-toolbar-search.agent-search-input:focus-within { box-shadow: 0 0 0 3px var(--accent-dim); }
+  /* 유형 필터: 테두리만 있는 기본 .agent-filter-btn 대신, 사이드바/목업과 같은
+     "꽉 채운 알약" 세그먼트 느낌으로 이 화면에서만 다시 칠한다. */
+  .interview-type-filter { gap: 6px; margin: 0; flex-wrap: wrap; }
+  .interview-type-filter .agent-filter-btn {
+    background: var(--elevated); border-color: transparent; color: var(--text-dim);
+    padding: 5px 12px; font-size: 12px; font-weight: 500;
+  }
+  .interview-type-filter .agent-filter-btn:hover { color: var(--text); background: var(--hairline); border-color: transparent; }
+  .interview-type-filter .agent-filter-btn.active {
+    background: var(--accent); border-color: var(--accent); color: var(--accent-text); font-weight: 600;
+  }
+  @media (max-width: 900px) {
+    .interview-toolbar-title-block { flex-basis: 100%; margin-right: 0; }
+    .interview-toolbar-search.agent-search-input { width: 100%; order: 3; }
+  }
   .agent-list-header-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .interview-export-menu { max-height: 320px; overflow-y: auto; min-width: 180px; }
   .interview-export-menu button { display: flex; align-items: center; justify-content: space-between; gap: 8px; white-space: nowrap; }

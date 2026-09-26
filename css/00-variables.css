@@ -34,25 +34,18 @@
     --weekend-tint: #1f2228;
     --sch-cell-bg: #262a32;
     --native-color-scheme: dark;
-    /* ---- 그래픽 효과(블러) 세기: 저사양 컴퓨터 대응용 ----
-       모든 backdrop-filter의 blur() 반경은 "고정값 * var(--fx-blur-scale)"로 계산된다.
-       기본값 1일 땐 아래 각 --fx-blur-* 값 그대로, 상태표시줄 "모드" 메뉴의
-       "그래픽 효과 줄이기"를 켜면(html[data-fx="reduced"]) 0이 되어 블러 계산 자체가
-       거의 사라진다(js/01d-undo-theme-dock.js의 setFxReduced 참고). */
-    --fx-blur-scale: 1;
-    --fx-blur-xl: calc(16px * var(--fx-blur-scale));   /* 예전 30~35px 자리 */
-    --fx-blur-lg: calc(13px * var(--fx-blur-scale));   /* 예전 26~28px 자리 */
-    --fx-blur-md: calc(11px * var(--fx-blur-scale));   /* 예전 20~24px 자리 */
-    --fx-blur-sm: calc(3px * var(--fx-blur-scale));    /* 예전 2~3px 자리(원래도 저렴함) */
+    /* ---- macOS 세그먼트/툴바 트랙 색(면담일지 AI요약·엑셀·추가 버튼 묶음 등, .mac-iv-*
+       클래스 전반이 공유). 원래 .agent-iv-popover 안에서만 정의돼 있어서, 같은 .mac-iv-tool
+       버튼이라도 그 팝오버 밖(전체 면담일지 화면 등)에서는 --mac-track이 없어
+       var(--hairline-strong)로 대체되며 색이 달라졌다. 전역으로 옮겨 항상 같은 색을 쓰게 한다. ---- */
+    --mac-track: rgba(120, 120, 128, 0.16);
+    --mac-track-strong: rgba(120, 120, 128, 0.26);
     /* ---- 반경 스케일: 최신 macOS(리퀴드 글래스)처럼 더 둥글고 큼직하게 ---- */
     --radius-xs: 8px;
     --radius-sm: 12px;
     --mac-radius: 14px;
     --mac-radius-lg: 22px;
     --radius-xl: 28px;
-    /* ---- 상시 노출 요소(상단 상태표시줄·오른쪽 내비게이션 독) 전용: 블러 없이 반투명 단색으로만 유리감을 낸다.
-       --mac-vibrancy보다 훨씬 진하게(거의 불투명) 잡아서, 블러가 없어도 뒤 콘텐츠가 비쳐 보이지 않게 한다. ---- */
-    --chrome-bg: rgba(24, 26, 32, 0.94);
     --mac-vibrancy: rgba(32, 35, 42, 0.66);
     --mac-vibrancy-hairline: rgba(255, 255, 255, 0.09);
     --mac-glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.07);
@@ -82,7 +75,6 @@
   }
   /* ---- light 테마는 상태색(오프·연차·대휴 등)이 다크와 다르게 밝은 배경용으로 조정된다 ---- */
   html[data-theme="light"] {
-    --chrome-bg: rgba(255, 255, 255, 0.94);
     --mac-vibrancy: rgba(255, 255, 255, 0.66);
     --mac-vibrancy-hairline: rgba(45, 48, 52, 0.14);
     --mac-glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.7);
@@ -110,26 +102,6 @@
     --indigo: #a554b6;
     --indigo-dim: #a554b626;
     --sch-cell-bg: var(--bg);
-  }
-  /* ---- "그래픽 효과 줄이기"를 켰을 때: 블러 반경을 0으로 낮추고(레이아웃/색은 그대로),
-     box-shadow와 transition/animation도 함께 줄인다. 예전엔 블러만 꺼져서 절반만
-     효과가 있었다 — box-shadow(그림자 블러 계산)와 backdrop-filter는 저사양(내장
-     그래픽) PC에서 특히 무거운 속성이고, transition/animation은 값 자체의 무게보다
-     "매 프레임 다시 그리는 시간"을 잡아먹어서 다른 무거운 렌더링과 겹치면 버벅임을
-     키운다. 전부 켜져 있던 상태를 기준으로 얼마나 "겹쳤을 때" 부담을 주는지가
-     핵심이라, 여기서는 아예 없애는 쪽을 택했다(레이아웃과 색은 전혀 안 바뀜 —
-     그림자만 없어지고 상태 전환이 즉시 일어난다). 토글 하나로 켜고 끌 수 있어서
-     리스크는 낮다. */
-  html[data-fx="reduced"] {
-    --fx-blur-scale: 0;
-  }
-  html[data-fx="reduced"] *,
-  html[data-fx="reduced"] *::before,
-  html[data-fx="reduced"] *::after {
-    box-shadow: none !important;
-    transition-duration: 0.01ms !important;
-    transition-delay: 0s !important;
-    animation-duration: 0.01ms !important;
   }
   * { box-sizing: border-box; }
   html, body {
