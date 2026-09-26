@@ -106,12 +106,29 @@
     _scheduleFitObserver.observe(wrap);
   }
 
+  // [성능 개선 계획 Phase 2] 셀 하나(근태 상태·메모·필요인력 등)만 바뀌어도 표 전체
+  // (수십 명 × 31일 = 수백~수천 개 셀)를 문자열로 다시 만들고 innerHTML을 통째로
+  // 교체 + 이벤트 전부 재바인딩하던 것을, domReconcileTable(js/01f-settings-menu-utils.js)로
+  // 실제로 달라진 칸만 그 자리에서 고쳐 쓰도록 바꿨다 — QA 표와 같은 방식.
+  // 인원이 추가/삭제되는 등 행 개수 자체가 바뀌는 경우(흔치 않음)는 domReconcileTable이
+  // 스스로 포기하고 false를 돌려주므로, 그때만 안전하게 표 전체를 새로 만든다.
   function updateScheduleTableArea() {
     const tableArea = document.getElementById("schedule-table-area");
     const logArea = document.getElementById("schedule-log-area");
     if (tableArea) {
-      tableArea.innerHTML = `<div class="schedule-table-wrap"><div class="schedule-scale-inner">${buildScheduleTableHtml()}</div></div>`;
-      attachScheduleTableHandlers(tableArea);
+      const newTableHtml = buildScheduleTableHtml();
+      const existingTable = tableArea.querySelector("table.schedule-table");
+      const patched = existingTable && domReconcileTable(existingTable, newTableHtml);
+      if (!patched) {
+        tableArea.innerHTML = `<div class="schedule-table-wrap"><div class="schedule-scale-inner">${newTableHtml}</div></div>`;
+        attachScheduleTableHandlers(tableArea);
+      } else {
+        // patch에 성공했으면 셀의 이벤트는 이미 다 붙어 있지만, 열/행 헤더 선택 표시·
+        // 복사해 둔 범위의 점선 표시는 class 보존만으로는 100% 안심할 수 없으니
+        // (이 두 함수는 멱등이라 다시 불러도 안전) 한 번 더 맞춰준다.
+        scheduleApplyHeaderSelectionHighlight();
+        scheduleApplyCopiedOutline();
+      }
     }
     if (logArea) {
       logArea.innerHTML = buildScheduleLogHtml();

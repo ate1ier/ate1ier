@@ -45,7 +45,10 @@
   // state[page] = { minimized, maximized, justOpened } — justOpened는 "방금 새로 연" 창에만 켜서(복원 때는
   // 켜지 않음) 팝 애니메이션을 돌리고 스크롤을 맨 위로 되돌린다. 복원(내려간 창을 다시 열기)은 이 플래그를
   // 켜지 않아서, 스크롤 위치 등 그 페이지 안에서 하던 작업 화면이 그대로 남아 있는다.
-  const hdWin = { order: [], state: {} };
+  // dirty[page] = true — "포커스된(맨 앞) 창만 즉시 갱신" 최적화(성능 개선 계획 Phase 2)용 표시.
+  // 배경(포커스 아님)에 있는 동안 상태가 바뀌어 "다시 그려야 하는데 지금은 건너뛴" 창에만 true로
+  // 남겨두고, 그 창이 다시 앞으로 올 때(hdBringToFront) 그 시점에 한 번만 실제로 그린다.
+  const hdWin = { order: [], state: {}, dirty: {} };
   // 화면 좌/우 절반 붙이기(스냅) 관련 임시 상태: 어시스트 패널 DOM과 그 패널을 닫기 위한 문서 이벤트 핸들러.
   const hdSnap = { assistEl: null, onDown: null, onKey: null };
 
@@ -153,7 +156,23 @@
       const frame = document.getElementById("app-win-" + p);
       if (frame) frame.style.zIndex = String(50 + i);
     });
+    hdRenderWindowIfDirty(page); // 배경에 있는 동안 밀려 있던(dirty) 최신 내용을, 막 앞으로 나오는 이 시점에 한 번만 그려준다.
     hdSaveOpenWindowsState();
+  }
+
+  // renderHomeDesktopWindows()가 "지금은 포커스가 아니라서" 건너뛰고 dirty만 표시해둔 창을,
+  // 그 창이 실제로 화면 맨 앞으로 나오는 순간(포커스) 한 번만 그린다. dirty가 아니면 아무 것도 하지 않는다
+  // (이미 최신 내용이 그려져 있거나, 애초에 한 번도 건너뛴 적이 없는 경우).
+  function hdRenderWindowIfDirty(page) {
+    if (!hdWin.dirty[page]) return;
+    const frame = document.getElementById("app-win-" + page);
+    const fn = hdPageRenderer(page);
+    if (!frame || !fn) return;
+    const inner = frame.querySelector(".page-inner");
+    if (!inner) return;
+    inner.classList.toggle("wide", page === "schedule" || page === "calendar");
+    fn(inner);
+    hdWin.dirty[page] = false;
   }
 
   // opts.minimized/opts.maximized를 넘기면(부팅 시 복원 전용) 그 상태로 접힌 채/최대화된 채
@@ -531,6 +550,7 @@
       setTimeout(() => frame.remove(), 230);
     }
     delete hdWin.state[page];
+    delete hdWin.dirty[page];
     const idx = hdWin.order.indexOf(page);
     if (idx !== -1) hdWin.order.splice(idx, 1);
     if (typeof _resetExpandedStateForPage === "function") _resetExpandedStateForPage(page);
@@ -550,15 +570,28 @@
     });
     hdWin.order = [];
     hdWin.state = {};
+    hdWin.dirty = {};
     document.body.classList.remove("hd-win-open"); // 창이 하나도 없으니 바탕화면 위젯 블러도 해제
     hdSaveOpenWindowsState();
   }
 
-  // renderApp()이 홈 위젯을 그린 뒤 불린다: 열려 있는 모든 창 각각에 그 페이지를 새로 그려서, 여러 창이
-  // 동시에 열려 있어도(다른 기기 동기화 등으로) 전부 최신 내용을 보여주게 한다. 실제로 화면에 없던 창을
-  // 새로 열 때는 appWin 상태가 이미 09a-home-desktop.js 쪽에서 만들어져 있다.
-  function renderHomeDesktopWindows() {
+  // renderApp()이 홈 위젯을 그린 뒤 불린다.
+  // [성능 개선 계획 Phase 2] 예전에는 상태가 하나만 바뀌어도(스케줄 셀 하나 편집 등) 열려 있는 창을
+  // 전부 처음부터 다시 그렸다 — 멀티태스킹(여러 창을 동시에 띄워두는, 이 앱의 핵심 사용 패턴)을 할수록
+  // 그만큼 버벅임이 커지는 구조였다. 지금은 지금 실제로 눈에 보이는(=맨 앞으로 포커스된) 창만 즉시
+  // 다시 그리고, 그 뒤에 가려진 나머지 창은 dirty로만 표시해뒀다가 그 창이 실제로 앞으로 나올 때
+  // (hdBringToFront → hdRenderWindowIfDirty) 딱 한 번만 그린다 — 안 보이는 동안 여러 번 바뀌어도 그린 건 한 번뿐.
+  //   - 처음 만들어져 아직 한 번도 내용이 그려진 적 없는 창(hasContent === false)은 포커스 여부와 관계없이
+  //     바로 그린다 — 새로고침 복원 등으로 여러 창이 한꺼번에 열릴 때 텅 빈 창이 보이는 일이 없게.
+  //   - 화면을 절반씩 나눠 붙인(스냅) 창은 원래부터 "두 창을 동시에 보기 위한" 기능이라 포커스가 아니어도
+  //     항상 즉시 그린다 — 안 그러면 옆에 나란히 보이는 창이 눈에 띄게 오래된 내용으로 남을 수 있다.
+  //   - 그 밖의(가려져 있거나 최소화된) 배경 창은, 다른 기기 동기화처럼 "지금 당장 반영돼야 하는" 예외
+  //     경우에 한해 opts.forceAllWindows로 이 최적화를 건너뛰고 예전처럼 전부 다시 그릴 수 있다
+  //     (js/01c-cloud-sync-runtime.js 참고).
+  function renderHomeDesktopWindows(opts) {
     if (CURRENT_ACCOUNT_IS_MASTER) return;
+    const forceAll = !!(opts && opts.forceAllWindows);
+    const frontPage = hdWin.order.length ? hdWin.order[hdWin.order.length - 1] : null;
     hdWin.order.forEach((page) => {
       const frame = document.getElementById("app-win-" + page);
       const fn = hdPageRenderer(page);
@@ -566,9 +599,15 @@
       const inner = frame.querySelector(".page-inner");
       if (!inner) return;
       inner.classList.toggle("wide", page === "schedule" || page === "calendar");
-      fn(inner);
       const st = hdWin.state[page];
-      if (st && st.justOpened) inner.scrollTop = 0;
+      const hasContent = !!inner.firstChild;
+      if (forceAll || page === frontPage || !hasContent || (st && st.snap)) {
+        fn(inner);
+        hdWin.dirty[page] = false;
+        if (st && st.justOpened) inner.scrollTop = 0;
+      } else {
+        hdWin.dirty[page] = true; // 지금은 건너뛴다 — 이 창이 다시 포커스될 때 hdRenderWindowIfDirty가 그린다.
+      }
     });
     syncAppWindows();
   }

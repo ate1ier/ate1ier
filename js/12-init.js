@@ -1,4 +1,8 @@
-  function renderApp() {
+  // opts.forceAllWindows: true를 넘기면 배경(포커스 아님) 창까지 전부 지금 당장 다시 그린다(성능 개선
+  // 계획 Phase 2로 기본은 포커스된 창만 즉시 갱신하도록 바뀌었다 — js/09a-home-desktop.js의
+  // renderHomeDesktopWindows 참고). 다른 기기 실시간 동기화·탭 복귀 시 "밀린 내용 한꺼번에 반영"처럼
+  // 배경 창도 지금 당장 최신이어야 하는 드문 경우에만 이 옵션을 넘긴다.
+  function renderApp(opts) {
     renderNav();
     const root = document.getElementById("page-inner");
     root.classList.toggle("wide", state.page === "schedule" || state.page === "home" || state.page === "calendar");
@@ -9,7 +13,7 @@
     const homeRoot = document.getElementById("home-root");
     if (homeRoot && typeof renderHomeDesktopWindows === "function") {
       renderHomePage(homeRoot);
-      renderHomeDesktopWindows();
+      renderHomeDesktopWindows(opts);
       return;
     }
     // (#home-root/js/09a-home-desktop.js가 없는 경우를 대비한 안전망) 예전처럼 페이지 하나만 #page-inner에 그린다.
