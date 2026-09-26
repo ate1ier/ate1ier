@@ -15,6 +15,12 @@
   .mac-seg button { border: none; background: none; padding: 6px 9px; border-radius: 7px; cursor: pointer; color: var(--text-dim); display: flex; align-items: center; font-family: inherit; }
   .mac-seg button:hover { background: var(--panel); }
   .mac-seg .month-label { padding: 6px 12px; font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; }
+  /* 이름 검색창(.interview-toolbar-search, padding 6px 12px + 1px 테두리, 12.5px 글자)과
+     세로 높이를 맞춘다. 다른 화면(월별 스케줄 등)도 같은 .mac-seg/.schedule-month-nav를
+     쓰므로 QA 상단 툴바(.qa-top) 안에서만 살짝 낮춘다. */
+  .qa-top .mac-seg { padding: 1px; }
+  .qa-top .mac-seg button,
+  .qa-top .mac-seg .month-label { padding-top: 5px; padding-bottom: 5px; }
 
   .lock-chip {
     display: flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 600; color: var(--amber);
@@ -34,24 +40,28 @@
     border-bottom: 1px solid var(--hairline);
   }
   .qa-stat-row .qa-stat-grid { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
-  /* 플레이스홀더가 "이름 검색"으로 짧아져서 굳이 넓을 필요가 없다. 자세한 검색 방법은
-     title(마우스 올렸을 때 뜨는 툴팁)로 안내한다. 오른쪽 끝에 붙도록 align-self로 정렬. */
-  .qa-stat-row .agent-search-input { width: 200px; max-width: 100%; flex-shrink: 0; align-self: flex-end; }
+  /* 이름 검색창은 상단 툴바(.qa-top)의 "이 달 잠그기" 버튼 오른쪽으로 이동했고,
+     전체 면담일지 검색창(.interview-toolbar-search)과 같은 규격을 그대로 쓴다. */
   
   /* [macOS 스타일 재설계 3단계] 테두리 없는 숫자 나열 대신, macOS 위젯/Stocks 앱처럼
      작은 카드(.qa-stat-card) + 증감 배지(.qa-stat-card-trend)로 스캔하기 쉽게 바꿨다.
      qaStatItemHtml()이 이 마크업을 만들어내고, 캡처(이미지 저장) 쪽도 같은 함수를
      재사용하므로 화면과 캡처 이미지가 항상 같은 카드 모양을 갖는다. */
   .qa-stat-grid {
-    display: flex; flex-wrap: wrap; align-items: stretch;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+    align-items: stretch;
     gap: 10px; margin-bottom: 26px; padding-bottom: 22px;
     border-bottom: 1px solid var(--hairline);
   }
   .qa-stat-card {
-    flex: 0 0 auto; min-width: 132px; background: var(--elevated); border: 1px solid var(--hairline);
+    /* 카드 배경을 --elevated보다 --panel 쪽으로 살짝 섞어서(밝게) 만든다.
+       --elevated 자체는 다른 화면(면담일지 등)도 같이 쓰는 전역 토큰이라
+       바꾸지 않고, 이 카드에서만 색을 밝혔다. */
+    background: color-mix(in srgb, var(--elevated) 65%, var(--panel) 35%);
+    border: 1px solid var(--hairline);
     border-radius: var(--mac-radius, 14px); padding: 12px 14px; box-shadow: var(--mac-shadow-sm, 0 6px 18px rgba(0,0,0,.22));
   }
-  .qa-stat-card.accent { background: linear-gradient(160deg, var(--accent-dim-soft), var(--elevated)); border-color: var(--accent-dim); }
+  .qa-stat-card.accent { background: linear-gradient(160deg, var(--accent-dim-soft), color-mix(in srgb, var(--elevated) 65%, var(--panel) 35%)); border-color: var(--accent-dim); }
   /* 통계 숫자·라벨은 페이지 제목과 같은 세리프 계열로 */
   .qa-stat-card-num, .qa-stat-card-label {
     font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Apple SD Gothic Neo", "Helvetica Neue", Arial, sans-serif;
@@ -83,6 +93,63 @@
   }
   .qa-pill-filter button:hover { background: var(--hairline); }
   .qa-pill-filter button.on { background: var(--accent); color: var(--accent-text); font-weight: 600; }
+
+  /* ==========================================================================
+     [macOS 스타일 재설계 5단계] 표(<table>) → 인셋 그룹 리스트(div 목록) 교체.
+     화면(renderQAPage/updateQATableArea)에서만 쓰고, 이미지 캡처(captureQAPage,
+     forCapture=true)는 여전히 아래 .qa-table/.qa-table-wrap(<table>)을 그대로 쓴다.
+     grid-template-columns는 buildQATableHtml()이 만드는 5칸(이름·업무·조·점수·전월
+     대비)과 순서를 맞춰야 한다. */
+  .qa-list-wrap { border: 1px solid var(--hairline); border-radius: 16px; overflow: hidden; background: var(--panel); }
+  .qa-list-head {
+    display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; padding: 9px 18px;
+    font-size: 11px; font-weight: 600; color: var(--text-faint); letter-spacing: .02em; text-transform: uppercase;
+    background: color-mix(in srgb, var(--elevated) 88%, transparent);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--hairline-strong); position: sticky; top: 0;
+    text-align: center;
+  }
+  .qa-row {
+    display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; align-items: center;
+    padding: 9px 18px; border-bottom: 1px solid var(--hairline); transition: background .12s ease;
+    text-align: center;
+  }
+  .qa-list-wrap .qa-row:last-child { border-bottom: none; }
+  .qa-row:hover { background: var(--accent-dim-soft); }
+  .qa-row.qa-row-highlight { background: var(--accent-dim); transition: background 1.8s ease; }
+  /* 퇴사 처리된 인원: 목록에서 바로 지우지 않고, 이름에 취소선을 그은 채로
+     퇴사월과 그 다음달까지 유지되다가 그 이후 달부터 자연스럽게 목록에서 빠진다. */
+  .qa-row.qa-row-resigned { opacity: 0.62; }
+  .qa-row.qa-row-resigned .qa-name-main { text-decoration: line-through; color: var(--text-faint); }
+  .qa-empty-row { grid-template-columns: 1fr; padding: 24px 18px; }
+  .qa-empty-row .qa-empty { text-align: center; color: var(--text-faint); background: none; padding: 0; }
+
+  /* 헤더·행 모두 가운데 정렬: flex로 배치되는 칸(이름/업무뱃지/조/점수/전월대비)은
+     text-align만으로는 안 맞춰지므로 justify-content도 함께 가운데로 맞춘다. */
+  .qa-name-cell { display: flex; align-items: center; justify-content: center; gap: 9px; min-width: 0; cursor: pointer; }
+  .qa-name-cell:hover .qa-name-main { text-decoration: underline; color: var(--accent); }
+  .qa-name-cell:hover .qa-name-search-icon { color: var(--accent); opacity: 1; }
+  .qa-name-text { min-width: 0; text-align: center; }
+  .qa-name-main { font-size: 13.5px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .qa-name-ldap { font-size: 11px; color: var(--text-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .qa-badges { display: flex; gap: 4px; flex-wrap: wrap; justify-content: center; }
+  .qa-row-group, .qa-row-score, .qa-row-diff { display: flex; align-items: center; justify-content: center; }
+  .qa-row-timezone { font-size: 12.5px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* 점수 입력칸을 구간별 색이 칠해진 "칩"처럼 보이게 한다(값 자체는 여전히
+     <input>이라 클릭해서 바로 편집 가능). 잠긴 달(:disabled)에는 항상 회색으로
+     돌아가서 "지금은 수정할 수 없다"는 신호가 색보다 우선한다. */
+  .qa-score-input.s-high:not(:disabled) { color: var(--green); background: var(--green-dim); border-color: transparent; }
+  .qa-score-input.s-mid:not(:disabled) { color: var(--blue); background: var(--blue-dim); border-color: transparent; }
+  .qa-score-input.s-low:not(:disabled) { color: var(--amber); background: var(--amber-dim); border-color: transparent; }
+  .qa-score-input.s-bad:not(:disabled) { color: var(--red); background: var(--red-dim); border-color: transparent; }
+  .qa-score-input.s-empty:not(:disabled) { color: var(--text-faint); background: var(--mac-track); border-color: transparent; }
+
+  @media (max-width: 900px) {
+    .qa-list-head, .qa-row { grid-template-columns: repeat(4, 1fr); }
+    .qa-list-head span:nth-child(2), .qa-list-head span:nth-child(3),
+    .qa-row .qa-row-timezone, .qa-row .qa-badges { display: none; }
+  }
 
   .qa-table-wrap { overflow-x: auto; border: 1px solid var(--hairline); border-radius: 16px; background: var(--panel); }
   .qa-table {
@@ -117,7 +184,10 @@
     border-radius: 10px; background: var(--bg); color: var(--text); font-size: 13px; font-weight: 700; padding: 5px 4px;
     -moz-appearance: textfield; vertical-align: middle;
   }
-  html:not([data-theme="light"]) .qa-score-input:not(:disabled) { color: #ffffff; }
+  /* :where()로 감싸서 이 규칙의 명시도를 낮춘다 — 그대로 두면(html 태그+속성선택자
+     때문에) 아래 .qa-score-chip 색상 규칙(s-high 등)보다 명시도가 높아져서, 다크
+     테마에서 점수 구간별 글자색이 전부 흰색으로 덮이며 사라지는 문제가 있었다. */
+  :where(html:not([data-theme="light"])) .qa-score-input:not(:disabled) { color: #ffffff; }
   .qa-score-input:disabled { background: var(--bg); color: var(--text-faint); cursor: not-allowed; }
   .qa-score-input:focus { border-color: var(--accent); }
   .qa-score-input::-webkit-outer-spin-button,
@@ -172,6 +242,11 @@
   .qa-detail-head-actions { display: flex; align-items: center; gap: 6px; }
   .qa-detail-delete-btn, .qa-bulk-delete-btn { color: var(--red); border-color: var(--red); }
   .qa-detail-delete-btn:hover, .qa-bulk-delete-btn:hover { background: color-mix(in srgb, var(--red) 12%, transparent); }
+  /* [전체 면담일지 툴바(.mac-iv-tool)와 규격/굵기/색을 맞춤] 일괄삭제 버튼은 그 안의
+     아이콘·라벨 span에도 .mac-iv-tool-icon/.mac-iv-tool-label의 기본색(!important)을
+     덮어써서 빨간색을 유지해야 한다. */
+  .qa-bulk-delete-btn .mac-iv-tool-icon,
+  .qa-bulk-delete-btn .mac-iv-tool-label { color: var(--red) !important; }
   /* .qa-round-summary-box / .qa-round-hint: 면담일지 AI 요약 박스와 공유하는 클래스라 그대로 둔다. */
   .qa-round-summary-box {
     margin-top: 10px; font-size: 13px; line-height: 1.7; color: var(--text-dim);

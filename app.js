@@ -8063,11 +8063,31 @@
     setTimeout(() => document.addEventListener("keydown", qaDetailEscHandler, true), 0);
   }
 
-  function qaScoreCellHtml(agent, year, monthIndex) {
+  // [macOS 스타일 재설계 5단계] 점수 구간(90+/80대/70대/70미만/값없음)에 따라 칩 색
+  // 클래스(css/10-qa.css의 .qa-score-chip.s-*, 1단계에서 이미 준비해둔 토큰)를 골라준다.
+  // 인셋 리스트의 점수 입력칸(<input>)에 그대로 얹어서 "표"가 아니라 "색칠된 칩"처럼
+  // 보이게 하는 용도 — 값 자체는 여전히 input이라 클릭해서 바로 편집할 수 있다.
+  function qaScoreChipClass(val) {
+    if (val === null || val === undefined) return "s-empty";
+    if (val >= 90) return "s-high";
+    if (val >= 80) return "s-mid";
+    if (val >= 70) return "s-low";
+    return "s-bad";
+  }
+
+  // 점수 입력칸 자체(<input>)만 만든다. buildQATableHtml()의 화면용(인셋 리스트) 행은
+  // <td> 래퍼 없이 이 입력칸을 div 셀 안에 바로 넣는다.
+  function qaScoreInputHtml(agent, year, monthIndex) {
     const val = getQAScore(agent.id, year, monthIndex);
     const locked = qaIsMonthLocked(year, monthIndex);
-    return `<td><input type="number" class="qa-score-input" min="0" max="100" step="0.1" inputmode="decimal"
-      data-qa-agent="${agent.id}" value="${val === null ? "" : val.toFixed(1)}" placeholder="-" title="점수"${locked ? " disabled" : ""}></td>`;
+    return `<input type="number" class="qa-score-input ${qaScoreChipClass(val)}" min="0" max="100" step="0.1" inputmode="decimal"
+      data-qa-agent="${agent.id}" value="${val === null ? "" : val.toFixed(1)}" placeholder="-" title="점수"${locked ? " disabled" : ""}>`;
+  }
+
+  // <table> 캡처용 마크업(buildQATableHtml의 forCapture 경로)이 여전히 <td> 래퍼를
+  // 쓰므로 그대로 유지한다.
+  function qaScoreCellHtml(agent, year, monthIndex) {
+    return `<td>${qaScoreInputHtml(agent, year, monthIndex)}</td>`;
   }
 
   function qaDiffHtml(agent, year, monthIndex) {
@@ -8192,51 +8212,101 @@
     });
   }
 
-  // 화면에 보이는 표와 이미지 캡처용 표가 같은 마크업을 쓰도록 분리해뒀다.
-  // forCapture가 true면 점수 입력칸 대신 텍스트로 값을 보여준다(캡처 이미지에 <input>이 그대로 찍히지 않도록).
+  // 이름(또는 사번)을 해시로 돌려서 아바타 배경색(css/10-qa.css의 .qa-avatar.pal-0~7,
+  // 1단계에서 이미 준비해둔 팔레트)을 안정적으로 골라준다. 같은 사람은 항상 같은 색.
+  // 퇴사자는 항상 pal-resigned(회색)로 고정해서 "더 이상 활동하지 않음"이 표시되게 한다.
+  function qaAvatarPaletteClass(agent) {
+    if (agent.status === "RESIGNED") return "pal-resigned";
+    const str = String(agent.id || agent.name || "");
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) hash = (hash * 31 + str.charCodeAt(i)) >>> 0;
+    return `pal-${hash % 8}`;
+  }
+
+  // [macOS 스타일 재설계 5단계] 화면용 표(<table>)를 macOS Mail/Finder 느낌의
+  // "인셋 그룹 리스트"(div 목록)로 바꾼다. 이미지 캡처(forCapture=true, 05g의
+  // captureQAPage())는 그대로 <table> 마크업을 쓰므로 그 경로는 손대지 않았다.
+  // 화면 쪽에서 계속 지켜야 하는 것들: data-qa-row-agent(강조 스크롤/CSS.escape 조회),
+  // 배지 클래스("badge sm night/day", "badge sm resigned"), 점수 입력칸의 blur/Enter
+  // 저장(.qa-score-input, data-qa-agent), 잠긴 달의 disabled, 퇴사자 취소선 스타일.
   function buildQATableHtml(agentsList, year, monthIndex, forCapture) {
+    if (forCapture) {
+      return `
+        <div class="qa-table-wrap">
+          <table class="qa-table">
+            <thead>
+              <tr>
+                <th>이름</th>
+                <th>LDAP</th>
+                <th>시간대</th>
+                <th>업무구분</th>
+                <th>조</th>
+                <th>점수</th>
+                <th>전월 대비</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${agentsList.length === 0 ? `
+                <tr><td class="qa-empty" colspan="7">해당하는 상담사가 없어요.</td></tr>
+              ` : agentsList.map((a) => {
+                const typeBadges = renderWorkTypeBadges(a.workTypes, "sm");
+                const groupBadge = `<span class="badge sm ${a.group === "night" ? "night" : "day"}">${a.group === "night" ? "야간" : "주간"}</span>`;
+                const val = getQAScore(a.id, year, monthIndex);
+                const isResigned = a.status === "RESIGNED";
+                const rowClass = isResigned ? "qa-row-resigned" : "";
+                const resignedBadge = isResigned ? ` <span class="badge sm resigned">퇴사</span>` : "";
+                return `
+                  <tr data-qa-row-agent="${a.id}" class="${rowClass}">
+                    <td class="qa-col-name">${esc(a.name)}${resignedBadge}</td>
+                    <td class="qa-col-ldap">${esc(a.ldap || "-")}</td>
+                    <td>${esc(a.timezone || "-")}</td>
+                    <td class="qa-col-badges">${typeBadges || "-"}</td>
+                    <td>${groupBadge}</td>
+                    <td>${val === null ? "-" : val.toFixed(1)}</td>
+                    <td>${qaDiffHtml(a, year, monthIndex)}</td>
+                  </tr>
+                `;
+              }).join("")}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
     return `
-      <div class="qa-table-wrap">
-        <table class="qa-table">
-          <thead>
-            <tr>
-              <th>이름</th>
-              <th>LDAP</th>
-              <th>시간대</th>
-              <th>업무구분</th>
-              <th>조</th>
-              <th>점수</th>
-              <th>전월 대비</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${agentsList.length === 0 ? `
-              <tr><td class="qa-empty" colspan="7">${forCapture ? "해당하는 상담사가 없어요." : `근무중인 상담사가 없어요. "상담사 관리"에서 인원을 등록해주세요.`}</td></tr>
-            ` : agentsList.map((a) => {
-              const typeBadges = renderWorkTypeBadges(a.workTypes, "sm");
-              const groupBadge = `<span class="badge sm ${a.group === "night" ? "night" : "day"}">${a.group === "night" ? "야간" : "주간"}</span>`;
-              const val = getQAScore(a.id, year, monthIndex);
-              const scoreCell = forCapture
-                ? `<td>${val === null ? "-" : val.toFixed(1)}</td>`
-                : qaScoreCellHtml(a, year, monthIndex);
-              const highlight = !forCapture && qaHighlightAgentId === a.id;
-              const isResigned = a.status === "RESIGNED";
-              const rowClass = `${highlight ? "qa-row-highlight " : ""}${isResigned ? "qa-row-resigned" : ""}`.trim();
-              const resignedBadge = isResigned ? ` <span class="badge sm resigned">퇴사</span>` : "";
-              return `
-                <tr data-qa-row-agent="${a.id}" class="${rowClass}">
-                  <td class="qa-col-name"${forCapture ? "" : ` data-qa-name-click="${a.id}"`}>${esc(a.name)}${resignedBadge}${forCapture ? "" : `<span class="qa-name-search-icon">${ICON_SEARCH_MINI}</span>`}</td>
-                  <td class="qa-col-ldap">${esc(a.ldap || "-")}</td>
-                  <td>${esc(a.timezone || "-")}</td>
-                  <td class="qa-col-badges">${typeBadges || "-"}</td>
-                  <td>${groupBadge}</td>
-                  ${scoreCell}
-                  <td>${qaDiffHtml(a, year, monthIndex)}</td>
-                </tr>
-              `;
-            }).join("")}
-          </tbody>
-        </table>
+      <div class="qa-list-wrap">
+        <div class="qa-list-head">
+          <span>이름</span><span>시간대</span><span>업무</span><span>조</span><span>점수</span><span>전월 대비</span>
+        </div>
+        ${agentsList.length === 0 ? `
+          <div class="qa-row qa-empty-row"><div class="qa-empty">근무중인 상담사가 없어요. "상담사 관리"에서 인원을 등록해주세요.</div></div>
+        ` : agentsList.map((a) => {
+          const typeBadges = renderWorkTypeBadges(a.workTypes, "sm");
+          const groupBadge = `<span class="badge sm ${a.group === "night" ? "night" : "day"}">${a.group === "night" ? "야간" : "주간"}</span>`;
+          const highlight = qaHighlightAgentId === a.id;
+          const isResigned = a.status === "RESIGNED";
+          const rowClass = ["qa-row", highlight ? "qa-row-highlight" : "", isResigned ? "qa-row-resigned" : ""].filter(Boolean).join(" ");
+          const resignedBadge = isResigned ? ` <span class="badge sm resigned">퇴사</span>` : "";
+          const ldapLine = a.ldap || "-";
+          const initial = esc(String(a.name || "-").charAt(0) || "-");
+          return `
+            <div class="${rowClass}" data-qa-row-agent="${a.id}">
+              <div class="qa-name-cell" data-qa-name-click="${a.id}">
+                <div class="qa-avatar ${qaAvatarPaletteClass(a)}">${initial}</div>
+                <div class="qa-name-text">
+                  <div class="qa-name-main">${esc(a.name)}${resignedBadge}</div>
+                  <div class="qa-name-ldap">${esc(ldapLine)}</div>
+                </div>
+                <span class="qa-name-search-icon">${ICON_SEARCH_MINI}</span>
+              </div>
+              <div class="qa-row-timezone">${esc(a.timezone || "-")}</div>
+              <div class="qa-badges">${typeBadges || "-"}</div>
+              <div class="qa-row-group">${groupBadge}</div>
+              <div class="qa-row-score">${qaScoreInputHtml(a, year, monthIndex)}</div>
+              <div class="qa-row-diff">${qaDiffHtml(a, year, monthIndex)}</div>
+            </div>
+          `;
+        }).join("")}
       </div>
     `;
   }
@@ -8304,18 +8374,18 @@
           <button id="qa-next-month" aria-label="다음 달">›</button>
         </div>
         <button class="lock-chip" id="qa-lock-btn">${locked ? `${ICON_UNLOCK} 잠금 해제` : `${ICON_LOCK} 이 달 잠그기`}</button>
-        <div class="mac-toolbar-group">
-          <button class="mac-tool" id="qa-excel-upload-btn">${ICON_UPLOAD} 엑셀 업로드</button>
-          <button class="mac-tool qa-bulk-delete-btn" id="qa-bulk-delete-btn">${ICON_TRASH} 일괄삭제</button>
-          <button class="mac-tool" id="qa-capture-btn">${ICON_CAMERA} 이미지로 저장 ▾</button>
+        <div class="agent-search-input interview-toolbar-search">
+          <input type="text" class="agent-search-input-field" id="qa-search-input" placeholder="이름 검색" title="상담사 검색 (이름/주간/야간/채팅/유선, 쉼표로 여러 개)" value="${esc(qaUi.searchQuery)}" autocomplete="off">
+          ${ICON_SEARCH_MINI}
+        </div>
+        <div class="mac-iv-toolbar">
+          <button type="button" class="mac-iv-tool" id="qa-excel-upload-btn"><span class="mac-iv-tool-icon">${ICON_UPLOAD}</span><span class="mac-iv-tool-label">엑셀 업로드</span></button>
+          <button type="button" class="mac-iv-tool qa-bulk-delete-btn" id="qa-bulk-delete-btn"><span class="mac-iv-tool-icon">${ICON_TRASH}</span><span class="mac-iv-tool-label">일괄삭제</span></button>
+          <button type="button" class="mac-iv-tool" id="qa-capture-btn"><span class="mac-iv-tool-icon">${ICON_CAMERA}</span><span class="mac-iv-tool-label">이미지로 저장 ▾</span></button>
         </div>
       </div>
       <div class="status" id="qa-status"></div>
       <div class="qa-stat-row">
-        <div class="agent-search-input">
-          <input type="text" class="agent-search-input-field" id="qa-search-input" placeholder="이름 검색" title="상담사 검색 (이름/주간/야간/채팅/유선, 쉼표로 여러 개)" value="${esc(qaUi.searchQuery)}" autocomplete="off">
-          ${ICON_SEARCH_MINI}
-        </div>
         <div class="qa-stat-grid">
           ${qaStatItemHtml("전체 평균", stats.total, prevStats.total, true)}
           ${qaStatItemHtml("유선 점수 평균", stats.voice, prevStats.voice)}
@@ -8530,7 +8600,7 @@
 
     function cleanup(label) {
       if (wrapper.parentNode) document.body.removeChild(wrapper);
-      if (btn) { btn.disabled = false; btn.innerHTML = ICON_CAMERA + " 이미지로 저장 ▾"; }
+      if (btn) { btn.disabled = false; btn.innerHTML = `<span class="mac-iv-tool-icon">${ICON_CAMERA}</span><span class="mac-iv-tool-label">이미지로 저장 ▾</span>`; }
       if (label) flashQAStatus(label);
     }
 
@@ -11963,7 +12033,7 @@
       console.error(err);
       flashScheduleStatus("엑셀 파일을 만들지 못했어요.");
     } finally {
-      if (btn) { btn.disabled = false; btn.innerHTML = ICON_CHART + " 엑셀로 다운로드"; }
+      if (btn) { btn.disabled = false; btn.innerHTML = `<span class="mac-iv-tool-icon">${ICON_CHART}</span><span class="mac-iv-tool-label">엑셀</span>`; }
     }
   }
 
@@ -12168,7 +12238,7 @@
 
     function cleanup(label) {
       if (wrapper.parentNode) document.body.removeChild(wrapper);
-      if (btn) { btn.disabled = false; btn.innerHTML = ICON_CAMERA + " 이미지로 저장 ▾"; }
+      if (btn) { btn.disabled = false; btn.innerHTML = ICON_CAMERA + " 이미지로 저장"; }
       if (label) flashScheduleStatus(label);
     }
 
@@ -13285,19 +13355,47 @@
 
   // 07a8-schedule-render-page.js — renderSchedulePage 진입점
   // (07-schedule.js를 기능 단위로 분할한 파일 중 하나. 실행 순서는 파일명 정렬로 유지됨)
+  // 툴바의 "···" 더보기 메뉴(#sch-more-menu)를 문서 아무 곳이나 클릭하면 닫는 핸들러.
+  // renderSchedulePage()가 다시 호출될 때마다 리스너가 중복으로 쌓이지 않도록,
+  // resize 핸들러(fitScheduleTable 등)와 같은 방식으로 이름 붙은 함수로 빼서
+  // 등록 전에 항상 먼저 제거한다.
+  function scheduleCloseMoreMenuOnOutsideClick() {
+    const menu = document.getElementById("sch-more-menu");
+    if (menu) menu.classList.remove("open");
+  }
   function renderSchedulePage(root) {
     root.innerHTML = `
       <div class="schedule-top">
-        <div class="schedule-title">월별 스케줄</div>
-        <div class="schedule-month-nav">
-          <button class="schedule-month-btn" id="sch-prev-month">‹</button>
-          <div class="schedule-month-label">${scheduleMonthLabel()}${scheduleIsMonthLocked(scheduleUi.year, scheduleUi.monthIndex) ? ` <span class="sch-locked-badge">${ICON_LOCK} 확정됨</span>` : ""}</div>
-          <button class="schedule-month-btn" id="sch-next-month">›</button>
-          <button class="ghost-btn sch-lock-toggle-btn ${scheduleIsMonthLocked(scheduleUi.year, scheduleUi.monthIndex) ? "locked" : ""}" id="sch-lock-btn" style="margin-left:8px;">${scheduleIsMonthLocked(scheduleUi.year, scheduleUi.monthIndex) ? `${ICON_UNLOCK} 잠금 해제` : `${ICON_LOCK} 이 달 잠그기`}</button>
-          <button class="ghost-btn ${scheduleBulkPasteOpen ? "active" : ""}" id="sch-bulk-btn" style="margin-left:8px;">${ICON_CLIPBOARD} 일괄 붙여넣기</button>
-          <button class="ghost-btn" id="sch-capture-btn">${ICON_CAMERA} 이미지로 저장 ▾</button>
-          <button class="ghost-btn" id="sch-excel-btn">${ICON_CHART} 엑셀로 다운로드</button>
-          <button class="ghost-btn" id="sch-holidaydoc-btn">${ICON_CLIPBOARD} 휴일대체 확인서</button>
+        <div class="sch-toolbar-title">월별 스케줄<small>${scheduleMonthLabel()} · 전체 ${getStaffListForMonth(scheduleUi.year, scheduleUi.monthIndex).length}명</small></div>
+
+        <div class="mac-seg">
+          <button id="sch-prev-month">‹</button>
+          <div class="month-label">${scheduleMonthLabel()}</div>
+          <button id="sch-next-month">›</button>
+        </div>
+
+        <button class="lock-chip" id="sch-lock-btn">${scheduleIsMonthLocked(scheduleUi.year, scheduleUi.monthIndex) ? `${ICON_LOCK} 확정됨` : `${ICON_UNLOCK} 이 달 잠그기`}</button>
+
+        <div class="mac-search">
+          <input type="text" id="sch-search-input" placeholder="이름 검색" title="상담사 검색 (이름/주간/야간/채팅/유선, 쉼표로 여러 개)" value="${esc(scheduleUi.searchQuery)}" autocomplete="off">
+          ${ICON_SEARCH_MINI}
+        </div>
+
+        <div class="mac-iv-toolbar">
+          <button type="button" class="mac-iv-tool ${scheduleBulkPasteOpen ? "mac-iv-tool-accent" : ""}" id="sch-bulk-btn" title="일괄 붙여넣기"><span class="mac-iv-tool-icon">${ICON_CLIPBOARD}</span><span class="mac-iv-tool-label">일괄 붙여넣기</span></button>
+          <button type="button" class="mac-iv-tool ${scheduleHiddenPanelOpen ? "mac-iv-tool-accent" : ""}" id="sch-hidden-btn" title="숨긴 열·행"><span class="mac-iv-tool-icon">${ICON_CALENDAR}</span><span class="mac-iv-tool-label">숨긴 열·행</span>${scheduleHiddenCount() > 0 ? `<span class="sch-more-badge">${scheduleHiddenCount()}</span>` : ""}</button>
+          <button type="button" class="mac-iv-tool danger" id="sch-delete-btn" title="일정 삭제"><span class="mac-iv-tool-icon">${ICON_TRASH}</span><span class="mac-iv-tool-label">일정 삭제</span></button>
+          <button type="button" class="mac-iv-tool" id="sch-auto-btn" title="AI 자동 배치"><span class="mac-iv-tool-icon">${ICON_SPARK}</span><span class="mac-iv-tool-label">자동 배치</span></button>
+          <button type="button" class="mac-iv-tool" id="sch-excel-btn" title="엑셀로 다운로드"><span class="mac-iv-tool-icon">${ICON_CHART}</span><span class="mac-iv-tool-label">엑셀</span></button>
+        </div>
+
+        <div class="sch-more-wrap">
+          <button type="button" class="sch-more-btn" id="sch-more-btn" title="더보기">···</button>
+          <div class="sch-more-menu" id="sch-more-menu">
+            <button type="button" id="sch-adjust-summary-btn">${ICON_CLIPBOARD} 가감점 취합</button>
+            <button type="button" id="sch-holidaydoc-btn">${ICON_CLIPBOARD} 휴일대체 확인서</button>
+            <button type="button" id="sch-capture-btn">${ICON_CAMERA} 이미지로 저장</button>
+          </div>
         </div>
       </div>
       <div class="status" id="schedule-status"></div>
@@ -13328,16 +13426,6 @@
         <span class="item"><span class="swatch" style="background:var(--amber);"></span>지각</span>
         <span class="item"><span class="swatch" style="background:var(--red);"></span>결근</span>
         <span class="item"><span class="swatch" style="background:var(--text-faint);"></span>퇴사</span>
-      </div>
-      <div class="schedule-table-toolbar">
-        <div class="agent-search-input">
-          <input type="text" class="agent-search-input-field" id="sch-search-input" placeholder="이름 검색" title="상담사 검색 (이름/주간/야간/채팅/유선, 쉼표로 여러 개)" value="${esc(scheduleUi.searchQuery)}" autocomplete="off">
-          ${ICON_SEARCH_MINI}
-        </div>
-        <button class="ghost-btn" id="sch-adjust-summary-btn">${ICON_CLIPBOARD} 가감점 취합</button>
-        <button class="ghost-btn" id="sch-auto-btn">자동 배치 ▾</button>
-        <button class="ghost-btn ${scheduleHiddenPanelOpen ? "active" : ""}" id="sch-hidden-btn">${ICON_CALENDAR} 숨긴 열/행${scheduleHiddenCount() > 0 ? ` (${scheduleHiddenCount()})` : ""} ▾</button>
-        <button class="ghost-btn sch-delete-btn-small" id="sch-delete-btn">${ICON_TRASH} 일정 삭제</button>
       </div>
       ${scheduleHiddenPanelOpen ? `
         <div class="schedule-colgroup-panel">
@@ -13417,6 +13505,19 @@
     };
     document.getElementById("sch-adjust-summary-btn").onclick = () => openScheduleAdjustModal();
     document.getElementById("sch-auto-btn").onclick = (e) => openScheduleAutoMenu(e.currentTarget);
+    const schMoreBtn = document.getElementById("sch-more-btn");
+    const schMoreMenu = document.getElementById("sch-more-menu");
+    if (schMoreBtn && schMoreMenu) {
+      // 목업과 동일한 동작: 버튼 클릭은 전파를 막고 메뉴만 토글하고,
+      // 메뉴 안 항목(가감점 취합/휴일대체 확인서/이미지로 저장) 클릭이나 그 외 바깥
+      // 클릭은 전파를 막지 않으므로 document 리스너가 그대로 메뉴를 닫아준다.
+      schMoreBtn.onclick = (e) => {
+        e.stopPropagation();
+        schMoreMenu.classList.toggle("open");
+      };
+    }
+    document.removeEventListener("click", scheduleCloseMoreMenuOnOutsideClick);
+    document.addEventListener("click", scheduleCloseMoreMenuOnOutsideClick);
     const schSearchInput = document.getElementById("sch-search-input");
     if (schSearchInput) {
       // 표 영역만 다시 그려서(전체 renderApp() 대신) 검색창의 IME 조합·포커스가 끊기지 않게 한다.
@@ -17595,7 +17696,6 @@
         <button class="nav-btn ${state.page === "calendar" ? "active" : ""}" data-nav="calendar" title="캘린더">${NAV_ICON_CALENDAR} <span class="nav-text">캘린더</span></button>
         <button class="nav-btn ${state.page === "agents" ? "active" : ""}" data-nav="agents" title="상담사 관리">${NAV_ICON_AGENTS} <span class="nav-text">상담사 관리</span></button>
         <button class="nav-btn ${state.page === "notes" ? "active" : ""}" data-nav="notes" title="업무 정리">${NAV_ICON_NOTES} <span class="nav-text">업무 정리</span></button>
-        <button class="nav-btn ${state.page === "interviews" ? "active" : ""}" data-nav="interviews" title="면담일지">${NAV_ICON_INTERVIEWS} <span class="nav-text">면담일지</span></button>
         <button class="nav-btn ${state.page === "qa" ? "active" : ""}" data-nav="qa" title="품질 관리">${NAV_ICON_QA} <span class="nav-text">품질 관리</span></button>
         <button class="nav-btn ${state.page === "schedule" ? "active" : ""}" data-nav="schedule" title="월별 스케줄">${NAV_ICON_SCHEDULE} <span class="nav-text">월별 스케줄</span></button>
       `}
@@ -17646,7 +17746,10 @@
   }
   // 품질 관리는 상담사 관리 → 전체 QA 점수에서 사용하므로 앱 정보는 유지하되,
   // 바탕화면/하단 Dock의 독립 실행 아이콘에서는 제외한다.
-  const HOME_DESKTOP_LAUNCH_APPS = HOME_DESKTOP_APPS.filter((a) => a[0] !== "qa");
+  // 면담일지도 같은 이유로 제외한다: 상담사별 면담일지(agent-iv-popover)와 전역 검색에서
+  // setPage("interviews")로 페이지 자체는 계속 쓰이므로 앱 정보는 남겨두고, 독립 실행
+  // 아이콘(내비게이션 사이드바·바탕화면·하단 Dock)에서만 뺀다.
+  const HOME_DESKTOP_LAUNCH_APPS = HOME_DESKTOP_APPS.filter((a) => a[0] !== "qa" && a[0] !== "interviews");
   const HOME_DESKTOP_APP_BY_ID = {};
   HOME_DESKTOP_APPS.forEach((a) => { HOME_DESKTOP_APP_BY_ID[a[0]] = a; });
   // 창으로 열 수 있는 대상의 정보([id, 이름, 그라데이션, 아이콘 path]). 기본 앱 6개 외에, 바탕화면에서 우클릭으로
@@ -18462,12 +18565,13 @@
   }
   function desktopFolderCellKey(col, row) { return col + "," + row; }
   // 지금 옮기는 폴더(excludeId) 말고, 나머지 폴더들이 차지하고 있는 칸의 집합.
-  // (저장된 x,y는 항상 스냅된 값이므로 그대로 칸으로 되돌려도 정확히 들어맞는다.)
+  // 칸 인덱스(col,row)가 저장돼 있으면 그걸 그대로 쓰고(가장 정확함), 옛 데이터처럼 픽셀 좌표(x,y)만
+  // 있으면 지금 화면 기준으로 한 번 계산해서 쓴다(마이그레이션 전 과도기 대비).
   function desktopFolderOccupiedCells(folders, excludeId, vw) {
     const set = new Set();
     Object.values(folders || {}).forEach((f) => {
       if (!f || f.id === excludeId) return;
-      const c = desktopFolderGridCell(f.x, f.y, vw);
+      const c = (f.col != null && f.row != null) ? { col: f.col, row: f.row } : desktopFolderGridCell(f.x, f.y, vw);
       set.add(desktopFolderCellKey(c.col, c.row));
     });
     return set;
@@ -18492,13 +18596,19 @@
     }
     return { col: c0, row: r0 }; // 화면 전체가 꽉 찬 경우
   }
-  // 놓은 자리(x,y)를 "다른 폴더와 겹치지 않는" 가장 가까운 그리드 칸의 좌표로 맞춘다.
-  // folders는 desktopFoldersData.folders, excludeId는 지금 옮기거나 새로 만드는 폴더 자신의 id(있으면 그 칸은 비교 대상에서 뺀다).
-  function desktopFolderSnapToFreeGrid(x, y, folders, excludeId, vw, vh) {
+  // 놓은 자리(x,y)가 속한 "빈" 그리드 칸의 [열,행] 인덱스만 구한다(다른 폴더와 안 겹치는 칸으로 맞춤).
+  // 폴더에 저장하는 값은 항상 이 칸 인덱스여야 한다 — 픽셀 좌표(x,y)는 화면 오른쪽 기준선이 해상도마다
+  // 달라지므로 그대로 저장하면 다른 모니터/창 크기에서 엉뚱한 자리로 보이거나 다른 아이콘과 겹칠 수 있다.
+  function desktopFolderSnapToFreeCell(x, y, folders, excludeId, vw, vh) {
     const target = desktopFolderGridCell(x, y, vw);
     const bounds = desktopFolderGridBounds(vw, vh);
     const occupied = desktopFolderOccupiedCells(folders, excludeId, vw);
-    const free = desktopFolderNearestFreeCell(target.col, target.row, occupied, bounds.maxCol, bounds.maxRow);
+    return desktopFolderNearestFreeCell(target.col, target.row, occupied, bounds.maxCol, bounds.maxRow);
+  }
+  // 놓은 자리(x,y)를 "다른 폴더와 겹치지 않는" 가장 가까운 그리드 칸의 좌표로 맞춘다.
+  // folders는 desktopFoldersData.folders, excludeId는 지금 옮기거나 새로 만드는 폴더 자신의 id(있으면 그 칸은 비교 대상에서 뺀다).
+  function desktopFolderSnapToFreeGrid(x, y, folders, excludeId, vw, vh) {
+    const free = desktopFolderSnapToFreeCell(x, y, folders, excludeId, vw, vh);
     return desktopFolderCellToPos(free.col, free.row, vw, vh);
   }
 
@@ -18523,10 +18633,23 @@
     if (!layer || CURRENT_ACCOUNT_IS_MASTER) return;
     if (dfUi.renamingId || dfUi.dragging) return;
     const list = Object.values(desktopFoldersData.folders).sort((a, b) => String(a.createdAt || "").localeCompare(String(b.createdAt || "")));
+    let migrated = false;
     layer.innerHTML = list.map((f) => {
-      const p = desktopFolderClampPos(f.x, f.y);
+      // 저장된 픽셀 좌표(x,y)가 아니라 그리드 칸(col,row)을 기준으로 매번 새로 좌표를 계산한다.
+      // 그래야 모니터 해상도·창 크기가 달라져(화면 오른쪽 기준선이 움직여) 있어도 항상 같은 칸에 놓인다.
+      // 옛 데이터(칸 정보 없이 x,y만 있던 폴더)는 지금 화면 기준으로 칸을 한 번 계산해 그 자리에 고정한다.
+      if (f.col == null || f.row == null) {
+        const c = desktopFolderGridCell(f.x, f.y);
+        f.col = c.col;
+        f.row = c.row;
+        delete f.x;
+        delete f.y;
+        migrated = true;
+      }
+      const p = desktopFolderCellToPos(f.col, f.row);
       return `<div class="hd-fld" role="button" tabindex="0" data-fld-id="${esc(f.id)}" style="left:${p.x}px;top:${p.y}px" title="${esc(f.name)}">${DESKTOP_FOLDER_SVG}<span class="hd-fld-name">${esc(f.name)}</span></div>`;
     }).join("");
+    if (migrated) saveDesktopFoldersData();
     syncDesktopFolderStates();
   }
 
@@ -18544,9 +18667,9 @@
   function createDesktopFolder(clientX, clientY) {
     const id = genId();
     const names = Object.values(desktopFoldersData.folders).map((f) => f.name);
-    const pos = desktopFolderSnapToFreeGrid(clientX - 43, clientY - 30, desktopFoldersData.folders, id);
+    const cell = desktopFolderSnapToFreeCell(clientX - 43, clientY - 30, desktopFoldersData.folders, id);
     desktopFoldersData.folders[id] = {
-      id, name: desktopFolderUniqueName("새 폴더", names), x: pos.x, y: pos.y, createdAt: new Date().toISOString(), files: [],
+      id, name: desktopFolderUniqueName("새 폴더", names), col: cell.col, row: cell.row, createdAt: new Date().toISOString(), files: [],
     };
     saveDesktopFoldersData();
     renderDesktopFolders();
@@ -18729,11 +18852,16 @@
         el.classList.remove("dragging");
         const dropX = parseFloat(el.style.left) || 0;
         const dropY = parseFloat(el.style.top) || 0;
-        const snapped = desktopFolderSnapToFreeGrid(dropX, dropY, desktopFoldersData.folders, id); // 놓은 자리를 다른 폴더와 안 겹치는 가까운 칸으로 맞춘다
+        const freeCell = desktopFolderSnapToFreeCell(dropX, dropY, desktopFoldersData.folders, id); // 놓은 자리를 다른 폴더와 안 겹치는 가까운 칸으로 맞춘다
+        const snapped = desktopFolderCellToPos(freeCell.col, freeCell.row);
         el.style.left = snapped.x + "px";
         el.style.top = snapped.y + "px";
-        f.x = snapped.x;
-        f.y = snapped.y;
+        // 픽셀 좌표(x,y)가 아니라 칸 인덱스(col,row)를 저장한다 — 그래야 다른 해상도/창 크기에서도
+        // 항상 같은 칸에 다시 놓인다(renderDesktopFolders가 이 값으로 매번 좌표를 새로 계산함).
+        f.col = freeCell.col;
+        f.row = freeCell.row;
+        delete f.x;
+        delete f.y;
         saveDesktopFoldersData();
       };
       document.addEventListener("pointermove", move);
@@ -18772,6 +18900,16 @@
       const id = el.getAttribute("data-fld-id");
       if (e.key === "Enter") { e.preventDefault(); setPage(dfPage(id)); }
       else if (e.key === "F2") { e.preventDefault(); startDesktopFolderRename(id); }
+    });
+  })();
+
+  // 창 크기가 바뀌거나(브라우저 리사이즈) 다른 해상도의 모니터로 창을 옮기면 화면 오른쪽 기준선이
+  // 바뀌므로, 그 자리에서 바로 폴더 위치를 다시 계산해서 새로고침 없이도 항상 같은 칸에 보이게 한다.
+  (function wireDesktopFolderResizeReflow() {
+    let resizeTimer = null;
+    window.addEventListener("resize", () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => { if (!dfUi.dragging && !dfUi.renamingId) renderDesktopFolders(); }, 150);
     });
   })();
 

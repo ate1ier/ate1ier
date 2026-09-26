@@ -128,7 +128,7 @@
     outline-offset: 2px;
   }
   /* 각 페이지 상단 타이틀(상담사 관리·면담일지·업무 정리·품질 관리·월별 스케줄·캘린더 등) — KoPub 바탕체 Light */
-  .agent-list-title, .notes-title, .qa-title, .schedule-title, .calendar-page-title {
+  .agent-list-title, .notes-title, .qa-title, .calendar-page-title {
     font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Apple SD Gothic Neo", "Helvetica Neue", Arial, sans-serif;
     font-weight: 300;
   }

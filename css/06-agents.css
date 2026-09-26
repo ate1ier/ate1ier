@@ -379,6 +379,8 @@
   .mac-iv-tool-label { font-size: 11.5px !important; font-weight: 600 !important; color: var(--text-dim); white-space: nowrap; }
   .mac-iv-tool-accent .mac-iv-tool-icon,
   .mac-iv-tool-accent .mac-iv-tool-label { color: var(--accent); }
+  .mac-iv-tool.danger .mac-iv-tool-icon,
+  .mac-iv-tool.danger .mac-iv-tool-label { color: var(--red); }
 
   .mac-iv-body { display: flex; flex-direction: column; gap: 12px; }
 
