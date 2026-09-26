@@ -33,6 +33,11 @@
 
   renderApp();
   if (typeof window !== "undefined" && window.__hideBootLoader) window.__hideBootLoader();
+  // 이 브라우저(컴퓨터)에서 처음으로 사양이 낮아 보이면, "그래픽 효과 줄이기" 토글의
+  // 존재를 몰라서 못 쓰는 경우를 막기 위해 딱 한 번만 안내한다 (js/01d-undo-theme-dock.js).
+  if (!CURRENT_ACCOUNT_IS_MASTER && typeof maybeSuggestLowGraphicsMode === "function") {
+    setTimeout(maybeSuggestLowGraphicsMode, 600);
+  }
 
   // 로그인/계정 생성 직후 딱 한 번, 홈 화면 위에 팝업을 살짝 늦게(화면이 먼저 자리
   // 잡은 뒤) 애니메이션과 함께 띄워준다. 지난달 마감(최종 스케줄/품질 관리 확정)이

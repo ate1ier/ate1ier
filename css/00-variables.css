@@ -111,9 +111,25 @@
     --indigo-dim: #a554b626;
     --sch-cell-bg: var(--bg);
   }
-  /* ---- "그래픽 효과 줄이기"를 켰을 때: 블러 반경만 0으로 낮춘다(레이아웃/색은 그대로) ---- */
+  /* ---- "그래픽 효과 줄이기"를 켰을 때: 블러 반경을 0으로 낮추고(레이아웃/색은 그대로),
+     box-shadow와 transition/animation도 함께 줄인다. 예전엔 블러만 꺼져서 절반만
+     효과가 있었다 — box-shadow(그림자 블러 계산)와 backdrop-filter는 저사양(내장
+     그래픽) PC에서 특히 무거운 속성이고, transition/animation은 값 자체의 무게보다
+     "매 프레임 다시 그리는 시간"을 잡아먹어서 다른 무거운 렌더링과 겹치면 버벅임을
+     키운다. 전부 켜져 있던 상태를 기준으로 얼마나 "겹쳤을 때" 부담을 주는지가
+     핵심이라, 여기서는 아예 없애는 쪽을 택했다(레이아웃과 색은 전혀 안 바뀜 —
+     그림자만 없어지고 상태 전환이 즉시 일어난다). 토글 하나로 켜고 끌 수 있어서
+     리스크는 낮다. */
   html[data-fx="reduced"] {
     --fx-blur-scale: 0;
+  }
+  html[data-fx="reduced"] *,
+  html[data-fx="reduced"] *::before,
+  html[data-fx="reduced"] *::after {
+    box-shadow: none !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0s !important;
+    animation-duration: 0.01ms !important;
   }
   * { box-sizing: border-box; }
   html, body {

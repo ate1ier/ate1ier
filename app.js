@@ -198,6 +198,8 @@
     // 값인데 빠져 있어서, 15초마다 모든 사람의 탭에서 클라우드에 저장을 시도하고 있었다.
     // 그 하트비트는 계정 구분 없이 하나의 키를 공유해서, 다른 사람이 그냥 탭을 열어두기만
     // 해도 계속 클라우드 쓰기가 발생하는 원인 중 하나였다.
+    "app-fx-suggested", // "그래픽 효과 줄이기 켤까요?" 안내를 이미 봤는지 여부. 이 컴퓨터의
+    // 사양 얘기라 기기별로 따로 기억하면 되고, 굳이 클라우드로 보낼 필요가 없다.
   ]);
   function isCloudSynced(key) {
     if (!cloud) return false;
@@ -1060,6 +1062,56 @@
     renderNav();
   }
   applyFxReduced(getStoredFxReduced());
+
+  /* ---- 저사양 자동 감지: 토글이 있는 걸 몰라서 못 쓰는 사람들을 위해,
+     이 컴퓨터가 사양이 낮아 보이면 처음 한 번만 "그래픽 효과 줄이기를 켤까요?"
+     라고 안내한다. 이미 껐다 켰다 해본 사람(FX_KEY 존재)이나, 이미 한 번
+     안내를 봤던 브라우저(FX_SUGGEST_KEY)에는 다시 띄우지 않는다.
+     navigator.deviceMemory는 Safari 등 일부 브라우저엔 아예 없을 수 있어서,
+     hardwareConcurrency(코어 수)만으로도 판단하게 둔다. */
+  const FX_SUGGEST_KEY = "app-fx-suggested";
+  function _isLikelyLowSpecDevice() {
+    try {
+      const cores = navigator.hardwareConcurrency || 0;
+      const mem = navigator.deviceMemory; // 없으면 undefined
+      if (cores && cores <= 4) return true;
+      if (typeof mem === "number" && mem > 0 && mem <= 4) return true;
+      return false;
+    } catch (e) { return false; }
+  }
+  function _liveBannerWrapForFxSuggest() {
+    let el = document.getElementById("cloud-live-banner-wrap");
+    if (!el) {
+      el = document.createElement("div");
+      el.id = "cloud-live-banner-wrap";
+      el.className = "cloud-live-banner-wrap";
+      document.body.appendChild(el);
+    }
+    return el;
+  }
+  function maybeSuggestLowGraphicsMode() {
+    if (isFxReduced()) return;
+    try { if (localStorage.getItem(FX_KEY) !== null) return; } catch (e) {} // 한 번이라도 직접 켜/꺼본 사람은 그 선택을 존중
+    try { if (localStorage.getItem(FX_SUGGEST_KEY)) return; } catch (e) {}
+    if (!_isLikelyLowSpecDevice()) return;
+    try { localStorage.setItem(FX_SUGGEST_KEY, "1"); } catch (e) {}
+    const el = document.createElement("div");
+    el.className = "cloud-live-banner";
+    el.id = "fx-suggest-banner";
+    el.innerHTML = `
+      <div class="cloud-live-banner-body">
+        <div class="cloud-live-banner-title">그래픽 효과를 줄여볼까요?</div>
+        <div class="cloud-live-banner-desc">이 컴퓨터는 사양이 낮게 감지됐어요. "그래픽 효과 줄이기"를 켜면 화면이 더 부드럽게 움직일 수 있어요. (상태표시줄 → 모드 메뉴에서 언제든 다시 켜고 끌 수 있어요.)</div>
+        <div class="cloud-live-banner-actions">
+          <button type="button" class="ghost-btn" id="fx-suggest-dismiss">괜찮아요</button>
+          <button type="button" class="primary-btn" id="fx-suggest-enable">켜기</button>
+        </div>
+      </div>
+    `;
+    _liveBannerWrapForFxSuggest().appendChild(el);
+    document.getElementById("fx-suggest-dismiss").onclick = () => el.remove();
+    document.getElementById("fx-suggest-enable").onclick = () => { setFxReduced(true); el.remove(); };
+  }
 
   /* ===================== 데스크톱 독(Dock) 펼치기/닫기 =====================
      독 안에는 메뉴 카테고리(#nav)가 들어있고, 펼치기/접기 대상은 그걸 감싸는
@@ -5173,6 +5225,38 @@
     } catch (e) { flashNotesStatus("저장 실패"); }
   }
 
+  /* ---- 메모 내용 입력 debounce ----
+     예전엔 글자를 한 자 칠 때마다(oninput) saveNotesData()가 그대로 불려서
+     localStorage.setItem → (js/01c-cloud-sync-runtime.js가 가로채서) 매번
+     전체 메모 데이터를 JSON.stringify + Supabase 네트워크 전송까지 했다.
+     저사양 PC에서 타이핑이 밀리는 가장 큰 원인이라 실제 저장(및 네트워크 전송)만
+     debounce로 늦춘다. 화면에 보이는 값(note.content)은 updateNoteContent에서
+     이미 즉시 반영되므로, 그동안 다른 곳에서 메모 내용을 참조해도(목록 미리보기 등)
+     최신 글자 그대로 보인다 — 늦춰지는 건 "저장" 그 자체뿐이다. */
+  const NOTES_SAVE_DEBOUNCE_MS = 400;
+  let _notesSaveTimer = null;
+  function scheduleSaveNotesData() {
+    flashNotesStatus("저장 중…");
+    clearTimeout(_notesSaveTimer);
+    _notesSaveTimer = setTimeout(() => {
+      _notesSaveTimer = null;
+      saveNotesData();
+    }, NOTES_SAVE_DEBOUNCE_MS);
+  }
+  // 탭을 닫거나(beforeunload) 다른 탭/화면으로 넘어가기 전(visibilitychange)에는
+  // 미뤄둔 저장을 그 자리에서 바로 끝낸다 — 그렇지 않으면 debounce 시간(400ms)
+  // 안에 탭을 닫아버렸을 때 방금 친 글자가 저장되지 않고 사라질 수 있다.
+  function flushNotesSaveIfPending() {
+    if (_notesSaveTimer === null) return;
+    clearTimeout(_notesSaveTimer);
+    _notesSaveTimer = null;
+    saveNotesData();
+  }
+  window.addEventListener("beforeunload", flushNotesSaveIfPending);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") flushNotesSaveIfPending();
+  });
+
   const notesUi = {
     expanded: {},
     collapsedFolders: {},
@@ -5244,8 +5328,8 @@
   function updateNoteContent(id, content) {
     const note = notesData.notes[id];
     if (!note) return;
-    note.content = content;
-    saveNotesData();
+    note.content = content; // 화면에 쓸 값은 즉시 반영, 실제 저장(및 네트워크 전송)만 debounce
+    scheduleSaveNotesData();
   }
   function renameNote(id) {
     const note = notesData.notes[id];
@@ -5559,6 +5643,9 @@
     });
     root.querySelectorAll("[data-content-id]").forEach((ta) => {
       ta.addEventListener("input", (e) => { updateNoteContent(ta.getAttribute("data-content-id"), e.target.value); });
+      // 이 칸에서 포커스가 빠지면(다른 메모 클릭, 접기/펴기 등으로 이 textarea가
+      // 다시 그려져 사라지기 전) 미뤄둔 저장을 바로 끝낸다.
+      ta.addEventListener("blur", flushNotesSaveIfPending);
     });
 
     root.querySelectorAll("[data-action='attach-file']").forEach((btn) => {
@@ -19616,6 +19703,11 @@
 
   renderApp();
   if (typeof window !== "undefined" && window.__hideBootLoader) window.__hideBootLoader();
+  // 이 브라우저(컴퓨터)에서 처음으로 사양이 낮아 보이면, "그래픽 효과 줄이기" 토글의
+  // 존재를 몰라서 못 쓰는 경우를 막기 위해 딱 한 번만 안내한다 (js/01d-undo-theme-dock.js).
+  if (!CURRENT_ACCOUNT_IS_MASTER && typeof maybeSuggestLowGraphicsMode === "function") {
+    setTimeout(maybeSuggestLowGraphicsMode, 600);
+  }
 
   // 로그인/계정 생성 직후 딱 한 번, 홈 화면 위에 팝업을 살짝 늦게(화면이 먼저 자리
   // 잡은 뒤) 애니메이션과 함께 띄워준다. 지난달 마감(최종 스케줄/품질 관리 확정)이
