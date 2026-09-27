@@ -8,12 +8,12 @@
   *::-webkit-scrollbar-thumb:hover { background: var(--text-faint); background-clip: padding-box; }
 
   .add-input, .todo-due-input, .agent-sort-select,
-  .note-content, .interview-textarea, .inline-form input[type="text"],
-  .inline-form select, .add-input, .range-row .date-input, .repeat-row .date-input, .repeat-row .repeat-select {
+  .notes-detail-content, .notes-detail-title, .notes-folder-sel, .notes-search input, .interview-textarea,
+  .add-input, .range-row .date-input, .repeat-row .date-input, .repeat-row .repeat-select {
     border-radius: 10px !important;
   }
-  .add-input:focus-visible, .note-content:focus-visible, .interview-textarea:focus-visible,
-  .todo-due-input:focus-visible, .inline-form input:focus-visible, .inline-form select:focus-visible {
+  .add-input:focus-visible, .notes-detail-content:focus-visible, .notes-detail-title:focus-visible,
+  .notes-folder-sel:focus-visible, .interview-textarea:focus-visible, .todo-due-input:focus-visible {
     outline: 3px solid var(--accent-dim);
     outline-offset: 0;
     border-color: var(--accent);
@@ -660,6 +660,6 @@ html:not([data-theme="light"]) .mac-calendar-window .cal-pop .repeat-row .app-da
   background:var(--toolbar-bg) !important;
   border-bottom:1px solid var(--border) !important;
   box-shadow:none !important;
-  backdrop-filter:blur(20px) saturate(1) !important;
-  -webkit-backdrop-filter:blur(20px) saturate(1) !important;
+  backdrop-filter:blur(var(--fx-blur-md)) saturate(1) !important;
+  -webkit-backdrop-filter:blur(var(--fx-blur-md)) saturate(1) !important;
 }

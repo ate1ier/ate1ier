@@ -703,7 +703,7 @@
       console.error(err);
       flashScheduleStatus("엑셀 파일을 만들지 못했어요.");
     } finally {
-      if (btn) { btn.disabled = false; btn.innerHTML = `<span class="mac-iv-tool-icon">${ICON_CHART}</span><span class="mac-iv-tool-label">엑셀</span>`; }
+      if (btn) { btn.disabled = false; btn.innerHTML = ICON_CHART + " 엑셀로 다운로드"; }
     }
   }
 

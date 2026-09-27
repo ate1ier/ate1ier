@@ -226,13 +226,14 @@
   function openNoteFromGlobalSearch(id) {
     const note = notesData.notes[id];
     if (!note) return;
-    const folderKey = note.folderId || UNFILED;
-    notesUi.collapsedFolders[folderKey] = false;
-    notesUi.expanded[id] = true;
+    // 목업 기반 3단(사이드바·목록·본문) 구성에서는 "펼치기" 개념이 없다 — 그 메모가
+    // 속한 폴더(또는 전체 메모)로 view를 맞추고 바로 선택해서 본문에 열어준다.
+    notesUi.view = note.folderId || "all";
+    notesUi.selectedId = id;
     setPage("notes");
     resetGlobalSearchAfterNavigate();
     setTimeout(() => {
-      const row = document.querySelector(`.note-row[data-note-id="${id}"]`);
+      const row = document.querySelector(`.notes-row[data-id="${id}"]`);
       if (row) row.scrollIntoView({ behavior: "smooth", block: "center" });
     }, 60);
   }

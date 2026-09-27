@@ -41,6 +41,10 @@
        안 보이는 상태로 있다가 마지막에 툭 나타나 보인다). */
     transition: transform 0.5s cubic-bezier(.32, .72, 0, 1), opacity 0.3s ease-out;
   }
+  /* 제목줄을 잡고 끄는 동안(js/09a-home-desktop.js)엔 transform을 프레임마다 직접 바꾸는데,
+     위 기본 transition이 그대로 걸려 있으면 0.5초 걸려 뒤늦게 따라와서 마우스보다 창이 밀린다.
+     끄는 동안만 transition을 꺼서 즉시 따라오게 한다(손을 떼면 클래스가 빠지며 원래대로 복귀). */
+  .app-win.aw-dragging { transition: none !important; }
   html[data-theme="light"] .app-win {
     box-shadow: 0 0 0 1px var(--hairline-strong), 0 24px 64px rgba(0, 0, 0, 0.28);
   }
@@ -88,7 +92,7 @@
      바깥 여백 8px / 두 창 사이 8px, 위는 상태표시줄 아래 8px, 아래는 최대화 창과 같이 독 위까지.
      미리보기(#hd-snap-preview)와 반대편 고르기 패널(#hd-snap-assist)도 같은 값을 써서 창이 붙을 자리와 정확히 겹친다.
      좁은 화면(700px 이하)은 아래 미디어쿼리처럼 창이 항상 전체 폭이라 적용하지 않는다. */
-  @media (min-width: 701px) {
+  
     .app-win.win-snap-l, .app-win.win-snap-r, #hd-snap-preview, #hd-snap-assist {
       top: calc(47px + env(safe-area-inset-top, 0px)) !important;
       width: calc(50% - 12px) !important;
@@ -97,7 +101,7 @@
     .app-win.win-snap-l, #hd-snap-preview[data-side="l"], #hd-snap-assist[data-side="l"] { left: 8px !important; }
     .app-win.win-snap-r, #hd-snap-preview[data-side="r"], #hd-snap-assist[data-side="r"] { left: calc(50% + 4px) !important; }
     .app-win.win-snap-l, .app-win.win-snap-r { resize: none; }
-  }
+  
 
   /* 스냅 전용 트랜지션(2026-09 부드럽게 조정): 끌던 자리에서 반쪽 자리까지는 이동 거리가 길어서 크게/작게(.45s)보다 조금 더 길게(.6s),
      끝에서 아주 천천히 잦아드는 감속 곡선(.22,1,.36,1)으로 미끄러져 들어가게 한다. js/09a-home-desktop.js의 hdAnimateWindowResize(frame, "snap")가
@@ -125,8 +129,9 @@
   /* 제목줄 */
   .app-win .aw-tb {
     display: flex; align-items: center; flex: none; height: 32px; padding: 0 14px;
-    border-bottom: 1px solid var(--hairline); background: var(--mac-vibrancy);
-    backdrop-filter: blur(30px) saturate(1.8); -webkit-backdrop-filter: blur(30px) saturate(1.8);
+    /* 창이 열려있는 동안 계속 떠 있고, 여러 창을 동시에 열면 그만큼 겹쳐 쌓이는 요소라
+       블러 대신 --chrome-bg(반투명 단색)를 쓴다(저사양 컴퓨터에서 부담이 큰 지점) */
+    border-bottom: 1px solid var(--hairline); background: var(--chrome-bg);
     color: var(--text); cursor: default; user-select: none; -webkit-user-select: none; touch-action: none;
   }
   .aw-tl { display: flex; gap: 8px; width: 60px; }
@@ -179,7 +184,7 @@
     border-radius: 12px; overflow: auto; color: var(--hd-t);
     background: var(--hd-bar); background: color-mix(in srgb, var(--hd-w2) 80%, transparent); /* 뒤에 비치는 바탕화면 아이콘이 어수선해 보이지 않게 독보다 조금 더 진하게 */
     box-shadow: 0 0 0 1px var(--hd-ln), 0 24px 64px rgba(0, 0, 0, 0.45);
-    backdrop-filter: blur(30px) saturate(1.8); -webkit-backdrop-filter: blur(30px) saturate(1.8);
+    backdrop-filter: blur(var(--fx-blur-lg)) saturate(1.8); -webkit-backdrop-filter: blur(var(--fx-blur-lg)) saturate(1.8);
     /* 창이 반쪽 자리로 미끄러져 들어가는 동안(.6s)에는 아직 안 보이다가, 거의 자리 잡을 즈음(.18s 뒤) 천천히 떠오른다 */
     animation: hd-sa-in 0.55s cubic-bezier(.22, 1, .36, 1) 0.18s backwards;
   }
@@ -225,15 +230,7 @@
   body.home-desktop.hd-win-open #wg .wd { filter: blur(var(--hd-widget-blur, 3px)); }
 
   /* 좁은 화면(목업 max-width:700px): 창은 화면 전체 폭, 독 위까지 */
-  @media (max-width: 700px) {
-    .app-win {
-      left: 0 !important; top: calc(39px + env(safe-area-inset-top, 0px)) !important;
-      width: 100% !important; height: calc(100% - 39px - 66px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) !important;
-      border-radius: 0; resize: none;
-    }
-    .app-win .page-inner,
-    .app-win .page-inner.wide { padding: 14px 12px 22px; }
-  }
+  
   .app-win.win-max .aw-resize-handle,
   .app-win.win-snap-l .aw-resize-handle,
   .app-win.win-snap-r .aw-resize-handle,

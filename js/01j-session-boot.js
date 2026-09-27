@@ -309,8 +309,6 @@
     } else if (p === "calendar") {
       if (typeof cal !== "undefined") { cal.expandedEntries = {}; cal.upcomingExpanded = false; }
       if (typeof todoUi !== "undefined") { todoUi.expanded = {}; todoUi.doneExpanded = false; }
-    } else if (p === "notes") {
-      if (typeof notesUi !== "undefined") notesUi.expanded = {};
     } else if (p === "interviews") {
       if (typeof interviewsUi !== "undefined") interviewsUi.expandedIds = new Set();
     }

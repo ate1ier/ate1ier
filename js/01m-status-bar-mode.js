@@ -21,16 +21,26 @@
     anchorEl.setAttribute("aria-expanded", "true");
     const rect = anchorEl.getBoundingClientRect();
     const current = getCurrentTheme();
-    const menu = document.createElement("div");
-    menu.id = "status-bar-mode-menu";
-    menu.className = "theme-menu";
-    menu.innerHTML = THEME_LIST.map((t) => `
+    const fxOn = isFxReduced();
+    const themeItemsHtml = THEME_LIST.map((t) => `
       <button type="button" class="theme-menu-item ${t.id === current ? "active" : ""}" data-theme-id="${t.id}">
         <span class="theme-menu-dot" style="background:${t.bg};"></span>
         <span class="theme-menu-name">${t.label}</span>
         ${t.id === current ? '<span class="theme-menu-check">✓</span>' : ""}
       </button>
     `).join("");
+    // "그래픽 효과 줄이기": 사양이 낮은 컴퓨터에서 배경 블러를 끄는 토글(js/01d-undo-theme-dock.js의 setFxReduced)
+    const fxToggleHtml = `
+      <div class="settings-menu-divider"></div>
+      <button type="button" class="theme-menu-item theme-menu-fx-item" data-fx-toggle="1" title="배경 블러를 줄여서 저사양 컴퓨터에서 더 가볍게 동작하게 합니다">
+        <span class="theme-menu-name">그래픽 효과 줄이기</span>
+        <span class="theme-menu-fx-switch ${fxOn ? "on" : ""}" aria-hidden="true"></span>
+      </button>
+    `;
+    const menu = document.createElement("div");
+    menu.id = "status-bar-mode-menu";
+    menu.className = "theme-menu";
+    menu.innerHTML = themeItemsHtml + fxToggleHtml;
     document.body.appendChild(menu);
     // 상태표시줄은 화면 맨 위에 있으니, 목업처럼 버튼 "아래"로 펼친다
     // (설정 메뉴처럼 버튼 위쪽에 띄우면 화면 밖으로 넘어가버림).
@@ -45,6 +55,17 @@
         closeStatusBarModeMenu();
       };
     });
+    // 효과 줄이기 토글은 테마 선택과 달리 눌러도 메뉴를 닫지 않고 스위치만 바꿔서,
+    // 켜고 끄며 바로 화면(블러) 변화를 확인해볼 수 있게 한다.
+    const fxToggleBtn = menu.querySelector("[data-fx-toggle]");
+    if (fxToggleBtn) {
+      fxToggleBtn.onclick = (e) => {
+        e.stopPropagation();
+        setFxReduced(!isFxReduced());
+        const sw = fxToggleBtn.querySelector(".theme-menu-fx-switch");
+        if (sw) sw.classList.toggle("on", isFxReduced());
+      };
+    }
     setTimeout(() => document.addEventListener("mousedown", statusBarModeMenuOutsideHandler, true), 0);
   }
   const statusBarModeBtn = document.getElementById("status-bar-mode-btn");

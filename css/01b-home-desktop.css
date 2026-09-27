@@ -66,8 +66,10 @@
     position: fixed; left: 50%; bottom: calc(8px + env(safe-area-inset-bottom, 0px));
     transform: translateX(-50%); z-index: 59; /* 페이지 창들(여러 개 동시에 열릴 수 있어 z 50~55 사이에서 겹침)보다 위 — 최대화한 창 위로 독이 확대돼도 잘리지 않게. 모달(80+)·상태표시줄 메뉴(60)보다는 아래 */
     align-items: flex-end; gap: 13px; padding: 8px 14px 10px; border-radius: 24px;
-    background: var(--hd-bar); border: 1px solid rgba(255, 255, 255, 0.35);
-    backdrop-filter: blur(30px) saturate(1.8); -webkit-backdrop-filter: blur(30px) saturate(1.8);
+    /* 홈 화면에 있는 동안 항상 떠 있는 요소라 블러 대신, 이미 거의 불투명한 --hd-w2(0.95)를
+       배경으로 써서 유리 질감을 흉내낸다(원래 --hd-bar는 0.6대라 블러 없이는 바탕화면이
+       그대로 비쳐 지저분해 보임 — 저사양 컴퓨터에서 매 프레임 블러를 다시 계산하지 않아도 됨) */
+    background: var(--hd-w2); border: 1px solid rgba(255, 255, 255, 0.35);
   }
   .hd-dk {
     position: relative; display: block; padding: 0; margin: 0; border: 0; background: none;
@@ -89,8 +91,4 @@
   .hd-dk:hover::before { opacity: 1; transform: translateX(-50%) scale(1) translateY(0); }
 
   /* 좁은 화면(목업 max-width:700px): 오른쪽 아이콘은 숨기고 독 아이콘을 줄인다 */
-  @media (max-width: 700px) {
-    body.home-desktop #home-icons { display: none; }
-    .hd-dk .hd-ic { width: 38px; height: 38px; }
-    #home-dock { gap: 5px; padding: 5px 8px 7px; }
-  }
+  

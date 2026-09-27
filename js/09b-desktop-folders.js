@@ -116,13 +116,12 @@
   }
   function desktopFolderCellKey(col, row) { return col + "," + row; }
   // 지금 옮기는 폴더(excludeId) 말고, 나머지 폴더들이 차지하고 있는 칸의 집합.
-  // 칸 인덱스(col,row)가 저장돼 있으면 그걸 그대로 쓰고(가장 정확함), 옛 데이터처럼 픽셀 좌표(x,y)만
-  // 있으면 지금 화면 기준으로 한 번 계산해서 쓴다(마이그레이션 전 과도기 대비).
+  // (저장된 x,y는 항상 스냅된 값이므로 그대로 칸으로 되돌려도 정확히 들어맞는다.)
   function desktopFolderOccupiedCells(folders, excludeId, vw) {
     const set = new Set();
     Object.values(folders || {}).forEach((f) => {
       if (!f || f.id === excludeId) return;
-      const c = (f.col != null && f.row != null) ? { col: f.col, row: f.row } : desktopFolderGridCell(f.x, f.y, vw);
+      const c = desktopFolderGridCell(f.x, f.y, vw);
       set.add(desktopFolderCellKey(c.col, c.row));
     });
     return set;
@@ -147,19 +146,13 @@
     }
     return { col: c0, row: r0 }; // 화면 전체가 꽉 찬 경우
   }
-  // 놓은 자리(x,y)가 속한 "빈" 그리드 칸의 [열,행] 인덱스만 구한다(다른 폴더와 안 겹치는 칸으로 맞춤).
-  // 폴더에 저장하는 값은 항상 이 칸 인덱스여야 한다 — 픽셀 좌표(x,y)는 화면 오른쪽 기준선이 해상도마다
-  // 달라지므로 그대로 저장하면 다른 모니터/창 크기에서 엉뚱한 자리로 보이거나 다른 아이콘과 겹칠 수 있다.
-  function desktopFolderSnapToFreeCell(x, y, folders, excludeId, vw, vh) {
-    const target = desktopFolderGridCell(x, y, vw);
-    const bounds = desktopFolderGridBounds(vw, vh);
-    const occupied = desktopFolderOccupiedCells(folders, excludeId, vw);
-    return desktopFolderNearestFreeCell(target.col, target.row, occupied, bounds.maxCol, bounds.maxRow);
-  }
   // 놓은 자리(x,y)를 "다른 폴더와 겹치지 않는" 가장 가까운 그리드 칸의 좌표로 맞춘다.
   // folders는 desktopFoldersData.folders, excludeId는 지금 옮기거나 새로 만드는 폴더 자신의 id(있으면 그 칸은 비교 대상에서 뺀다).
   function desktopFolderSnapToFreeGrid(x, y, folders, excludeId, vw, vh) {
-    const free = desktopFolderSnapToFreeCell(x, y, folders, excludeId, vw, vh);
+    const target = desktopFolderGridCell(x, y, vw);
+    const bounds = desktopFolderGridBounds(vw, vh);
+    const occupied = desktopFolderOccupiedCells(folders, excludeId, vw);
+    const free = desktopFolderNearestFreeCell(target.col, target.row, occupied, bounds.maxCol, bounds.maxRow);
     return desktopFolderCellToPos(free.col, free.row, vw, vh);
   }
 
@@ -184,23 +177,10 @@
     if (!layer || CURRENT_ACCOUNT_IS_MASTER) return;
     if (dfUi.renamingId || dfUi.dragging) return;
     const list = Object.values(desktopFoldersData.folders).sort((a, b) => String(a.createdAt || "").localeCompare(String(b.createdAt || "")));
-    let migrated = false;
     layer.innerHTML = list.map((f) => {
-      // 저장된 픽셀 좌표(x,y)가 아니라 그리드 칸(col,row)을 기준으로 매번 새로 좌표를 계산한다.
-      // 그래야 모니터 해상도·창 크기가 달라져(화면 오른쪽 기준선이 움직여) 있어도 항상 같은 칸에 놓인다.
-      // 옛 데이터(칸 정보 없이 x,y만 있던 폴더)는 지금 화면 기준으로 칸을 한 번 계산해 그 자리에 고정한다.
-      if (f.col == null || f.row == null) {
-        const c = desktopFolderGridCell(f.x, f.y);
-        f.col = c.col;
-        f.row = c.row;
-        delete f.x;
-        delete f.y;
-        migrated = true;
-      }
-      const p = desktopFolderCellToPos(f.col, f.row);
+      const p = desktopFolderClampPos(f.x, f.y);
       return `<div class="hd-fld" role="button" tabindex="0" data-fld-id="${esc(f.id)}" style="left:${p.x}px;top:${p.y}px" title="${esc(f.name)}">${DESKTOP_FOLDER_SVG}<span class="hd-fld-name">${esc(f.name)}</span></div>`;
     }).join("");
-    if (migrated) saveDesktopFoldersData();
     syncDesktopFolderStates();
   }
 
@@ -218,9 +198,9 @@
   function createDesktopFolder(clientX, clientY) {
     const id = genId();
     const names = Object.values(desktopFoldersData.folders).map((f) => f.name);
-    const cell = desktopFolderSnapToFreeCell(clientX - 43, clientY - 30, desktopFoldersData.folders, id);
+    const pos = desktopFolderSnapToFreeGrid(clientX - 43, clientY - 30, desktopFoldersData.folders, id);
     desktopFoldersData.folders[id] = {
-      id, name: desktopFolderUniqueName("새 폴더", names), col: cell.col, row: cell.row, createdAt: new Date().toISOString(), files: [],
+      id, name: desktopFolderUniqueName("새 폴더", names), x: pos.x, y: pos.y, createdAt: new Date().toISOString(), files: [],
     };
     saveDesktopFoldersData();
     renderDesktopFolders();
@@ -384,35 +364,40 @@
       const r = el.getBoundingClientRect();
       const offX = startX - r.left, offY = startY - r.top;
       let moved = false;
+      // 성능 최적화(저사양 PC 버벅임 대응): left/top(레이아웃 재계산 유발) 대신 translate3d로
+      // 프레임당 한 번만(requestAnimationFrame) 옮기고, left/top은 손을 뗄 때 딱 한 번만 확정한다.
+      // .hd-fld.dragging엔 이미 transition:none이 있어 transform과 겹쳐 늦게 따라오는 문제는 없다.
+      const baseLeft = r.left, baseTop = r.top;
+      let lastX = baseLeft, lastY = baseTop;
+      let rafId = null;
+      const flush = () => {
+        rafId = null;
+        el.style.transform = `translate3d(${lastX - baseLeft}px, ${lastY - baseTop}px, 0)`;
+      };
       const move = (v) => {
         if (!moved && Math.abs(v.clientX - startX) < 5 && Math.abs(v.clientY - startY) < 5) return;
         moved = true;
         dfUi.dragging = true;
         el.classList.add("dragging");
         const p = desktopFolderClampPos(v.clientX - offX, v.clientY - offY);
-        el.style.left = p.x + "px";
-        el.style.top = p.y + "px";
+        lastX = p.x; lastY = p.y;
+        if (rafId == null) rafId = requestAnimationFrame(flush);
       };
       const up = () => {
         document.removeEventListener("pointermove", move);
         document.removeEventListener("pointerup", up);
         document.removeEventListener("pointercancel", up);
+        if (rafId != null) { cancelAnimationFrame(rafId); rafId = null; }
+        el.style.transform = "";
         if (!moved) return;
         dfUi.dragging = false;
         dfUi.suppressClickUntil = Date.now() + 120; // 끌기를 끝낸 직후 따라오는 click이 "열기"로 처리되지 않게
         el.classList.remove("dragging");
-        const dropX = parseFloat(el.style.left) || 0;
-        const dropY = parseFloat(el.style.top) || 0;
-        const freeCell = desktopFolderSnapToFreeCell(dropX, dropY, desktopFoldersData.folders, id); // 놓은 자리를 다른 폴더와 안 겹치는 가까운 칸으로 맞춘다
-        const snapped = desktopFolderCellToPos(freeCell.col, freeCell.row);
+        const snapped = desktopFolderSnapToFreeGrid(lastX, lastY, desktopFoldersData.folders, id); // 놓은 자리를 다른 폴더와 안 겹치는 가까운 칸으로 맞춘다
         el.style.left = snapped.x + "px";
         el.style.top = snapped.y + "px";
-        // 픽셀 좌표(x,y)가 아니라 칸 인덱스(col,row)를 저장한다 — 그래야 다른 해상도/창 크기에서도
-        // 항상 같은 칸에 다시 놓인다(renderDesktopFolders가 이 값으로 매번 좌표를 새로 계산함).
-        f.col = freeCell.col;
-        f.row = freeCell.row;
-        delete f.x;
-        delete f.y;
+        f.x = snapped.x;
+        f.y = snapped.y;
         saveDesktopFoldersData();
       };
       document.addEventListener("pointermove", move);
@@ -451,16 +436,6 @@
       const id = el.getAttribute("data-fld-id");
       if (e.key === "Enter") { e.preventDefault(); setPage(dfPage(id)); }
       else if (e.key === "F2") { e.preventDefault(); startDesktopFolderRename(id); }
-    });
-  })();
-
-  // 창 크기가 바뀌거나(브라우저 리사이즈) 다른 해상도의 모니터로 창을 옮기면 화면 오른쪽 기준선이
-  // 바뀌므로, 그 자리에서 바로 폴더 위치를 다시 계산해서 새로고침 없이도 항상 같은 칸에 보이게 한다.
-  (function wireDesktopFolderResizeReflow() {
-    let resizeTimer = null;
-    window.addEventListener("resize", () => {
-      clearTimeout(resizeTimer);
-      resizeTimer = setTimeout(() => { if (!dfUi.dragging && !dfUi.renamingId) renderDesktopFolders(); }, 150);
     });
   })();
 
