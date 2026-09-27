@@ -200,6 +200,13 @@
     // 해도 계속 클라우드 쓰기가 발생하는 원인 중 하나였다.
     "app-fx-suggested", // "그래픽 효과 줄이기 켤까요?" 안내를 이미 봤는지 여부. 이 컴퓨터의
     // 사양 얘기라 기기별로 따로 기억하면 되고, 굳이 클라우드로 보낼 필요가 없다.
+    "personal-app:team-login-member", // 팀용 계정에서 "지금 이 브라우저에 로그인한 인원"
+    // 이름표. 로그인 세션과 마찬가지로 이 브라우저(탭)에서만 의미 있는 값이라, 클라우드로
+    // 올라가면 안 된다. 이게 빠져 있으면: 기기 A에서 "철수"로 로그인해 인원을 고르는 순간
+    // 그 값이 클라우드로 올라가고, 기기 B("영희"로 로그인해 있던)가 실시간 반영이나
+    // 새로고침으로 그 값을 받아서 화면 표시가 "영희"에서 "철수"로 잘못 바뀌어 버렸다
+    // (실제 데이터가 아니라 "누구로 표시되는지"만 바뀌는 문제이긴 하지만, 활동 로그에
+    // 남는 이름도 같이 틀어져서 반드시 막아야 함).
   ]);
   function isCloudSynced(key) {
     if (!cloud) return false;
@@ -820,6 +827,12 @@
       const { data, error } = await cloud.from("kv_store").select("key,value,updated_at");
       if (error || !data) return;
       data.forEach((row) => {
+        // isCloudSynced()로 한 번 걸러서, 예전에(제외 목록에 추가되기 전에) 실수로
+        // 클라우드에 올라가 있던 "이 브라우저 전용" 값(예: personal-app:team-login-member)이
+        // 남아있더라도 이제부터는 받아오지 않는다. 그런 값들은 앞으로 새로 저장되지도
+        // 않으니(cloudPush에서 이미 막힘), 이렇게 받는 쪽도 같이 막아야 예전에 올라간
+        // 값이 새로고침/재로그인 때마다 계속 이 브라우저 값을 덮어쓰는 걸 완전히 막을 수 있다.
+        if (!isCloudSynced(row.key)) return;
         try { _origSetItem(row.key, row.value); } catch (e) {}
         _knownServerUpdatedAt[row.key] = row.updated_at;
         _knownServerValue[row.key] = row.value;
@@ -3100,10 +3113,69 @@
     if (p === "home") {
       if (typeof homeUi !== "undefined") homeUi.interviewAlertExpanded = false;
     } else if (p === "calendar") {
-      if (typeof cal !== "undefined") { cal.expandedEntries = {}; cal.upcomingExpanded = false; }
-      if (typeof todoUi !== "undefined") { todoUi.expanded = {}; todoUi.doneExpanded = false; }
+      if (typeof cal !== "undefined") {
+        cal.expandedEntries = {};
+        cal.upcomingExpanded = false;
+        // 아래는 "추가 폼 작성 중"이던 값들 — 저장 안 하고 떠났다면 남을 이유가 없다.
+        cal.panel = null;
+        cal.formType = "event";
+        cal.formPriority = false;
+        cal.rangeMode = false;
+        cal.repeatMode = false;
+        cal.repeatFreq = "weekly";
+        cal.repeatWeekday = null;
+        cal.repeatMonthDay = null;
+        cal.formDetailMode = false;
+        // 아래는 "인라인 수정 중"이던 값들 — 마찬가지로 저장 안 했으면 초기화한다.
+        cal.editingEntryId = null;
+        cal.editRangeMode = false;
+        cal.editPriority = false;
+        cal.editType = "memo";
+        cal.editDetailMode = false;
+      }
+      if (typeof todoUi !== "undefined") {
+        todoUi.expanded = {};
+        todoUi.doneExpanded = false;
+        todoUi.editingId = null; // 인라인으로 수정 중이던 할 일 (저장 안 한 채 떠난 경우)
+        todoUi.editDetailMode = false;
+        todoUi.formDetailMode = false;
+        todoUi.dueInput = ""; // 새 할 일 입력칸에 쓰다 만 내용
+      }
     } else if (p === "interviews") {
-      if (typeof interviewsUi !== "undefined") interviewsUi.expandedIds = new Set();
+      if (typeof interviewsUi !== "undefined") {
+        interviewsUi.expandedIds = new Set();
+        interviewsUi.mode = "list"; // 작성/수정 폼을 열어둔 채 떠났다면 목록으로 되돌린다
+        interviewsUi.editingId = null;
+        interviewsUi.selectedId = null; // 상세 패널에 펼쳐서 보고 있던 항목
+        interviewsUi.mobileDetailOpen = false;
+      }
+    } else if (p === "notes") {
+      if (typeof notesUi !== "undefined") {
+        notesUi.selectedId = null; // 펼쳐서 보고 있던 메모
+        notesUi.uploadingNoteId = null;
+      }
+    } else if (p === "agents") {
+      if (typeof agentsUi !== "undefined") {
+        agentsUi.selectedId = null; // 펼쳐서 보고 있던 상담사 상세
+        agentsUi.mode = "view"; // 등록/수정 폼을 열어둔 채 떠났다면 목록 보기로 되돌린다
+        agentsUi.editingId = null;
+        agentsUi.interviewMode = "list";
+        agentsUi.interviewEditingId = null;
+        agentsUi.popoverOpen = false; // 사이드바 요약 팝오버
+        agentsUi.popoverEdit = false;
+        agentsUi.popoverEditGroup = null;
+        agentsUi.popoverEditAdmin = null;
+        agentsUi.popoverEditWorkTypes = null;
+      }
+    } else if (p === "schedule") {
+      // 열/행 접기(collapsedRowGroups 등)는 scheduleData에 저장돼 다른 사람 화면과도
+      // 공유되는 "확정된 보기 설정"이라 여기서 건드리지 않는다 — 여기서 초기화하는 건
+      // 어디에도 저장되지 않는, 이 화면을 보는 동안만 있던 임시 상태들뿐이다.
+      if (typeof scheduleActiveEdit !== "undefined") scheduleActiveEdit = null; // 셀 인라인 수정 중(미저장)
+      if (typeof scheduleHeaderSelCols !== "undefined") scheduleHeaderSelCols = new Set();
+      if (typeof scheduleHeaderSelRows !== "undefined") scheduleHeaderSelRows = new Set();
+      if (typeof scheduleHiddenPanelOpen !== "undefined") scheduleHiddenPanelOpen = false;
+      if (typeof scheduleAutoPlan !== "undefined") scheduleAutoPlan = null; // 자동 배치 미리보기(아직 적용 안 한 계획)
     }
   }
 

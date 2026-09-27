@@ -307,10 +307,69 @@
     if (p === "home") {
       if (typeof homeUi !== "undefined") homeUi.interviewAlertExpanded = false;
     } else if (p === "calendar") {
-      if (typeof cal !== "undefined") { cal.expandedEntries = {}; cal.upcomingExpanded = false; }
-      if (typeof todoUi !== "undefined") { todoUi.expanded = {}; todoUi.doneExpanded = false; }
+      if (typeof cal !== "undefined") {
+        cal.expandedEntries = {};
+        cal.upcomingExpanded = false;
+        // 아래는 "추가 폼 작성 중"이던 값들 — 저장 안 하고 떠났다면 남을 이유가 없다.
+        cal.panel = null;
+        cal.formType = "event";
+        cal.formPriority = false;
+        cal.rangeMode = false;
+        cal.repeatMode = false;
+        cal.repeatFreq = "weekly";
+        cal.repeatWeekday = null;
+        cal.repeatMonthDay = null;
+        cal.formDetailMode = false;
+        // 아래는 "인라인 수정 중"이던 값들 — 마찬가지로 저장 안 했으면 초기화한다.
+        cal.editingEntryId = null;
+        cal.editRangeMode = false;
+        cal.editPriority = false;
+        cal.editType = "memo";
+        cal.editDetailMode = false;
+      }
+      if (typeof todoUi !== "undefined") {
+        todoUi.expanded = {};
+        todoUi.doneExpanded = false;
+        todoUi.editingId = null; // 인라인으로 수정 중이던 할 일 (저장 안 한 채 떠난 경우)
+        todoUi.editDetailMode = false;
+        todoUi.formDetailMode = false;
+        todoUi.dueInput = ""; // 새 할 일 입력칸에 쓰다 만 내용
+      }
     } else if (p === "interviews") {
-      if (typeof interviewsUi !== "undefined") interviewsUi.expandedIds = new Set();
+      if (typeof interviewsUi !== "undefined") {
+        interviewsUi.expandedIds = new Set();
+        interviewsUi.mode = "list"; // 작성/수정 폼을 열어둔 채 떠났다면 목록으로 되돌린다
+        interviewsUi.editingId = null;
+        interviewsUi.selectedId = null; // 상세 패널에 펼쳐서 보고 있던 항목
+        interviewsUi.mobileDetailOpen = false;
+      }
+    } else if (p === "notes") {
+      if (typeof notesUi !== "undefined") {
+        notesUi.selectedId = null; // 펼쳐서 보고 있던 메모
+        notesUi.uploadingNoteId = null;
+      }
+    } else if (p === "agents") {
+      if (typeof agentsUi !== "undefined") {
+        agentsUi.selectedId = null; // 펼쳐서 보고 있던 상담사 상세
+        agentsUi.mode = "view"; // 등록/수정 폼을 열어둔 채 떠났다면 목록 보기로 되돌린다
+        agentsUi.editingId = null;
+        agentsUi.interviewMode = "list";
+        agentsUi.interviewEditingId = null;
+        agentsUi.popoverOpen = false; // 사이드바 요약 팝오버
+        agentsUi.popoverEdit = false;
+        agentsUi.popoverEditGroup = null;
+        agentsUi.popoverEditAdmin = null;
+        agentsUi.popoverEditWorkTypes = null;
+      }
+    } else if (p === "schedule") {
+      // 열/행 접기(collapsedRowGroups 등)는 scheduleData에 저장돼 다른 사람 화면과도
+      // 공유되는 "확정된 보기 설정"이라 여기서 건드리지 않는다 — 여기서 초기화하는 건
+      // 어디에도 저장되지 않는, 이 화면을 보는 동안만 있던 임시 상태들뿐이다.
+      if (typeof scheduleActiveEdit !== "undefined") scheduleActiveEdit = null; // 셀 인라인 수정 중(미저장)
+      if (typeof scheduleHeaderSelCols !== "undefined") scheduleHeaderSelCols = new Set();
+      if (typeof scheduleHeaderSelRows !== "undefined") scheduleHeaderSelRows = new Set();
+      if (typeof scheduleHiddenPanelOpen !== "undefined") scheduleHiddenPanelOpen = false;
+      if (typeof scheduleAutoPlan !== "undefined") scheduleAutoPlan = null; // 자동 배치 미리보기(아직 적용 안 한 계획)
     }
   }
 

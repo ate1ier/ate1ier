@@ -285,6 +285,12 @@
       const { data, error } = await cloud.from("kv_store").select("key,value,updated_at");
       if (error || !data) return;
       data.forEach((row) => {
+        // isCloudSynced()로 한 번 걸러서, 예전에(제외 목록에 추가되기 전에) 실수로
+        // 클라우드에 올라가 있던 "이 브라우저 전용" 값(예: personal-app:team-login-member)이
+        // 남아있더라도 이제부터는 받아오지 않는다. 그런 값들은 앞으로 새로 저장되지도
+        // 않으니(cloudPush에서 이미 막힘), 이렇게 받는 쪽도 같이 막아야 예전에 올라간
+        // 값이 새로고침/재로그인 때마다 계속 이 브라우저 값을 덮어쓰는 걸 완전히 막을 수 있다.
+        if (!isCloudSynced(row.key)) return;
         try { _origSetItem(row.key, row.value); } catch (e) {}
         _knownServerUpdatedAt[row.key] = row.updated_at;
         _knownServerValue[row.key] = row.value;
