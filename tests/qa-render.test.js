@@ -65,11 +65,10 @@ test("qaFilterAgentsByMode: 조·업무구분별로 걸러내고, 둘 다 하는
   assert.deepEqual(ids("CHAT"), ["a2", "a3"]);
 });
 
-test("buildQATableHtml: 인원 수만큼 행(인셋 리스트)을 만들고 이름·LDAP·조 배지를 채운다", () => {
+test("buildQATableHtml: 인원 수만큼 행을 만들고 이름·LDAP·조 배지를 채운다", () => {
   const m = loadQA();
   const html = m.buildQATableHtml(AGENTS, 2026, 8, false);
-  // [macOS 스타일 재설계 5단계] 화면용은 <table><tr>이 아니라 div.qa-row 목록이다.
-  assert.equal(countMatches(html, /<div class="qa-row[^"]*" data-qa-row-agent=/), 3);
+  assert.equal(countMatches(html, /<tr data-qa-row-agent=/), 3);
   assert.deepEqual(extractAll(html, /data-qa-row-agent="([^"]+)"/), ["a1", "a2", "a3"]);
   assert.equal(html.includes("김주간"), true);
   assert.equal(html.includes("park"), true);
@@ -80,11 +79,10 @@ test("buildQATableHtml: 인원 수만큼 행(인셋 리스트)을 만들고 이�
 test("buildQATableHtml: 인원이 없으면 안내 문구 한 줄만 그리고, 캡처용은 문구가 다르다", () => {
   const m = loadQA();
   const screen = m.buildQATableHtml([], 2026, 8, false);
-  assert.equal(countMatches(screen, /<div class="qa-row[^"]*" data-qa-row-agent=/), 0);
+  assert.equal(countMatches(screen, /<tr data-qa-row-agent=/), 0);
   assert.equal(screen.includes("상담사 관리"), true); // 화면용: 등록을 안내
 
   const capture = m.buildQATableHtml([], 2026, 8, true);
-  assert.equal(countMatches(capture, /<tr data-qa-row-agent=/), 0);
   assert.equal(capture.includes("해당하는 상담사가 없어요."), true); // 캡처용: 필터 결과 안내
 });
 

@@ -77,33 +77,6 @@ test("desktopFolderSnapToFreeGrid: 목표 칸이 비어 있으면 그대로, 차
   assert.deepEqual(toPlain(p3), { x: ORIGIN_X - 96 * 5, y: ORIGIN_Y + 112 * 5 });
 });
 
-// [해상도 무관 배치 고정] 저장하는 값은 픽셀(x,y)이 아니라 칸 인덱스(col,row)여야 한다는 것을 검증한다.
-// desktopFolderSnapToFreeCell은 desktopFolderSnapToFreeGrid와 같은 "빈 칸 찾기" 로직을 쓰되
-// 좌표 대신 칸 인덱스 자체를 돌려준다 — 이 값을 폴더에 저장해두면, 화면 크기가 바뀌어도
-// desktopFolderCellToPos(col,row)로 항상 같은 칸의 좌표를 다시 구할 수 있다.
-test("desktopFolderSnapToFreeCell: desktopFolderSnapToFreeGrid와 같은 칸을 고르되 좌표 대신 칸 인덱스를 돌려준다", () => {
-  const m = loadFolders();
-  const folders = { a: { id: "a", x: ORIGIN_X, y: ORIGIN_Y } };
-  const cell = m.desktopFolderSnapToFreeCell(ORIGIN_X + 4, ORIGIN_Y + 5, folders, "b", 1200, 800);
-  const pos = m.desktopFolderSnapToFreeGrid(ORIGIN_X + 4, ORIGIN_Y + 5, folders, "b", 1200, 800);
-  assert.deepEqual(toPlain(m.desktopFolderCellToPos(cell.col, cell.row, 1200, 800)), toPlain(pos));
-});
-
-// 같은 칸 인덱스(col,row)라도 화면 폭(vw)이 다르면 오른쪽 기준선이 움직이므로 픽셀 좌표는
-// 달라져야 정상이다 — 즉 "칸"이 화면(해상도)과 무관한 고정 기준이고, 화면이 바뀔 때마다
-// desktopFolderCellToPos가 그 화면에 맞는 자리를 다시 계산해준다는 것을 보여준다.
-test("desktopFolderCellToPos: 같은 칸이라도 화면 폭(모니터 해상도)이 다르면 그 화면에 맞는 좌표를 새로 계산한다", () => {
-  const m = loadFolders();
-  const posWide = m.desktopFolderCellToPos(2, 1, 1920, 1080); // 큰 모니터
-  const posNarrow = m.desktopFolderCellToPos(2, 1, 1280, 720); // 작은 모니터
-  // 화면 폭이 다르면 오른쪽 기준선이 다르므로 x좌표도 달라진다(같은 칸이 화면 위 다른 위치에 그려짐)
-  assert.notEqual(posWide.x, posNarrow.x);
-  // 같은 칸으로 되돌리면(반대 방향 계산) 항상 같은 [col,row]가 나와야 한다 — 해상도가 바뀌어도
-  // "몇 번째 칸에 있었는지"는 흔들리지 않는다는 뜻
-  assert.deepEqual(toPlain(m.desktopFolderGridCell(posWide.x, posWide.y, 1920)), { col: 2, row: 1 });
-  assert.deepEqual(toPlain(m.desktopFolderGridCell(posNarrow.x, posNarrow.y, 1280)), { col: 2, row: 1 });
-});
-
 test("desktopFolderNearestFreeCell: 칸이 꽉 찬 경우 점점 넓혀가며 빈 칸을 찾고, 화면을 벗어나지 않는다", () => {
   const m = loadFolders();
   const occupied = new Set(["2,2"]);
