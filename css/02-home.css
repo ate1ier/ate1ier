@@ -31,10 +31,10 @@
   #wg > * { pointer-events: auto; }
   #wg .cols { display: flex; gap: 16px; align-items: flex-start; justify-content: center; }
   #wg .col { display: flex; flex-direction: column; gap: 16px; width: var(--cw); }
-  
+  @media (min-width: 901px) {
     #wg .col:nth-child(1) { width: calc(var(--cw) * 3 * .85 / 2.85); }
     #wg .col:nth-child(n+2) { width: calc(var(--cw) * 3 / 2.85); }
-  
+  }
   #wg button, #wg input { font-family: inherit; font-weight: inherit; }
   #wg b, #wg strong { font-weight: 500; }
   #wg p { margin: 8px 0; }
@@ -87,8 +87,17 @@
   #wg .qm { font-size: 10.5px; fill: var(--t2); }
   #wg .qm.cur { fill: var(--ac); font-weight: 700; }
 
-  /* 좁은 화면(목업의 
-  
+  /* 좁은 화면(목업의 @media): 목업 원본은 이 규칙이 뒤에 나오는 기본 규칙에 덮여 적용되지 않던 순서였는데,
+     의도대로 동작하도록 기본 규칙 뒤에 두었습니다(값은 목업 그대로). */
+  @media (max-width: 900px) {
+    #wg { overflow: auto; bottom: 96px; left: 12px; right: 112px; justify-content: flex-start; align-items: stretch; }
+    #wg .cols { flex-direction: column; }
+    #wg .col, #wg .hero { width: 100%; }
+    #wg .st { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 700px) {
+    #wg { right: 12px; }
+  }
 
   /* ---- 이 앱에만 있는 기능용 (목업에는 없음) ---- */
   /* 카드를 끌어서 열/순서 바꾸기: 위젯 제목줄(.wh)을 잡고 끈다. 끄는 동안 빈 열도 놓을 수 있게 최소 높이를 준다 */

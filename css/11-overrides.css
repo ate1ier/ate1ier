@@ -8,12 +8,12 @@
   *::-webkit-scrollbar-thumb:hover { background: var(--text-faint); background-clip: padding-box; }
 
   .add-input, .todo-due-input, .agent-sort-select,
-  .notes-detail-content, .notes-detail-title, .notes-folder-sel, .notes-search input, .interview-textarea,
-  .add-input, .range-row .date-input, .repeat-row .date-input, .repeat-row .repeat-select {
+  .note-content, .interview-textarea, .inline-form input[type="text"],
+  .inline-form select, .add-input, .range-row .date-input, .repeat-row .date-input, .repeat-row .repeat-select {
     border-radius: 10px !important;
   }
-  .add-input:focus-visible, .notes-detail-content:focus-visible, .notes-detail-title:focus-visible,
-  .notes-folder-sel:focus-visible, .interview-textarea:focus-visible, .todo-due-input:focus-visible {
+  .add-input:focus-visible, .note-content:focus-visible, .interview-textarea:focus-visible,
+  .todo-due-input:focus-visible, .inline-form input:focus-visible, .inline-form select:focus-visible {
     outline: 3px solid var(--accent-dim);
     outline-offset: 0;
     border-color: var(--accent);

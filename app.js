@@ -892,10 +892,7 @@
           let affectedPages = [];
           try { affectedPages = _applyRemoteChangeToMemory(row.key); } catch (e) {}
           // 여러 페이지 창이 동시에 열려 있을 수 있으므로, 포커스된 페이지뿐 아니라 열려 있는
-          // 창 중 하나라도 영향을 받았으면 다시 그린다. 성능 개선 계획 Phase 2로 renderApp()은 기본적으로
-          // 포커스된(맨 앞) 창만 즉시 그리므로, 다른 기기에서 온 변경처럼 "배경 창이라도 지금 당장
-          // 반영돼야 하는" 경우에는 아래에서 { forceAllWindows: true }를 넘겨 예전처럼 영향받은 배경
-          // 창까지 전부 그리게 한다(js/09a-home-desktop.js의 renderHomeDesktopWindows 참고).
+          // 창 중 하나라도 영향을 받았으면 다시 그린다(renderApp이 열려 있는 창을 전부 새로 그림).
           const isCurrentPageAffected = affectedPages.some((p) => p === state.page || (typeof hdWin !== "undefined" && !!hdWin.state[p]));
           // 화면(그림)을 다시 그리는 것만 "지금 이 탭이 실제로 보이고 있고 + 뭔가
           // 입력 중인 칸에 커서가 가 있지 않을 때"로 미룬다. 데이터 자체(메모리·로컬
@@ -906,7 +903,7 @@
           // 진짜로 같은 항목·같은 필드가 겹친 경우는 저장 시점의 3-way 병합이 정확하게
           // 잡아내서 _renderFieldConflictBanner / _renderConflictBanner로 알려준다.
           if (isCurrentPageAffected && !_hasActiveEditableFocus() && _isTabVisible()) {
-            renderApp({ forceAllWindows: true }); // 다른 기기에서 온 변경은 배경 창이라도 곧장 최신으로 보여준다.
+            renderApp();
           } else if (affectedPages.indexOf("home") !== -1 && _isTabVisible() && typeof refreshHomeWidgetsBehindWindow === "function") {
             refreshHomeWidgetsBehindWindow(); // 페이지 창은 그대로 두고, 그 뒤 바탕화면 위젯만 갱신
           }
@@ -922,10 +919,7 @@
   function _catchUpRenderIfSafe() {
     if (!_appBooted) return; // 로그인 화면에서는 아직 renderApp()이 참조하는 값들이 없으므로 건너뜀
     if (!_isTabVisible() || _hasActiveEditableFocus()) return;
-    // 탭이 안 보이는 동안 여러 창에 걸쳐 밀린 변경을 한꺼번에 따라잡는 자리라, 포커스된 창만이
-    // 아니라 배경 창까지 지금 당장 최신으로 보여준다(성능 개선 계획 Phase 2 — 기본 renderApp()은
-    // 포커스된 창만 즉시 그린다. js/09a-home-desktop.js의 renderHomeDesktopWindows 참고).
-    try { renderApp({ forceAllWindows: true }); } catch (e) {}
+    try { renderApp(); } catch (e) {}
   }
   document.addEventListener("visibilitychange", _catchUpRenderIfSafe);
   window.addEventListener("focus", _catchUpRenderIfSafe);
@@ -1085,16 +1079,6 @@
       return false;
     } catch (e) { return false; }
   }
-  function _liveBannerWrapForFxSuggest() {
-    let el = document.getElementById("cloud-live-banner-wrap");
-    if (!el) {
-      el = document.createElement("div");
-      el.id = "cloud-live-banner-wrap";
-      el.className = "cloud-live-banner-wrap";
-      document.body.appendChild(el);
-    }
-    return el;
-  }
   function maybeSuggestLowGraphicsMode() {
     if (isFxReduced()) return;
     try { if (localStorage.getItem(FX_KEY) !== null) return; } catch (e) {} // 한 번이라도 직접 켜/꺼본 사람은 그 선택을 존중
@@ -1114,7 +1098,7 @@
         </div>
       </div>
     `;
-    _liveBannerWrapForFxSuggest().appendChild(el);
+    _liveBannerWrap().appendChild(el);
     document.getElementById("fx-suggest-dismiss").onclick = () => el.remove();
     document.getElementById("fx-suggest-enable").onclick = () => { setFxReduced(true); el.remove(); };
   }
@@ -1575,115 +1559,6 @@
     const nextBtn = nav.querySelector('[data-page-nav="next"]');
     if (prevBtn) prevBtn.onclick = () => onDelta(-1);
     if (nextBtn) nextBtn.onclick = () => onDelta(1);
-  }
-
-  /* ===================== 표 부분 patch (domReconcileTable) =====================
-   * [성능 개선 계획 Phase 2] 셀 하나만 바뀌어도 표 전체를 문자열로 다시 만들어
-   * innerHTML을 통째로 교체하던 것을, 실제로 값이 달라진 <td>/<th>만 그 자리에서
-   * 고쳐 쓰도록 하는 공용 유틸. QA 표(05f-qa-render.js)·월별 스케줄 표
-   * (07a5-schedule-log-capture.js)가 함께 쓴다.
-   *
-   * tableEl: 지금 화면에 붙어있는 <table> 엘리먼트(기존 DOM, 이벤트가 이미 붙어있음)
-   * newTableHtml: build*TableHtml()이 새로 만들어낸 문자열. <table>이 그 문자열
-   *   어딘가(바깥에 wrap용 div가 있어도 됨)에 있기만 하면 된다.
-   * 반환값: true면 그 자리에서 다 고쳐 썼으니 이벤트 재바인딩이 필요 없다는 뜻.
-   *   false면 (예: 행 개수 자체가 달라짐) patch를 포기했다는 뜻이니, 호출부가
-   *   지금까지처럼 표 전체를 다시 그리고 이벤트를 다시 붙여야 한다.
-   *
-   * 규칙(자세한 이유는 각 처리 위 주석 참고):
-   * - <thead>/<tbody> 각각 행 개수가 안 맞으면 그 표 전체를 포기(false)한다.
-   *   (인원이 추가/삭제되는 등 "행 자체가 달라지는" 흔치 않은 경우는 여기서
-   *   걸러지고, 안전하게 표 전체를 새로 그린다.)
-   * - 칸(행 포함) 자체는 절대 새로 만들지 않고, 기존 DOM 노드의 class/속성/내용만
-   *   필요한 만큼 고쳐 쓴다 — 그래야 그 칸에 이미 붙어있는 이벤트 핸들러가 그대로
-   *   남아있는다(재바인딩 불필요).
-   * - class 이름이 "…--selected"/"…--copied"로 끝나는 것들은 렌더링 함수가 만드는
-   *   문자열에는 없고 화면에서만 나중에 JS로 붙이는 상태 표시라, 새 class로
-   *   덮어쓰지 않고 그대로 보존한다.
-   * - class에 "…--editing"이 붙어있는 칸(지금 사용자가 그 칸을 직접 타이핑해서
-   *   고치는 중)은 아예 건드리지 않고 건너뛴다.
-   * - <input> 하나만 든 칸은 칸 전체를 다시 쓰지 않고 그 input의 값/비활성 여부만
-   *   바꾼다. 지금 포커스가 가 있는(사용자가 타이핑 중인) input은 값을 건드리지
-   *   않아서, 다른 칸이 저장되며 표가 patch될 때 타이핑 중이던 값이 사라지지 않는다.
-   */
-  function domReconcileTable(tableEl, newTableHtml) {
-    if (!tableEl || !newTableHtml) return false;
-    let newTable;
-    try {
-      const tmp = document.createElement("template");
-      tmp.innerHTML = newTableHtml;
-      newTable = tmp.content.querySelector("table");
-    } catch (e) { return false; }
-    if (!newTable) return false;
-
-    const RUNTIME_CLASS_RE = /--(selected|copied)$/;
-    const EDITING_CLASS_RE = /--editing$/;
-
-    function syncClassName(oldEl, newEl) {
-      const oldTokens = (oldEl.className || "").split(/\s+/).filter(Boolean);
-      const newTokens = (newEl.className || "").split(/\s+/).filter(Boolean);
-      const preserved = oldTokens.filter((t) => RUNTIME_CLASS_RE.test(t));
-      const merged = newTokens.slice();
-      preserved.forEach((t) => { if (merged.indexOf(t) === -1) merged.push(t); });
-      const mergedStr = merged.join(" ");
-      if (oldEl.className !== mergedStr) oldEl.className = mergedStr;
-    }
-    function syncPlainAttributes(oldEl, newEl, skipNames) {
-      const skip = skipNames || [];
-      Array.from(newEl.attributes).forEach((attr) => {
-        if (attr.name === "class" || skip.indexOf(attr.name) !== -1) return;
-        if (oldEl.getAttribute(attr.name) !== attr.value) oldEl.setAttribute(attr.name, attr.value);
-      });
-      Array.from(oldEl.attributes).forEach((attr) => {
-        if (attr.name === "class" || skip.indexOf(attr.name) !== -1) return;
-        if (!newEl.hasAttribute(attr.name)) oldEl.removeAttribute(attr.name);
-      });
-    }
-    function soleInput(el) {
-      return (el.children.length === 1 && el.children[0].tagName === "INPUT") ? el.children[0] : null;
-    }
-    function reconcileCell(oldCell, newCell) {
-      if (oldCell.tagName !== newCell.tagName) { oldCell.outerHTML = newCell.outerHTML; return; }
-      if (EDITING_CLASS_RE.test(oldCell.className || "")) return; // 편집 중인 칸은 손대지 않는다
-      syncClassName(oldCell, newCell);
-      syncPlainAttributes(oldCell, newCell);
-
-      const oldInput = soleInput(oldCell);
-      const newInput = soleInput(newCell);
-      if (oldInput && newInput) {
-        if (document.activeElement !== oldInput) {
-          const newVal = newInput.getAttribute("value") || "";
-          if (oldInput.value !== newVal) oldInput.value = newVal;
-        }
-        const newDisabled = newInput.hasAttribute("disabled");
-        if (oldInput.disabled !== newDisabled) oldInput.disabled = newDisabled;
-        syncClassName(oldInput, newInput);
-        syncPlainAttributes(oldInput, newInput, ["value", "disabled"]);
-        return;
-      }
-      if (oldCell.innerHTML !== newCell.innerHTML) oldCell.innerHTML = newCell.innerHTML;
-    }
-    function reconcileRow(oldRow, newRow) {
-      syncClassName(oldRow, newRow);
-      syncPlainAttributes(oldRow, newRow);
-      const oldCells = Array.from(oldRow.children);
-      const newCells = Array.from(newRow.children);
-      if (oldCells.length !== newCells.length) { oldRow.innerHTML = newRow.innerHTML; return; }
-      for (let i = 0; i < oldCells.length; i++) reconcileCell(oldCells[i], newCells[i]);
-    }
-    function reconcileSection(oldSection, newSection) {
-      if (!oldSection && !newSection) return true;
-      if (!oldSection || !newSection) return false;
-      const oldRows = Array.from(oldSection.children);
-      const newRows = Array.from(newSection.children);
-      if (oldRows.length !== newRows.length) return false;
-      for (let i = 0; i < oldRows.length; i++) reconcileRow(oldRows[i], newRows[i]);
-      return true;
-    }
-
-    if (!reconcileSection(tableEl.tHead, newTable.tHead)) return false;
-    if (!reconcileSection(tableEl.tBodies[0], newTable.tBodies[0])) return false;
-    return true;
   }
 
   // ==================== 비밀번호 해시(PBKDF2), 계정 CRUD, 디스코드 알림 허용 설정, 세션/마스터 모드/팀원, 로그아웃 ====================
@@ -6009,13 +5884,10 @@
     if (!detail || !detail.rounds || !detail.rounds.length) {
       return `<div class="agent-qa-popover-empty">${esc(monthLabel)}에 등록된 QA 엑셀이 없어요.</div>`;
     }
-    const rows = detail.rounds.map((round) => `
-      <div class="agent-qa-popover-round-row">
-        <span class="agent-qa-popover-round-label">${esc(round.label)}</span>
-        <span class="agent-qa-popover-round-score">${round.score === null || round.score === undefined ? "-" : round.score}</span>
-      </div>
-    `).join("");
-    return `<div class="agent-qa-popover-rounds">${rows}</div>`;
+    // 품질 관리 페이지에서 상담사를 클릭하면 뜨는 QA 상세 팝업(openQADetailModal)과
+    // 완전히 같은 함수(qaRoundCardsHtml)로 만들어서, 면담일지 리스트와 같은 레이아웃의
+    // 회차 목록(날짜·상담ID·"원문 보기")이 그대로 나온다.
+    return qaRoundCardsHtml(detail, `agent-qa-pop-${agent.id}`);
   }
   function renderAgentQaPopover(agent) {
     const year = today.getFullYear(), monthIndex = today.getMonth();
@@ -6083,6 +5955,13 @@
         qaHighlightAgentId = agent.id;
         setPage("qa");
       };
+    }
+    // 회차 카드("원문 보기" 토글 포함)는 품질 관리 페이지의 QA 상세 팝업과 같은
+    // 공통 함수(attachQaRoundCardEvents)로 동작을 붙인다.
+    const year = today.getFullYear(), monthIndex = today.getMonth();
+    const detail = (typeof getQADetail === "function") ? getQADetail(agent.id, year, monthIndex) : null;
+    if (detail && detail.rounds && detail.rounds.length && typeof attachQaRoundCardEvents === "function") {
+      attachQaRoundCardEvents(pop, detail.rounds, `agent-qa-pop-${agent.id}`);
     }
   }
   // "면담 현황": 총 면담 건수 / 마지막 면담(며칠 전) / 다음 면담 필요 여부.
@@ -6282,6 +6161,58 @@
         </div>
         <div class="agent-row-count">${needsIv ? '<span class="need-dot" title="면담 필요"></span>' : ""}${ivCount ? `<span class="agent-row-count-num">${ivCount}건</span>` : ""}</div>
       </div>
+    `;
+  }
+
+  function renderAgentDetail(agent) {
+    return `
+      <div class="agent-detail-header">
+        <div class="agent-detail-heading">
+          <div class="agent-detail-name">${esc(agent.name)}</div>
+        </div>
+        <div class="agent-detail-actions">
+          <button class="ghost-btn" data-action="edit-agent" data-id="${agent.id}">수정</button>
+          <button class="ghost-btn danger" data-action="delete-agent" data-id="${agent.id}">삭제</button>
+        </div>
+      </div>
+      <div class="agent-field">
+        <span class="agent-field-label">LDAP 이름</span>
+        <span class="agent-field-value">${esc(agent.ldap)}</span>
+      </div>
+      <div class="agent-field">
+        <span class="agent-field-label">사번</span>
+        <span class="agent-field-value">${agent.empNo ? esc(agent.empNo) : '<span class="agent-field-empty">-</span>'}</span>
+      </div>
+      <div class="agent-field">
+        <span class="agent-field-label">입사일자</span>
+        <span class="agent-field-value">${agent.hireDate ? esc(agent.hireDate) : '<span class="agent-field-empty">-</span>'}</span>
+      </div>
+      <div class="agent-field">
+        <span class="agent-field-label">연락처</span>
+        <span class="agent-field-value">${agent.contact ? esc(agent.contact) : '<span class="agent-field-empty">-</span>'}</span>
+      </div>
+      <div class="agent-field">
+        <span class="agent-field-label">업무 구분</span>
+        <span class="agent-field-value">${workTypeBadgesHtml(agent.workTypes)}</span>
+      </div>
+      <div class="agent-field">
+        <span class="agent-field-label">근무 조</span>
+        <span class="agent-field-value">${scheduleGroupBadgeHtml(agent.group)}</span>
+      </div>
+      <div class="agent-field">
+        <span class="agent-field-label">시간대</span>
+        <span class="agent-field-value">${agent.timezone ? esc(agent.timezone) : '<span class="agent-field-empty">-</span>'}</span>
+      </div>
+      <div class="agent-field">
+        <span class="agent-field-label">권한</span>
+        <span class="agent-field-value">${agent.isAdmin ? '<span class="badge admin">관리자</span>' : '<span class="agent-field-empty">일반</span>'}</span>
+      </div>
+      <div class="agent-field">
+        <span class="agent-field-label">재직 상태</span>
+        <span class="agent-field-value">${agent.status === "RESIGNED" ? '<span class="badge resigned">퇴사</span>' : '<span class="badge working">근무중</span>'}${isAgentScheduledResign(agent) ? ` <span class="agent-field-empty">(${esc(agent.resignDate)}부터 자동 퇴사 예정, 월별 스케줄엔 이미 반영됨)</span>` : ""}</span>
+      </div>
+      ${renderAgentQAPreview(agent)}
+      ${renderAgentInterviewSection(agent)}
     `;
   }
 
@@ -7386,6 +7317,9 @@
     year: today.getFullYear(),
     monthIndex: today.getMonth(), // 0-based. 실시간 기준 당월로 시작한다.
     searchQuery: "", // 상담사 검색어. 쉼표(,)로 여러 명을 한 번에 검색할 수 있다.
+    // [macOS 스타일 재설계 4단계] 유형 필터 pill(전체/주간/야간/유선/채팅)의 현재 선택 상태.
+    // qaFilterAgentsByMode()가 받는 mode 값과 동일한 키를 쓴다. 검색어와는 별개로 함께 적용된다.
+    filterMode: "ALL",
   };
 
   // ----- 상담사 검색 -----
@@ -8065,6 +7999,81 @@
   }
   function qaDetailEscHandler(e) { if (e.key === "Escape") closeQADetailModal(); }
 
+  // 회차별 목록(날짜·상담ID가 포함된 한 줄 + "원문 보기" 눌러 펼치기) HTML을 만든다.
+  // 상담사 관리의 "면담일지" 리스트(macOS 인셋 그룹 리스트, .mac-iv-*)와 완전히 같은
+  // 레이아웃을 쓰되, 수정/다운로드/삭제 같은 개별 액션 버튼은 두지 않는다.
+  // QA 상세 모달과 상담사 관리의 QA 팝오버가 완전히 같은 마크업/동작을 쓰도록
+  // 공통 함수로 뽑아뒀다. idPrefix는 두 곳에서 DOM id가 서로 겹치지 않게 구분하는 용도.
+  function qaRoundCardsHtml(detail, idPrefix) {
+    if (!detail || !detail.rounds || !detail.rounds.length) return "";
+    const rows = detail.rounds.map((round, idx) => {
+      // itemCount가 없는 예전 데이터(이 필드가 생기기 전에 저장된 회차)는
+      // items 개수로 대신 판단한다. items도 없다면(정말 원문이 없는 경우) 0으로 취급.
+      const effectiveItemCount = (round.itemCount !== undefined && round.itemCount !== null)
+        ? round.itemCount
+        : (round.items ? round.items.length : 0);
+      const isPerfect = effectiveItemCount === 0;
+      const rawGone = !isPerfect && round.items && round.items.length === 0; // 원문 만료로 사라진 경우
+      const scoreText = (round.score === null || round.score === undefined) ? "-" : round.score;
+      return `
+      <div class="mac-iv-row">
+        <div class="mac-iv-row-main" data-qa-round-toggle="${idx}">
+          <span class="mac-iv-dot type-regular"></span>
+          <div class="mac-iv-row-center">
+            <div class="mac-iv-row-line1">
+              <span class="mac-iv-date">${esc(round.date || "-")}</span>
+              <span class="mac-iv-type-label">${esc(round.label)} · 총점 ${esc(String(scoreText))}</span>
+              ${round.consultId ? `<span class="mac-iv-manager">상담ID ${esc(round.consultId)}</span>` : ""}
+            </div>
+          </div>
+          <span class="mac-iv-chevron" id="${idPrefix}-chevron-${idx}">${ICON_CHEVRON_RIGHT}</span>
+        </div>
+        <div class="mac-iv-row-footer" id="${idPrefix}-footer-${idx}">
+          <div class="mac-iv-preview">원문 보기 &lt;</div>
+        </div>
+        <div class="mac-iv-detail-divider" id="${idPrefix}-divider-${idx}" style="display:none;"></div>
+        <div class="mac-iv-row-detail" id="${idPrefix}-detail-${idx}" style="display:none;"
+          data-qa-perfect="${isPerfect ? "1" : "0"}" data-qa-gone="${rawGone ? "1" : "0"}"></div>
+      </div>
+    `;
+    }).join("");
+    return `<div class="mac-iv-list">${rows}</div>`;
+  }
+
+  // 위 목록의 행을 누르면 그 자리에서 펼쳐져(면담일지 리스트와 같은 동작) 원문을 보여준다.
+  // container: 행들을 담고 있는 상위 엘리먼트(오버레이 전체 또는 팝오버 카드).
+  function attachQaRoundCardEvents(container, rounds, idPrefix) {
+    if (!container) return;
+    container.querySelectorAll("[data-qa-round-toggle]").forEach((head) => {
+      head.onclick = () => {
+        const idx = head.getAttribute("data-qa-round-toggle");
+        const row = head.closest(".mac-iv-row");
+        const footer = document.getElementById(`${idPrefix}-footer-${idx}`);
+        const divider = document.getElementById(`${idPrefix}-divider-${idx}`);
+        const detailBox = document.getElementById(`${idPrefix}-detail-${idx}`);
+        if (!detailBox) return;
+        const opening = detailBox.style.display === "none";
+        if (opening && !detailBox.dataset.filled) {
+          const round = rounds[idx];
+          const isPerfect = detailBox.getAttribute("data-qa-perfect") === "1";
+          const rawGone = detailBox.getAttribute("data-qa-gone") === "1";
+          if (isPerfect) {
+            detailBox.innerHTML = `<div class="mac-iv-detail-followup">감점/코멘트 항목이 없어요 (만점 처리된 차수예요).</div>`;
+          } else if (rawGone) {
+            detailBox.innerHTML = `<div class="mac-iv-detail-followup" style="color:var(--red);">원문이 ${QA_DETAIL_EXPIRY_MONTHS}개월 만료되어 삭제됐어요.</div>`;
+          } else {
+            detailBox.innerHTML = `<div class="mac-iv-detail-content">${qaFormatSummaryHtml(qaOrganizeItemsText(round.items))}</div>`;
+          }
+          detailBox.dataset.filled = "1";
+        }
+        if (row) row.classList.toggle("expanded", opening);
+        if (footer) footer.style.display = opening ? "none" : "";
+        if (divider) divider.style.display = opening ? "" : "none";
+        detailBox.style.display = opening ? "" : "none";
+      };
+    });
+  }
+
   function openQADetailModal(agentId) {
     closeQADetailModal();
     qaPurgeExpiredDetails();
@@ -8087,39 +8096,7 @@
       ? `<div class="qa-detail-empty">이번 달(${esc(qaMonthLabel())})에 업로드된 QA 평가 엑셀이 없어요.<br>상단 "${esc("엑셀 업로드")}" 버튼으로 이 상담사의 평가표를 올려주세요.</div>`
       : `
         <div class="qa-detail-meta">${metaText}</div>
-        <div class="qa-detail-rounds">
-          ${detail.rounds.map((round, idx) => {
-            // itemCount가 없는 예전 데이터(이 필드가 생기기 전에 저장된 회차)는
-            // items 개수로 대신 판단한다. items도 없다면(정말 원문이 없는 경우) 0으로 취급.
-            const effectiveItemCount = (round.itemCount !== undefined && round.itemCount !== null)
-              ? round.itemCount
-              : (round.items ? round.items.length : 0);
-            const isPerfect = effectiveItemCount === 0;
-            const rawGone = !isPerfect && round.items.length === 0; // 원문 만료로 사라진 경우
-            let bodyBlock;
-            if (isPerfect) {
-              bodyBlock = `<div class="qa-round-empty">감점/코멘트 항목이 없어요 (만점 처리된 차수예요).</div>`;
-            } else if (rawGone) {
-              bodyBlock = `<div class="qa-round-summary-box" id="qa-round-summary-${idx}"><span class="qa-round-hint" style="color:var(--red);">원문이 ${QA_DETAIL_EXPIRY_MONTHS}개월 만료되어 삭제됐어요.</span></div>`;
-            } else {
-              bodyBlock = `
-              <div class="qa-round-raw">
-                <button type="button" class="qa-round-raw-toggle" data-qa-raw-toggle="${idx}">원문 보기</button>
-                <div class="qa-round-raw-box" id="qa-round-raw-${idx}" style="display:none;"></div>
-              </div>`;
-            }
-            return `
-            <div class="qa-round-card">
-              <div class="qa-round-head" data-qa-round-toggle="${idx}">
-                <div class="qa-round-title"><span class="qa-round-chevron" id="qa-round-chevron-${idx}">▶</span>${qaRoundSummaryLine(round)}</div>
-              </div>
-              <div class="qa-round-body" id="qa-round-body-${idx}" style="display:none;">
-                ${bodyBlock}
-              </div>
-            </div>
-          `;
-          }).join("")}
-        </div>
+        ${qaRoundCardsHtml(detail, "qa-round")}
       `;
 
     const overlay = document.createElement("div");
@@ -8153,46 +8130,39 @@
       };
     }
 
-    // "원문 보기" 토글: 개별 버튼이 아니라 오버레이 전체에 위임해서 클릭을 잡는다.
-    // 기본은 접힌 상태(style="display:none")이고, 누를 때마다 펼치고/접는다.
-    overlay.addEventListener("click", (e) => {
-      const toggleBtn = e.target.closest && e.target.closest("[data-qa-raw-toggle]");
-      if (!toggleBtn) return;
-      e.stopPropagation();
-      const idx = Number(toggleBtn.getAttribute("data-qa-raw-toggle"));
-      const round = detail.rounds[idx];
-      const rawBox = document.getElementById(`qa-round-raw-${idx}`);
-      if (!round || !rawBox) return;
-      const opening = rawBox.style.display === "none";
-      if (opening && !rawBox.dataset.filled) {
-        rawBox.innerHTML = qaFormatSummaryHtml(qaOrganizeItemsText(round.items));
-        rawBox.dataset.filled = "1";
-      }
-      rawBox.style.display = opening ? "" : "none";
-      toggleBtn.textContent = opening ? "원문 접기" : "원문 보기";
-    });
-
-    // 회차 카드 헤드를 누르면 펼치기/접기 (버튼 클릭은 위에서 stopPropagation으로 분리됨)
-    overlay.querySelectorAll("[data-qa-round-toggle]").forEach((head) => {
-      head.onclick = () => {
-        const idx = head.getAttribute("data-qa-round-toggle");
-        const body = document.getElementById(`qa-round-body-${idx}`);
-        const chevron = document.getElementById(`qa-round-chevron-${idx}`);
-        if (!body) return;
-        const opening = body.style.display === "none";
-        body.style.display = opening ? "" : "none";
-        if (chevron) chevron.textContent = opening ? "▼" : "▶";
-      };
-    });
+    // "원문 보기" 토글 + 회차 카드 펼치기/접기 (모달·QA 팝오버가 공유하는 공통 동작)
+    if (detail && detail.rounds && detail.rounds.length) {
+      attachQaRoundCardEvents(overlay, detail.rounds, "qa-round");
+    }
 
     setTimeout(() => document.addEventListener("keydown", qaDetailEscHandler, true), 0);
   }
 
-  function qaScoreCellHtml(agent, year, monthIndex) {
+  // [macOS 스타일 재설계 5단계] 점수 구간(90+/80대/70대/70미만/값없음)에 따라 칩 색
+  // 클래스(css/10-qa.css의 .qa-score-chip.s-*, 1단계에서 이미 준비해둔 토큰)를 골라준다.
+  // 인셋 리스트의 점수 입력칸(<input>)에 그대로 얹어서 "표"가 아니라 "색칠된 칩"처럼
+  // 보이게 하는 용도 — 값 자체는 여전히 input이라 클릭해서 바로 편집할 수 있다.
+  function qaScoreChipClass(val) {
+    if (val === null || val === undefined) return "s-empty";
+    if (val >= 90) return "s-high";
+    if (val >= 80) return "s-mid";
+    if (val >= 70) return "s-low";
+    return "s-bad";
+  }
+
+  // 점수 입력칸 자체(<input>)만 만든다. buildQATableHtml()의 화면용(인셋 리스트) 행은
+  // <td> 래퍼 없이 이 입력칸을 div 셀 안에 바로 넣는다.
+  function qaScoreInputHtml(agent, year, monthIndex) {
     const val = getQAScore(agent.id, year, monthIndex);
     const locked = qaIsMonthLocked(year, monthIndex);
-    return `<td><input type="number" class="qa-score-input" min="0" max="100" step="0.1" inputmode="decimal"
-      data-qa-agent="${agent.id}" value="${val === null ? "" : val.toFixed(1)}" placeholder="-" title="점수"${locked ? " disabled" : ""}></td>`;
+    return `<input type="number" class="qa-score-input ${qaScoreChipClass(val)}" min="0" max="100" step="0.1" inputmode="decimal"
+      data-qa-agent="${agent.id}" value="${val === null ? "" : val.toFixed(1)}" placeholder="-" title="점수"${locked ? " disabled" : ""}>`;
+  }
+
+  // <table> 캡처용 마크업(buildQATableHtml의 forCapture 경로)이 여전히 <td> 래퍼를
+  // 쓰므로 그대로 유지한다.
+  function qaScoreCellHtml(agent, year, monthIndex) {
+    return `<td>${qaScoreInputHtml(agent, year, monthIndex)}</td>`;
   }
 
   function qaDiffHtml(agent, year, monthIndex) {
@@ -8249,13 +8219,18 @@
     return { cls: diff > 0 ? "up" : "down", sign: diff > 0 ? "▲" : "▼", abs: Math.abs(diff) };
   }
 
+  // [macOS 스타일 재설계 3단계] 테두리 없는 숫자 나열 대신, 위젯 카드 + 증감 배지로 바꿔서
+  // 오른 지표/내린 지표가 색으로 바로 들어오게 한다. qaComputeStats()가 주는 데이터는 그대로이고,
+  // 이 함수가 만들어내는 HTML(마크업)만 바뀐다 — renderQAPage()와 captureQAPage()(05g)가 이 함수를
+  // 그대로 재사용하므로 화면과 캡처 이미지가 항상 같은 카드 모양을 갖는다.
   function qaStatItemHtml(label, value, prevValue, accent) {
     const isEmpty = value === null;
     const d = qaStatDiff(value, prevValue);
-    const diffHtml = d ? ` <span class="qa-stat-diff ${d.cls}">${d.sign} ${d.abs.toFixed(1)}</span>` : "";
-    return `<div class="qa-stat-item${accent ? " accent" : ""}">
-      <div class="qa-stat-num${isEmpty ? " empty" : ""}">${isEmpty ? "데이터 없음" : value.toFixed(1)}</div>
-      <div class="qa-stat-label">${esc(label)}${diffHtml}</div>
+    const trendHtml = d ? `<span class="qa-stat-card-trend ${d.cls}">${d.sign} ${d.abs.toFixed(1)}</span>` : "";
+    return `<div class="qa-stat-card${accent ? " accent" : ""}">
+      <div class="qa-stat-card-label">${esc(label)}</div>
+      <div class="qa-stat-card-num${isEmpty ? " empty" : ""}">${isEmpty ? "데이터 없음" : value.toFixed(1)}</div>
+      ${trendHtml}
     </div>`;
   }
 
@@ -8274,91 +8249,152 @@
     return agentsList;
   }
 
-  // 화면에 보이는 표와 이미지 캡처용 표가 같은 마크업을 쓰도록 분리해뒀다.
-  // forCapture가 true면 점수 입력칸 대신 텍스트로 값을 보여준다(캡처 이미지에 <input>이 그대로 찍히지 않도록).
-  function buildQATableHtml(agentsList, year, monthIndex, forCapture) {
+  // [macOS 스타일 재설계 4단계] 유형 필터 pill(qaUi.filterMode)과 검색어(qaUi.searchQuery)를
+  // 함께 적용해 화면(표/캡처 아님)에 보여줄 목록을 만든다. renderQAPage()/updateQATableArea()가
+  // 공통으로 쓴다.
+  function qaVisibleAgents() {
+    const modeFiltered = qaFilterAgentsByMode(qaWorkingAgents(), qaUi.filterMode);
+    return modeFiltered.filter((a) => qaAgentMatchesSearch(a, qaUi.searchQuery));
+  }
+
+  const QA_FILTER_PILLS = [
+    { mode: "ALL", label: "전체" },
+    { mode: "DAY", label: "주간" },
+    { mode: "NIGHT", label: "야간" },
+    { mode: "VOICE", label: "유선" },
+    { mode: "CHAT", label: "채팅" },
+  ];
+
+  function qaFilterRowHtml() {
+    const cur = qaUi.filterMode || "ALL";
     return `
-      <div class="qa-table-wrap">
-        <table class="qa-table">
-          <thead>
-            <tr>
-              <th>이름</th>
-              <th>LDAP</th>
-              <th>시간대</th>
-              <th>업무구분</th>
-              <th>조</th>
-              <th>점수</th>
-              <th>전월 대비</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${agentsList.length === 0 ? `
-              <tr><td class="qa-empty" colspan="7">${forCapture ? "해당하는 상담사가 없어요." : `근무중인 상담사가 없어요. "상담사 관리"에서 인원을 등록해주세요.`}</td></tr>
-            ` : agentsList.map((a) => {
-              const typeBadges = renderWorkTypeBadges(a.workTypes, "sm");
-              const groupBadge = `<span class="badge sm ${a.group === "night" ? "night" : "day"}">${a.group === "night" ? "야간" : "주간"}</span>`;
-              const val = getQAScore(a.id, year, monthIndex);
-              const scoreCell = forCapture
-                ? `<td>${val === null ? "-" : val.toFixed(1)}</td>`
-                : qaScoreCellHtml(a, year, monthIndex);
-              const highlight = !forCapture && qaHighlightAgentId === a.id;
-              const isResigned = a.status === "RESIGNED";
-              const rowClass = `${highlight ? "qa-row-highlight " : ""}${isResigned ? "qa-row-resigned" : ""}`.trim();
-              const resignedBadge = isResigned ? ` <span class="badge sm resigned">퇴사</span>` : "";
-              return `
-                <tr data-qa-row-agent="${a.id}" class="${rowClass}">
-                  <td class="qa-col-name"${forCapture ? "" : ` data-qa-name-click="${a.id}"`}>${esc(a.name)}${resignedBadge}${forCapture ? "" : `<span class="qa-name-search-icon">${ICON_SEARCH_MINI}</span>`}</td>
-                  <td class="qa-col-ldap">${esc(a.ldap || "-")}</td>
-                  <td>${esc(a.timezone || "-")}</td>
-                  <td class="qa-col-badges">${typeBadges || "-"}</td>
-                  <td>${groupBadge}</td>
-                  ${scoreCell}
-                  <td>${qaDiffHtml(a, year, monthIndex)}</td>
-                </tr>
-              `;
-            }).join("")}
-          </tbody>
-        </table>
+      <div class="qa-filter-row">
+        <div class="qa-pill-filter">
+          ${QA_FILTER_PILLS.map((p) => `<button type="button" class="${p.mode === cur ? "on" : ""}" data-qa-filter-mode="${p.mode}">${p.label}</button>`).join("")}
+        </div>
+      </div>
+    `;
+  }
+
+  function attachQAFilterRowHandlers(root) {
+    root.querySelectorAll("[data-qa-filter-mode]").forEach((btn) => {
+      btn.onclick = () => {
+        const mode = btn.getAttribute("data-qa-filter-mode");
+        if (qaUi.filterMode === mode) return;
+        qaUi.filterMode = mode;
+        renderApp();
+      };
+    });
+  }
+
+  // 이름(또는 사번)을 해시로 돌려서 아바타 배경색(css/10-qa.css의 .qa-avatar.pal-0~7,
+  // 1단계에서 이미 준비해둔 팔레트)을 안정적으로 골라준다. 같은 사람은 항상 같은 색.
+  // 퇴사자는 항상 pal-resigned(회색)로 고정해서 "더 이상 활동하지 않음"이 표시되게 한다.
+  function qaAvatarPaletteClass(agent) {
+    if (agent.status === "RESIGNED") return "pal-resigned";
+    const str = String(agent.id || agent.name || "");
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) hash = (hash * 31 + str.charCodeAt(i)) >>> 0;
+    return `pal-${hash % 8}`;
+  }
+
+  // [macOS 스타일 재설계 5단계] 화면용 표(<table>)를 macOS Mail/Finder 느낌의
+  // "인셋 그룹 리스트"(div 목록)로 바꾼다. 이미지 캡처(forCapture=true, 05g의
+  // captureQAPage())는 그대로 <table> 마크업을 쓰므로 그 경로는 손대지 않았다.
+  // 화면 쪽에서 계속 지켜야 하는 것들: data-qa-row-agent(강조 스크롤/CSS.escape 조회),
+  // 배지 클래스("badge sm night/day", "badge sm resigned"), 점수 입력칸의 blur/Enter
+  // 저장(.qa-score-input, data-qa-agent), 잠긴 달의 disabled, 퇴사자 취소선 스타일.
+  function buildQATableHtml(agentsList, year, monthIndex, forCapture) {
+    if (forCapture) {
+      return `
+        <div class="qa-table-wrap">
+          <table class="qa-table">
+            <thead>
+              <tr>
+                <th>이름</th>
+                <th>LDAP</th>
+                <th>시간대</th>
+                <th>업무구분</th>
+                <th>조</th>
+                <th>점수</th>
+                <th>전월 대비</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${agentsList.length === 0 ? `
+                <tr><td class="qa-empty" colspan="7">해당하는 상담사가 없어요.</td></tr>
+              ` : agentsList.map((a) => {
+                const typeBadges = renderWorkTypeBadges(a.workTypes, "sm");
+                const groupBadge = `<span class="badge sm ${a.group === "night" ? "night" : "day"}">${a.group === "night" ? "야간" : "주간"}</span>`;
+                const val = getQAScore(a.id, year, monthIndex);
+                const isResigned = a.status === "RESIGNED";
+                const rowClass = isResigned ? "qa-row-resigned" : "";
+                const resignedBadge = isResigned ? ` <span class="badge sm resigned">퇴사</span>` : "";
+                return `
+                  <tr data-qa-row-agent="${a.id}" class="${rowClass}">
+                    <td class="qa-col-name">${esc(a.name)}${resignedBadge}</td>
+                    <td class="qa-col-ldap">${esc(a.ldap || "-")}</td>
+                    <td>${esc(a.timezone || "-")}</td>
+                    <td class="qa-col-badges">${typeBadges || "-"}</td>
+                    <td>${groupBadge}</td>
+                    <td>${val === null ? "-" : val.toFixed(1)}</td>
+                    <td>${qaDiffHtml(a, year, monthIndex)}</td>
+                  </tr>
+                `;
+              }).join("")}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    return `
+      <div class="qa-list-wrap">
+        <div class="qa-list-head">
+          <span>이름</span><span>시간대</span><span>업무</span><span>조</span><span>점수</span><span>전월 대비</span>
+        </div>
+        ${agentsList.length === 0 ? `
+          <div class="qa-row qa-empty-row"><div class="qa-empty">근무중인 상담사가 없어요. "상담사 관리"에서 인원을 등록해주세요.</div></div>
+        ` : agentsList.map((a) => {
+          const typeBadges = renderWorkTypeBadges(a.workTypes, "sm");
+          const groupBadge = `<span class="badge sm ${a.group === "night" ? "night" : "day"}">${a.group === "night" ? "야간" : "주간"}</span>`;
+          const highlight = qaHighlightAgentId === a.id;
+          const isResigned = a.status === "RESIGNED";
+          const rowClass = ["qa-row", highlight ? "qa-row-highlight" : "", isResigned ? "qa-row-resigned" : ""].filter(Boolean).join(" ");
+          const resignedBadge = isResigned ? ` <span class="badge sm resigned">퇴사</span>` : "";
+          const ldapLine = a.ldap || "-";
+          const initial = esc(String(a.name || "-").charAt(0) || "-");
+          return `
+            <div class="${rowClass}" data-qa-row-agent="${a.id}">
+              <div class="qa-name-cell" data-qa-name-click="${a.id}">
+                <div class="qa-avatar ${qaAvatarPaletteClass(a)}">${initial}</div>
+                <div class="qa-name-text">
+                  <div class="qa-name-main">${esc(a.name)}${resignedBadge}</div>
+                  <div class="qa-name-ldap">${esc(ldapLine)}</div>
+                </div>
+                <span class="qa-name-search-icon">${ICON_SEARCH_MINI}</span>
+              </div>
+              <div class="qa-row-timezone">${esc(a.timezone || "-")}</div>
+              <div class="qa-badges">${typeBadges || "-"}</div>
+              <div class="qa-row-group">${groupBadge}</div>
+              <div class="qa-row-score">${qaScoreInputHtml(a, year, monthIndex)}</div>
+              <div class="qa-row-diff">${qaDiffHtml(a, year, monthIndex)}</div>
+            </div>
+          `;
+        }).join("")}
       </div>
     `;
   }
 
   // 검색창 자체는 다시 그리지 않고 표 영역만 갱신한다(agents/interviews 화면과 같은 방식).
   // IME(한글) 조합 중에도 입력이 끊기지 않고, 타이핑 즉시 결과가 반영된다.
-  // [성능 개선 계획 Phase 2] 검색 결과가 그대로(=행 개수가 그대로)라면, 표 전체를 새로 안 만들고
-  // domReconcileTable(js/01f-settings-menu-utils.js)로 실제로 달라진 칸만 그 자리에서 고쳐 쓴다 —
-  // 스케줄 표와 같은 방식. 검색으로 보이는 인원이 실제로 달라지면(행 개수가 바뀌면) 안전하게
-  // 표 전체를 새로 만든다.
   function updateQATableArea() {
     const tableArea = document.getElementById("qa-table-area");
     if (!tableArea) return;
     const { year, monthIndex } = qaUi;
-    const filteredList = qaWorkingAgents().filter((a) => qaAgentMatchesSearch(a, qaUi.searchQuery));
-    const newHtml = buildQATableHtml(filteredList, year, monthIndex, false);
-    const existingTable = tableArea.querySelector("table.qa-table");
-    const patched = existingTable && domReconcileTable(existingTable, newHtml);
-    if (!patched) {
-      tableArea.innerHTML = newHtml;
-      attachQATableAreaHandlers(tableArea, filteredList, year, monthIndex);
-    }
-    // patch에 성공했으면 칸 DOM을 그대로 재사용했으니(점수 입력칸 포함) 이벤트는 이미 다 붙어 있다.
-  }
-  // 점수 입력칸(.qa-score-input) 하나가 바뀌었을 때: 예전에는 페이지 전체를 다시 그렸지만(상단
-  // 툴바·검색창까지 통째로 다시 만드는 건 낭비), 이제 그 값이 실제로 영향을 주는 두 곳 —
-  // 표 영역(그 인원의 점수·전월 대비 칸)과 평균 통계칸 — 만 갱신한다.
-  function updateQAStatsArea() {
-    const grid = document.getElementById("qa-stat-grid");
-    if (!grid) return;
-    const { year, monthIndex } = qaUi;
-    const agentsList = qaWorkingAgents();
-    const stats = qaComputeStats(agentsList, year, monthIndex);
-    const prevYm = qaPrevMonth(year, monthIndex);
-    const prevStats = qaComputeStats(agentsList, prevYm.year, prevYm.monthIndex);
-    grid.innerHTML = qaStatGridInnerHtml(stats, prevStats);
-  }
-  function qaHandleScoreChanged() {
-    updateQATableArea();
-    updateQAStatsArea();
+    const filteredList = qaVisibleAgents();
+    tableArea.innerHTML = buildQATableHtml(filteredList, year, monthIndex, false);
+    attachQATableAreaHandlers(tableArea, filteredList, year, monthIndex);
   }
 
   function attachQATableAreaHandlers(root, agentsList, year, monthIndex) {
@@ -8375,7 +8411,7 @@
           year, monthIndex,
           input.value
         );
-        qaHandleScoreChanged();
+        renderApp();
       };
       // 엑셀처럼 Enter/Tab으로 다음(아래) 칸, Shift+Enter/Shift+Tab으로 이전(위) 칸으로
       // 바로 이동한다. blur()를 호출하면 값이 바뀐 경우 change 이벤트가 이 안에서
@@ -8396,7 +8432,7 @@
 
   function renderQAPage(root) {
     const agentsList = qaWorkingAgents();
-    const filteredList = agentsList.filter((a) => qaAgentMatchesSearch(a, qaUi.searchQuery));
+    const filteredList = qaVisibleAgents();
     const { year, monthIndex } = qaUi;
     // 통계(평균)는 검색어와 무관하게 항상 재직중인 전체 인원 기준으로 보여준다.
     const stats = qaComputeStats(agentsList, year, monthIndex);
@@ -8406,25 +8442,38 @@
 
     root.innerHTML = `
       <div class="qa-top">
-        <div class="qa-title">품질 관리</div>
-        <div class="schedule-month-nav">
-          <button class="schedule-month-btn" id="qa-prev-month">‹</button>
-          <div class="schedule-month-label">${qaMonthLabel()}${locked ? ` <span class="sch-locked-badge">${ICON_LOCK} 확정됨</span>` : ""}</div>
-          <button class="schedule-month-btn" id="qa-next-month">›</button>
-          <button class="ghost-btn sch-lock-toggle-btn ${locked ? "locked" : ""}" id="qa-lock-btn" style="margin-left:8px;">${locked ? `${ICON_UNLOCK} 잠금 해제` : `${ICON_LOCK} 이 달 잠그기`}</button>
-          <button class="ghost-btn" id="qa-excel-upload-btn">${ICON_UPLOAD} 엑셀 업로드</button>
-          <button class="ghost-btn qa-bulk-delete-btn" id="qa-bulk-delete-btn">${ICON_TRASH} 엑셀 일괄삭제</button>
-          <button class="ghost-btn" id="qa-capture-btn">${ICON_CAMERA} 이미지로 저장 ▾</button>
+        <div class="qa-toolbar-title">품질 관리<small>${qaMonthLabel()} · 전체 ${agentsList.length}명</small></div>
+        <div class="mac-seg schedule-month-nav">
+          <button id="qa-prev-month" aria-label="이전 달">‹</button>
+          <div class="month-label">${qaMonthLabel()}${locked ? ` <span class="sch-locked-badge">${ICON_LOCK} 확정됨</span>` : ""}</div>
+          <button id="qa-next-month" aria-label="다음 달">›</button>
+        </div>
+        <button class="lock-chip" id="qa-lock-btn">${locked ? `${ICON_UNLOCK} 잠금 해제` : `${ICON_LOCK} 이 달 잠그기`}</button>
+        <div class="agent-search-input interview-toolbar-search">
+          <input type="text" class="agent-search-input-field" id="qa-search-input" placeholder="이름 검색" title="상담사 검색 (이름/주간/야간/채팅/유선, 쉼표로 여러 개)" value="${esc(qaUi.searchQuery)}" autocomplete="off">
+          ${ICON_SEARCH_MINI}
+        </div>
+        <div class="mac-iv-toolbar">
+          <button type="button" class="mac-iv-tool" id="qa-excel-upload-btn"><span class="mac-iv-tool-icon">${ICON_UPLOAD}</span><span class="mac-iv-tool-label">엑셀 업로드</span></button>
+          <button type="button" class="mac-iv-tool qa-bulk-delete-btn" id="qa-bulk-delete-btn"><span class="mac-iv-tool-icon">${ICON_TRASH}</span><span class="mac-iv-tool-label">일괄삭제</span></button>
+          <button type="button" class="mac-iv-tool" id="qa-capture-btn"><span class="mac-iv-tool-icon">${ICON_CAMERA}</span><span class="mac-iv-tool-label">이미지로 저장 ▾</span></button>
         </div>
       </div>
       <div class="status" id="qa-status"></div>
       <div class="qa-stat-row">
-        <div class="agent-search-input">
-          <input type="text" class="agent-search-input-field" id="qa-search-input" placeholder="이름 검색" title="상담사 검색 (이름/주간/야간/채팅/유선, 쉼표로 여러 개)" value="${esc(qaUi.searchQuery)}" autocomplete="off">
-          ${ICON_SEARCH_MINI}
+        <div class="qa-stat-grid">
+          ${qaStatItemHtml("전체 평균", stats.total, prevStats.total, true)}
+          ${qaStatItemHtml("유선 점수 평균", stats.voice, prevStats.voice)}
+          ${qaStatItemHtml("채팅 점수 평균", stats.chat, prevStats.chat)}
+          ${qaStatItemHtml("주간 점수 평균", stats.day, prevStats.day)}
+          ${qaStatItemHtml("야간 점수 평균", stats.night, prevStats.night)}
+          ${qaStatItemHtml("주간 채팅 평균", stats.dayChat, prevStats.dayChat)}
+          ${qaStatItemHtml("주간 유선 평균", stats.dayVoice, prevStats.dayVoice)}
+          ${qaStatItemHtml("야간 채팅 평균", stats.nightChat, prevStats.nightChat)}
+          ${qaStatItemHtml("야간 유선 평균", stats.nightVoice, prevStats.nightVoice)}
         </div>
-        <div class="qa-stat-grid" id="qa-stat-grid">${qaStatGridInnerHtml(stats, prevStats)}</div>
       </div>
+      ${qaFilterRowHtml()}
       <div id="qa-table-area">${buildQATableHtml(filteredList, year, monthIndex, false)}</div>
     `;
 
@@ -8452,6 +8501,7 @@
       renderApp();
     };
     document.getElementById("qa-excel-upload-btn").onclick = () => openQAUploadModal();
+    attachQAFilterRowHandlers(root);
 
     const qaSearchInput = document.getElementById("qa-search-input");
     if (qaSearchInput) {
@@ -8625,7 +8675,7 @@
 
     function cleanup(label) {
       if (wrapper.parentNode) document.body.removeChild(wrapper);
-      if (btn) { btn.disabled = false; btn.innerHTML = ICON_CAMERA + " 이미지로 저장 ▾"; }
+      if (btn) { btn.disabled = false; btn.innerHTML = `<span class="mac-iv-tool-icon">${ICON_CAMERA}</span><span class="mac-iv-tool-label">이미지로 저장 ▾</span>`; }
       if (label) flashQAStatus(label);
     }
 
@@ -8939,9 +8989,55 @@
     editingId: null,
     searchQuery: "",
     typeFilter: "all", // "all" | "정기" | "비정기" | "경고" | "퇴사"
-    expandedIds: new Set(), // 목록에서 펼쳐본 면담 기록 id들 (상담사 상세 화면과 공유)
+    expandedIds: new Set(), // 상담사 팝오버(mac-iv-row)에서 펼쳐본 면담 기록 id들. 독립 면담일지 목록(iv-row)은
+                             // 3단계부터 오른쪽 상세 패널만 쓰므로 이 값을 더 이상 참조하지 않는다.
     page: 1, // 면담일지 목록의 현재 페이지(10건씩)
+    selectedId: null, // 독립 면담일지 페이지의 2단 레이아웃에서 오른쪽 상세 패널에 표시 중인 기록 id.
+                       // 상담사 팝오버 등 상세 패널이 없는 화면에서는 이 값이 쓰이지 않는다.
+    mobileDetailOpen: false, // (5단계) 목록/상세가 나란히 두기엔 좁아졌을 때, 상세 패널이 전체 폭
+                              // 오버레이로 열려 있는지 여부. 넓은 화면(2단 분할)에서는 쓰이지 않는다.
   };
+
+  // (5단계) 목록/상세 2단 분할이 실제로 들어갈 자리가 좁은지는 브라우저 창(뷰포트) 폭이 아니라
+  // 이 페이지가 그려지는 요소(root)의 실측 폭으로 판단한다 — 바탕화면 창 모드는 창을 자유롭게
+  // 줄일 수 있고, 상담사 관리에 이식된 화면은 사이드바/팝오버 때문에 뷰포트보다 훨씬 좁을 수
+  // 있어서, 기존처럼 @media (max-width) 하나로는 두 경우를 모두 못 잡아낸다.
+  const INTERVIEW_SPLIT_COMPACT_WIDTH = 700;
+  let _interviewsSplitCompact = false;
+
+  // root(면담일지 페이지 컨테이너)의 폭을 관찰해 좁아지면(iv-compact) 목록 전체 폭 +
+  // 상세 오버레이 방식으로, 다시 넓어지면 원래 2단 분할로 자동 전환한다. 같은 root에는
+  // 한 번만 관찰을 걸어두고(riderInterviewsPage가 다시 그릴 때마다 root 자체는 재사용되므로),
+  // 매 렌더링 시점의 최신 상태는 렌더 함수 쪽에서 _interviewsSplitCompact 값을 읽어 바로 반영한다.
+  function attachInterviewSplitResponsive(root) {
+    if (!root || root._ivSplitResizeObserver || typeof ResizeObserver !== "function") return;
+    const apply = () => {
+      const split = root.querySelector(".interview-split");
+      if (!split) return;
+      const wasCompact = _interviewsSplitCompact;
+      const nowCompact = root.getBoundingClientRect().width < INTERVIEW_SPLIT_COMPACT_WIDTH;
+      _interviewsSplitCompact = nowCompact;
+      split.classList.toggle("iv-compact", nowCompact);
+      if (!nowCompact) {
+        // 다시 넓어지면 오버레이는 필요 없으니 접어두고, 나중에 또 좁아지면 항상 목록부터 보이게 한다.
+        interviewsUi.mobileDetailOpen = false;
+        split.classList.remove("detail-open");
+      } else if (wasCompact && interviewsUi.mobileDetailOpen) {
+        split.classList.add("detail-open");
+      }
+    };
+    const observer = new ResizeObserver(apply);
+    observer.observe(root);
+    root._ivSplitResizeObserver = observer;
+    apply();
+  }
+
+  // 좁은 화면에서 열려 있던 상세 오버레이를 목록으로 되돌린다("뒤로" 버튼).
+  function closeInterviewMobileDetail() {
+    interviewsUi.mobileDetailOpen = false;
+    const split = _interviewsPageRoot ? _interviewsPageRoot.querySelector(".interview-split") : null;
+    if (split) split.classList.remove("detail-open");
+  }
 
   // renderInterviewsPage(root)가 그릴 때마다 그 root를 기억해둔다. 바탕화면 창 모드(js/09a-home-desktop.js)에서는
   // 창마다 각자 다른 #page-inner 요소를 쓰므로, updateInterviewListArea()의 부분 갱신이 항상 이 페이지의
@@ -9098,56 +9194,76 @@
     return { agentId, managerId, date, type, content, followUp };
   }
 
-  function renderInterviewRow(rec, actionPrefix) {
+  // (2단계 → 3단계 정리) 목록 행: 유형별 색상 바 + 아바타 + 이름/LDAP/날짜 + 배지 + 내용 미리보기 2줄.
+  // 아바타 색상·이니셜은 상담사 목록/팝오버(js/04-agents.js)와 같은 agentAvatarColor/agentInitials를 그대로 써서
+  // 앱 전체에서 같은 상담사가 항상 같은 색으로 보이게 한다. 클릭하면 selectedId가 갱신되고 오른쪽
+  // 상세 패널(renderInterviewDetailPaneHtml, 3단계)이 새로 그려진다. 다운로드/수정/삭제 버튼과 펼침형
+  // 전체 내용은 이제 이 행이 아니라 오른쪽 상세 패널의 몫이라 여기서는 뺐다.
+  function renderInterviewRow(rec) {
     const agent = agentsData.find((a) => a.id === rec.agentId);
-    const agentNameHtml = agent
-      ? `<span class="interview-agent-name">${esc(agent.name)}</span><span class="interview-agent-ldap">${esc(agent.ldap)}</span>`
-      : `<span class="interview-agent-name agent-field-empty">(삭제된 상담사)</span>`;
-    const agentMetaHtml = agent ? `
-      <span class="interview-agent-meta">
-        ${agent.timezone ? `<span class="interview-agent-timezone">${ICON_CLOCK} ${esc(agent.timezone)}</span>` : ""}
-        <span class="badge sm ${agent.group === "night" ? "night" : "day"}">${agent.group === "night" ? "야간" : "주간"}</span>
-        ${renderWorkTypeBadges(agent.workTypes, "sm")}
-      </span>
-    ` : "";
-    const manager = rec.managerId ? agentsData.find((a) => a.id === rec.managerId) : null;
-    const managerHtml = manager ? `<span class="interview-agent-ldap">${ICON_SHIELD} ${esc(manager.name)} · ${esc(manager.ldap)}</span>` : "";
-    const isExpanded = interviewsUi.expandedIds.has(rec.id);
+    const typeCls = interviewTypeBadgeClass(rec.type);
+    const isSelected = interviewsUi.selectedId === rec.id;
+    const previewLine = (rec.content || "").trim();
+    const avatarHtml = agent
+      ? `<div class="iv-row-avatar" style="background:${agentAvatarColor(agent.id)}">${esc(agentInitials(agent.name))}</div>`
+      : `<div class="iv-row-avatar iv-row-avatar-empty">?</div>`;
+    const nameHtml = agent
+      ? `<span class="iv-row-name">${esc(agent.name)}</span><span class="iv-row-ldap">${esc(agent.ldap || "")}</span>`
+      : `<span class="iv-row-name agent-field-empty">(삭제된 상담사)</span>`;
     return `
-      <div class="interview-row ${isExpanded ? "expanded" : ""}">
-        <div class="interview-row-top" data-action="toggle-interview-row" data-id="${rec.id}">
-          <span class="interview-row-chevron">${ICON_CHEVRON_RIGHT}</span>
-          <span class="interview-date">${esc(rec.date || "-")}</span>
-          <span class="badge sm ${interviewTypeBadgeClass(rec.type)}">${esc(rec.type || "비정기")}</span>
-          ${agentNameHtml}
-          ${agentMetaHtml}
-          ${managerHtml}
-          <div class="interview-row-actions">
-            <button class="ghost-btn" data-action="${actionPrefix}-download-interview" data-id="${rec.id}" title="엑셀 다운로드">${ICON_DOWNLOAD}</button>
-            <button class="ghost-btn" data-action="${actionPrefix}-edit-interview" data-id="${rec.id}">수정</button>
-            <button class="ghost-btn danger" data-action="${actionPrefix}-delete-interview" data-id="${rec.id}">삭제</button>
+      <div class="iv-row ${typeCls} ${isSelected ? "selected" : ""}">
+        <div class="iv-row-top" data-action="toggle-interview-row" data-id="${rec.id}">
+          <span class="iv-row-bar"></span>
+          ${avatarHtml}
+          <div class="iv-row-main">
+            <div class="iv-row-line1">
+              ${nameHtml}
+              <span class="iv-row-date">${esc(rec.date || "-")}</span>
+            </div>
+            <div class="iv-row-badges">
+              <span class="badge sm ${typeCls}">${esc(rec.type || "비정기")}</span>
+              ${agent ? `<span class="badge sm ${agent.group === "night" ? "night" : "day"}">${agent.group === "night" ? "야간" : "주간"}</span>` : ""}
+            </div>
+            <div class="iv-row-snippet">${previewLine ? esc(previewLine) : ""}</div>
           </div>
         </div>
-        ${isExpanded ? `
-          <div class="interview-row-body">
-            ${rec.content ? `<div class="interview-content">${esc(rec.content)}</div>` : ""}
-            <div class="interview-followup">후속조치: ${rec.followUp ? esc(rec.followUp) : "없음"}</div>
-          </div>
-        ` : ""}
       </div>
     `;
   }
+  // 목록을 날짜(연-월) 기준으로 훑으면서 달이 바뀔 때마다 sticky 그룹 헤더("2026년 09월")를 끼워 넣는다.
+  function interviewMonthLabel(dateStr) {
+    const m = /^(\d{4})-(\d{2})/.exec(dateStr || "");
+    return m ? `${m[1]}년 ${m[2]}월` : "날짜 미상";
+  }
 
-  // 면담 기록 행을 펼치고/접는 클릭을 처리한다. 수정·삭제 버튼 클릭은 여기서 무시한다.
+  // 면담 기록 행을 펼치고/접는 클릭을 처리한다.
+  // 같은 클릭에서 interviewsUi.selectedId도 함께 갱신해, 독립 면담일지 페이지의
+  // 오른쪽 상세 패널(#interview-detail-pane)이 있으면 그 내용도 같이 새로고침한다.
+  // 상세 패널이 없는 화면(상담사 팝오버 등)에서는 updateInterviewDetailPane()가 조용히 아무 일도 하지 않는다.
   function attachInterviewRowToggles(root, onToggle) {
     root.querySelectorAll("[data-action='toggle-interview-row']").forEach((row) => {
-      row.onclick = (e) => {
-        if (e.target.closest(".interview-row-actions")) return;
+      row.onclick = () => {
         const id = row.getAttribute("data-id");
         if (interviewsUi.expandedIds.has(id)) {
           interviewsUi.expandedIds.delete(id);
         } else {
           interviewsUi.expandedIds.add(id);
+        }
+        interviewsUi.selectedId = id;
+        // (6단계) 추가/수정 폼이 열려 있는 동안 다른 행을 고르면, 쓰던 폼은 버리고
+        // 그 행의 상세로 바로 전환한다(별도 확인 없이 — 폼은 아직 저장되지 않은 내용이라 가볍게 버려도 된다).
+        if (interviewsUi.mode !== "list") {
+          interviewsUi.mode = "list";
+          interviewsUi.editingId = null;
+        }
+        updateInterviewDetailPane();
+        // (5단계) 목록/상세를 나란히 둘 자리가 없을 만큼 좁으면(.interview-split.iv-compact),
+        // 상세를 전체 폭 오버레이로 밀어 올린다. 이 클래스가 없는 화면(넓은 2단 분할, 상담사
+        // 팝오버 등)에서는 아무 효과가 없다.
+        const split = row.closest(".interview-split");
+        if (split && split.classList.contains("iv-compact")) {
+          interviewsUi.mobileDetailOpen = true;
+          split.classList.add("detail-open");
         }
         onToggle();
       };
@@ -9155,90 +9271,387 @@
   }
 
   /* ---- 독립 메뉴: 면담일지 페이지 ---- */
+  // (6단계: 추가/수정 폼 위치 정리) 폼은 더 이상 리스트 전체를 덮지 않는다 — 왼쪽 목록/검색/필터는
+  // add·edit 모드에서도 항상 그대로 살아있고, 폼은 오른쪽 상세 패널 자리(interview-split-detail)에만
+  // 뜬다. 그래서 아래에서는 모드와 무관하게 툴바와 목록을 항상 같은 방식으로 그리고, 오른쪽 패널
+  // 내용물만 모드에 따라 상세 보기 / 폼으로 갈라진다.
   function renderInterviewsPage(root) {
     _interviewsPageRoot = root;
+    // 상담사 관리 화면에 이식된 "전체 면담일지"(id="agent-interviews-embedded")일 때만 창 높이에
+    // 맞춰 페이지네이션을 하단에 고정한다. 독립 면담일지 페이지는 이 플래그가 false로 남는다.
+    _interviewsFitToHeight = !!root && root.id === "agent-interviews-embedded";
     const filtered = sortInterviews(
       interviewsData.filter((r) => interviewMatchesSearch(r, interviewsUi.searchQuery) && interviewMatchesType(r, interviewsUi.typeFilter))
     );
 
-    let bodyHtml;
-    let exportRowHtml = "";
-    if (interviewsUi.mode === "add") {
-      bodyHtml = `
-        <div class="agent-form-title">새 면담 기록 추가</div>
-        <form class="agent-form" id="interview-page-form">
-          ${renderInterviewFormFields({ date: todayISO(), type: "정기" }, null, "interview-page")}
-          <div class="agent-form-actions">
-            <button type="submit" class="primary-btn">추가</button>
-            <button type="button" class="cancel-btn" id="interview-page-cancel">취소</button>
-          </div>
-        </form>
-      `;
-    } else if (interviewsUi.mode === "edit") {
-      const editing = interviewsData.find((r) => r.id === interviewsUi.editingId) || null;
-      bodyHtml = editing ? `
-        <div class="agent-form-title">면담 기록 수정</div>
-        <form class="agent-form" id="interview-page-form">
-          ${renderInterviewFormFields(editing, null, "interview-page")}
-          <div class="agent-form-actions">
-            <button type="submit" class="primary-btn">저장</button>
-            <button type="button" class="cancel-btn" id="interview-page-cancel">취소</button>
-          </div>
-        </form>
-      ` : `<div class="agent-list-empty">기록을 찾을 수 없어요.</div>`;
-    } else {
-      const typeFilterBtns = ["all", ...INTERVIEW_TYPES].map((t) => `
-        <button type="button" class="agent-filter-btn ${interviewsUi.typeFilter === t ? "active" : ""}" data-interview-filter="${t}">${t === "all" ? "전체" : t}</button>
-      `).join("");
-      exportRowHtml = `<button class="ghost-btn" id="interview-export-btn">${ICON_DOWNLOAD} 엑셀로 다운로드 ▾</button>`;
-      bodyHtml = `
-        <div class="agent-controls">
-          <div class="agent-filter-row">${typeFilterBtns}</div>
+    const typeFilterBtns = ["all", ...INTERVIEW_TYPES].map((t) => `
+      <button type="button" class="agent-filter-btn ${interviewsUi.typeFilter === t ? "active" : ""}" data-interview-filter="${t}">${t === "all" ? "전체" : t}</button>
+    `).join("");
+    const exportRowHtml = `<button type="button" class="mac-iv-tool" id="interview-export-btn"><span class="mac-iv-tool-icon">${ICON_DOWNLOAD}</span><span class="mac-iv-tool-label">엑셀</span></button>`;
+    // (4단계: 상단 툴바 재구성) 유형 필터(알약형 세그먼트) + 검색창(사이드바와 통일된 라운드
+    // 스타일) + 엑셀 다운로드/AI 요약/면담 기록 추가 버튼을 목업(main-toolbar)처럼 한 줄로 묶는다.
+    const toolbarHtml = `
+      <div class="interview-type-filter agent-filter-row">${typeFilterBtns}</div>
+      <div class="agent-search-input interview-toolbar-search"><input type="text" class="agent-search-input-field" id="interview-search-input" placeholder="상담사 이름 또는 LDAP 검색" value="${esc(interviewsUi.searchQuery)}" autocomplete="off">${ICON_SEARCH_MINI}</div>
+      <div class="agent-list-header-actions">
+        <div class="mac-iv-toolbar">
+          <button type="button" class="mac-iv-tool" id="btn-interview-ai-summary"><span class="mac-iv-tool-icon">✦</span><span class="mac-iv-tool-label">AI 요약</span></button>
+          ${exportRowHtml}
+          <button type="button" class="mac-iv-tool mac-iv-tool-accent" id="btn-interview-add"><span class="mac-iv-tool-icon">＋</span><span class="mac-iv-tool-label">면담 기록 추가</span></button>
         </div>
-        <div id="interview-list-area">
-          ${renderInterviewListAreaHtml(filtered)}
+      </div>
+    `;
+
+    const detailPaneHtml = (interviewsUi.mode === "add" || interviewsUi.mode === "edit")
+      ? renderInterviewFormPaneHtml(interviewsUi.mode)
+      : renderInterviewDetailPaneHtml();
+
+    // (5단계 + 6단계) 좁은 화면에서는 폼이 열려 있는 것도 상세 보기와 똑같이 오른쪽에서
+    // 밀려들어오는 전체 폭 오버레이로 다룬다 — list 모드가 아니면 항상 오버레이를 편다.
+    const detailShouldOverlay = interviewsUi.mode !== "list" || interviewsUi.mobileDetailOpen;
+
+    // (0단계) 목록 rows와 페이지네이션을 분리해서, 페이지네이션이 #interview-list-area의
+    // 스크롤 영역 밖(#interview-list-pagination)에 항상 고정되도록 한다.
+    const { listHtml: interviewListHtml, paginationHtml: interviewPaginationHtml } = buildInterviewListAreaHtml(filtered);
+
+    // (1단계: 레이아웃 뼈대만 전환) 목록/상세를 좌우 2단으로 나눈다.
+    const bodyHtml = `
+      <div class="interview-split ${_interviewsSplitCompact ? "iv-compact" : ""} ${_interviewsSplitCompact && detailShouldOverlay ? "detail-open" : ""}">
+        <div class="interview-split-list">
+          <div id="interview-list-area">${interviewListHtml}</div>
+          <div id="interview-list-pagination">${interviewPaginationHtml}</div>
         </div>
-      `;
-    }
+        <div class="interview-split-detail" id="interview-detail-pane">
+          ${detailPaneHtml}
+        </div>
+      </div>
+    `;
 
     root.innerHTML = `
-      <div class="agent-list-header">
-        <div class="agent-list-title">면담일지</div>
-        ${interviewsUi.mode === "list" ? `<div class="agent-list-header-actions">${exportRowHtml}<button class="ghost-btn" id="btn-interview-ai-summary">AI 요약</button><button class="ghost-btn solid-accent-btn" id="btn-interview-add">＋ 면담 기록 추가</button></div>` : ""}
-      </div>
-      <div class="card">
-        <div class="interview-summary-row">
-          <div class="agent-summary">전체 ${interviewsData.length}건${interviewsUi.mode === "list" && filtered.length !== interviewsData.length ? ` · 필터 결과 ${filtered.length}건` : ""}</div>
-          ${interviewsUi.mode === "list" ? `<div class="agent-search-input"><input type="text" class="agent-search-input-field" id="interview-search-input" placeholder="상담사 이름 또는 LDAP 검색" value="${esc(interviewsUi.searchQuery)}" autocomplete="off">${ICON_SEARCH_MINI}</div>` : ""}
+      <div class="agent-list-header interview-toolbar">
+        <div class="interview-toolbar-title-block">
+          <div class="agent-list-title">면담일지</div>
+          <div class="agent-summary interview-toolbar-summary">전체 ${interviewsData.length}건${filtered.length !== interviewsData.length ? ` · 필터 결과 ${filtered.length}건` : ""}</div>
         </div>
-        <div class="status" id="interview-status"></div>
-        ${bodyHtml}
+        ${toolbarHtml}
       </div>
+      <div class="status" id="interview-status"></div>
+      ${bodyHtml}
     `;
 
     attachInterviewsPageEvents(root);
+    attachInterviewSplitResponsive(root);
+
+    // 목록 영역이 실제로 차지하는 높이를 재서 페이지당 개수를 맞추고(전체 면담일지일 때만),
+    // 이후 창 크기가 바뀔 때마다도 다시 맞추도록 관찰을 새로 건다(root.innerHTML을 통째로
+    // 새로 그렸으므로 #interview-list-area도 매번 새 DOM 노드).
+    watchInterviewListSize();
+    measureAndSyncInterviewPageSize();
+    enforceInterviewListFit();
   }
 
-  // 면담일지 목록 영역(검색바 아래)의 내용을 만든다. 10건씩 페이지를 나눠서 보여준다.
-  function renderInterviewListAreaHtml(filtered) {
-    if (filtered.length === 0) {
-      return `<div class="agent-list-empty">${interviewsData.length === 0 ? "등록된 면담 기록이 없어요." : "검색 또는 필터 조건에 맞는 면담 기록이 없어요."}</div>`;
+  const ICON_INTERVIEW_DETAIL_EMPTY = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 9h18"/><path d="M8 3v4"/><path d="M16 3v4"/></svg>`;
+
+  // (3단계) 오른쪽 상세 패널: 아바타/이름/배지 헤더 + 툴바(다운로드/수정/삭제), 정보 그리드
+  // (면담일자·면담 관리자·작성일시), 면담 내용, 후속조치 강조 박스로 구성된 리딩 페인 디자인.
+  // 다운로드/수정/삭제는 더 이상 목록 행(renderInterviewRow)에 없고 이 패널의 툴바로만 존재한다.
+  function renderInterviewDetailPaneHtml() {
+    const rec = interviewsData.find((r) => r.id === interviewsUi.selectedId);
+    if (!rec) {
+      // (6단계) 빈 상태 문구: 처음 들어왔을 때와 방금 선택 해제/삭제로 비워졌을 때 모두 자연스럽도록,
+      // 지시형("선택하면") 대신 있는 그대로 안내하는 톤으로 다듬었다.
+      return `
+        <div class="interview-detail-empty iv-fade-in">
+          ${ICON_INTERVIEW_DETAIL_EMPTY}
+          <div>아직 선택된 면담 기록이 없어요.<br>왼쪽 목록에서 하나를 골라주세요.</div>
+        </div>
+      `;
     }
-    const { items, page, totalPages } = paginateList(filtered, interviewsUi.page);
-    interviewsUi.page = page;
+    const agent = agentsData.find((a) => a.id === rec.agentId);
+    const manager = rec.managerId ? agentsData.find((a) => a.id === rec.managerId) : null;
+    const typeCls = interviewTypeBadgeClass(rec.type);
+    const avatarHtml = agent
+      ? `<div class="interview-detail-avatar" style="background:${agentAvatarColor(agent.id)}">${esc(agentInitials(agent.name))}</div>`
+      : `<div class="interview-detail-avatar iv-row-avatar-empty">?</div>`;
+    const managerLabel = manager ? `${esc(manager.name)} (${esc(manager.ldap || "-")})` : '<span class="agent-field-empty">-</span>';
+    const createdAtLabel = rec.createdAt ? esc(rec.createdAt.replace("T", " ").slice(0, 16)) : '<span class="agent-field-empty">-</span>';
     return `
-      <div class="interview-list">${items.map((r) => renderInterviewRow(r, "page")).join("")}</div>
-      ${renderPaginationHtml(page, totalPages, "interview-list")}
+      <div class="interview-detail-pane-inner iv-fade-in" key="${rec.id}">
+        <div class="interview-detail-header">
+          <button type="button" class="interview-detail-back-btn" data-action="detail-back" title="목록으로">${ICON_CHEVRON_LEFT}</button>
+          ${avatarHtml}
+          <div class="interview-detail-head-main">
+            <div class="interview-detail-name-row">
+              <span class="interview-detail-name">${agent ? esc(agent.name) : "(삭제된 상담사)"}</span>
+              ${agent && agent.ldap ? `<span class="interview-detail-ldap">${esc(agent.ldap)}</span>` : ""}
+            </div>
+            <div class="interview-detail-badges">
+              <span class="badge sm ${typeCls}">${esc(rec.type || "비정기")}</span>
+              ${agent ? `<span class="badge sm ${agent.group === "night" ? "night" : "day"}">${agent.group === "night" ? "야간" : "주간"}</span>` : ""}
+            </div>
+          </div>
+          <div class="interview-detail-tools">
+            <button type="button" class="iv-row-icon-btn" data-action="detail-download-interview" data-id="${rec.id}" title="엑셀 다운로드">${ICON_DOWNLOAD}</button>
+            <button type="button" class="iv-row-icon-btn" data-action="detail-edit-interview" data-id="${rec.id}" title="수정">${ICON_EDIT}</button>
+            <button type="button" class="iv-row-icon-btn danger" data-action="detail-delete-interview" data-id="${rec.id}" title="삭제">${ICON_TRASH}</button>
+          </div>
+        </div>
+        <div class="interview-detail-grid">
+          <div class="interview-detail-grid-item"><span class="interview-detail-grid-label">면담일자</span><span class="interview-detail-grid-value">${esc(rec.date || "-")}</span></div>
+          <div class="interview-detail-grid-item"><span class="interview-detail-grid-label">면담 관리자</span><span class="interview-detail-grid-value">${managerLabel}</span></div>
+          <div class="interview-detail-grid-item"><span class="interview-detail-grid-label">작성일시</span><span class="interview-detail-grid-value">${createdAtLabel}</span></div>
+        </div>
+        <div class="interview-detail-section-label">면담 내용</div>
+        <div class="interview-detail-content-box">${rec.content ? esc(rec.content) : '<span class="agent-field-empty">내용 없음</span>'}</div>
+        <div class="interview-detail-section-label">후속조치 / 다음 계획</div>
+        <div class="interview-detail-followup-box">${rec.followUp ? esc(rec.followUp) : "없음"}</div>
+      </div>
     `;
+  }
+
+  // 상세 패널 툴바의 다운로드/수정/삭제 버튼을 연결한다. renderInterviewsPage의 최초 렌더 직후와
+  // updateInterviewDetailPane()의 부분 갱신 직후, 두 군데에서 모두 불러줘야 버튼이 항상 살아있다.
+  function attachInterviewDetailPaneHandlers(pane) {
+    if (!pane) return;
+    pane.querySelectorAll("[data-action='detail-back']").forEach((btn) => {
+      btn.onclick = () => closeInterviewMobileDetail();
+    });
+    pane.querySelectorAll("[data-action='detail-download-interview']").forEach((btn) => {
+      btn.onclick = () => downloadSingleInterview(btn.getAttribute("data-id"));
+    });
+    pane.querySelectorAll("[data-action='detail-edit-interview']").forEach((btn) => {
+      btn.onclick = () => {
+        interviewsUi.mode = "edit";
+        interviewsUi.editingId = btn.getAttribute("data-id");
+        renderApp();
+      };
+    });
+    pane.querySelectorAll("[data-action='detail-delete-interview']").forEach((btn) => {
+      btn.onclick = () => {
+        const id = btn.getAttribute("data-id");
+        if (window.confirm("이 면담 기록을 삭제할까요?")) {
+          if (interviewsUi.selectedId === id) {
+            interviewsUi.selectedId = null;
+            // 좁은 화면에서 보고 있던 상세를 지우는 경우, 더 보여줄 내용이 없으니 목록으로 되돌린다.
+            closeInterviewMobileDetail();
+          }
+          deleteInterview(id);
+          renderApp();
+        }
+      };
+    });
+  }
+
+  // (6단계) 오른쪽 상세 패널 자리에 뜨는 추가/수정 폼. 목업엔 폼 디자인이 없어서, 상세 보기와
+  // 같은 리딩 페인 톤(agent-form 계열 필드 + 좁은 화면에서만 보이는 "‹" 뒤로가기)으로 맞췄다.
+  // "‹" 버튼과 하단 "취소" 버튼은 둘 다 cancelInterviewForm()으로 이어진다 — 좁은 화면에서
+  // 편집 중이던 기록의 상세를 보다가 연 폼이면 취소 시 그 상세로, 목록에서 바로 "추가"를 눌러 연
+  // 폼이면 취소 시 목록으로 자연스럽게 돌아간다(cancelInterviewForm의 mobileDetailOpen 보존 참고).
+  function renderInterviewFormPaneHtml(mode) {
+    const isEdit = mode === "edit";
+    const editing = isEdit ? (interviewsData.find((r) => r.id === interviewsUi.editingId) || null) : null;
+    if (isEdit && !editing) {
+      return `
+        <div class="interview-detail-empty">
+          ${ICON_INTERVIEW_DETAIL_EMPTY}
+          <div>수정하려던 기록을 찾을 수 없어요.<br>목록에서 다시 선택해주세요.</div>
+        </div>
+      `;
+    }
+    const initialValues = isEdit ? editing : { date: todayISO(), type: "정기" };
+    return `
+      <div class="interview-form-pane iv-fade-in">
+        <div class="interview-form-pane-header">
+          <button type="button" class="interview-detail-back-btn" data-action="form-cancel" title="취소하고 돌아가기">${ICON_CHEVRON_LEFT}</button>
+          <div class="agent-form-title interview-form-pane-title">${isEdit ? "면담 기록 수정" : "새 면담 기록 추가"}</div>
+        </div>
+        <form class="agent-form" id="interview-page-form">
+          ${renderInterviewFormFields(initialValues, null, "interview-page")}
+          <div class="agent-form-actions">
+            <button type="submit" class="primary-btn">${isEdit ? "저장" : "추가"}</button>
+            <button type="button" class="cancel-btn" id="interview-page-cancel">취소</button>
+          </div>
+        </form>
+      </div>
+    `;
+  }
+
+  // 폼의 "취소" 버튼과 좁은 화면의 "‹" 뒤로가기 버튼이 공유하는 종료 동작.
+  // mobileDetailOpen은 건드리지 않으므로, 상세를 보다가 연 수정 폼이면 취소 시 그 상세로
+  // 자연스레 되돌아가고, 목록에서 바로 연 추가 폼이면 취소 시 목록으로 돌아간다.
+  function cancelInterviewForm() {
+    interviewsUi.mode = "list";
+    interviewsUi.editingId = null;
+    renderApp();
+  }
+
+  // renderInterviewFormPaneHtml로 그려진 폼이 실제 DOM에 붙은 뒤 제출/취소를 동작시킨다.
+  // 전체 렌더(attachInterviewsPageEvents)와 부분 갱신(updateInterviewDetailPane) 양쪽에서 공용으로 쓴다.
+  function attachInterviewFormPaneHandlers(pane) {
+    if (!pane) return;
+    const form = pane.querySelector("#interview-page-form");
+    if (!form) return;
+    attachInterviewFormPickers("interview-page", null);
+    form.onsubmit = (e) => {
+      e.preventDefault();
+      const values = readInterviewFormValues("interview-page", null);
+      if (!values) { flashInterviewStatus("대상 상담사를 선택해주세요."); return; }
+      if (interviewsUi.mode === "edit" && interviewsUi.editingId) {
+        updateInterview(interviewsUi.editingId, values);
+        interviewsUi.selectedId = interviewsUi.editingId;
+      } else {
+        // 등록 직후 오른쪽 패널이 비어 보이지 않도록, 방금 추가한 기록을 바로 선택 상태로 만든다.
+        interviewsUi.selectedId = addInterview(values);
+      }
+      interviewsUi.mode = "list";
+      interviewsUi.editingId = null;
+      renderApp();
+    };
+    pane.querySelectorAll("[data-action='form-cancel']").forEach((btn) => { btn.onclick = () => cancelInterviewForm(); });
+    const cancelBtn = pane.querySelector("#interview-page-cancel");
+    if (cancelBtn) cancelBtn.onclick = () => cancelInterviewForm();
+  }
+
+  // interviewsUi.selectedId(또는 add/edit 모드)가 바뀔 때마다 상세 패널만 부분 갱신한다.
+  // 상세 패널이 없는 화면(상담사 팝오버 등)에서는 요소를 못 찾아 조용히 아무 일도 하지 않는다.
+  function updateInterviewDetailPane() {
+    const pane = document.getElementById("interview-detail-pane");
+    if (!pane) return;
+    if (interviewsUi.mode === "add" || interviewsUi.mode === "edit") {
+      pane.innerHTML = renderInterviewFormPaneHtml(interviewsUi.mode);
+      attachInterviewFormPaneHandlers(pane);
+    } else {
+      pane.innerHTML = renderInterviewDetailPaneHtml();
+      attachInterviewDetailPaneHandlers(pane);
+    }
+  }
+
+  // (0단계) 상담사 관리에 이식된 "전체 면담일지"(agent-interviews-embedded)에서만, 목록이 창 높이에
+  // 꽉 차도록 페이지당 개수를 동적으로 계산하고 페이지네이션을 목록 하단에 고정한다(#agent-list-area/
+  // #agent-list-pagination과 완전히 같은 방식 — js/04-agents.js의 measureAndSyncAgentPageSize 참고).
+  // 독립 면담일지 페이지(js/12-init.js의 state.page === "interviews")는 예전처럼 페이지 전체가
+  // 자연스럽게 스크롤되므로, 이 계산 대상이 아니다(_interviewsFitToHeight로 구분해서 건드리지 않음).
+  let _interviewsFitToHeight = false;
+  let interviewListDynamicPageSize = null;
+  let interviewListResizeObserver = null;
+
+  // 면담일지 목록 영역(검색바 아래)의 내용을 만든다. 목록 rows와 페이지네이션을 각각 별도
+  // 컨테이너(#interview-list-area / #interview-list-pagination)에 넣을 수 있도록 나눠서 돌려준다.
+  function buildInterviewListAreaHtml(filtered) {
+    if (filtered.length === 0) {
+      return {
+        listHtml: `<div class="agent-list-empty">${interviewsData.length === 0 ? "등록된 면담 기록이 없어요." : "검색 또는 필터 조건에 맞는 면담 기록이 없어요."}</div>`,
+        paginationHtml: "",
+      };
+    }
+    const { items, page, totalPages } = paginateList(filtered, interviewsUi.page, interviewListDynamicPageSize);
+    interviewsUi.page = page;
+    let lastMonth = null;
+    const rowsHtml = items.map((r) => {
+      const month = interviewMonthLabel(r.date);
+      const labelHtml = month !== lastMonth ? `<div class="iv-month-label">${esc(month)}</div>` : "";
+      lastMonth = month;
+      return labelHtml + renderInterviewRow(r);
+    }).join("");
+    return {
+      listHtml: `<div class="interview-list">${rowsHtml}</div>`,
+      paginationHtml: renderPaginationHtml(page, totalPages, "interview-list"),
+    };
+  }
+
+  // ---- (0단계) #interview-list-area의 실제 렌더링된 높이와 행 하나의 높이를 재서, 그 안에
+  //      몇 줄이 들어가는지 계산해 페이지 크기로 쓴다(js/04-agents.js와 동일한 접근). 달이
+  //      바뀌는 자리에 끼는 iv-month-label 높이까지는 1차 계산에 넣지 않고, 실측 기반 보정
+  //      루프(enforceInterviewListFit)가 마지막으로 안전하게 맞춰준다.
+  function measureAndSyncInterviewPageSize() {
+    if (!_interviewsFitToHeight) return;
+    const listArea = document.getElementById("interview-list-area");
+    if (!listArea) return;
+    const availableHeight = Math.floor(listArea.clientHeight);
+    if (!availableHeight) return; // 창이 접혀 있는 등, 아직 잴 수 없는 상태면 건너뜀
+
+    const sampleRow = listArea.querySelector(".interview-list .iv-row");
+    if (!sampleRow) return; // 목록이 비어 있으면(검색결과 없음 등) 계산할 기준이 없으므로 건너뜀
+    const rowHeight = Math.ceil(sampleRow.getBoundingClientRect().height);
+    if (!rowHeight) return;
+    const listGap = Math.ceil(parseFloat(window.getComputedStyle(sampleRow.parentElement).rowGap || "0") || 0);
+
+    // 반올림 오차에 대비한 최소한의 안전 여백(2px).
+    const SAFETY_MARGIN = 2;
+    const usableHeight = Math.max(0, availableHeight - SAFETY_MARGIN);
+    const computed = Math.max(4, Math.floor((usableHeight + listGap) / (rowHeight + listGap)));
+    if (computed === interviewListDynamicPageSize) {
+      // 계산값은 그대로라도, 월 라벨 등으로 실제 렌더링 결과가 이미 넘쳐 있을 수 있으니
+      // 여기서도 한 번은 실측 검증을 해준다.
+      enforceInterviewListFit();
+      return;
+    }
+    interviewListDynamicPageSize = computed;
+    interviewsUi.page = 1; // 페이지 크기가 바뀌면 이전 페이지 번호가 더 이상 맞지 않으므로 처음으로
+    updateInterviewListArea();
+  }
+
+  // ---- 계산이 아무리 정교해도(월 라벨, 서브픽셀 반올림 등) 몇 px 차이로 어긋나서 마지막
+  //      한 줄만 살짝 넘쳐 스크롤이 생기는 경우가 있었다. 실제로 그려진 결과(scrollHeight)를
+  //      직접 재서 넘치면 그 자리에서 한 줄씩 줄여 다음 페이지로 밀어낸다. ----
+  function enforceInterviewListFit(attemptsLeft) {
+    if (!_interviewsFitToHeight) return;
+    const listArea = document.getElementById("interview-list-area");
+    if (!listArea) return;
+    if (typeof attemptsLeft !== "number") attemptsLeft = 8;
+    if (attemptsLeft <= 0) return;
+    if (listArea.scrollHeight <= listArea.clientHeight + 1) return; // 이미 딱 맞음(1px은 반올림 오차 허용)
+
+    const current = interviewListDynamicPageSize && interviewListDynamicPageSize > 4 ? interviewListDynamicPageSize : PAGE_SIZE;
+    interviewListDynamicPageSize = Math.max(4, current - 1);
+    interviewsUi.page = 1;
+    renderInterviewListAreaOnly(); // measureAndSyncInterviewPageSize를 다시 부르지 않는, 순수 다시 그리기
+    enforceInterviewListFit(attemptsLeft - 1); // 한 줄 줄이고도 여전히 넘치면 더 줄인다
+  }
+
+  // updateInterviewListArea와 내용은 같지만, 끝에서 measureAndSyncInterviewPageSize를
+  // 다시 부르지 않는다 — enforceInterviewListFit이 이미 정한 페이지 크기가 계산값으로
+  // 되돌아가 버리는(줄였다가 다시 늘어나는) 걸 막기 위한 전용 버전.
+  function renderInterviewListAreaOnly() {
+    const area = document.getElementById("interview-list-area");
+    const paginationArea = document.getElementById("interview-list-pagination");
+    if (!area) return;
+    const filtered = sortInterviews(
+      interviewsData.filter((r) => interviewMatchesSearch(r, interviewsUi.searchQuery) && interviewMatchesType(r, interviewsUi.typeFilter))
+    );
+    const { listHtml, paginationHtml } = buildInterviewListAreaHtml(filtered);
+    area.innerHTML = listHtml;
+    if (paginationArea) paginationArea.innerHTML = paginationHtml;
+    attachInterviewListAreaHandlers(area);
+  }
+
+  // #interview-list-area의 실제 크기가 바뀔 때마다(브라우저 창 크기 변경, 상담사 관리 창을
+  // 손으로 늘리거나 최대화할 때도) 다시 계산한다. 독립 면담일지 페이지에서는 아예 관찰하지 않는다.
+  function watchInterviewListSize() {
+    const listArea = document.getElementById("interview-list-area");
+    if (interviewListResizeObserver) interviewListResizeObserver.disconnect();
+    interviewListResizeObserver = null;
+    if (!listArea || !_interviewsFitToHeight || typeof ResizeObserver === "undefined") return;
+    let lastH = 0;
+    interviewListResizeObserver = new ResizeObserver((entries) => {
+      const h = entries[0] && entries[0].contentRect ? entries[0].contentRect.height : 0;
+      if (Math.abs(h - lastH) < 1) return;
+      lastH = h;
+      measureAndSyncInterviewPageSize();
+    });
+    interviewListResizeObserver.observe(listArea);
   }
 
   function updateInterviewListArea() {
     const area = document.getElementById("interview-list-area");
     if (!area) return;
+    const paginationArea = document.getElementById("interview-list-pagination");
     const filtered = sortInterviews(
       interviewsData.filter((r) => interviewMatchesSearch(r, interviewsUi.searchQuery) && interviewMatchesType(r, interviewsUi.typeFilter))
     );
-    area.innerHTML = renderInterviewListAreaHtml(filtered);
+    const { listHtml, paginationHtml } = buildInterviewListAreaHtml(filtered);
+    area.innerHTML = listHtml;
+    if (paginationArea) paginationArea.innerHTML = paginationHtml;
     attachInterviewListAreaHandlers(area);
     const summaryEl = _interviewsPageRoot
       ? _interviewsPageRoot.querySelector(".agent-summary")
@@ -9246,33 +9659,23 @@
     if (summaryEl) {
       summaryEl.textContent = `전체 ${interviewsData.length}건${filtered.length !== interviewsData.length ? ` · 필터 결과 ${filtered.length}건` : ""}`;
     }
+    // 목록 내용이 바뀌면(검색/필터/페이지 이동 등) 실제 행 높이·개수가 달라질 수 있으므로
+    // 다음 배치 때 다시 한 번 크기를 확인해 필요하면 페이지 크기를 보정한다.
+    measureAndSyncInterviewPageSize();
+    enforceInterviewListFit();
   }
 
   function attachInterviewListAreaHandlers(root) {
     attachInterviewRowToggles(root, updateInterviewListArea);
-    attachPaginationHandlers(root, "interview-list", (delta) => {
+    // 이전/다음 버튼은 이제 #interview-list-area 밖(#interview-list-pagination)에 따로 그려질
+    // 수 있으므로, 그 컨테이너를 못 받으면 root 자신에서라도 찾아본다(초기 렌더링 때는 root가
+    // 페이지 전체라 둘 다 포함하고 있음).
+    const paginationRoot = document.getElementById("interview-list-pagination") || root;
+    attachPaginationHandlers(paginationRoot, "interview-list", (delta) => {
       interviewsUi.page = interviewsUi.page + delta;
       updateInterviewListArea();
     });
-    root.querySelectorAll("[data-action='page-download-interview']").forEach((btn) => {
-      btn.onclick = () => downloadSingleInterview(btn.getAttribute("data-id"));
-    });
-    root.querySelectorAll("[data-action='page-edit-interview']").forEach((btn) => {
-      btn.onclick = () => {
-        interviewsUi.mode = "edit";
-        interviewsUi.editingId = btn.getAttribute("data-id");
-        renderApp();
-      };
-    });
-    root.querySelectorAll("[data-action='page-delete-interview']").forEach((btn) => {
-      btn.onclick = () => {
-        const id = btn.getAttribute("data-id");
-        if (window.confirm("이 면담 기록을 삭제할까요?")) {
-          deleteInterview(id);
-          renderApp();
-        }
-      };
-    });
+    // 다운로드/수정/삭제는 이제 행이 아니라 오른쪽 상세 패널 툴바에서 처리한다 (attachInterviewDetailPaneHandlers 참고).
   }
 
   function attachInterviewsPageEvents(root) {
@@ -9305,30 +9708,13 @@
     if (exportBtn) exportBtn.onclick = (e) => openInterviewExportMenu(e.currentTarget);
     attachInterviewListAreaHandlers(root);
 
-    const form = document.getElementById("interview-page-form");
-    if (form) {
-      attachInterviewFormPickers("interview-page", null);
-      form.onsubmit = (e) => {
-        e.preventDefault();
-        const values = readInterviewFormValues("interview-page", null);
-        if (!values) { flashInterviewStatus("대상 상담사를 선택해주세요."); return; }
-        if (interviewsUi.mode === "edit" && interviewsUi.editingId) {
-          updateInterview(interviewsUi.editingId, values);
-        } else {
-          addInterview(values);
-        }
-        interviewsUi.mode = "list";
-        interviewsUi.editingId = null;
-        renderApp();
-      };
-      const cancelBtn = document.getElementById("interview-page-cancel");
-      if (cancelBtn) {
-        cancelBtn.onclick = () => {
-          interviewsUi.mode = "list";
-          interviewsUi.editingId = null;
-          renderApp();
-        };
-      }
+    // (6단계) 오른쪽 패널은 이제 상세 보기 / 추가·수정 폼 둘 중 하나이므로, 현재 모드에 맞는
+    // 핸들러만 연결한다(updateInterviewDetailPane의 부분 갱신 로직과 동일한 분기).
+    const detailPane = document.getElementById("interview-detail-pane");
+    if (interviewsUi.mode === "add" || interviewsUi.mode === "edit") {
+      attachInterviewFormPaneHandlers(detailPane);
+    } else {
+      attachInterviewDetailPaneHandlers(detailPane);
     }
   }
 
@@ -11722,7 +12108,7 @@
       console.error(err);
       flashScheduleStatus("엑셀 파일을 만들지 못했어요.");
     } finally {
-      if (btn) { btn.disabled = false; btn.innerHTML = ICON_CHART + " 엑셀로 다운로드"; }
+      if (btn) { btn.disabled = false; btn.innerHTML = `<span class="mac-iv-tool-icon">${ICON_CHART}</span><span class="mac-iv-tool-label">엑셀</span>`; }
     }
   }
 
@@ -11837,29 +12223,12 @@
     _scheduleFitObserver.observe(wrap);
   }
 
-  // [성능 개선 계획 Phase 2] 셀 하나(근태 상태·메모·필요인력 등)만 바뀌어도 표 전체
-  // (수십 명 × 31일 = 수백~수천 개 셀)를 문자열로 다시 만들고 innerHTML을 통째로
-  // 교체 + 이벤트 전부 재바인딩하던 것을, domReconcileTable(js/01f-settings-menu-utils.js)로
-  // 실제로 달라진 칸만 그 자리에서 고쳐 쓰도록 바꿨다 — QA 표와 같은 방식.
-  // 인원이 추가/삭제되는 등 행 개수 자체가 바뀌는 경우(흔치 않음)는 domReconcileTable이
-  // 스스로 포기하고 false를 돌려주므로, 그때만 안전하게 표 전체를 새로 만든다.
   function updateScheduleTableArea() {
     const tableArea = document.getElementById("schedule-table-area");
     const logArea = document.getElementById("schedule-log-area");
     if (tableArea) {
-      const newTableHtml = buildScheduleTableHtml();
-      const existingTable = tableArea.querySelector("table.schedule-table");
-      const patched = existingTable && domReconcileTable(existingTable, newTableHtml);
-      if (!patched) {
-        tableArea.innerHTML = `<div class="schedule-table-wrap"><div class="schedule-scale-inner">${newTableHtml}</div></div>`;
-        attachScheduleTableHandlers(tableArea);
-      } else {
-        // patch에 성공했으면 셀의 이벤트는 이미 다 붙어 있지만, 열/행 헤더 선택 표시·
-        // 복사해 둔 범위의 점선 표시는 class 보존만으로는 100% 안심할 수 없으니
-        // (이 두 함수는 멱등이라 다시 불러도 안전) 한 번 더 맞춰준다.
-        scheduleApplyHeaderSelectionHighlight();
-        scheduleApplyCopiedOutline();
-      }
+      tableArea.innerHTML = `<div class="schedule-table-wrap"><div class="schedule-scale-inner">${buildScheduleTableHtml()}</div></div>`;
+      attachScheduleTableHandlers(tableArea);
     }
     if (logArea) {
       logArea.innerHTML = buildScheduleLogHtml();
@@ -11944,7 +12313,7 @@
 
     function cleanup(label) {
       if (wrapper.parentNode) document.body.removeChild(wrapper);
-      if (btn) { btn.disabled = false; btn.innerHTML = ICON_CAMERA + " 이미지로 저장 ▾"; }
+      if (btn) { btn.disabled = false; btn.innerHTML = ICON_CAMERA + " 이미지로 저장"; }
       if (label) flashScheduleStatus(label);
     }
 
@@ -12751,10 +13120,6 @@
     root.querySelectorAll(".sch-required-input").forEach((input) => {
       // 입력칸을 벗어날 때(blur) 또는 Enter 시 저장. 매 타이핑마다 전체를 다시 그리지 않아
       // 숫자 입력 중 표가 깜빡이거나 포커스가 빠지지 않는다.
-      // [성능 개선 계획 Phase 2] 필요인력은 이 표(대비/인력 대비 편성 행 포함) 밖의 다른
-      // 화면에는 영향을 주지 않으므로, 예전처럼 renderApp()으로 페이지 전체를 다시 그리지
-      // 않고 표 영역만 갱신한다(근태 셀 편집과 같은 방식). updateScheduleTableArea 안에서
-      // domReconcileTable이 실제로 달라진 칸만 고쳐 쓴다.
       input.onchange = () => {
         const { year, monthIndex } = scheduleUi;
         setRequiredHeadcount(
@@ -12764,7 +13129,7 @@
           Number(input.getAttribute("data-required-day")),
           input.value
         );
-        updateScheduleTableArea();
+        renderApp();
       };
       input.onkeydown = (e) => { if (e.key === "Enter") input.blur(); };
     });
@@ -13065,19 +13430,47 @@
 
   // 07a8-schedule-render-page.js — renderSchedulePage 진입점
   // (07-schedule.js를 기능 단위로 분할한 파일 중 하나. 실행 순서는 파일명 정렬로 유지됨)
+  // 툴바의 "···" 더보기 메뉴(#sch-more-menu)를 문서 아무 곳이나 클릭하면 닫는 핸들러.
+  // renderSchedulePage()가 다시 호출될 때마다 리스너가 중복으로 쌓이지 않도록,
+  // resize 핸들러(fitScheduleTable 등)와 같은 방식으로 이름 붙은 함수로 빼서
+  // 등록 전에 항상 먼저 제거한다.
+  function scheduleCloseMoreMenuOnOutsideClick() {
+    const menu = document.getElementById("sch-more-menu");
+    if (menu) menu.classList.remove("open");
+  }
   function renderSchedulePage(root) {
     root.innerHTML = `
       <div class="schedule-top">
-        <div class="schedule-title">월별 스케줄</div>
-        <div class="schedule-month-nav">
-          <button class="schedule-month-btn" id="sch-prev-month">‹</button>
-          <div class="schedule-month-label">${scheduleMonthLabel()}${scheduleIsMonthLocked(scheduleUi.year, scheduleUi.monthIndex) ? ` <span class="sch-locked-badge">${ICON_LOCK} 확정됨</span>` : ""}</div>
-          <button class="schedule-month-btn" id="sch-next-month">›</button>
-          <button class="ghost-btn sch-lock-toggle-btn ${scheduleIsMonthLocked(scheduleUi.year, scheduleUi.monthIndex) ? "locked" : ""}" id="sch-lock-btn" style="margin-left:8px;">${scheduleIsMonthLocked(scheduleUi.year, scheduleUi.monthIndex) ? `${ICON_UNLOCK} 잠금 해제` : `${ICON_LOCK} 이 달 잠그기`}</button>
-          <button class="ghost-btn ${scheduleBulkPasteOpen ? "active" : ""}" id="sch-bulk-btn" style="margin-left:8px;">${ICON_CLIPBOARD} 일괄 붙여넣기</button>
-          <button class="ghost-btn" id="sch-capture-btn">${ICON_CAMERA} 이미지로 저장 ▾</button>
-          <button class="ghost-btn" id="sch-excel-btn">${ICON_CHART} 엑셀로 다운로드</button>
-          <button class="ghost-btn" id="sch-holidaydoc-btn">${ICON_CLIPBOARD} 휴일대체 확인서</button>
+        <div class="sch-toolbar-title">월별 스케줄<small>${scheduleMonthLabel()} · 전체 ${getStaffListForMonth(scheduleUi.year, scheduleUi.monthIndex).length}명</small></div>
+
+        <div class="mac-seg">
+          <button id="sch-prev-month">‹</button>
+          <div class="month-label">${scheduleMonthLabel()}</div>
+          <button id="sch-next-month">›</button>
+        </div>
+
+        <button class="lock-chip" id="sch-lock-btn">${scheduleIsMonthLocked(scheduleUi.year, scheduleUi.monthIndex) ? `${ICON_LOCK} 확정됨` : `${ICON_UNLOCK} 이 달 잠그기`}</button>
+
+        <div class="mac-search">
+          <input type="text" id="sch-search-input" placeholder="이름 검색" title="상담사 검색 (이름/주간/야간/채팅/유선, 쉼표로 여러 개)" value="${esc(scheduleUi.searchQuery)}" autocomplete="off">
+          ${ICON_SEARCH_MINI}
+        </div>
+
+        <div class="mac-iv-toolbar">
+          <button type="button" class="mac-iv-tool ${scheduleBulkPasteOpen ? "mac-iv-tool-accent" : ""}" id="sch-bulk-btn" title="일괄 붙여넣기"><span class="mac-iv-tool-icon">${ICON_CLIPBOARD}</span><span class="mac-iv-tool-label">일괄 붙여넣기</span></button>
+          <button type="button" class="mac-iv-tool ${scheduleHiddenPanelOpen ? "mac-iv-tool-accent" : ""}" id="sch-hidden-btn" title="숨긴 열·행"><span class="mac-iv-tool-icon">${ICON_CALENDAR}</span><span class="mac-iv-tool-label">숨긴 열·행</span>${scheduleHiddenCount() > 0 ? `<span class="sch-more-badge">${scheduleHiddenCount()}</span>` : ""}</button>
+          <button type="button" class="mac-iv-tool danger" id="sch-delete-btn" title="일정 삭제"><span class="mac-iv-tool-icon">${ICON_TRASH}</span><span class="mac-iv-tool-label">일정 삭제</span></button>
+          <button type="button" class="mac-iv-tool" id="sch-auto-btn" title="AI 자동 배치"><span class="mac-iv-tool-icon">${ICON_SPARK}</span><span class="mac-iv-tool-label">자동 배치</span></button>
+          <button type="button" class="mac-iv-tool" id="sch-excel-btn" title="엑셀로 다운로드"><span class="mac-iv-tool-icon">${ICON_CHART}</span><span class="mac-iv-tool-label">엑셀</span></button>
+        </div>
+
+        <div class="sch-more-wrap">
+          <button type="button" class="sch-more-btn" id="sch-more-btn" title="더보기">···</button>
+          <div class="sch-more-menu" id="sch-more-menu">
+            <button type="button" id="sch-adjust-summary-btn">${ICON_CLIPBOARD} 가감점 취합</button>
+            <button type="button" id="sch-holidaydoc-btn">${ICON_CLIPBOARD} 휴일대체 확인서</button>
+            <button type="button" id="sch-capture-btn">${ICON_CAMERA} 이미지로 저장</button>
+          </div>
         </div>
       </div>
       <div class="status" id="schedule-status"></div>
@@ -13108,16 +13501,6 @@
         <span class="item"><span class="swatch" style="background:var(--amber);"></span>지각</span>
         <span class="item"><span class="swatch" style="background:var(--red);"></span>결근</span>
         <span class="item"><span class="swatch" style="background:var(--text-faint);"></span>퇴사</span>
-      </div>
-      <div class="schedule-table-toolbar">
-        <div class="agent-search-input">
-          <input type="text" class="agent-search-input-field" id="sch-search-input" placeholder="이름 검색" title="상담사 검색 (이름/주간/야간/채팅/유선, 쉼표로 여러 개)" value="${esc(scheduleUi.searchQuery)}" autocomplete="off">
-          ${ICON_SEARCH_MINI}
-        </div>
-        <button class="ghost-btn" id="sch-adjust-summary-btn">${ICON_CLIPBOARD} 가감점 취합</button>
-        <button class="ghost-btn" id="sch-auto-btn">자동 배치 ▾</button>
-        <button class="ghost-btn ${scheduleHiddenPanelOpen ? "active" : ""}" id="sch-hidden-btn">${ICON_CALENDAR} 숨긴 열/행${scheduleHiddenCount() > 0 ? ` (${scheduleHiddenCount()})` : ""} ▾</button>
-        <button class="ghost-btn sch-delete-btn-small" id="sch-delete-btn">${ICON_TRASH} 일정 삭제</button>
       </div>
       ${scheduleHiddenPanelOpen ? `
         <div class="schedule-colgroup-panel">
@@ -13197,6 +13580,19 @@
     };
     document.getElementById("sch-adjust-summary-btn").onclick = () => openScheduleAdjustModal();
     document.getElementById("sch-auto-btn").onclick = (e) => openScheduleAutoMenu(e.currentTarget);
+    const schMoreBtn = document.getElementById("sch-more-btn");
+    const schMoreMenu = document.getElementById("sch-more-menu");
+    if (schMoreBtn && schMoreMenu) {
+      // 목업과 동일한 동작: 버튼 클릭은 전파를 막고 메뉴만 토글하고,
+      // 메뉴 안 항목(가감점 취합/휴일대체 확인서/이미지로 저장) 클릭이나 그 외 바깥
+      // 클릭은 전파를 막지 않으므로 document 리스너가 그대로 메뉴를 닫아준다.
+      schMoreBtn.onclick = (e) => {
+        e.stopPropagation();
+        schMoreMenu.classList.toggle("open");
+      };
+    }
+    document.removeEventListener("click", scheduleCloseMoreMenuOnOutsideClick);
+    document.addEventListener("click", scheduleCloseMoreMenuOnOutsideClick);
     const schSearchInput = document.getElementById("sch-search-input");
     if (schSearchInput) {
       // 표 영역만 다시 그려서(전체 renderApp() 대신) 검색창의 IME 조합·포커스가 끊기지 않게 한다.
@@ -13839,22 +14235,6 @@
   // Groq는 그 후보의 번호만 선택한다. Groq가 일정/조건 자체를 생성하거나 수정할 수는 없다.
   const SCHEDULE_AUTO_HYBRID_CANDIDATE_COUNT = 6;
   let scheduleAutoHybridRequestId = 0;
-
-  // scheduleAutoBuildPlan(제약조건 탐색/백트래킹) 자체는 여전히 동기 함수라 한 번 호출될 때는
-  // 여전히 무겁지만, 후보를 6개 연달아 만들 때(scheduleAutoBuildHybridPlan) 이 사이사이에
-  // 브라우저에게 한 번씩 제어권을 돌려줘서(화면을 그릴 틈을 줘서) "화면이 통째로 멈추는" 것처럼
-  // 보이지 않게 한다. rAF로 다음 페인트 시점까지 기다린 뒤 setTimeout(0)까지 한 번 더 거쳐서,
-  // 실제로 한 프레임이 화면에 그려진 뒤에 다음 계산을 이어가도록 보장한다(계산 로직 자체는 그대로 둠).
-  // requestAnimationFrame은 "다음 화면을 그리기 직전"에 딱 한 번 호출되므로, 여기서 await로 한 번
-  // 걸어두면(async 함수가 일시 정지하며 호출 스택을 비움) 그 사이에 브라우저가 지금 프레임을 그릴 틈이
-  // 생긴다 — setTimeout까지 얹지 않아도 이 정도로 "화면이 멈춘 것처럼 안 보이게" 하기엔 충분하다.
-  // rAF가 없는 환경(예: 테스트의 순수 Node 샌드박스)에서는 실제로 그릴 화면이 없으므로 그냥 즉시 진행한다.
-  function scheduleAutoYieldToUi() {
-    if (typeof requestAnimationFrame === "function") {
-      return new Promise((resolve) => requestAnimationFrame(() => resolve()));
-    }
-    return Promise.resolve();
-  }
 
   // 이 일수를 넘는 연속 근무(=6일째부터)는 만들지 않는다.
   const SCHEDULE_AUTO_MAX_WORK_STREAK = 5;
@@ -16588,28 +16968,11 @@
     };
   }
 
-  // isStale: 계산 도중 이 요청이 이미 낡은 요청이 됐는지 확인하는 함수(예: 그 사이 사용자가 조건을
-  //   또 바꿔서 새 미리보기 요청이 시작됐는지). 매 후보 계산 전에 확인해서, 낡았으면 남은 후보는
-  //   계산하지 않고 그때까지 만든 후보만으로 즉시 끝낸다(화면에 반영되지도 않을 계산을 계속 붙잡지 않기 위함).
-  // onProgress(i, total): 후보를 하나 만들 때마다 호출되는 선택적 콜백. 미리보기 로딩 문구 갱신용.
-  async function scheduleAutoBuildHybridPlan(year, monthIndex, options, isStale, onProgress) {
+  async function scheduleAutoBuildHybridPlan(year, monthIndex, options) {
     const baseOptions = Object.assign({}, options || {});
     const candidates = [];
     for (let i = 0; i < SCHEDULE_AUTO_HYBRID_CANDIDATE_COUNT; i++) {
-      // 매 후보 계산 직전에 브라우저에 제어권을 한 번 돌려준다(6번 연달아 도는 대신 사이사이 화면 갱신 틈 확보).
-      await scheduleAutoYieldToUi();
-      if (typeof isStale === "function" && isStale()) break;
       candidates.push(scheduleAutoBuildPlan(year, monthIndex, Object.assign({}, baseOptions, { variant: i })));
-      if (typeof onProgress === "function") onProgress(candidates.length, SCHEDULE_AUTO_HYBRID_CANDIDATE_COUNT);
-    }
-    // 낡은 요청이라 후보 계산을 중간에 멈췄으면, 이후 로직(메트릭 비교·Groq 호출 등)도 의미가 없으므로
-    // 지금까지 만든 후보 중 첫 번째(또는 하나도 없으면 기준 옵션으로 즉시 하나) 것만으로 간단히 마무리한다.
-    // 호출부(scheduleAutoRefreshPreview)가 requestId를 다시 확인해서 이 결과를 화면에 쓰지 않고 버린다.
-    if (typeof isStale === "function" && isStale()) {
-      if (candidates.length === 0) candidates.push(scheduleAutoBuildPlan(year, monthIndex, Object.assign({}, baseOptions, { variant: 0 })));
-      const fallback = candidates[0];
-      fallback.hybrid = { improve: null, enabled: false, candidateCount: candidates.length, allowedCandidateCount: 1, selectedCandidate: 0, metrics: scheduleAutoPlanMetrics(fallback), groqStatus: "stale", groqModel: null, groqUsage: null, groqRequestId: null, groqError: null };
-      return fallback;
     }
     const metricsList = candidates.map(scheduleAutoPlanMetrics);
     const baseMetrics = metricsList[0];
@@ -16658,15 +17021,8 @@
   async function scheduleAutoRefreshPreview() {
     const requestId = ++scheduleAutoHybridRequestId;
     const area = document.getElementById("sch-auto-preview-area");
-    const isStale = () => requestId !== scheduleAutoHybridRequestId || !document.getElementById("sch-auto-overlay");
-    const setLoadingText = (text) => { if (!isStale()) { const a = document.getElementById("sch-auto-preview-area"); if (a) a.innerHTML = `<div class="sch-auto-none">${text}</div>`; } };
-    setLoadingText("조건을 확인하고 배치 후보를 최적화하는 중...");
-    const plan = await scheduleAutoBuildHybridPlan(
-      scheduleUi.year, scheduleUi.monthIndex,
-      { excludeStaffIds: scheduleAutoExcludedIds, minWorkingByGroup: scheduleAutoMinWorkingByGroup },
-      isStale,
-      (done, total) => setLoadingText(`배치 후보를 계산하는 중... (${done}/${total})`)
-    );
+    if (area) area.innerHTML = `<div class="sch-auto-none">조건을 확인하고 배치 후보를 최적화하는 중...</div>`;
+    const plan = await scheduleAutoBuildHybridPlan(scheduleUi.year, scheduleUi.monthIndex, { excludeStaffIds: scheduleAutoExcludedIds, minWorkingByGroup: scheduleAutoMinWorkingByGroup });
     if (requestId !== scheduleAutoHybridRequestId || !document.getElementById("sch-auto-overlay")) return;
     scheduleAutoPlan = plan;
     if (area) area.innerHTML = scheduleAutoPreviewHtml(scheduleAutoPlan);
@@ -16923,10 +17279,7 @@
         if (!card) return;
         const startX = e.clientX, startY = e.clientY;
         const wg = document.getElementById("wg");
-        let started = false, placeholder = null, baseX = 0, baseY = 0;
-        // rAF 배칭(저사양 PC 버벅임 완화): 위치 이동은 transform으로만 처리하고(레이아웃 재계산 없음),
-        // 카드 재배치를 위한 elementFromPoint/DOM 이동처럼 무거운 부분은 프레임당 한 번만 실행한다.
-        let pendingX = startX, pendingY = startY, rafId = null;
+        let started = false, placeholder = null, offsetX = 0, offsetY = 0, baseX = 0, baseY = 0;
 
         function begin() {
           started = true;
@@ -16935,53 +17288,48 @@
           const shifted = wg && getComputedStyle(wg).transform !== "none";
           const wgRect = shifted ? wg.getBoundingClientRect() : { left: 0, top: 0 };
           baseX = wgRect.left; baseY = wgRect.top;
+          offsetX = startX - rect.left; offsetY = startY - rect.top;
           placeholder = document.createElement("div");
           placeholder.className = "home-card-placeholder";
           placeholder.style.height = rect.height + "px";
           card.parentNode.insertBefore(placeholder, card.nextSibling);
           card.classList.add("dg");
-          // left/top은 드래그 시작 시점에 한 번만 고정하고, 이후엔 transform(translate3d)만 바꿔서 따라가게 한다.
           Object.assign(card.style, {
             position: "fixed", width: rect.width + "px", left: (rect.left - baseX) + "px", top: (rect.top - baseY) + "px",
           });
           document.body.classList.add("home-card-drag-active");
-        }
-        function flushMove() {
-          rafId = null;
-          card.style.transform = `translate3d(${pendingX - startX}px, ${pendingY - startY}px, 0)`;
-          card.style.pointerEvents = "none";
-          const elUnder = document.elementFromPoint(pendingX, pendingY);
-          card.style.pointerEvents = "";
-          if (!elUnder) return;
-          const overCard = elUnder.closest(".wd[data-home-card]");
-          const overCol = elUnder.closest(".col");
-          if (overCard && overCard !== card) {
-            const rectOver = overCard.getBoundingClientRect();
-            const before = (pendingY - rectOver.top) < rectOver.height / 2;
-            overCard.parentNode.insertBefore(placeholder, before ? overCard : overCard.nextSibling);
-          } else if (overCol && !overCard) {
-            overCol.appendChild(placeholder);
-          }
         }
         function onMove(ev) {
           if (!started) {
             if (Math.hypot(ev.clientX - startX, ev.clientY - startY) < 5) return;
             begin();
           }
-          pendingX = ev.clientX; pendingY = ev.clientY;
-          if (rafId == null) rafId = requestAnimationFrame(flushMove);
+          card.style.left = (ev.clientX - offsetX - baseX) + "px";
+          card.style.top = (ev.clientY - offsetY - baseY) + "px";
+          card.style.pointerEvents = "none";
+          const elUnder = document.elementFromPoint(ev.clientX, ev.clientY);
+          card.style.pointerEvents = "";
+          if (!elUnder) return;
+          const overCard = elUnder.closest(".wd[data-home-card]");
+          const overCol = elUnder.closest(".col");
+          if (overCard && overCard !== card) {
+            const rectOver = overCard.getBoundingClientRect();
+            const before = (ev.clientY - rectOver.top) < rectOver.height / 2;
+            overCard.parentNode.insertBefore(placeholder, before ? overCard : overCard.nextSibling);
+          } else if (overCol && !overCard) {
+            overCol.appendChild(placeholder);
+          }
         }
         function onUp() {
           document.removeEventListener("pointermove", onMove);
           document.removeEventListener("pointerup", onUp);
           document.removeEventListener("pointercancel", onUp);
-          if (rafId != null) { cancelAnimationFrame(rafId); rafId = null; }
           if (!started) return;
           document.body.classList.remove("home-card-drag-active");
           placeholder.parentNode.insertBefore(card, placeholder);
           placeholder.remove();
           card.classList.remove("dg");
-          Object.assign(card.style, { position: "", width: "", left: "", top: "", transform: "", pointerEvents: "" });
+          Object.assign(card.style, { position: "", width: "", left: "", top: "", pointerEvents: "" });
           const newLayout = Array.from(grid.querySelectorAll(".col")).map((col) =>
             Array.from(col.querySelectorAll(".wd[data-home-card]")).map((c) => c.getAttribute("data-home-card"))
           );
@@ -17000,7 +17348,7 @@
     if (!w) return;
     const h = w.firstElementChild;
     w.style.transform = "";
-    if (!h) return;
+    if (window.innerWidth <= 900 || !h) return;
     const t = h.getBoundingClientRect().top;
     w.style.transform = `translateY(${-Math.max(0, Math.min(100, t - 79))}px)`;
   }
@@ -17423,7 +17771,6 @@
         <button class="nav-btn ${state.page === "calendar" ? "active" : ""}" data-nav="calendar" title="캘린더">${NAV_ICON_CALENDAR} <span class="nav-text">캘린더</span></button>
         <button class="nav-btn ${state.page === "agents" ? "active" : ""}" data-nav="agents" title="상담사 관리">${NAV_ICON_AGENTS} <span class="nav-text">상담사 관리</span></button>
         <button class="nav-btn ${state.page === "notes" ? "active" : ""}" data-nav="notes" title="업무 정리">${NAV_ICON_NOTES} <span class="nav-text">업무 정리</span></button>
-        <button class="nav-btn ${state.page === "interviews" ? "active" : ""}" data-nav="interviews" title="면담일지">${NAV_ICON_INTERVIEWS} <span class="nav-text">면담일지</span></button>
         <button class="nav-btn ${state.page === "qa" ? "active" : ""}" data-nav="qa" title="품질 관리">${NAV_ICON_QA} <span class="nav-text">품질 관리</span></button>
         <button class="nav-btn ${state.page === "schedule" ? "active" : ""}" data-nav="schedule" title="월별 스케줄">${NAV_ICON_SCHEDULE} <span class="nav-text">월별 스케줄</span></button>
       `}
@@ -17474,7 +17821,10 @@
   }
   // 품질 관리는 상담사 관리 → 전체 QA 점수에서 사용하므로 앱 정보는 유지하되,
   // 바탕화면/하단 Dock의 독립 실행 아이콘에서는 제외한다.
-  const HOME_DESKTOP_LAUNCH_APPS = HOME_DESKTOP_APPS.filter((a) => a[0] !== "qa");
+  // 면담일지도 같은 이유로 제외한다: 상담사별 면담일지(agent-iv-popover)와 전역 검색에서
+  // setPage("interviews")로 페이지 자체는 계속 쓰이므로 앱 정보는 남겨두고, 독립 실행
+  // 아이콘(내비게이션 사이드바·바탕화면·하단 Dock)에서만 뺀다.
+  const HOME_DESKTOP_LAUNCH_APPS = HOME_DESKTOP_APPS.filter((a) => a[0] !== "qa" && a[0] !== "interviews");
   const HOME_DESKTOP_APP_BY_ID = {};
   HOME_DESKTOP_APPS.forEach((a) => { HOME_DESKTOP_APP_BY_ID[a[0]] = a; });
   // 창으로 열 수 있는 대상의 정보([id, 이름, 그라데이션, 아이콘 path]). 기본 앱 6개 외에, 바탕화면에서 우클릭으로
@@ -17489,10 +17839,7 @@
   // state[page] = { minimized, maximized, justOpened } — justOpened는 "방금 새로 연" 창에만 켜서(복원 때는
   // 켜지 않음) 팝 애니메이션을 돌리고 스크롤을 맨 위로 되돌린다. 복원(내려간 창을 다시 열기)은 이 플래그를
   // 켜지 않아서, 스크롤 위치 등 그 페이지 안에서 하던 작업 화면이 그대로 남아 있는다.
-  // dirty[page] = true — "포커스된(맨 앞) 창만 즉시 갱신" 최적화(성능 개선 계획 Phase 2)용 표시.
-  // 배경(포커스 아님)에 있는 동안 상태가 바뀌어 "다시 그려야 하는데 지금은 건너뛴" 창에만 true로
-  // 남겨두고, 그 창이 다시 앞으로 올 때(hdBringToFront) 그 시점에 한 번만 실제로 그린다.
-  const hdWin = { order: [], state: {}, dirty: {} };
+  const hdWin = { order: [], state: {} };
   // 화면 좌/우 절반 붙이기(스냅) 관련 임시 상태: 어시스트 패널 DOM과 그 패널을 닫기 위한 문서 이벤트 핸들러.
   const hdSnap = { assistEl: null, onDown: null, onKey: null };
 
@@ -17600,23 +17947,7 @@
       const frame = document.getElementById("app-win-" + p);
       if (frame) frame.style.zIndex = String(50 + i);
     });
-    hdRenderWindowIfDirty(page); // 배경에 있는 동안 밀려 있던(dirty) 최신 내용을, 막 앞으로 나오는 이 시점에 한 번만 그려준다.
     hdSaveOpenWindowsState();
-  }
-
-  // renderHomeDesktopWindows()가 "지금은 포커스가 아니라서" 건너뛰고 dirty만 표시해둔 창을,
-  // 그 창이 실제로 화면 맨 앞으로 나오는 순간(포커스) 한 번만 그린다. dirty가 아니면 아무 것도 하지 않는다
-  // (이미 최신 내용이 그려져 있거나, 애초에 한 번도 건너뛴 적이 없는 경우).
-  function hdRenderWindowIfDirty(page) {
-    if (!hdWin.dirty[page]) return;
-    const frame = document.getElementById("app-win-" + page);
-    const fn = hdPageRenderer(page);
-    if (!frame || !fn) return;
-    const inner = frame.querySelector(".page-inner");
-    if (!inner) return;
-    inner.classList.toggle("wide", page === "schedule" || page === "calendar");
-    fn(inner);
-    hdWin.dirty[page] = false;
   }
 
   // opts.minimized/opts.maximized를 넘기면(부팅 시 복원 전용) 그 상태로 접힌 채/최대화된 채
@@ -17690,24 +18021,16 @@
       const maxH = Math.max(minH, window.innerHeight - 55);
       frame.style.cursor = "nwse-resize";
       try { frame.setPointerCapture?.(e.pointerId); } catch (_) {}
-      // rAF로 묶어서 한 프레임당 한 번만 width/height를 반영한다(저사양 PC에서 리사이즈 중 버벅임 완화).
-      let pendingW = startW, pendingH = startH, rafId = null;
-      const flush = () => {
-        rafId = null;
-        frame.style.width = Math.round(pendingW) + "px";
-        frame.style.height = Math.round(pendingH) + "px";
-      };
       const move = (v) => {
-        pendingW = Math.min(maxW, Math.max(minW, startW + (v.clientX - startX)));
-        pendingH = Math.min(maxH, Math.max(minH, startH + (v.clientY - startY)));
-        if (rafId == null) rafId = requestAnimationFrame(flush);
+        const width = Math.min(maxW, Math.max(minW, startW + (v.clientX - startX)));
+        const height = Math.min(maxH, Math.max(minH, startH + (v.clientY - startY)));
+        frame.style.width = Math.round(width) + "px";
+        frame.style.height = Math.round(height) + "px";
       };
       const up = () => {
         document.removeEventListener("pointermove", move, true);
         document.removeEventListener("pointerup", up, true);
         document.removeEventListener("pointercancel", up, true);
-        if (rafId != null) { cancelAnimationFrame(rafId); rafId = null; }
-        flush();
         frame.style.cursor = "";
         try { frame.releasePointerCapture?.(e.pointerId); } catch (_) {}
         hdSaveOpenWindowsState();
@@ -17734,24 +18057,16 @@
         const minW = 340, minH = 240;
         const maxW = Math.max(minW, window.innerWidth - 16);
         const maxH = Math.max(minH, window.innerHeight - 55);
-        // rAF로 한 프레임당 한 번만 width/height를 반영한다(저사양 PC에서 리사이즈 중 버벅임 완화).
-        let pendingSE = null, rafIdSE = null;
-        const flushSE = () => {
-          rafIdSE = null;
-          if (pendingSE) { frame.style.width = pendingSE.w + "px"; frame.style.height = pendingSE.h + "px"; }
-        };
         const moveSE = (v) => {
           const width = Math.min(maxW, Math.max(minW, startW + (v.clientX - startX)));
           const height = Math.min(maxH, Math.max(minH, startH + (v.clientY - startY)));
-          pendingSE = { w: Math.round(width), h: Math.round(height) };
-          if (rafIdSE == null) rafIdSE = requestAnimationFrame(flushSE);
+          frame.style.width = Math.round(width) + "px";
+          frame.style.height = Math.round(height) + "px";
         };
         const upSE = () => {
           document.removeEventListener("pointermove", moveSE);
           document.removeEventListener("pointerup", upSE);
           document.removeEventListener("pointercancel", upSE);
-          if (rafIdSE != null) { cancelAnimationFrame(rafIdSE); rafIdSE = null; }
-          flushSE();
           hdSaveOpenWindowsState();
         };
         document.addEventListener("pointermove", moveSE);
@@ -17793,25 +18108,15 @@
           }
           width = Math.min(maxW, Math.max(minW, width));
           height = Math.min(maxH, Math.max(minH, height));
-          pending = { left: Math.round(left), top: Math.round(top), width: Math.round(width), height: Math.round(height) };
-          if (rafId == null) rafId = requestAnimationFrame(flush);
+          frame.style.left = Math.round(left) + "px"; frame.style.top = Math.round(top) + "px";
+          frame.style.width = Math.round(width) + "px"; frame.style.height = Math.round(height) + "px";
         };
         const up = () => {
           document.removeEventListener("pointermove", move);
           document.removeEventListener("pointerup", up);
           document.removeEventListener("pointercancel", up);
-          if (rafId != null) { cancelAnimationFrame(rafId); rafId = null; }
-          flush();
           try { if (handle.releasePointerCapture) handle.releasePointerCapture(e.pointerId); } catch (_) {}
           hdSaveOpenWindowsState();
-        };
-        // rAF로 한 프레임당 한 번만 left/top/width/height를 반영한다(저사양 PC에서 리사이즈 중 버벅임 완화).
-        let pending = null, rafId = null;
-        const flush = () => {
-          rafId = null;
-          if (!pending) return;
-          frame.style.left = pending.left + "px"; frame.style.top = pending.top + "px";
-          frame.style.width = pending.width + "px"; frame.style.height = pending.height + "px";
         };
         document.addEventListener("pointermove", move);
         document.addEventListener("pointerup", up);
@@ -17866,20 +18171,6 @@
       const origLeft = frame.style.left, origTop = frame.style.top;
       const topMin = 39;
       let side = null;
-      // 성능 최적화(저사양 PC 버벅임 대응): 끄는 동안엔 left/top(레이아웃 재계산 유발)을 매 이벤트마다
-      // 바로 쓰지 않고, translate3d(컴포지터에서만 처리되는 transform)로 마우스를 따라가게 한 뒤
-      // requestAnimationFrame으로 한 프레임당 한 번만 반영한다. left/top은 손을 놓는 순간(up)에
-      // 딱 한 번만 확정해서 쓴다. 창엔 backdrop-filter가 없어도 box-shadow가 있어서, 매 mousemove마다
-      // reflow를 일으키던 예전 방식보다 이 방식이 특히 저사양 통합그래픽에서 훨씬 부드럽다.
-      const baseLeft = parseFloat(frame.style.left) || r.left;
-      const baseTop = parseFloat(frame.style.top) || r.top;
-      let lastLeft = baseLeft, lastTop = baseTop;
-      let rafId = null;
-      const flush = () => {
-        rafId = null;
-        frame.style.transform = `translate3d(${lastLeft - baseLeft}px, ${lastTop - baseTop}px, 0)`;
-      };
-      frame.classList.add("aw-dragging"); // css: transition:none — transform 트랜지션과 겹쳐 마우스보다 늦게 따라오는 것 방지
       const move = (v) => {
         if (st.snap) {
           if (Math.abs(v.clientX - startX) < 6 && Math.abs(v.clientY - startY) < 6) return;
@@ -17896,9 +18187,8 @@
           frame._hdResizeAnimTimer = setTimeout(() => frame.classList.remove("aw-unsnap-anim"), 420);
           hdHideSnapAssist(true);
         }
-        lastLeft = Math.max(-width + 90, Math.min(window.innerWidth - 90, v.clientX - dx));
-        lastTop = Math.max(topMin, Math.min(window.innerHeight - 60, v.clientY - dy));
-        if (rafId == null) rafId = requestAnimationFrame(flush);
+        frame.style.left = Math.max(-width + 90, Math.min(window.innerWidth - 90, v.clientX - dx)) + "px";
+        frame.style.top = Math.max(topMin, Math.min(window.innerHeight - 60, v.clientY - dy)) + "px";
         const next = hdSnapSideAt(v.clientX);
         if (next !== side) { side = next; hdShowSnapPreview(side); }
       };
@@ -17906,11 +18196,6 @@
         document.removeEventListener("pointermove", move);
         document.removeEventListener("pointerup", up);
         document.removeEventListener("pointercancel", up);
-        if (rafId != null) { cancelAnimationFrame(rafId); rafId = null; }
-        frame.style.transform = "";
-        frame.style.left = lastLeft + "px";
-        frame.style.top = lastTop + "px";
-        frame.classList.remove("aw-dragging");
         hdShowSnapPreview(null);
         if (side && !st.snap && hdWin.state[page] === st) { hdSnapWindow(page, side, true, { left: origLeft, top: origTop }); return; }
         hdSaveOpenWindowsState(); // 끌기가 끝나면(놓았을 때) 바뀐 위치를 로컬에 남긴다.
@@ -17994,7 +18279,6 @@
       setTimeout(() => frame.remove(), 230);
     }
     delete hdWin.state[page];
-    delete hdWin.dirty[page];
     const idx = hdWin.order.indexOf(page);
     if (idx !== -1) hdWin.order.splice(idx, 1);
     if (typeof _resetExpandedStateForPage === "function") _resetExpandedStateForPage(page);
@@ -18014,28 +18298,15 @@
     });
     hdWin.order = [];
     hdWin.state = {};
-    hdWin.dirty = {};
     document.body.classList.remove("hd-win-open"); // 창이 하나도 없으니 바탕화면 위젯 블러도 해제
     hdSaveOpenWindowsState();
   }
 
-  // renderApp()이 홈 위젯을 그린 뒤 불린다.
-  // [성능 개선 계획 Phase 2] 예전에는 상태가 하나만 바뀌어도(스케줄 셀 하나 편집 등) 열려 있는 창을
-  // 전부 처음부터 다시 그렸다 — 멀티태스킹(여러 창을 동시에 띄워두는, 이 앱의 핵심 사용 패턴)을 할수록
-  // 그만큼 버벅임이 커지는 구조였다. 지금은 지금 실제로 눈에 보이는(=맨 앞으로 포커스된) 창만 즉시
-  // 다시 그리고, 그 뒤에 가려진 나머지 창은 dirty로만 표시해뒀다가 그 창이 실제로 앞으로 나올 때
-  // (hdBringToFront → hdRenderWindowIfDirty) 딱 한 번만 그린다 — 안 보이는 동안 여러 번 바뀌어도 그린 건 한 번뿐.
-  //   - 처음 만들어져 아직 한 번도 내용이 그려진 적 없는 창(hasContent === false)은 포커스 여부와 관계없이
-  //     바로 그린다 — 새로고침 복원 등으로 여러 창이 한꺼번에 열릴 때 텅 빈 창이 보이는 일이 없게.
-  //   - 화면을 절반씩 나눠 붙인(스냅) 창은 원래부터 "두 창을 동시에 보기 위한" 기능이라 포커스가 아니어도
-  //     항상 즉시 그린다 — 안 그러면 옆에 나란히 보이는 창이 눈에 띄게 오래된 내용으로 남을 수 있다.
-  //   - 그 밖의(가려져 있거나 최소화된) 배경 창은, 다른 기기 동기화처럼 "지금 당장 반영돼야 하는" 예외
-  //     경우에 한해 opts.forceAllWindows로 이 최적화를 건너뛰고 예전처럼 전부 다시 그릴 수 있다
-  //     (js/01c-cloud-sync-runtime.js 참고).
-  function renderHomeDesktopWindows(opts) {
+  // renderApp()이 홈 위젯을 그린 뒤 불린다: 열려 있는 모든 창 각각에 그 페이지를 새로 그려서, 여러 창이
+  // 동시에 열려 있어도(다른 기기 동기화 등으로) 전부 최신 내용을 보여주게 한다. 실제로 화면에 없던 창을
+  // 새로 열 때는 appWin 상태가 이미 09a-home-desktop.js 쪽에서 만들어져 있다.
+  function renderHomeDesktopWindows() {
     if (CURRENT_ACCOUNT_IS_MASTER) return;
-    const forceAll = !!(opts && opts.forceAllWindows);
-    const frontPage = hdWin.order.length ? hdWin.order[hdWin.order.length - 1] : null;
     hdWin.order.forEach((page) => {
       const frame = document.getElementById("app-win-" + page);
       const fn = hdPageRenderer(page);
@@ -18043,15 +18314,9 @@
       const inner = frame.querySelector(".page-inner");
       if (!inner) return;
       inner.classList.toggle("wide", page === "schedule" || page === "calendar");
+      fn(inner);
       const st = hdWin.state[page];
-      const hasContent = !!inner.firstChild;
-      if (forceAll || page === frontPage || !hasContent || (st && st.snap)) {
-        fn(inner);
-        hdWin.dirty[page] = false;
-        if (st && st.justOpened) inner.scrollTop = 0;
-      } else {
-        hdWin.dirty[page] = true; // 지금은 건너뛴다 — 이 창이 다시 포커스될 때 hdRenderWindowIfDirty가 그린다.
-      }
+      if (st && st.justOpened) inner.scrollTop = 0;
     });
     syncAppWindows();
   }
@@ -18100,7 +18365,9 @@
   // 딱 붙는다(win-snap-l / win-snap-r — 위치·크기는 css/01c-app-window.css가 정하므로 화면 크기가 바뀌어도 알아서 맞춰진다).
   // 붙인 직후 반대편 절반에는 "어떤 페이지를 띄울까요?" 패널(#hd-snap-assist)이 떠서, 앱 아이콘을 누르면 그 페이지가
   // 반대편에 붙어 열린다(이미 열려 있거나 내려가 있던 창이면 그 창이 옮겨 붙는다). 패널은 Esc·바깥 클릭·"건너뛰기"로 닫힌다.
+  // 좁은 화면(700px 이하)은 창이 항상 전체 폭이라 이 기능을 쓰지 않는다.
   function hdSnapSideAt(x) {
+    if (window.innerWidth <= 700) return null;
     if (x <= 16) return "l";
     if (x >= window.innerWidth - 16) return "r";
     return null;
@@ -18132,7 +18399,7 @@
   function hdSnapWindow(page, side, animate, restore) {
     const st = hdWin.state[page];
     const frame = document.getElementById("app-win-" + page);
-    if (!st || !frame) return;
+    if (!st || !frame || window.innerWidth <= 700) return;
     if (animate) hdAnimateWindowResize(frame, "snap");
     st.snap = side;
     st.maximized = false;
@@ -18156,6 +18423,7 @@
   // page 창을 side 쪽에 붙인 뒤, 반대편 절반 자리에 "여기에 띄울 페이지" 고르기 패널을 띄운다.
   function hdShowSnapAssist(page, side) {
     hdHideSnapAssist(true);
+    if (window.innerWidth <= 700) return;
     const other = side === "l" ? "r" : "l";
     // 반대편에 이미 붙어서 떠 있는 창이 있으면 그 자리는 이미 찼으므로 패널을 띄우지 않는다.
     if (hdWin.order.some((p) => p !== page && hdWin.state[p] && !hdWin.state[p].minimized && hdWin.state[p].snap === other)) return;
@@ -18372,12 +18640,13 @@
   }
   function desktopFolderCellKey(col, row) { return col + "," + row; }
   // 지금 옮기는 폴더(excludeId) 말고, 나머지 폴더들이 차지하고 있는 칸의 집합.
-  // (저장된 x,y는 항상 스냅된 값이므로 그대로 칸으로 되돌려도 정확히 들어맞는다.)
+  // 칸 인덱스(col,row)가 저장돼 있으면 그걸 그대로 쓰고(가장 정확함), 옛 데이터처럼 픽셀 좌표(x,y)만
+  // 있으면 지금 화면 기준으로 한 번 계산해서 쓴다(마이그레이션 전 과도기 대비).
   function desktopFolderOccupiedCells(folders, excludeId, vw) {
     const set = new Set();
     Object.values(folders || {}).forEach((f) => {
       if (!f || f.id === excludeId) return;
-      const c = desktopFolderGridCell(f.x, f.y, vw);
+      const c = (f.col != null && f.row != null) ? { col: f.col, row: f.row } : desktopFolderGridCell(f.x, f.y, vw);
       set.add(desktopFolderCellKey(c.col, c.row));
     });
     return set;
@@ -18402,13 +18671,19 @@
     }
     return { col: c0, row: r0 }; // 화면 전체가 꽉 찬 경우
   }
-  // 놓은 자리(x,y)를 "다른 폴더와 겹치지 않는" 가장 가까운 그리드 칸의 좌표로 맞춘다.
-  // folders는 desktopFoldersData.folders, excludeId는 지금 옮기거나 새로 만드는 폴더 자신의 id(있으면 그 칸은 비교 대상에서 뺀다).
-  function desktopFolderSnapToFreeGrid(x, y, folders, excludeId, vw, vh) {
+  // 놓은 자리(x,y)가 속한 "빈" 그리드 칸의 [열,행] 인덱스만 구한다(다른 폴더와 안 겹치는 칸으로 맞춤).
+  // 폴더에 저장하는 값은 항상 이 칸 인덱스여야 한다 — 픽셀 좌표(x,y)는 화면 오른쪽 기준선이 해상도마다
+  // 달라지므로 그대로 저장하면 다른 모니터/창 크기에서 엉뚱한 자리로 보이거나 다른 아이콘과 겹칠 수 있다.
+  function desktopFolderSnapToFreeCell(x, y, folders, excludeId, vw, vh) {
     const target = desktopFolderGridCell(x, y, vw);
     const bounds = desktopFolderGridBounds(vw, vh);
     const occupied = desktopFolderOccupiedCells(folders, excludeId, vw);
-    const free = desktopFolderNearestFreeCell(target.col, target.row, occupied, bounds.maxCol, bounds.maxRow);
+    return desktopFolderNearestFreeCell(target.col, target.row, occupied, bounds.maxCol, bounds.maxRow);
+  }
+  // 놓은 자리(x,y)를 "다른 폴더와 겹치지 않는" 가장 가까운 그리드 칸의 좌표로 맞춘다.
+  // folders는 desktopFoldersData.folders, excludeId는 지금 옮기거나 새로 만드는 폴더 자신의 id(있으면 그 칸은 비교 대상에서 뺀다).
+  function desktopFolderSnapToFreeGrid(x, y, folders, excludeId, vw, vh) {
+    const free = desktopFolderSnapToFreeCell(x, y, folders, excludeId, vw, vh);
     return desktopFolderCellToPos(free.col, free.row, vw, vh);
   }
 
@@ -18433,10 +18708,23 @@
     if (!layer || CURRENT_ACCOUNT_IS_MASTER) return;
     if (dfUi.renamingId || dfUi.dragging) return;
     const list = Object.values(desktopFoldersData.folders).sort((a, b) => String(a.createdAt || "").localeCompare(String(b.createdAt || "")));
+    let migrated = false;
     layer.innerHTML = list.map((f) => {
-      const p = desktopFolderClampPos(f.x, f.y);
+      // 저장된 픽셀 좌표(x,y)가 아니라 그리드 칸(col,row)을 기준으로 매번 새로 좌표를 계산한다.
+      // 그래야 모니터 해상도·창 크기가 달라져(화면 오른쪽 기준선이 움직여) 있어도 항상 같은 칸에 놓인다.
+      // 옛 데이터(칸 정보 없이 x,y만 있던 폴더)는 지금 화면 기준으로 칸을 한 번 계산해 그 자리에 고정한다.
+      if (f.col == null || f.row == null) {
+        const c = desktopFolderGridCell(f.x, f.y);
+        f.col = c.col;
+        f.row = c.row;
+        delete f.x;
+        delete f.y;
+        migrated = true;
+      }
+      const p = desktopFolderCellToPos(f.col, f.row);
       return `<div class="hd-fld" role="button" tabindex="0" data-fld-id="${esc(f.id)}" style="left:${p.x}px;top:${p.y}px" title="${esc(f.name)}">${DESKTOP_FOLDER_SVG}<span class="hd-fld-name">${esc(f.name)}</span></div>`;
     }).join("");
+    if (migrated) saveDesktopFoldersData();
     syncDesktopFolderStates();
   }
 
@@ -18454,9 +18742,9 @@
   function createDesktopFolder(clientX, clientY) {
     const id = genId();
     const names = Object.values(desktopFoldersData.folders).map((f) => f.name);
-    const pos = desktopFolderSnapToFreeGrid(clientX - 43, clientY - 30, desktopFoldersData.folders, id);
+    const cell = desktopFolderSnapToFreeCell(clientX - 43, clientY - 30, desktopFoldersData.folders, id);
     desktopFoldersData.folders[id] = {
-      id, name: desktopFolderUniqueName("새 폴더", names), x: pos.x, y: pos.y, createdAt: new Date().toISOString(), files: [],
+      id, name: desktopFolderUniqueName("새 폴더", names), col: cell.col, row: cell.row, createdAt: new Date().toISOString(), files: [],
     };
     saveDesktopFoldersData();
     renderDesktopFolders();
@@ -18620,40 +18908,35 @@
       const r = el.getBoundingClientRect();
       const offX = startX - r.left, offY = startY - r.top;
       let moved = false;
-      // 성능 최적화(저사양 PC 버벅임 대응): left/top(레이아웃 재계산 유발) 대신 translate3d로
-      // 프레임당 한 번만(requestAnimationFrame) 옮기고, left/top은 손을 뗄 때 딱 한 번만 확정한다.
-      // .hd-fld.dragging엔 이미 transition:none이 있어 transform과 겹쳐 늦게 따라오는 문제는 없다.
-      const baseLeft = r.left, baseTop = r.top;
-      let lastX = baseLeft, lastY = baseTop;
-      let rafId = null;
-      const flush = () => {
-        rafId = null;
-        el.style.transform = `translate3d(${lastX - baseLeft}px, ${lastY - baseTop}px, 0)`;
-      };
       const move = (v) => {
         if (!moved && Math.abs(v.clientX - startX) < 5 && Math.abs(v.clientY - startY) < 5) return;
         moved = true;
         dfUi.dragging = true;
         el.classList.add("dragging");
         const p = desktopFolderClampPos(v.clientX - offX, v.clientY - offY);
-        lastX = p.x; lastY = p.y;
-        if (rafId == null) rafId = requestAnimationFrame(flush);
+        el.style.left = p.x + "px";
+        el.style.top = p.y + "px";
       };
       const up = () => {
         document.removeEventListener("pointermove", move);
         document.removeEventListener("pointerup", up);
         document.removeEventListener("pointercancel", up);
-        if (rafId != null) { cancelAnimationFrame(rafId); rafId = null; }
-        el.style.transform = "";
         if (!moved) return;
         dfUi.dragging = false;
         dfUi.suppressClickUntil = Date.now() + 120; // 끌기를 끝낸 직후 따라오는 click이 "열기"로 처리되지 않게
         el.classList.remove("dragging");
-        const snapped = desktopFolderSnapToFreeGrid(lastX, lastY, desktopFoldersData.folders, id); // 놓은 자리를 다른 폴더와 안 겹치는 가까운 칸으로 맞춘다
+        const dropX = parseFloat(el.style.left) || 0;
+        const dropY = parseFloat(el.style.top) || 0;
+        const freeCell = desktopFolderSnapToFreeCell(dropX, dropY, desktopFoldersData.folders, id); // 놓은 자리를 다른 폴더와 안 겹치는 가까운 칸으로 맞춘다
+        const snapped = desktopFolderCellToPos(freeCell.col, freeCell.row);
         el.style.left = snapped.x + "px";
         el.style.top = snapped.y + "px";
-        f.x = snapped.x;
-        f.y = snapped.y;
+        // 픽셀 좌표(x,y)가 아니라 칸 인덱스(col,row)를 저장한다 — 그래야 다른 해상도/창 크기에서도
+        // 항상 같은 칸에 다시 놓인다(renderDesktopFolders가 이 값으로 매번 좌표를 새로 계산함).
+        f.col = freeCell.col;
+        f.row = freeCell.row;
+        delete f.x;
+        delete f.y;
         saveDesktopFoldersData();
       };
       document.addEventListener("pointermove", move);
@@ -18692,6 +18975,16 @@
       const id = el.getAttribute("data-fld-id");
       if (e.key === "Enter") { e.preventDefault(); setPage(dfPage(id)); }
       else if (e.key === "F2") { e.preventDefault(); startDesktopFolderRename(id); }
+    });
+  })();
+
+  // 창 크기가 바뀌거나(브라우저 리사이즈) 다른 해상도의 모니터로 창을 옮기면 화면 오른쪽 기준선이
+  // 바뀌므로, 그 자리에서 바로 폴더 위치를 다시 계산해서 새로고침 없이도 항상 같은 칸에 보이게 한다.
+  (function wireDesktopFolderResizeReflow() {
+    let resizeTimer = null;
+    window.addEventListener("resize", () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => { if (!dfUi.dragging && !dfUi.renamingId) renderDesktopFolders(); }, 150);
     });
   })();
 
@@ -19814,11 +20107,7 @@
     draw();
   }
 
-  // opts.forceAllWindows: true를 넘기면 배경(포커스 아님) 창까지 전부 지금 당장 다시 그린다(성능 개선
-  // 계획 Phase 2로 기본은 포커스된 창만 즉시 갱신하도록 바뀌었다 — js/09a-home-desktop.js의
-  // renderHomeDesktopWindows 참고). 다른 기기 실시간 동기화·탭 복귀 시 "밀린 내용 한꺼번에 반영"처럼
-  // 배경 창도 지금 당장 최신이어야 하는 드문 경우에만 이 옵션을 넘긴다.
-  function renderApp(opts) {
+  function renderApp() {
     renderNav();
     const root = document.getElementById("page-inner");
     root.classList.toggle("wide", state.page === "schedule" || state.page === "home" || state.page === "calendar");
@@ -19829,7 +20118,7 @@
     const homeRoot = document.getElementById("home-root");
     if (homeRoot && typeof renderHomeDesktopWindows === "function") {
       renderHomePage(homeRoot);
-      renderHomeDesktopWindows(opts);
+      renderHomeDesktopWindows();
       return;
     }
     // (#home-root/js/09a-home-desktop.js가 없는 경우를 대비한 안전망) 예전처럼 페이지 하나만 #page-inner에 그린다.
@@ -19853,6 +20142,7 @@
 
   renderApp();
   if (typeof window !== "undefined" && window.__hideBootLoader) window.__hideBootLoader();
+
   // 이 브라우저(컴퓨터)에서 처음으로 사양이 낮아 보이면, "그래픽 효과 줄이기" 토글의
   // 존재를 몰라서 못 쓰는 경우를 막기 위해 딱 한 번만 안내한다 (js/01d-undo-theme-dock.js).
   if (!CURRENT_ACCOUNT_IS_MASTER && typeof maybeSuggestLowGraphicsMode === "function") {

@@ -34,25 +34,32 @@
     --weekend-tint: #1f2228;
     --sch-cell-bg: #262a32;
     --native-color-scheme: dark;
+    /* ---- macOS 세그먼트/툴바 트랙 색(면담일지 AI요약·엑셀·추가 버튼 묶음 등, .mac-iv-*
+       클래스 전반이 공유). 원래 .agent-iv-popover 안에서만 정의돼 있어서, 같은 .mac-iv-tool
+       버튼이라도 그 팝오버 밖(전체 면담일지 화면 등)에서는 --mac-track이 없어
+       var(--hairline-strong)로 대체되며 색이 달라졌다. 전역으로 옮겨 항상 같은 색을 쓰게 한다. ---- */
+    --mac-track: rgba(120, 120, 128, 0.16);
+    --mac-track-strong: rgba(120, 120, 128, 0.26);
     /* ---- 그래픽 효과(블러) 세기: 저사양 컴퓨터 대응용 ----
        모든 backdrop-filter의 blur() 반경은 "고정값 * var(--fx-blur-scale)"로 계산된다.
        기본값 1일 땐 아래 각 --fx-blur-* 값 그대로, 상태표시줄 "모드" 메뉴의
        "그래픽 효과 줄이기"를 켜면(html[data-fx="reduced"]) 0이 되어 블러 계산 자체가
        거의 사라진다(js/01d-undo-theme-dock.js의 setFxReduced 참고). */
     --fx-blur-scale: 1;
-    --fx-blur-xl: calc(16px * var(--fx-blur-scale));   /* 예전 30~35px 자리 */
-    --fx-blur-lg: calc(13px * var(--fx-blur-scale));   /* 예전 26~28px 자리 */
+    --fx-blur-xl: calc(16px * var(--fx-blur-scale));   /* 예전 50px 자리 */
+    --fx-blur-lg: calc(13px * var(--fx-blur-scale));   /* 예전 26~30px 자리 */
     --fx-blur-md: calc(11px * var(--fx-blur-scale));   /* 예전 20~24px 자리 */
-    --fx-blur-sm: calc(3px * var(--fx-blur-scale));    /* 예전 2~3px 자리(원래도 저렴함) */
+    --fx-blur-sm: calc(3px * var(--fx-blur-scale));    /* 예전 2~10px 자리(원래도 저렴함) */
+    /* ---- 상시 노출 요소(상단 상태표시줄·오른쪽 내비게이션 독·앱 창 타이틀바) 전용: 블러 없이
+       반투명 단색으로만 유리감을 낸다. --mac-vibrancy보다 훨씬 진하게(거의 불투명) 잡아서,
+       블러가 없어도 뒤 콘텐츠가 비쳐 보이지 않게 한다. ---- */
+    --chrome-bg: rgba(24, 26, 32, 0.94);
     /* ---- 반경 스케일: 최신 macOS(리퀴드 글래스)처럼 더 둥글고 큼직하게 ---- */
     --radius-xs: 8px;
     --radius-sm: 12px;
     --mac-radius: 14px;
     --mac-radius-lg: 22px;
     --radius-xl: 28px;
-    /* ---- 상시 노출 요소(상단 상태표시줄·오른쪽 내비게이션 독) 전용: 블러 없이 반투명 단색으로만 유리감을 낸다.
-       --mac-vibrancy보다 훨씬 진하게(거의 불투명) 잡아서, 블러가 없어도 뒤 콘텐츠가 비쳐 보이지 않게 한다. ---- */
-    --chrome-bg: rgba(24, 26, 32, 0.94);
     --mac-vibrancy: rgba(32, 35, 42, 0.66);
     --mac-vibrancy-hairline: rgba(255, 255, 255, 0.09);
     --mac-glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.07);
@@ -82,7 +89,6 @@
   }
   /* ---- light 테마는 상태색(오프·연차·대휴 등)이 다크와 다르게 밝은 배경용으로 조정된다 ---- */
   html[data-theme="light"] {
-    --chrome-bg: rgba(255, 255, 255, 0.94);
     --mac-vibrancy: rgba(255, 255, 255, 0.66);
     --mac-vibrancy-hairline: rgba(45, 48, 52, 0.14);
     --mac-glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.7);
@@ -110,6 +116,7 @@
     --indigo: #a554b6;
     --indigo-dim: #a554b626;
     --sch-cell-bg: var(--bg);
+    --chrome-bg: rgba(255, 255, 255, 0.94);
   }
   /* ---- "그래픽 효과 줄이기"를 켰을 때: 블러 반경을 0으로 낮추고(레이아웃/색은 그대로),
      box-shadow와 transition/animation도 함께 줄인다. 예전엔 블러만 꺼져서 절반만
@@ -130,6 +137,27 @@
     transition-duration: 0.01ms !important;
     transition-delay: 0s !important;
     animation-duration: 0.01ms !important;
+  }
+  /* ---- OS "동작 줄이기"(prefers-reduced-motion) 자동 대응 ----
+     위 data-fx="reduced"는 사용자가 앱 안에서 직접 토글을 눌러야 켜진다.
+     하지만 OS/브라우저 설정에서 이미 "동작 줄이기"를 켜둔 사용자는 굳이
+     앱 안에서 또 찾아서 켜지 않아도, 처음부터 같은 효과(블러 반경 0,
+     그림자 제거, 전환/애니메이션 즉시 처리)가 자동으로 적용돼야 한다.
+     data-fx 속성 자체는 건드리지 않으므로(로컬 저장된 사용자 선택과
+     충돌 없음) 사용자가 앱 안에서 수동으로 다시 켜거나 끄는 것도 그대로
+     동작한다. */
+  @media (prefers-reduced-motion: reduce) {
+    :root {
+      --fx-blur-scale: 0;
+    }
+    *,
+    *::before,
+    *::after {
+      box-shadow: none !important;
+      transition-duration: 0.01ms !important;
+      transition-delay: 0s !important;
+      animation-duration: 0.01ms !important;
+    }
   }
   * { box-sizing: border-box; }
   html, body {
@@ -156,7 +184,7 @@
     outline-offset: 2px;
   }
   /* 각 페이지 상단 타이틀(상담사 관리·면담일지·업무 정리·품질 관리·월별 스케줄·캘린더 등) — KoPub 바탕체 Light */
-  .agent-list-title, .notes-title, .qa-title, .schedule-title, .calendar-page-title {
+  .agent-list-title, .notes-title, .qa-title, .calendar-page-title {
     font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Apple SD Gothic Neo", "Helvetica Neue", Arial, sans-serif;
     font-weight: 300;
   }

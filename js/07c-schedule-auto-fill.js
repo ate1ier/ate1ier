@@ -70,22 +70,6 @@
   const SCHEDULE_AUTO_HYBRID_CANDIDATE_COUNT = 6;
   let scheduleAutoHybridRequestId = 0;
 
-  // scheduleAutoBuildPlan(제약조건 탐색/백트래킹) 자체는 여전히 동기 함수라 한 번 호출될 때는
-  // 여전히 무겁지만, 후보를 6개 연달아 만들 때(scheduleAutoBuildHybridPlan) 이 사이사이에
-  // 브라우저에게 한 번씩 제어권을 돌려줘서(화면을 그릴 틈을 줘서) "화면이 통째로 멈추는" 것처럼
-  // 보이지 않게 한다. rAF로 다음 페인트 시점까지 기다린 뒤 setTimeout(0)까지 한 번 더 거쳐서,
-  // 실제로 한 프레임이 화면에 그려진 뒤에 다음 계산을 이어가도록 보장한다(계산 로직 자체는 그대로 둠).
-  // requestAnimationFrame은 "다음 화면을 그리기 직전"에 딱 한 번 호출되므로, 여기서 await로 한 번
-  // 걸어두면(async 함수가 일시 정지하며 호출 스택을 비움) 그 사이에 브라우저가 지금 프레임을 그릴 틈이
-  // 생긴다 — setTimeout까지 얹지 않아도 이 정도로 "화면이 멈춘 것처럼 안 보이게" 하기엔 충분하다.
-  // rAF가 없는 환경(예: 테스트의 순수 Node 샌드박스)에서는 실제로 그릴 화면이 없으므로 그냥 즉시 진행한다.
-  function scheduleAutoYieldToUi() {
-    if (typeof requestAnimationFrame === "function") {
-      return new Promise((resolve) => requestAnimationFrame(() => resolve()));
-    }
-    return Promise.resolve();
-  }
-
   // 이 일수를 넘는 연속 근무(=6일째부터)는 만들지 않는다.
   const SCHEDULE_AUTO_MAX_WORK_STREAK = 5;
   // 새로 배정하는 오프가 기존 휴무(필휴 포함)와 연결되어 연속 휴무가 4일 이상 생기지 않게 한다.
@@ -2818,28 +2802,11 @@
     };
   }
 
-  // isStale: 계산 도중 이 요청이 이미 낡은 요청이 됐는지 확인하는 함수(예: 그 사이 사용자가 조건을
-  //   또 바꿔서 새 미리보기 요청이 시작됐는지). 매 후보 계산 전에 확인해서, 낡았으면 남은 후보는
-  //   계산하지 않고 그때까지 만든 후보만으로 즉시 끝낸다(화면에 반영되지도 않을 계산을 계속 붙잡지 않기 위함).
-  // onProgress(i, total): 후보를 하나 만들 때마다 호출되는 선택적 콜백. 미리보기 로딩 문구 갱신용.
-  async function scheduleAutoBuildHybridPlan(year, monthIndex, options, isStale, onProgress) {
+  async function scheduleAutoBuildHybridPlan(year, monthIndex, options) {
     const baseOptions = Object.assign({}, options || {});
     const candidates = [];
     for (let i = 0; i < SCHEDULE_AUTO_HYBRID_CANDIDATE_COUNT; i++) {
-      // 매 후보 계산 직전에 브라우저에 제어권을 한 번 돌려준다(6번 연달아 도는 대신 사이사이 화면 갱신 틈 확보).
-      await scheduleAutoYieldToUi();
-      if (typeof isStale === "function" && isStale()) break;
       candidates.push(scheduleAutoBuildPlan(year, monthIndex, Object.assign({}, baseOptions, { variant: i })));
-      if (typeof onProgress === "function") onProgress(candidates.length, SCHEDULE_AUTO_HYBRID_CANDIDATE_COUNT);
-    }
-    // 낡은 요청이라 후보 계산을 중간에 멈췄으면, 이후 로직(메트릭 비교·Groq 호출 등)도 의미가 없으므로
-    // 지금까지 만든 후보 중 첫 번째(또는 하나도 없으면 기준 옵션으로 즉시 하나) 것만으로 간단히 마무리한다.
-    // 호출부(scheduleAutoRefreshPreview)가 requestId를 다시 확인해서 이 결과를 화면에 쓰지 않고 버린다.
-    if (typeof isStale === "function" && isStale()) {
-      if (candidates.length === 0) candidates.push(scheduleAutoBuildPlan(year, monthIndex, Object.assign({}, baseOptions, { variant: 0 })));
-      const fallback = candidates[0];
-      fallback.hybrid = { improve: null, enabled: false, candidateCount: candidates.length, allowedCandidateCount: 1, selectedCandidate: 0, metrics: scheduleAutoPlanMetrics(fallback), groqStatus: "stale", groqModel: null, groqUsage: null, groqRequestId: null, groqError: null };
-      return fallback;
     }
     const metricsList = candidates.map(scheduleAutoPlanMetrics);
     const baseMetrics = metricsList[0];
@@ -2888,15 +2855,8 @@
   async function scheduleAutoRefreshPreview() {
     const requestId = ++scheduleAutoHybridRequestId;
     const area = document.getElementById("sch-auto-preview-area");
-    const isStale = () => requestId !== scheduleAutoHybridRequestId || !document.getElementById("sch-auto-overlay");
-    const setLoadingText = (text) => { if (!isStale()) { const a = document.getElementById("sch-auto-preview-area"); if (a) a.innerHTML = `<div class="sch-auto-none">${text}</div>`; } };
-    setLoadingText("조건을 확인하고 배치 후보를 최적화하는 중...");
-    const plan = await scheduleAutoBuildHybridPlan(
-      scheduleUi.year, scheduleUi.monthIndex,
-      { excludeStaffIds: scheduleAutoExcludedIds, minWorkingByGroup: scheduleAutoMinWorkingByGroup },
-      isStale,
-      (done, total) => setLoadingText(`배치 후보를 계산하는 중... (${done}/${total})`)
-    );
+    if (area) area.innerHTML = `<div class="sch-auto-none">조건을 확인하고 배치 후보를 최적화하는 중...</div>`;
+    const plan = await scheduleAutoBuildHybridPlan(scheduleUi.year, scheduleUi.monthIndex, { excludeStaffIds: scheduleAutoExcludedIds, minWorkingByGroup: scheduleAutoMinWorkingByGroup });
     if (requestId !== scheduleAutoHybridRequestId || !document.getElementById("sch-auto-overlay")) return;
     scheduleAutoPlan = plan;
     if (area) area.innerHTML = scheduleAutoPreviewHtml(scheduleAutoPlan);

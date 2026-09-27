@@ -91,4 +91,8 @@
   .hd-dk:hover::before { opacity: 1; transform: translateX(-50%) scale(1) translateY(0); }
 
   /* 좁은 화면(목업 max-width:700px): 오른쪽 아이콘은 숨기고 독 아이콘을 줄인다 */
-  
+  @media (max-width: 700px) {
+    body.home-desktop #home-icons { display: none; }
+    .hd-dk .hd-ic { width: 38px; height: 38px; }
+    #home-dock { gap: 5px; padding: 5px 8px 7px; }
+  }

@@ -34,7 +34,7 @@
     background: var(--login-bg);
     transition: opacity 0.7s cubic-bezier(0.4, 0, 0.2, 1), transform 0.7s cubic-bezier(0.4, 0, 0.2, 1), filter 0.7s cubic-bezier(0.4, 0, 0.2, 1);
   }
-  #boot-loader.boot-handoff.boot-loader-hide { opacity: 0; transform: scale(1.05); filter: blur(8px); }
+  #boot-loader.boot-handoff.boot-loader-hide { opacity: 0; transform: scale(1.05); filter: blur(var(--fx-blur-sm)); }
   /* 첫 페인트 전부터(head의 인라인 스크립트가 html에 표시) 덮개가 처음부터 로그인 배경으로 보이게 한다 */
   html.boot-handoff-pre #boot-loader { background: var(--login-bg); }
   html.boot-handoff-pre #boot-loader > * { display: none; }

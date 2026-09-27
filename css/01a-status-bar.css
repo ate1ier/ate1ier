@@ -21,7 +21,7 @@
     height: 38px;
     padding: 0 14px 0;
     box-sizing: content-box;
-    /* 항상 화면 맨 위에 떠 있는 요소라 블러 대신 반투명 단색 배경만 쓴다(저사양 컴퓨터에서
+    /* 항상 떠 있는 요소라 블러 대신 반투명 단색 배경만 쓴다(저사양 컴퓨터에서
        스크롤/창 이동마다 블러를 다시 계산하지 않아도 되어 훨씬 가볍다) — --chrome-bg 참고 */
     background: var(--chrome-bg);
     border-bottom: 1px solid var(--mac-vibrancy-hairline);

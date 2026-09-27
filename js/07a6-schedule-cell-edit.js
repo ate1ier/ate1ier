@@ -759,10 +759,6 @@
     root.querySelectorAll(".sch-required-input").forEach((input) => {
       // 입력칸을 벗어날 때(blur) 또는 Enter 시 저장. 매 타이핑마다 전체를 다시 그리지 않아
       // 숫자 입력 중 표가 깜빡이거나 포커스가 빠지지 않는다.
-      // [성능 개선 계획 Phase 2] 필요인력은 이 표(대비/인력 대비 편성 행 포함) 밖의 다른
-      // 화면에는 영향을 주지 않으므로, 예전처럼 renderApp()으로 페이지 전체를 다시 그리지
-      // 않고 표 영역만 갱신한다(근태 셀 편집과 같은 방식). updateScheduleTableArea 안에서
-      // domReconcileTable이 실제로 달라진 칸만 고쳐 쓴다.
       input.onchange = () => {
         const { year, monthIndex } = scheduleUi;
         setRequiredHeadcount(
@@ -772,7 +768,7 @@
           Number(input.getAttribute("data-required-day")),
           input.value
         );
-        updateScheduleTableArea();
+        renderApp();
       };
       input.onkeydown = (e) => { if (e.key === "Enter") input.blur(); };
     });

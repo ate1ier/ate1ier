@@ -272,9 +272,55 @@
     editingId: null,
     searchQuery: "",
     typeFilter: "all", // "all" | "정기" | "비정기" | "경고" | "퇴사"
-    expandedIds: new Set(), // 목록에서 펼쳐본 면담 기록 id들 (상담사 상세 화면과 공유)
+    expandedIds: new Set(), // 상담사 팝오버(mac-iv-row)에서 펼쳐본 면담 기록 id들. 독립 면담일지 목록(iv-row)은
+                             // 3단계부터 오른쪽 상세 패널만 쓰므로 이 값을 더 이상 참조하지 않는다.
     page: 1, // 면담일지 목록의 현재 페이지(10건씩)
+    selectedId: null, // 독립 면담일지 페이지의 2단 레이아웃에서 오른쪽 상세 패널에 표시 중인 기록 id.
+                       // 상담사 팝오버 등 상세 패널이 없는 화면에서는 이 값이 쓰이지 않는다.
+    mobileDetailOpen: false, // (5단계) 목록/상세가 나란히 두기엔 좁아졌을 때, 상세 패널이 전체 폭
+                              // 오버레이로 열려 있는지 여부. 넓은 화면(2단 분할)에서는 쓰이지 않는다.
   };
+
+  // (5단계) 목록/상세 2단 분할이 실제로 들어갈 자리가 좁은지는 브라우저 창(뷰포트) 폭이 아니라
+  // 이 페이지가 그려지는 요소(root)의 실측 폭으로 판단한다 — 바탕화면 창 모드는 창을 자유롭게
+  // 줄일 수 있고, 상담사 관리에 이식된 화면은 사이드바/팝오버 때문에 뷰포트보다 훨씬 좁을 수
+  // 있어서, 기존처럼 @media (max-width) 하나로는 두 경우를 모두 못 잡아낸다.
+  const INTERVIEW_SPLIT_COMPACT_WIDTH = 700;
+  let _interviewsSplitCompact = false;
+
+  // root(면담일지 페이지 컨테이너)의 폭을 관찰해 좁아지면(iv-compact) 목록 전체 폭 +
+  // 상세 오버레이 방식으로, 다시 넓어지면 원래 2단 분할로 자동 전환한다. 같은 root에는
+  // 한 번만 관찰을 걸어두고(riderInterviewsPage가 다시 그릴 때마다 root 자체는 재사용되므로),
+  // 매 렌더링 시점의 최신 상태는 렌더 함수 쪽에서 _interviewsSplitCompact 값을 읽어 바로 반영한다.
+  function attachInterviewSplitResponsive(root) {
+    if (!root || root._ivSplitResizeObserver || typeof ResizeObserver !== "function") return;
+    const apply = () => {
+      const split = root.querySelector(".interview-split");
+      if (!split) return;
+      const wasCompact = _interviewsSplitCompact;
+      const nowCompact = root.getBoundingClientRect().width < INTERVIEW_SPLIT_COMPACT_WIDTH;
+      _interviewsSplitCompact = nowCompact;
+      split.classList.toggle("iv-compact", nowCompact);
+      if (!nowCompact) {
+        // 다시 넓어지면 오버레이는 필요 없으니 접어두고, 나중에 또 좁아지면 항상 목록부터 보이게 한다.
+        interviewsUi.mobileDetailOpen = false;
+        split.classList.remove("detail-open");
+      } else if (wasCompact && interviewsUi.mobileDetailOpen) {
+        split.classList.add("detail-open");
+      }
+    };
+    const observer = new ResizeObserver(apply);
+    observer.observe(root);
+    root._ivSplitResizeObserver = observer;
+    apply();
+  }
+
+  // 좁은 화면에서 열려 있던 상세 오버레이를 목록으로 되돌린다("뒤로" 버튼).
+  function closeInterviewMobileDetail() {
+    interviewsUi.mobileDetailOpen = false;
+    const split = _interviewsPageRoot ? _interviewsPageRoot.querySelector(".interview-split") : null;
+    if (split) split.classList.remove("detail-open");
+  }
 
   // renderInterviewsPage(root)가 그릴 때마다 그 root를 기억해둔다. 바탕화면 창 모드(js/09a-home-desktop.js)에서는
   // 창마다 각자 다른 #page-inner 요소를 쓰므로, updateInterviewListArea()의 부분 갱신이 항상 이 페이지의
@@ -431,56 +477,76 @@
     return { agentId, managerId, date, type, content, followUp };
   }
 
-  function renderInterviewRow(rec, actionPrefix) {
+  // (2단계 → 3단계 정리) 목록 행: 유형별 색상 바 + 아바타 + 이름/LDAP/날짜 + 배지 + 내용 미리보기 2줄.
+  // 아바타 색상·이니셜은 상담사 목록/팝오버(js/04-agents.js)와 같은 agentAvatarColor/agentInitials를 그대로 써서
+  // 앱 전체에서 같은 상담사가 항상 같은 색으로 보이게 한다. 클릭하면 selectedId가 갱신되고 오른쪽
+  // 상세 패널(renderInterviewDetailPaneHtml, 3단계)이 새로 그려진다. 다운로드/수정/삭제 버튼과 펼침형
+  // 전체 내용은 이제 이 행이 아니라 오른쪽 상세 패널의 몫이라 여기서는 뺐다.
+  function renderInterviewRow(rec) {
     const agent = agentsData.find((a) => a.id === rec.agentId);
-    const agentNameHtml = agent
-      ? `<span class="interview-agent-name">${esc(agent.name)}</span><span class="interview-agent-ldap">${esc(agent.ldap)}</span>`
-      : `<span class="interview-agent-name agent-field-empty">(삭제된 상담사)</span>`;
-    const agentMetaHtml = agent ? `
-      <span class="interview-agent-meta">
-        ${agent.timezone ? `<span class="interview-agent-timezone">${ICON_CLOCK} ${esc(agent.timezone)}</span>` : ""}
-        <span class="badge sm ${agent.group === "night" ? "night" : "day"}">${agent.group === "night" ? "야간" : "주간"}</span>
-        ${renderWorkTypeBadges(agent.workTypes, "sm")}
-      </span>
-    ` : "";
-    const manager = rec.managerId ? agentsData.find((a) => a.id === rec.managerId) : null;
-    const managerHtml = manager ? `<span class="interview-agent-ldap">${ICON_SHIELD} ${esc(manager.name)} · ${esc(manager.ldap)}</span>` : "";
-    const isExpanded = interviewsUi.expandedIds.has(rec.id);
+    const typeCls = interviewTypeBadgeClass(rec.type);
+    const isSelected = interviewsUi.selectedId === rec.id;
+    const previewLine = (rec.content || "").trim();
+    const avatarHtml = agent
+      ? `<div class="iv-row-avatar" style="background:${agentAvatarColor(agent.id)}">${esc(agentInitials(agent.name))}</div>`
+      : `<div class="iv-row-avatar iv-row-avatar-empty">?</div>`;
+    const nameHtml = agent
+      ? `<span class="iv-row-name">${esc(agent.name)}</span><span class="iv-row-ldap">${esc(agent.ldap || "")}</span>`
+      : `<span class="iv-row-name agent-field-empty">(삭제된 상담사)</span>`;
     return `
-      <div class="interview-row ${isExpanded ? "expanded" : ""}">
-        <div class="interview-row-top" data-action="toggle-interview-row" data-id="${rec.id}">
-          <span class="interview-row-chevron">${ICON_CHEVRON_RIGHT}</span>
-          <span class="interview-date">${esc(rec.date || "-")}</span>
-          <span class="badge sm ${interviewTypeBadgeClass(rec.type)}">${esc(rec.type || "비정기")}</span>
-          ${agentNameHtml}
-          ${agentMetaHtml}
-          ${managerHtml}
-          <div class="interview-row-actions">
-            <button class="ghost-btn" data-action="${actionPrefix}-download-interview" data-id="${rec.id}" title="엑셀 다운로드">${ICON_DOWNLOAD}</button>
-            <button class="ghost-btn" data-action="${actionPrefix}-edit-interview" data-id="${rec.id}">수정</button>
-            <button class="ghost-btn danger" data-action="${actionPrefix}-delete-interview" data-id="${rec.id}">삭제</button>
+      <div class="iv-row ${typeCls} ${isSelected ? "selected" : ""}">
+        <div class="iv-row-top" data-action="toggle-interview-row" data-id="${rec.id}">
+          <span class="iv-row-bar"></span>
+          ${avatarHtml}
+          <div class="iv-row-main">
+            <div class="iv-row-line1">
+              ${nameHtml}
+              <span class="iv-row-date">${esc(rec.date || "-")}</span>
+            </div>
+            <div class="iv-row-badges">
+              <span class="badge sm ${typeCls}">${esc(rec.type || "비정기")}</span>
+              ${agent ? `<span class="badge sm ${agent.group === "night" ? "night" : "day"}">${agent.group === "night" ? "야간" : "주간"}</span>` : ""}
+            </div>
+            <div class="iv-row-snippet">${previewLine ? esc(previewLine) : ""}</div>
           </div>
         </div>
-        ${isExpanded ? `
-          <div class="interview-row-body">
-            ${rec.content ? `<div class="interview-content">${esc(rec.content)}</div>` : ""}
-            <div class="interview-followup">후속조치: ${rec.followUp ? esc(rec.followUp) : "없음"}</div>
-          </div>
-        ` : ""}
       </div>
     `;
   }
+  // 목록을 날짜(연-월) 기준으로 훑으면서 달이 바뀔 때마다 sticky 그룹 헤더("2026년 09월")를 끼워 넣는다.
+  function interviewMonthLabel(dateStr) {
+    const m = /^(\d{4})-(\d{2})/.exec(dateStr || "");
+    return m ? `${m[1]}년 ${m[2]}월` : "날짜 미상";
+  }
 
-  // 면담 기록 행을 펼치고/접는 클릭을 처리한다. 수정·삭제 버튼 클릭은 여기서 무시한다.
+  // 면담 기록 행을 펼치고/접는 클릭을 처리한다.
+  // 같은 클릭에서 interviewsUi.selectedId도 함께 갱신해, 독립 면담일지 페이지의
+  // 오른쪽 상세 패널(#interview-detail-pane)이 있으면 그 내용도 같이 새로고침한다.
+  // 상세 패널이 없는 화면(상담사 팝오버 등)에서는 updateInterviewDetailPane()가 조용히 아무 일도 하지 않는다.
   function attachInterviewRowToggles(root, onToggle) {
     root.querySelectorAll("[data-action='toggle-interview-row']").forEach((row) => {
-      row.onclick = (e) => {
-        if (e.target.closest(".interview-row-actions")) return;
+      row.onclick = () => {
         const id = row.getAttribute("data-id");
         if (interviewsUi.expandedIds.has(id)) {
           interviewsUi.expandedIds.delete(id);
         } else {
           interviewsUi.expandedIds.add(id);
+        }
+        interviewsUi.selectedId = id;
+        // (6단계) 추가/수정 폼이 열려 있는 동안 다른 행을 고르면, 쓰던 폼은 버리고
+        // 그 행의 상세로 바로 전환한다(별도 확인 없이 — 폼은 아직 저장되지 않은 내용이라 가볍게 버려도 된다).
+        if (interviewsUi.mode !== "list") {
+          interviewsUi.mode = "list";
+          interviewsUi.editingId = null;
+        }
+        updateInterviewDetailPane();
+        // (5단계) 목록/상세를 나란히 둘 자리가 없을 만큼 좁으면(.interview-split.iv-compact),
+        // 상세를 전체 폭 오버레이로 밀어 올린다. 이 클래스가 없는 화면(넓은 2단 분할, 상담사
+        // 팝오버 등)에서는 아무 효과가 없다.
+        const split = row.closest(".interview-split");
+        if (split && split.classList.contains("iv-compact")) {
+          interviewsUi.mobileDetailOpen = true;
+          split.classList.add("detail-open");
         }
         onToggle();
       };
@@ -488,90 +554,387 @@
   }
 
   /* ---- 독립 메뉴: 면담일지 페이지 ---- */
+  // (6단계: 추가/수정 폼 위치 정리) 폼은 더 이상 리스트 전체를 덮지 않는다 — 왼쪽 목록/검색/필터는
+  // add·edit 모드에서도 항상 그대로 살아있고, 폼은 오른쪽 상세 패널 자리(interview-split-detail)에만
+  // 뜬다. 그래서 아래에서는 모드와 무관하게 툴바와 목록을 항상 같은 방식으로 그리고, 오른쪽 패널
+  // 내용물만 모드에 따라 상세 보기 / 폼으로 갈라진다.
   function renderInterviewsPage(root) {
     _interviewsPageRoot = root;
+    // 상담사 관리 화면에 이식된 "전체 면담일지"(id="agent-interviews-embedded")일 때만 창 높이에
+    // 맞춰 페이지네이션을 하단에 고정한다. 독립 면담일지 페이지는 이 플래그가 false로 남는다.
+    _interviewsFitToHeight = !!root && root.id === "agent-interviews-embedded";
     const filtered = sortInterviews(
       interviewsData.filter((r) => interviewMatchesSearch(r, interviewsUi.searchQuery) && interviewMatchesType(r, interviewsUi.typeFilter))
     );
 
-    let bodyHtml;
-    let exportRowHtml = "";
-    if (interviewsUi.mode === "add") {
-      bodyHtml = `
-        <div class="agent-form-title">새 면담 기록 추가</div>
-        <form class="agent-form" id="interview-page-form">
-          ${renderInterviewFormFields({ date: todayISO(), type: "정기" }, null, "interview-page")}
-          <div class="agent-form-actions">
-            <button type="submit" class="primary-btn">추가</button>
-            <button type="button" class="cancel-btn" id="interview-page-cancel">취소</button>
-          </div>
-        </form>
-      `;
-    } else if (interviewsUi.mode === "edit") {
-      const editing = interviewsData.find((r) => r.id === interviewsUi.editingId) || null;
-      bodyHtml = editing ? `
-        <div class="agent-form-title">면담 기록 수정</div>
-        <form class="agent-form" id="interview-page-form">
-          ${renderInterviewFormFields(editing, null, "interview-page")}
-          <div class="agent-form-actions">
-            <button type="submit" class="primary-btn">저장</button>
-            <button type="button" class="cancel-btn" id="interview-page-cancel">취소</button>
-          </div>
-        </form>
-      ` : `<div class="agent-list-empty">기록을 찾을 수 없어요.</div>`;
-    } else {
-      const typeFilterBtns = ["all", ...INTERVIEW_TYPES].map((t) => `
-        <button type="button" class="agent-filter-btn ${interviewsUi.typeFilter === t ? "active" : ""}" data-interview-filter="${t}">${t === "all" ? "전체" : t}</button>
-      `).join("");
-      exportRowHtml = `<button class="ghost-btn" id="interview-export-btn">${ICON_DOWNLOAD} 엑셀로 다운로드 ▾</button>`;
-      bodyHtml = `
-        <div class="agent-controls">
-          <div class="agent-filter-row">${typeFilterBtns}</div>
+    const typeFilterBtns = ["all", ...INTERVIEW_TYPES].map((t) => `
+      <button type="button" class="agent-filter-btn ${interviewsUi.typeFilter === t ? "active" : ""}" data-interview-filter="${t}">${t === "all" ? "전체" : t}</button>
+    `).join("");
+    const exportRowHtml = `<button type="button" class="mac-iv-tool" id="interview-export-btn"><span class="mac-iv-tool-icon">${ICON_DOWNLOAD}</span><span class="mac-iv-tool-label">엑셀</span></button>`;
+    // (4단계: 상단 툴바 재구성) 유형 필터(알약형 세그먼트) + 검색창(사이드바와 통일된 라운드
+    // 스타일) + 엑셀 다운로드/AI 요약/면담 기록 추가 버튼을 목업(main-toolbar)처럼 한 줄로 묶는다.
+    const toolbarHtml = `
+      <div class="interview-type-filter agent-filter-row">${typeFilterBtns}</div>
+      <div class="agent-search-input interview-toolbar-search"><input type="text" class="agent-search-input-field" id="interview-search-input" placeholder="상담사 이름 또는 LDAP 검색" value="${esc(interviewsUi.searchQuery)}" autocomplete="off">${ICON_SEARCH_MINI}</div>
+      <div class="agent-list-header-actions">
+        <div class="mac-iv-toolbar">
+          <button type="button" class="mac-iv-tool" id="btn-interview-ai-summary"><span class="mac-iv-tool-icon">✦</span><span class="mac-iv-tool-label">AI 요약</span></button>
+          ${exportRowHtml}
+          <button type="button" class="mac-iv-tool mac-iv-tool-accent" id="btn-interview-add"><span class="mac-iv-tool-icon">＋</span><span class="mac-iv-tool-label">면담 기록 추가</span></button>
         </div>
-        <div id="interview-list-area">
-          ${renderInterviewListAreaHtml(filtered)}
+      </div>
+    `;
+
+    const detailPaneHtml = (interviewsUi.mode === "add" || interviewsUi.mode === "edit")
+      ? renderInterviewFormPaneHtml(interviewsUi.mode)
+      : renderInterviewDetailPaneHtml();
+
+    // (5단계 + 6단계) 좁은 화면에서는 폼이 열려 있는 것도 상세 보기와 똑같이 오른쪽에서
+    // 밀려들어오는 전체 폭 오버레이로 다룬다 — list 모드가 아니면 항상 오버레이를 편다.
+    const detailShouldOverlay = interviewsUi.mode !== "list" || interviewsUi.mobileDetailOpen;
+
+    // (0단계) 목록 rows와 페이지네이션을 분리해서, 페이지네이션이 #interview-list-area의
+    // 스크롤 영역 밖(#interview-list-pagination)에 항상 고정되도록 한다.
+    const { listHtml: interviewListHtml, paginationHtml: interviewPaginationHtml } = buildInterviewListAreaHtml(filtered);
+
+    // (1단계: 레이아웃 뼈대만 전환) 목록/상세를 좌우 2단으로 나눈다.
+    const bodyHtml = `
+      <div class="interview-split ${_interviewsSplitCompact ? "iv-compact" : ""} ${_interviewsSplitCompact && detailShouldOverlay ? "detail-open" : ""}">
+        <div class="interview-split-list">
+          <div id="interview-list-area">${interviewListHtml}</div>
+          <div id="interview-list-pagination">${interviewPaginationHtml}</div>
         </div>
-      `;
-    }
+        <div class="interview-split-detail" id="interview-detail-pane">
+          ${detailPaneHtml}
+        </div>
+      </div>
+    `;
 
     root.innerHTML = `
-      <div class="agent-list-header">
-        <div class="agent-list-title">면담일지</div>
-        ${interviewsUi.mode === "list" ? `<div class="agent-list-header-actions">${exportRowHtml}<button class="ghost-btn" id="btn-interview-ai-summary">AI 요약</button><button class="ghost-btn solid-accent-btn" id="btn-interview-add">＋ 면담 기록 추가</button></div>` : ""}
-      </div>
-      <div class="card">
-        <div class="interview-summary-row">
-          <div class="agent-summary">전체 ${interviewsData.length}건${interviewsUi.mode === "list" && filtered.length !== interviewsData.length ? ` · 필터 결과 ${filtered.length}건` : ""}</div>
-          ${interviewsUi.mode === "list" ? `<div class="agent-search-input"><input type="text" class="agent-search-input-field" id="interview-search-input" placeholder="상담사 이름 또는 LDAP 검색" value="${esc(interviewsUi.searchQuery)}" autocomplete="off">${ICON_SEARCH_MINI}</div>` : ""}
+      <div class="agent-list-header interview-toolbar">
+        <div class="interview-toolbar-title-block">
+          <div class="agent-list-title">면담일지</div>
+          <div class="agent-summary interview-toolbar-summary">전체 ${interviewsData.length}건${filtered.length !== interviewsData.length ? ` · 필터 결과 ${filtered.length}건` : ""}</div>
         </div>
-        <div class="status" id="interview-status"></div>
-        ${bodyHtml}
+        ${toolbarHtml}
       </div>
+      <div class="status" id="interview-status"></div>
+      ${bodyHtml}
     `;
 
     attachInterviewsPageEvents(root);
+    attachInterviewSplitResponsive(root);
+
+    // 목록 영역이 실제로 차지하는 높이를 재서 페이지당 개수를 맞추고(전체 면담일지일 때만),
+    // 이후 창 크기가 바뀔 때마다도 다시 맞추도록 관찰을 새로 건다(root.innerHTML을 통째로
+    // 새로 그렸으므로 #interview-list-area도 매번 새 DOM 노드).
+    watchInterviewListSize();
+    measureAndSyncInterviewPageSize();
+    enforceInterviewListFit();
   }
 
-  // 면담일지 목록 영역(검색바 아래)의 내용을 만든다. 10건씩 페이지를 나눠서 보여준다.
-  function renderInterviewListAreaHtml(filtered) {
-    if (filtered.length === 0) {
-      return `<div class="agent-list-empty">${interviewsData.length === 0 ? "등록된 면담 기록이 없어요." : "검색 또는 필터 조건에 맞는 면담 기록이 없어요."}</div>`;
+  const ICON_INTERVIEW_DETAIL_EMPTY = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 9h18"/><path d="M8 3v4"/><path d="M16 3v4"/></svg>`;
+
+  // (3단계) 오른쪽 상세 패널: 아바타/이름/배지 헤더 + 툴바(다운로드/수정/삭제), 정보 그리드
+  // (면담일자·면담 관리자·작성일시), 면담 내용, 후속조치 강조 박스로 구성된 리딩 페인 디자인.
+  // 다운로드/수정/삭제는 더 이상 목록 행(renderInterviewRow)에 없고 이 패널의 툴바로만 존재한다.
+  function renderInterviewDetailPaneHtml() {
+    const rec = interviewsData.find((r) => r.id === interviewsUi.selectedId);
+    if (!rec) {
+      // (6단계) 빈 상태 문구: 처음 들어왔을 때와 방금 선택 해제/삭제로 비워졌을 때 모두 자연스럽도록,
+      // 지시형("선택하면") 대신 있는 그대로 안내하는 톤으로 다듬었다.
+      return `
+        <div class="interview-detail-empty iv-fade-in">
+          ${ICON_INTERVIEW_DETAIL_EMPTY}
+          <div>아직 선택된 면담 기록이 없어요.<br>왼쪽 목록에서 하나를 골라주세요.</div>
+        </div>
+      `;
     }
-    const { items, page, totalPages } = paginateList(filtered, interviewsUi.page);
-    interviewsUi.page = page;
+    const agent = agentsData.find((a) => a.id === rec.agentId);
+    const manager = rec.managerId ? agentsData.find((a) => a.id === rec.managerId) : null;
+    const typeCls = interviewTypeBadgeClass(rec.type);
+    const avatarHtml = agent
+      ? `<div class="interview-detail-avatar" style="background:${agentAvatarColor(agent.id)}">${esc(agentInitials(agent.name))}</div>`
+      : `<div class="interview-detail-avatar iv-row-avatar-empty">?</div>`;
+    const managerLabel = manager ? `${esc(manager.name)} (${esc(manager.ldap || "-")})` : '<span class="agent-field-empty">-</span>';
+    const createdAtLabel = rec.createdAt ? esc(rec.createdAt.replace("T", " ").slice(0, 16)) : '<span class="agent-field-empty">-</span>';
     return `
-      <div class="interview-list">${items.map((r) => renderInterviewRow(r, "page")).join("")}</div>
-      ${renderPaginationHtml(page, totalPages, "interview-list")}
+      <div class="interview-detail-pane-inner iv-fade-in" key="${rec.id}">
+        <div class="interview-detail-header">
+          <button type="button" class="interview-detail-back-btn" data-action="detail-back" title="목록으로">${ICON_CHEVRON_LEFT}</button>
+          ${avatarHtml}
+          <div class="interview-detail-head-main">
+            <div class="interview-detail-name-row">
+              <span class="interview-detail-name">${agent ? esc(agent.name) : "(삭제된 상담사)"}</span>
+              ${agent && agent.ldap ? `<span class="interview-detail-ldap">${esc(agent.ldap)}</span>` : ""}
+            </div>
+            <div class="interview-detail-badges">
+              <span class="badge sm ${typeCls}">${esc(rec.type || "비정기")}</span>
+              ${agent ? `<span class="badge sm ${agent.group === "night" ? "night" : "day"}">${agent.group === "night" ? "야간" : "주간"}</span>` : ""}
+            </div>
+          </div>
+          <div class="interview-detail-tools">
+            <button type="button" class="iv-row-icon-btn" data-action="detail-download-interview" data-id="${rec.id}" title="엑셀 다운로드">${ICON_DOWNLOAD}</button>
+            <button type="button" class="iv-row-icon-btn" data-action="detail-edit-interview" data-id="${rec.id}" title="수정">${ICON_EDIT}</button>
+            <button type="button" class="iv-row-icon-btn danger" data-action="detail-delete-interview" data-id="${rec.id}" title="삭제">${ICON_TRASH}</button>
+          </div>
+        </div>
+        <div class="interview-detail-grid">
+          <div class="interview-detail-grid-item"><span class="interview-detail-grid-label">면담일자</span><span class="interview-detail-grid-value">${esc(rec.date || "-")}</span></div>
+          <div class="interview-detail-grid-item"><span class="interview-detail-grid-label">면담 관리자</span><span class="interview-detail-grid-value">${managerLabel}</span></div>
+          <div class="interview-detail-grid-item"><span class="interview-detail-grid-label">작성일시</span><span class="interview-detail-grid-value">${createdAtLabel}</span></div>
+        </div>
+        <div class="interview-detail-section-label">면담 내용</div>
+        <div class="interview-detail-content-box">${rec.content ? esc(rec.content) : '<span class="agent-field-empty">내용 없음</span>'}</div>
+        <div class="interview-detail-section-label">후속조치 / 다음 계획</div>
+        <div class="interview-detail-followup-box">${rec.followUp ? esc(rec.followUp) : "없음"}</div>
+      </div>
     `;
+  }
+
+  // 상세 패널 툴바의 다운로드/수정/삭제 버튼을 연결한다. renderInterviewsPage의 최초 렌더 직후와
+  // updateInterviewDetailPane()의 부분 갱신 직후, 두 군데에서 모두 불러줘야 버튼이 항상 살아있다.
+  function attachInterviewDetailPaneHandlers(pane) {
+    if (!pane) return;
+    pane.querySelectorAll("[data-action='detail-back']").forEach((btn) => {
+      btn.onclick = () => closeInterviewMobileDetail();
+    });
+    pane.querySelectorAll("[data-action='detail-download-interview']").forEach((btn) => {
+      btn.onclick = () => downloadSingleInterview(btn.getAttribute("data-id"));
+    });
+    pane.querySelectorAll("[data-action='detail-edit-interview']").forEach((btn) => {
+      btn.onclick = () => {
+        interviewsUi.mode = "edit";
+        interviewsUi.editingId = btn.getAttribute("data-id");
+        renderApp();
+      };
+    });
+    pane.querySelectorAll("[data-action='detail-delete-interview']").forEach((btn) => {
+      btn.onclick = () => {
+        const id = btn.getAttribute("data-id");
+        if (window.confirm("이 면담 기록을 삭제할까요?")) {
+          if (interviewsUi.selectedId === id) {
+            interviewsUi.selectedId = null;
+            // 좁은 화면에서 보고 있던 상세를 지우는 경우, 더 보여줄 내용이 없으니 목록으로 되돌린다.
+            closeInterviewMobileDetail();
+          }
+          deleteInterview(id);
+          renderApp();
+        }
+      };
+    });
+  }
+
+  // (6단계) 오른쪽 상세 패널 자리에 뜨는 추가/수정 폼. 목업엔 폼 디자인이 없어서, 상세 보기와
+  // 같은 리딩 페인 톤(agent-form 계열 필드 + 좁은 화면에서만 보이는 "‹" 뒤로가기)으로 맞췄다.
+  // "‹" 버튼과 하단 "취소" 버튼은 둘 다 cancelInterviewForm()으로 이어진다 — 좁은 화면에서
+  // 편집 중이던 기록의 상세를 보다가 연 폼이면 취소 시 그 상세로, 목록에서 바로 "추가"를 눌러 연
+  // 폼이면 취소 시 목록으로 자연스럽게 돌아간다(cancelInterviewForm의 mobileDetailOpen 보존 참고).
+  function renderInterviewFormPaneHtml(mode) {
+    const isEdit = mode === "edit";
+    const editing = isEdit ? (interviewsData.find((r) => r.id === interviewsUi.editingId) || null) : null;
+    if (isEdit && !editing) {
+      return `
+        <div class="interview-detail-empty">
+          ${ICON_INTERVIEW_DETAIL_EMPTY}
+          <div>수정하려던 기록을 찾을 수 없어요.<br>목록에서 다시 선택해주세요.</div>
+        </div>
+      `;
+    }
+    const initialValues = isEdit ? editing : { date: todayISO(), type: "정기" };
+    return `
+      <div class="interview-form-pane iv-fade-in">
+        <div class="interview-form-pane-header">
+          <button type="button" class="interview-detail-back-btn" data-action="form-cancel" title="취소하고 돌아가기">${ICON_CHEVRON_LEFT}</button>
+          <div class="agent-form-title interview-form-pane-title">${isEdit ? "면담 기록 수정" : "새 면담 기록 추가"}</div>
+        </div>
+        <form class="agent-form" id="interview-page-form">
+          ${renderInterviewFormFields(initialValues, null, "interview-page")}
+          <div class="agent-form-actions">
+            <button type="submit" class="primary-btn">${isEdit ? "저장" : "추가"}</button>
+            <button type="button" class="cancel-btn" id="interview-page-cancel">취소</button>
+          </div>
+        </form>
+      </div>
+    `;
+  }
+
+  // 폼의 "취소" 버튼과 좁은 화면의 "‹" 뒤로가기 버튼이 공유하는 종료 동작.
+  // mobileDetailOpen은 건드리지 않으므로, 상세를 보다가 연 수정 폼이면 취소 시 그 상세로
+  // 자연스레 되돌아가고, 목록에서 바로 연 추가 폼이면 취소 시 목록으로 돌아간다.
+  function cancelInterviewForm() {
+    interviewsUi.mode = "list";
+    interviewsUi.editingId = null;
+    renderApp();
+  }
+
+  // renderInterviewFormPaneHtml로 그려진 폼이 실제 DOM에 붙은 뒤 제출/취소를 동작시킨다.
+  // 전체 렌더(attachInterviewsPageEvents)와 부분 갱신(updateInterviewDetailPane) 양쪽에서 공용으로 쓴다.
+  function attachInterviewFormPaneHandlers(pane) {
+    if (!pane) return;
+    const form = pane.querySelector("#interview-page-form");
+    if (!form) return;
+    attachInterviewFormPickers("interview-page", null);
+    form.onsubmit = (e) => {
+      e.preventDefault();
+      const values = readInterviewFormValues("interview-page", null);
+      if (!values) { flashInterviewStatus("대상 상담사를 선택해주세요."); return; }
+      if (interviewsUi.mode === "edit" && interviewsUi.editingId) {
+        updateInterview(interviewsUi.editingId, values);
+        interviewsUi.selectedId = interviewsUi.editingId;
+      } else {
+        // 등록 직후 오른쪽 패널이 비어 보이지 않도록, 방금 추가한 기록을 바로 선택 상태로 만든다.
+        interviewsUi.selectedId = addInterview(values);
+      }
+      interviewsUi.mode = "list";
+      interviewsUi.editingId = null;
+      renderApp();
+    };
+    pane.querySelectorAll("[data-action='form-cancel']").forEach((btn) => { btn.onclick = () => cancelInterviewForm(); });
+    const cancelBtn = pane.querySelector("#interview-page-cancel");
+    if (cancelBtn) cancelBtn.onclick = () => cancelInterviewForm();
+  }
+
+  // interviewsUi.selectedId(또는 add/edit 모드)가 바뀔 때마다 상세 패널만 부분 갱신한다.
+  // 상세 패널이 없는 화면(상담사 팝오버 등)에서는 요소를 못 찾아 조용히 아무 일도 하지 않는다.
+  function updateInterviewDetailPane() {
+    const pane = document.getElementById("interview-detail-pane");
+    if (!pane) return;
+    if (interviewsUi.mode === "add" || interviewsUi.mode === "edit") {
+      pane.innerHTML = renderInterviewFormPaneHtml(interviewsUi.mode);
+      attachInterviewFormPaneHandlers(pane);
+    } else {
+      pane.innerHTML = renderInterviewDetailPaneHtml();
+      attachInterviewDetailPaneHandlers(pane);
+    }
+  }
+
+  // (0단계) 상담사 관리에 이식된 "전체 면담일지"(agent-interviews-embedded)에서만, 목록이 창 높이에
+  // 꽉 차도록 페이지당 개수를 동적으로 계산하고 페이지네이션을 목록 하단에 고정한다(#agent-list-area/
+  // #agent-list-pagination과 완전히 같은 방식 — js/04-agents.js의 measureAndSyncAgentPageSize 참고).
+  // 독립 면담일지 페이지(js/12-init.js의 state.page === "interviews")는 예전처럼 페이지 전체가
+  // 자연스럽게 스크롤되므로, 이 계산 대상이 아니다(_interviewsFitToHeight로 구분해서 건드리지 않음).
+  let _interviewsFitToHeight = false;
+  let interviewListDynamicPageSize = null;
+  let interviewListResizeObserver = null;
+
+  // 면담일지 목록 영역(검색바 아래)의 내용을 만든다. 목록 rows와 페이지네이션을 각각 별도
+  // 컨테이너(#interview-list-area / #interview-list-pagination)에 넣을 수 있도록 나눠서 돌려준다.
+  function buildInterviewListAreaHtml(filtered) {
+    if (filtered.length === 0) {
+      return {
+        listHtml: `<div class="agent-list-empty">${interviewsData.length === 0 ? "등록된 면담 기록이 없어요." : "검색 또는 필터 조건에 맞는 면담 기록이 없어요."}</div>`,
+        paginationHtml: "",
+      };
+    }
+    const { items, page, totalPages } = paginateList(filtered, interviewsUi.page, interviewListDynamicPageSize);
+    interviewsUi.page = page;
+    let lastMonth = null;
+    const rowsHtml = items.map((r) => {
+      const month = interviewMonthLabel(r.date);
+      const labelHtml = month !== lastMonth ? `<div class="iv-month-label">${esc(month)}</div>` : "";
+      lastMonth = month;
+      return labelHtml + renderInterviewRow(r);
+    }).join("");
+    return {
+      listHtml: `<div class="interview-list">${rowsHtml}</div>`,
+      paginationHtml: renderPaginationHtml(page, totalPages, "interview-list"),
+    };
+  }
+
+  // ---- (0단계) #interview-list-area의 실제 렌더링된 높이와 행 하나의 높이를 재서, 그 안에
+  //      몇 줄이 들어가는지 계산해 페이지 크기로 쓴다(js/04-agents.js와 동일한 접근). 달이
+  //      바뀌는 자리에 끼는 iv-month-label 높이까지는 1차 계산에 넣지 않고, 실측 기반 보정
+  //      루프(enforceInterviewListFit)가 마지막으로 안전하게 맞춰준다.
+  function measureAndSyncInterviewPageSize() {
+    if (!_interviewsFitToHeight) return;
+    const listArea = document.getElementById("interview-list-area");
+    if (!listArea) return;
+    const availableHeight = Math.floor(listArea.clientHeight);
+    if (!availableHeight) return; // 창이 접혀 있는 등, 아직 잴 수 없는 상태면 건너뜀
+
+    const sampleRow = listArea.querySelector(".interview-list .iv-row");
+    if (!sampleRow) return; // 목록이 비어 있으면(검색결과 없음 등) 계산할 기준이 없으므로 건너뜀
+    const rowHeight = Math.ceil(sampleRow.getBoundingClientRect().height);
+    if (!rowHeight) return;
+    const listGap = Math.ceil(parseFloat(window.getComputedStyle(sampleRow.parentElement).rowGap || "0") || 0);
+
+    // 반올림 오차에 대비한 최소한의 안전 여백(2px).
+    const SAFETY_MARGIN = 2;
+    const usableHeight = Math.max(0, availableHeight - SAFETY_MARGIN);
+    const computed = Math.max(4, Math.floor((usableHeight + listGap) / (rowHeight + listGap)));
+    if (computed === interviewListDynamicPageSize) {
+      // 계산값은 그대로라도, 월 라벨 등으로 실제 렌더링 결과가 이미 넘쳐 있을 수 있으니
+      // 여기서도 한 번은 실측 검증을 해준다.
+      enforceInterviewListFit();
+      return;
+    }
+    interviewListDynamicPageSize = computed;
+    interviewsUi.page = 1; // 페이지 크기가 바뀌면 이전 페이지 번호가 더 이상 맞지 않으므로 처음으로
+    updateInterviewListArea();
+  }
+
+  // ---- 계산이 아무리 정교해도(월 라벨, 서브픽셀 반올림 등) 몇 px 차이로 어긋나서 마지막
+  //      한 줄만 살짝 넘쳐 스크롤이 생기는 경우가 있었다. 실제로 그려진 결과(scrollHeight)를
+  //      직접 재서 넘치면 그 자리에서 한 줄씩 줄여 다음 페이지로 밀어낸다. ----
+  function enforceInterviewListFit(attemptsLeft) {
+    if (!_interviewsFitToHeight) return;
+    const listArea = document.getElementById("interview-list-area");
+    if (!listArea) return;
+    if (typeof attemptsLeft !== "number") attemptsLeft = 8;
+    if (attemptsLeft <= 0) return;
+    if (listArea.scrollHeight <= listArea.clientHeight + 1) return; // 이미 딱 맞음(1px은 반올림 오차 허용)
+
+    const current = interviewListDynamicPageSize && interviewListDynamicPageSize > 4 ? interviewListDynamicPageSize : PAGE_SIZE;
+    interviewListDynamicPageSize = Math.max(4, current - 1);
+    interviewsUi.page = 1;
+    renderInterviewListAreaOnly(); // measureAndSyncInterviewPageSize를 다시 부르지 않는, 순수 다시 그리기
+    enforceInterviewListFit(attemptsLeft - 1); // 한 줄 줄이고도 여전히 넘치면 더 줄인다
+  }
+
+  // updateInterviewListArea와 내용은 같지만, 끝에서 measureAndSyncInterviewPageSize를
+  // 다시 부르지 않는다 — enforceInterviewListFit이 이미 정한 페이지 크기가 계산값으로
+  // 되돌아가 버리는(줄였다가 다시 늘어나는) 걸 막기 위한 전용 버전.
+  function renderInterviewListAreaOnly() {
+    const area = document.getElementById("interview-list-area");
+    const paginationArea = document.getElementById("interview-list-pagination");
+    if (!area) return;
+    const filtered = sortInterviews(
+      interviewsData.filter((r) => interviewMatchesSearch(r, interviewsUi.searchQuery) && interviewMatchesType(r, interviewsUi.typeFilter))
+    );
+    const { listHtml, paginationHtml } = buildInterviewListAreaHtml(filtered);
+    area.innerHTML = listHtml;
+    if (paginationArea) paginationArea.innerHTML = paginationHtml;
+    attachInterviewListAreaHandlers(area);
+  }
+
+  // #interview-list-area의 실제 크기가 바뀔 때마다(브라우저 창 크기 변경, 상담사 관리 창을
+  // 손으로 늘리거나 최대화할 때도) 다시 계산한다. 독립 면담일지 페이지에서는 아예 관찰하지 않는다.
+  function watchInterviewListSize() {
+    const listArea = document.getElementById("interview-list-area");
+    if (interviewListResizeObserver) interviewListResizeObserver.disconnect();
+    interviewListResizeObserver = null;
+    if (!listArea || !_interviewsFitToHeight || typeof ResizeObserver === "undefined") return;
+    let lastH = 0;
+    interviewListResizeObserver = new ResizeObserver((entries) => {
+      const h = entries[0] && entries[0].contentRect ? entries[0].contentRect.height : 0;
+      if (Math.abs(h - lastH) < 1) return;
+      lastH = h;
+      measureAndSyncInterviewPageSize();
+    });
+    interviewListResizeObserver.observe(listArea);
   }
 
   function updateInterviewListArea() {
     const area = document.getElementById("interview-list-area");
     if (!area) return;
+    const paginationArea = document.getElementById("interview-list-pagination");
     const filtered = sortInterviews(
       interviewsData.filter((r) => interviewMatchesSearch(r, interviewsUi.searchQuery) && interviewMatchesType(r, interviewsUi.typeFilter))
     );
-    area.innerHTML = renderInterviewListAreaHtml(filtered);
+    const { listHtml, paginationHtml } = buildInterviewListAreaHtml(filtered);
+    area.innerHTML = listHtml;
+    if (paginationArea) paginationArea.innerHTML = paginationHtml;
     attachInterviewListAreaHandlers(area);
     const summaryEl = _interviewsPageRoot
       ? _interviewsPageRoot.querySelector(".agent-summary")
@@ -579,33 +942,23 @@
     if (summaryEl) {
       summaryEl.textContent = `전체 ${interviewsData.length}건${filtered.length !== interviewsData.length ? ` · 필터 결과 ${filtered.length}건` : ""}`;
     }
+    // 목록 내용이 바뀌면(검색/필터/페이지 이동 등) 실제 행 높이·개수가 달라질 수 있으므로
+    // 다음 배치 때 다시 한 번 크기를 확인해 필요하면 페이지 크기를 보정한다.
+    measureAndSyncInterviewPageSize();
+    enforceInterviewListFit();
   }
 
   function attachInterviewListAreaHandlers(root) {
     attachInterviewRowToggles(root, updateInterviewListArea);
-    attachPaginationHandlers(root, "interview-list", (delta) => {
+    // 이전/다음 버튼은 이제 #interview-list-area 밖(#interview-list-pagination)에 따로 그려질
+    // 수 있으므로, 그 컨테이너를 못 받으면 root 자신에서라도 찾아본다(초기 렌더링 때는 root가
+    // 페이지 전체라 둘 다 포함하고 있음).
+    const paginationRoot = document.getElementById("interview-list-pagination") || root;
+    attachPaginationHandlers(paginationRoot, "interview-list", (delta) => {
       interviewsUi.page = interviewsUi.page + delta;
       updateInterviewListArea();
     });
-    root.querySelectorAll("[data-action='page-download-interview']").forEach((btn) => {
-      btn.onclick = () => downloadSingleInterview(btn.getAttribute("data-id"));
-    });
-    root.querySelectorAll("[data-action='page-edit-interview']").forEach((btn) => {
-      btn.onclick = () => {
-        interviewsUi.mode = "edit";
-        interviewsUi.editingId = btn.getAttribute("data-id");
-        renderApp();
-      };
-    });
-    root.querySelectorAll("[data-action='page-delete-interview']").forEach((btn) => {
-      btn.onclick = () => {
-        const id = btn.getAttribute("data-id");
-        if (window.confirm("이 면담 기록을 삭제할까요?")) {
-          deleteInterview(id);
-          renderApp();
-        }
-      };
-    });
+    // 다운로드/수정/삭제는 이제 행이 아니라 오른쪽 상세 패널 툴바에서 처리한다 (attachInterviewDetailPaneHandlers 참고).
   }
 
   function attachInterviewsPageEvents(root) {
@@ -638,30 +991,13 @@
     if (exportBtn) exportBtn.onclick = (e) => openInterviewExportMenu(e.currentTarget);
     attachInterviewListAreaHandlers(root);
 
-    const form = document.getElementById("interview-page-form");
-    if (form) {
-      attachInterviewFormPickers("interview-page", null);
-      form.onsubmit = (e) => {
-        e.preventDefault();
-        const values = readInterviewFormValues("interview-page", null);
-        if (!values) { flashInterviewStatus("대상 상담사를 선택해주세요."); return; }
-        if (interviewsUi.mode === "edit" && interviewsUi.editingId) {
-          updateInterview(interviewsUi.editingId, values);
-        } else {
-          addInterview(values);
-        }
-        interviewsUi.mode = "list";
-        interviewsUi.editingId = null;
-        renderApp();
-      };
-      const cancelBtn = document.getElementById("interview-page-cancel");
-      if (cancelBtn) {
-        cancelBtn.onclick = () => {
-          interviewsUi.mode = "list";
-          interviewsUi.editingId = null;
-          renderApp();
-        };
-      }
+    // (6단계) 오른쪽 패널은 이제 상세 보기 / 추가·수정 폼 둘 중 하나이므로, 현재 모드에 맞는
+    // 핸들러만 연결한다(updateInterviewDetailPane의 부분 갱신 로직과 동일한 분기).
+    const detailPane = document.getElementById("interview-detail-pane");
+    if (interviewsUi.mode === "add" || interviewsUi.mode === "edit") {
+      attachInterviewFormPaneHandlers(detailPane);
+    } else {
+      attachInterviewDetailPaneHandlers(detailPane);
     }
   }
 

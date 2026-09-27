@@ -153,16 +153,6 @@
       return false;
     } catch (e) { return false; }
   }
-  function _liveBannerWrapForFxSuggest() {
-    let el = document.getElementById("cloud-live-banner-wrap");
-    if (!el) {
-      el = document.createElement("div");
-      el.id = "cloud-live-banner-wrap";
-      el.className = "cloud-live-banner-wrap";
-      document.body.appendChild(el);
-    }
-    return el;
-  }
   function maybeSuggestLowGraphicsMode() {
     if (isFxReduced()) return;
     try { if (localStorage.getItem(FX_KEY) !== null) return; } catch (e) {} // 한 번이라도 직접 켜/꺼본 사람은 그 선택을 존중
@@ -182,7 +172,7 @@
         </div>
       </div>
     `;
-    _liveBannerWrapForFxSuggest().appendChild(el);
+    _liveBannerWrap().appendChild(el);
     document.getElementById("fx-suggest-dismiss").onclick = () => el.remove();
     document.getElementById("fx-suggest-enable").onclick = () => { setFxReduced(true); el.remove(); };
   }
