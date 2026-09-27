@@ -36,8 +36,13 @@ try {
   } catch (e) {}
   // "그래픽 효과 줄이기"도 테마처럼 첫 페인트 전에 미리 반영해서, 켜둔 사람 화면에
   // 블러가 있는 채로 한 프레임 그려졌다가 바로 꺼지는 깜빡임이 없게 한다.
+  // "0"(명시적으로 끔)도 여기서 미리 data-fx="normal"을 남겨야, OS "동작 줄이기"가
+  // 켜진 환경에서 css/00-variables.css의 미디어쿼리가 첫 페인트부터 그 선택을
+  // 존중한다(자바스크립트가 다 로드된 뒤에야 반영되면 한 프레임 반짝인다).
   try {
-    if (localStorage.getItem("app-fx-reduced") === "1") document.documentElement.setAttribute("data-fx", "reduced");
+    var _fxRaw = localStorage.getItem("app-fx-reduced");
+    if (_fxRaw === "1") document.documentElement.setAttribute("data-fx", "reduced");
+    else if (_fxRaw === "0") document.documentElement.setAttribute("data-fx", "normal");
   } catch (e) {}
   window.__bootStart = Date.now();
   // 방금 로그인/계정 생성으로 들어온 경우(로그인 화면이 새로고침을 거쳐 앱으로 넘어가는 중)에는

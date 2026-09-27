@@ -140,19 +140,25 @@
   }
   /* ---- OS "동작 줄이기"(prefers-reduced-motion) 자동 대응 ----
      위 data-fx="reduced"는 사용자가 앱 안에서 직접 토글을 눌러야 켜진다.
-     하지만 OS/브라우저 설정에서 이미 "동작 줄이기"를 켜둔 사용자는 굳이
-     앱 안에서 또 찾아서 켜지 않아도, 처음부터 같은 효과(블러 반경 0,
-     그림자 제거, 전환/애니메이션 즉시 처리)가 자동으로 적용돼야 한다.
-     data-fx 속성 자체는 건드리지 않으므로(로컬 저장된 사용자 선택과
-     충돌 없음) 사용자가 앱 안에서 수동으로 다시 켜거나 끄는 것도 그대로
-     동작한다. */
+     OS/브라우저 설정에서 이미 "동작 줄이기"를 켜둔 사용자는 굳이 앱 안에서
+     또 찾아서 켜지 않아도, 처음부터 같은 효과가 자동으로 적용돼야 한다 —
+     "그래픽 효과 줄이기" 토글을 한 번도 건드린 적 없는 경우(js/01d-undo-theme-dock.js가
+     data-fx 속성 자체를 안 남겨둔 상태)에 한해서다.
+     예전엔 이 미디어쿼리가 data-fx 속성을 전혀 확인하지 않고 무조건 껐다 —
+     그래서 OS에서 "동작 줄이기"가 켜져 있는 브라우저(자동화/샌드박스 환경 등에서
+     기본값인 경우가 흔함)에서는 앱 안 토글을 꺼도(data-fx 속성이 사라져도) 이
+     규칙이 계속 이겨서 화면상 아무 변화가 없었다. 지금은 사용자가 앱 안에서
+     명시적으로 "껐다"고 고르면(data-fx="normal") 그 선택이 OS 설정보다 우선하도록
+     ":not([data-fx=\"normal\"])"로 예외를 둔다 — 그래야 토글이 실제로 눌리는 대로
+     동작한다. (반대로 명시적으로 "켰을" 때는 위 html[data-fx="reduced"] 규칙이
+     이미 OS 설정과 무관하게 항상 적용된다.) */
   @media (prefers-reduced-motion: reduce) {
-    :root {
+    html:not([data-fx="normal"]) {
       --fx-blur-scale: 0;
     }
-    *,
-    *::before,
-    *::after {
+    html:not([data-fx="normal"]) *,
+    html:not([data-fx="normal"]) *::before,
+    html:not([data-fx="normal"]) *::after {
       box-shadow: none !important;
       transition-duration: 0.01ms !important;
       transition-delay: 0s !important;

@@ -1046,22 +1046,49 @@
      0이 되고, 전체 backdrop-filter의 blur() 반경이 사실상 0으로 줄어든다
      (레이아웃·색·모양은 그대로, 블러만 빠진다). 테마와 같은 방식으로 저장/적용한다. */
   const FX_KEY = "app-fx-reduced";
-  function getStoredFxReduced() {
-    try { return localStorage.getItem(FX_KEY) === "1"; } catch (e) { return false; }
+  // localStorage 원본 값을 그대로 반환한다: "1"(명시적으로 켬) / "0"(명시적으로 끔) /
+  // null(한 번도 토글을 안 건드림). getStoredFxReduced()처럼 boolean으로 뭉개면 "한 번도
+  // 안 건드림"과 "명시적으로 끔"을 구분할 수 없어서, 아래 applyFxReduced가 OS
+  // "동작 줄이기" 설정보다 사용자의 명시적 선택을 우선시키지 못했다(버그 — 켜본 적 없는
+  // 상태와 꺼본 상태를 똑같이 취급해 data-fx 속성을 아예 안 남겼고, 그러면
+  // css/00-variables.css의 prefers-reduced-motion 미디어쿼리가 토글과 무관하게 계속
+  // 이겨서 "꺼도 안 돌아오는" 것처럼 보였다).
+  function getStoredFxRaw() {
+    try { return localStorage.getItem(FX_KEY); } catch (e) { return null; }
   }
+  function getStoredFxReduced() {
+    return getStoredFxRaw() === "1";
+  }
+  // on === true  → data-fx="reduced" (명시적으로 켬)
+  // on === false → data-fx="normal"  (명시적으로 끔 — OS가 "동작 줄이기"를 켜놨어도
+  //                이 선택이 항상 이긴다. css/00-variables.css의
+  //                "html:not([data-fx=\"normal\"])" 참고)
+  // on === null  → 속성 없음 (한 번도 안 건드림 — OS 설정이 있으면 그대로 따르고,
+  //                없으면 평소처럼 전체 효과가 보인다)
   function applyFxReduced(on) {
-    if (on) document.documentElement.setAttribute("data-fx", "reduced");
+    if (on === true) document.documentElement.setAttribute("data-fx", "reduced");
+    else if (on === false) document.documentElement.setAttribute("data-fx", "normal");
     else document.documentElement.removeAttribute("data-fx");
   }
+  // 메뉴의 스위치 표시·토글 클릭 판단 모두 이 함수를 쓰므로, 사용자가 한 번도
+  // 토글을 안 건드렸는데 OS "동작 줄이기"가 켜져 있어 실제로는 효과가 줄어든
+  // 상태라면 true를 돌려준다 — 그래야 스위치도 그 상태를 보여주고, 처음 눌렀을 때
+  // "OS 설정을 명시적으로 끄기"로 바로 이어진다(위 applyFxReduced의 on===false 참고).
   function isFxReduced() {
-    return document.documentElement.getAttribute("data-fx") === "reduced";
+    const attr = document.documentElement.getAttribute("data-fx");
+    if (attr === "reduced") return true;
+    if (attr === "normal") return false;
+    try { return window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) { return false; }
   }
   function setFxReduced(on) {
-    applyFxReduced(on);
+    applyFxReduced(!!on);
     try { localStorage.setItem(FX_KEY, on ? "1" : "0"); } catch (e) { /* 저장 실패해도 화면 전환은 그대로 동작 */ }
     renderNav();
   }
-  applyFxReduced(getStoredFxReduced());
+  {
+    const _fxRaw = getStoredFxRaw();
+    applyFxReduced(_fxRaw === "1" ? true : _fxRaw === "0" ? false : null);
+  }
 
   /* ---- 저사양 자동 감지: 토글이 있는 걸 몰라서 못 쓰는 사람들을 위해,
      이 컴퓨터가 사양이 낮아 보이면 처음 한 번만 "그래픽 효과 줄이기를 켤까요?"
