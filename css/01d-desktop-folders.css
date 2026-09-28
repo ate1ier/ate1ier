@@ -45,7 +45,7 @@
   /* 우클릭 메뉴 (macOS 컨텍스트 메뉴 느낌) */
   .hd-ctx {
     position: fixed; z-index: 90; min-width: 168px; padding: 5px; border-radius: 10px;
-    background: var(--hd-w2); color: var(--hd-t);
+    background: var(--menu-bg); color: var(--hd-t);
     box-shadow: 0 0 0 1px var(--hd-ln), 0 14px 36px rgba(0, 0, 0, 0.45);
     backdrop-filter: blur(var(--fx-blur-lg)) saturate(1.6); -webkit-backdrop-filter: blur(var(--fx-blur-lg)) saturate(1.6);
     animation: hd-ctx-in 0.14s ease-out;

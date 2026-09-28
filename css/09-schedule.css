@@ -264,7 +264,7 @@
   .sch-staff-btn.danger:hover { color: var(--red); }
 
   .sch-menu {
-    position: fixed; z-index: 50; background: var(--mac-vibrancy); border: 1px solid var(--mac-vibrancy-hairline);
+    position: fixed; z-index: 50; background: var(--menu-bg); border: 1px solid var(--mac-vibrancy-hairline);
     backdrop-filter: blur(var(--fx-blur-lg)) saturate(2); -webkit-backdrop-filter: blur(var(--fx-blur-lg)) saturate(2);
     border-radius: 16px; padding: 6px; display: flex; flex-direction: column; gap: 2px;
     box-shadow: var(--mac-shadow-float); min-width: 108px;
@@ -674,7 +674,7 @@ html[data-theme="light"] .sch-auto-min-working-item input{background:var(--panel
 .sch-more-btn:hover { border-color: var(--accent); color: var(--accent); }
 .sch-more-menu {
   position: absolute; right: 0; top: calc(100% + 6px); z-index: 5; min-width: 190px;
-  background: var(--mac-vibrancy); backdrop-filter: blur(var(--fx-blur-md)) saturate(1.8);
+  background: var(--menu-bg); backdrop-filter: blur(var(--fx-blur-md)) saturate(1.8);
   border: 1px solid var(--mac-vibrancy-hairline); border-radius: 12px; padding: 6px;
   box-shadow: var(--mac-shadow-sm); display: none; flex-direction: column; gap: 1px;
 }

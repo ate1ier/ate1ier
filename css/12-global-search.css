@@ -9,10 +9,10 @@
     position: relative;
     width: 100%;
     /* 검색 결과 패널 배경: 기본 --mac-vibrancy(0.66)보다 불투명하게 */
-    --gs-results-bg: rgba(41, 41, 46, 0.94);
+    --gs-results-bg: rgba(41, 41, 46, 0.985);
   }
   html[data-theme="light"] .gs-wrap {
-    --gs-results-bg: rgba(255, 255, 255, 0.94);
+    --gs-results-bg: rgba(255, 255, 255, 0.985);
   }
   .gs-bar {
     display: flex;

@@ -108,7 +108,7 @@
   /* 공통 드롭다운 목록은 z-index가 60이라 로그인 화면(300) 뒤에 가려지므로 올려주고 목업 스타일로 */
   body.login-screen .app-select-menu {
     z-index: 400; border-radius: 12px; padding: 4px; gap: 0;
-    background: rgba(44, 46, 58, 0.96); border: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(44, 46, 58, 0.99); border: 1px solid rgba(255, 255, 255, 0.2);
     backdrop-filter: blur(var(--fx-blur-md)); -webkit-backdrop-filter: blur(var(--fx-blur-md)); color: #fff;
   }
   body.login-screen .app-select-menu button { color: #fff; font-size: 13px; padding: 6px 12px; border-radius: 7px; }

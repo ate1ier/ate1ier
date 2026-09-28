@@ -18044,7 +18044,10 @@
     hdWin.order.push(page);
     hdWin.order.forEach((p, i) => {
       const frame = document.getElementById("app-win-" + p);
-      if (frame) frame.style.zIndex = String(50 + i);
+      if (frame) {
+        frame.style.zIndex = String(50 + i);
+        frame.classList.toggle("aw-focus", p === page); // 창 본문을 눌러 앞으로 올릴 때도 윤곽선 강조가 즉시 따라오게
+      }
     });
     hdSaveOpenWindowsState();
   }
@@ -18433,11 +18436,14 @@
       el.classList.toggle("run", !!st && el.classList.contains("hd-dk"));
     });
     if (typeof syncDesktopFolderStates === "function") syncDesktopFolderStates(); // 열려 있는 폴더 아이콘 강조
+    const hdTopVisiblePage = [...hdWin.order].reverse().find((p) => hdWin.state[p] && !hdWin.state[p].minimized);
     hdWin.order.forEach((page) => {
       const st = hdWin.state[page];
       const frame = document.getElementById("app-win-" + page);
       if (!frame || !st) return;
       frame.classList.toggle("win-min", !!st.minimized);
+      // 지금 맨 앞(포커스)인 창에만 aw-focus — 여러 창이 겹쳐 있을 때 윤곽선 색으로 앞/뒤 창을 구분한다(css/01c-app-window.css)
+      frame.classList.toggle("aw-focus", !st.minimized && page === hdTopVisiblePage);
       frame.classList.toggle("win-max", !!st.maximized);
       frame.classList.toggle("win-snap-l", st.snap === "l" && !st.maximized);
       frame.classList.toggle("win-snap-r", st.snap === "r" && !st.maximized);

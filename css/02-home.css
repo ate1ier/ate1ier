@@ -124,7 +124,7 @@
     gap: 8px;
     padding: 10px 14px;
     border-radius: 12px;
-    background: var(--mac-vibrancy);
+    background: var(--menu-bg);
     backdrop-filter: blur(var(--fx-blur-lg)) saturate(1.6);
     -webkit-backdrop-filter: blur(var(--fx-blur-lg)) saturate(1.6);
     border: 1px solid var(--mac-vibrancy-hairline);

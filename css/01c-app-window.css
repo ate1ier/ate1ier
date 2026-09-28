@@ -122,6 +122,33 @@
     border-radius: 0; resize: none;
   }
 
+  /* ---------- 창 윤곽선 (여러 창을 동시에 열었을 때 창끼리 구분) ----------
+     창 배경(--bg)이 전부 같아서 겹쳐 열면 경계가 안 보였다. 그림자(box-shadow)는 "그래픽 효과 줄이기"를 켜면 사라지므로
+     윤곽선은 outline으로 그린다(그 모드에서도 유지됨). 라운드 모서리를 그대로 따라간다.
+       - 뒤에 있는 창: 얇고 또렷한 중립색 선(--aw-ln)
+       - 맨 앞(포커스) 창: 조금 더 밝고 굵은 회색 선(--aw-focus) + 바깥 은은한 회색 띠, 제목줄 글자도 또렷하게
+     최대화 창은 화면 가장자리에 붙어 있으니 윤곽선을 뺀다. */
+  /* 윤곽선은 포인트색 없이 옅은 회색만 쓴다(뒤 창은 더 옅게, 맨 앞 창은 조금 더 밝고 굵게) */
+  :root { --aw-ln: rgba(255, 255, 255, 0.20); --aw-focus: rgba(255, 255, 255, 0.55); --aw-focus-glow: rgba(255, 255, 255, 0.07); }
+  html[data-theme="light"] { --aw-ln: rgba(29, 31, 34, 0.28); --aw-focus: rgba(29, 31, 34, 0.50); --aw-focus-glow: rgba(29, 31, 34, 0.06); }
+  .app-win { outline: 1px solid var(--aw-ln); outline-offset: 0; }
+  .app-win.aw-focus {
+    outline: 2px solid var(--aw-focus);
+    box-shadow:
+      0 0 0 1px var(--hairline-strong),
+      0 0 0 5px var(--aw-focus-glow),
+      0 24px 64px rgba(0, 0, 0, 0.6);
+  }
+  html[data-theme="light"] .app-win.aw-focus {
+    box-shadow:
+      0 0 0 1px var(--hairline-strong),
+      0 0 0 5px var(--aw-focus-glow),
+      0 24px 64px rgba(0, 0, 0, 0.28);
+  }
+  .app-win.win-max, .app-win.win-max.aw-focus { outline: 0; }
+  .app-win:not(.aw-focus) .aw-tt { opacity: 0.55; }
+  .app-win .aw-tt { transition: opacity 0.2s ease-out; }
+
   /* 제목줄 */
   .app-win .aw-tb {
     display: flex; align-items: center; flex: none; height: 32px; padding: 0 14px;

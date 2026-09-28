@@ -107,7 +107,7 @@
     margin: 0;
     border: 1px solid var(--mac-vibrancy-hairline);
     border-radius: 18px;
-    background: var(--mac-vibrancy);
+    background: var(--menu-bg);
     backdrop-filter: blur(var(--fx-blur-lg)) saturate(2);
     -webkit-backdrop-filter: blur(var(--fx-blur-lg)) saturate(2);
     box-shadow: var(--mac-shadow-float);
@@ -187,7 +187,7 @@
     margin: 0;
     border: 1px solid var(--mac-vibrancy-hairline);
     border-radius: 18px;
-    background: var(--mac-vibrancy);
+    background: var(--menu-bg);
     backdrop-filter: blur(var(--fx-blur-lg)) saturate(2);
     -webkit-backdrop-filter: blur(var(--fx-blur-lg)) saturate(2);
     box-shadow: var(--mac-shadow-float);
@@ -203,7 +203,7 @@
     z-index: 201;
     padding: 8px 14px;
     border-radius: var(--mac-radius);
-    background: var(--mac-vibrancy);
+    background: var(--menu-bg);
     backdrop-filter: blur(var(--fx-blur-md)) saturate(1.6);
     -webkit-backdrop-filter: blur(var(--fx-blur-md)) saturate(1.6);
     border: 1px solid var(--mac-vibrancy-hairline);
@@ -233,7 +233,7 @@
   }
   .cloud-live-banner {
     pointer-events: auto; display: flex; align-items: flex-start; gap: 10px;
-    padding: 12px 14px; border-radius: var(--mac-radius); background: var(--mac-vibrancy);
+    padding: 12px 14px; border-radius: var(--mac-radius); background: var(--menu-bg);
     backdrop-filter: blur(var(--fx-blur-md)) saturate(1.6); -webkit-backdrop-filter: blur(var(--fx-blur-md)) saturate(1.6);
     border: 1px solid var(--mac-vibrancy-hairline); box-shadow: var(--mac-shadow-float);
     font-size: 13px; color: var(--text); animation: cloud-live-banner-in 0.18s ease;
