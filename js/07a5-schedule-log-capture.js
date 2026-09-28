@@ -201,6 +201,7 @@
     }
 
     requestAnimationFrame(() => {
+      flattenModernColorsForCapture(wrapper); // html2canvas가 못 읽는 최신 색 표기를 rgba로 바꿔 캡처 실패 방지
       const fullW = wrapper.scrollWidth;
       const fullH = wrapper.scrollHeight;
       html2canvas(wrapper, {

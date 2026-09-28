@@ -264,7 +264,7 @@
   .sch-staff-btn.danger:hover { color: var(--red); }
 
   .sch-menu {
-    position: fixed; z-index: 50; background: var(--menu-bg); border: 1px solid var(--mac-vibrancy-hairline);
+    position: fixed; z-index: 85; /* 열린 창들(z-index 50부터 1씩 증가)보다 항상 위 — 예전 50이면 2번째 이후 창 뒤에 가려져 메뉴가 안 보였다 */ background: var(--menu-bg); border: 1px solid var(--mac-vibrancy-hairline);
     backdrop-filter: blur(var(--fx-blur-lg)) saturate(2); -webkit-backdrop-filter: blur(var(--fx-blur-lg)) saturate(2);
     border-radius: 16px; padding: 6px; display: flex; flex-direction: column; gap: 2px;
     box-shadow: var(--mac-shadow-float); min-width: 108px;

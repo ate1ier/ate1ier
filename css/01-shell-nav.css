@@ -141,7 +141,7 @@
   .theme-picker-btn.open .theme-picker-chevron { transform: rotate(180deg); }
 
   .theme-menu {
-    position: fixed; z-index: 60; background: var(--mac-vibrancy); border: 1px solid var(--mac-vibrancy-hairline);
+    position: fixed; z-index: 60; background: var(--menu-bg); border: 1px solid var(--mac-vibrancy-hairline);
     backdrop-filter: blur(var(--fx-blur-lg)) saturate(2); -webkit-backdrop-filter: blur(var(--fx-blur-lg)) saturate(2);
     border-radius: 18px; padding: 6px; display: flex; flex-direction: column; gap: 1px;
     box-shadow: var(--mac-shadow-float); min-width: 180px;

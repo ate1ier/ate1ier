@@ -171,6 +171,7 @@
         statGridEl.style.width = tableWrapEl.getBoundingClientRect().width + "px";
       }
 
+      flattenModernColorsForCapture(wrapper); // color-mix 등 html2canvas가 못 읽는 색 → rgba (QA 통계 카드 때문에 전체 저장이 실패하던 문제)
       const fullW = wrapper.scrollWidth;
       const fullH = wrapper.scrollHeight;
       html2canvas(wrapper, {
