@@ -299,7 +299,17 @@
        내가 연달아 두 번 저장했을 뿐인데 스스로와 충돌났다고 오판하는 걸 막는다. */
   const _knownServerUpdatedAt = {};
   const _knownServerValue = {};
-  const _ourWriteTimestamps = {};
+  const _ourWriteTimestamps = {}; // key -> 내가 보낸 저장들의 updated_at 목록(최근 것부터 최대 _OWN_WRITE_KEEP개)
+  const _OWN_WRITE_KEEP = 50;
+  function _rememberOwnWrite(key, ts) {
+    const list = _ourWriteTimestamps[key] || (_ourWriteTimestamps[key] = []);
+    if (list.indexOf(ts) === -1) list.push(ts);
+    if (list.length > _OWN_WRITE_KEEP) list.splice(0, list.length - _OWN_WRITE_KEEP);
+  }
+  function _isOwnWriteEcho(key, ts) {
+    const list = _ourWriteTimestamps[key];
+    return !!list && list.indexOf(ts) !== -1;
+  }
   const _pushChains = {};
   const _conflictedKeys = new Set(); // 자동 병합도 실패해서 정말로 물어봐야 하는 키
   const _fieldConflictNotices = new Map(); // key -> 자동 병합은 됐지만 "이 부분은 겹쳤어요"라고 알려줄 경로들
@@ -738,6 +748,11 @@
     const attempt = (opts && opts.attempt) || 0;
     try {
       const newTs = new Date().toISOString();
+      // 이 저장의 updated_at을 요청을 보내기 "전에" 미리 내 것으로 등록해둔다. 서버 응답보다
+      // 실시간 에코(내가 쓴 게 되돌아오는 알림)가 먼저 도착할 수 있고, 연달아 저장하면
+      // 앞선 저장의 에코가 뒤늦게 도착하는데, 최신 시각 하나만 기억하면 그 에코를 남의 수정으로
+      // 오인해서 화면·저장소를 옛 값으로 되돌려버렸다(바탕화면 폴더 이름/파일이 사라지던 원인).
+      _rememberOwnWrite(key, newTs);
       const expected = _knownServerUpdatedAt[key];
       let wroteOk = true;
       let handledByPatch = false;
@@ -778,7 +793,6 @@
       _renderConflictBanner();
       _knownServerUpdatedAt[key] = newTs;
       _knownServerValue[key] = value;
-      _ourWriteTimestamps[key] = newTs;
       notifyCloudSyncSettle(true);
     } catch (e) {
       /* 네트워크 문제로 실패해도 로컬 저장은 이미 되어 있어 화면은 그대로 동작 */
@@ -897,7 +911,7 @@
             delete _knownServerValue[row.key];
             return;
           }
-          if (_ourWriteTimestamps[row.key] === row.updated_at) return; // 내가 방금 쓴 것의 에코
+          if (_isOwnWriteEcho(row.key, row.updated_at)) return; // 내가 방금 쓴 것의 에코(연달아 저장한 것 중 어느 것이든)
           _knownServerUpdatedAt[row.key] = row.updated_at;
           _knownServerValue[row.key] = row.value;
           if (localStorage.getItem(row.key) === row.value) return; // 이미 같은 내용이면 반영할 필요 없음

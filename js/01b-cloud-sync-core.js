@@ -245,7 +245,17 @@
        내가 연달아 두 번 저장했을 뿐인데 스스로와 충돌났다고 오판하는 걸 막는다. */
   const _knownServerUpdatedAt = {};
   const _knownServerValue = {};
-  const _ourWriteTimestamps = {};
+  const _ourWriteTimestamps = {}; // key -> 내가 보낸 저장들의 updated_at 목록(최근 것부터 최대 _OWN_WRITE_KEEP개)
+  const _OWN_WRITE_KEEP = 50;
+  function _rememberOwnWrite(key, ts) {
+    const list = _ourWriteTimestamps[key] || (_ourWriteTimestamps[key] = []);
+    if (list.indexOf(ts) === -1) list.push(ts);
+    if (list.length > _OWN_WRITE_KEEP) list.splice(0, list.length - _OWN_WRITE_KEEP);
+  }
+  function _isOwnWriteEcho(key, ts) {
+    const list = _ourWriteTimestamps[key];
+    return !!list && list.indexOf(ts) !== -1;
+  }
   const _pushChains = {};
   const _conflictedKeys = new Set(); // 자동 병합도 실패해서 정말로 물어봐야 하는 키
   const _fieldConflictNotices = new Map(); // key -> 자동 병합은 됐지만 "이 부분은 겹쳤어요"라고 알려줄 경로들
