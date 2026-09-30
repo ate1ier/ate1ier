@@ -185,7 +185,7 @@
     if (dfUi.renamingId || dfUi.dragging) return;
     const list = Object.values(desktopFoldersData.folders).sort((a, b) => String(a.createdAt || "").localeCompare(String(b.createdAt || "")));
     let migrated = false;
-    layer.innerHTML = list.map((f) => {
+    const foldersHtml = list.map((f) => {
       // 저장된 픽셀 좌표(x,y)가 아니라 그리드 칸(col,row)을 기준으로 매번 새로 좌표를 계산한다.
       // 그래야 모니터 해상도·창 크기가 달라져(화면 오른쪽 기준선이 움직여) 있어도 항상 같은 칸에 놓인다.
       // 옛 데이터(칸 정보 없이 x,y만 있던 폴더)는 지금 화면 기준으로 칸을 한 번 계산해 그 자리에 고정한다.
@@ -200,6 +200,11 @@
       const p = desktopFolderCellToPos(f.col, f.row);
       return `<div class="hd-fld" role="button" tabindex="0" data-fld-id="${esc(f.id)}" style="left:${p.x}px;top:${p.y}px" title="${esc(f.name)}">${DESKTOP_FOLDER_SVG}<span class="hd-fld-name">${esc(f.name)}</span></div>`;
     }).join("");
+    // 성능 3단계: 폴더 목록·위치가 지난번과 같으면 아이콘을 다시 만들지 않는다(이름 바꾸기/끌기는 DOM을 직접 건드리므로 시작할 때 이 값을 비운다)
+    if (layer._dfHtml !== foldersHtml || !layer.firstChild && list.length) {
+      layer._dfHtml = foldersHtml;
+      layer.innerHTML = foldersHtml;
+    }
     if (migrated) saveDesktopFoldersData();
     syncDesktopFolderStates();
   }
@@ -234,6 +239,7 @@
     const el = layer && layer.querySelector(`.hd-fld[data-fld-id="${id}"]`);
     if (!f || !el || dfUi.renamingId) return;
     dfUi.renamingId = id;
+    if (dfLayer()) dfLayer()._dfHtml = null; // 성능 3단계: 이름 입력칸이 DOM에 끼어들므로 끝나면 반드시 새로 그리게
     el.classList.add("renaming");
     const nameEl = el.querySelector(".hd-fld-name");
     nameEl.innerHTML = `<input type="text" class="hd-fld-input" maxlength="${DESKTOP_FOLDER_NAME_MAX}" spellcheck="false" aria-label="폴더 이름" value="${esc(f.name)}">`;
@@ -388,6 +394,7 @@
         if (!moved && Math.abs(v.clientX - startX) < 5 && Math.abs(v.clientY - startY) < 5) return;
         moved = true;
         dfUi.dragging = true;
+        if (dfLayer()) dfLayer()._dfHtml = null; // 성능 3단계: 끄는 동안 DOM 위치를 직접 바꾸므로 놓은 뒤 반드시 새로 그리게
         el.classList.add("dragging");
         const p = desktopFolderClampPos(v.clientX - offX, v.clientY - offY);
         el.style.left = p.x + "px";

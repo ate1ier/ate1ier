@@ -114,94 +114,152 @@
   }
   applyTheme(isValidTheme(getStoredTheme()) ? getStoredTheme() : "light");
 
-  /* ===================== 그래픽 효과(블러) 줄이기 =====================
-     사양이 낮은 컴퓨터에서 backdrop-filter 블러 계산 부담을 줄이기 위한 토글.
-     켜면 html[data-fx="reduced"]가 붙어 css/00-variables.css의 --fx-blur-scale이
-     0이 되고, 전체 backdrop-filter의 blur() 반경이 사실상 0으로 줄어든다
-     (레이아웃·색·모양은 그대로, 블러만 빠진다). 테마와 같은 방식으로 저장/적용한다. */
+  /* ===================== 그래픽 효과 단계(끔/약/강) =====================
+     사양이 낮은 컴퓨터에서 backdrop-filter 블러·그림자 계산 부담을 줄이는 3단계 스위치.
+       강(full)  : 모든 효과(기본)                        → data-fx="normal"
+       약(lite)  : 블러 반경 절반 + 그림자 작게, 전환은 유지 → data-fx="lite"
+       끔(off)   : 블러·그림자·전환 전부 제거              → data-fx="reduced"
+     저장값(localStorage "app-fx-reduced"): "0"=강, "2"=약, "1"=끔. "1"/"0"은 예전 토글
+     (켜면 끔, 끄면 강)과 같은 값이라 기존에 저장된 설정이 그대로 이어진다. null=한 번도 안 골랐음.
+     이 값은 기기별이다(js/01b-cloud-sync-core.js CLOUD_EXCLUDED_KEYS — 클라우드로 동기화하지 않는다). */
   const FX_KEY = "app-fx-reduced";
-  // localStorage 원본 값을 그대로 반환한다: "1"(명시적으로 켬) / "0"(명시적으로 끔) /
-  // null(한 번도 토글을 안 건드림). getStoredFxReduced()처럼 boolean으로 뭉개면 "한 번도
-  // 안 건드림"과 "명시적으로 끔"을 구분할 수 없어서, 아래 applyFxReduced가 OS
-  // "동작 줄이기" 설정보다 사용자의 명시적 선택을 우선시키지 못했다(버그 — 켜본 적 없는
-  // 상태와 꺼본 상태를 똑같이 취급해 data-fx 속성을 아예 안 남겼고, 그러면
-  // css/00-variables.css의 prefers-reduced-motion 미디어쿼리가 토글과 무관하게 계속
-  // 이겨서 "꺼도 안 돌아오는" 것처럼 보였다).
+  const FX_PROBED_KEY = "app-fx-probed"; // 처음 실행 프레임 측정을 이미 했는지(기기별)
+  const FX_AUTO_KEY = "app-fx-auto";     // 효과 단계를 자동으로 낮춘 기기인지(기기별)
   function getStoredFxRaw() {
     try { return localStorage.getItem(FX_KEY); } catch (e) { return null; }
   }
   function getStoredFxReduced() {
     return getStoredFxRaw() === "1";
   }
-  // on === true  → data-fx="reduced" (명시적으로 켬)
-  // on === false → data-fx="normal"  (명시적으로 끔 — OS가 "동작 줄이기"를 켜놨어도
-  //                이 선택이 항상 이긴다. css/00-variables.css의
-  //                "html:not([data-fx=\"normal\"])" 참고)
-  // on === null  → 속성 없음 (한 번도 안 건드림 — OS 설정이 있으면 그대로 따르고,
-  //                없으면 평소처럼 전체 효과가 보인다)
-  function applyFxReduced(on) {
-    if (on === true) document.documentElement.setAttribute("data-fx", "reduced");
-    else if (on === false) document.documentElement.setAttribute("data-fx", "normal");
-    else document.documentElement.removeAttribute("data-fx");
+  // level: "full" | "lite" | "off" | null(속성 없음 = 한 번도 안 건드림 → OS "동작 줄이기"가 있으면 따름)
+  function applyFxLevel(level) {
+    const el = document.documentElement;
+    if (level === "off") el.setAttribute("data-fx", "reduced");
+    else if (level === "lite") el.setAttribute("data-fx", "lite");
+    else if (level === "full") el.setAttribute("data-fx", "normal");
+    else el.removeAttribute("data-fx");
   }
-  // 메뉴의 스위치 표시·토글 클릭 판단 모두 이 함수를 쓰므로, 사용자가 한 번도
-  // 토글을 안 건드렸는데 OS "동작 줄이기"가 켜져 있어 실제로는 효과가 줄어든
-  // 상태라면 true를 돌려준다 — 그래야 스위치도 그 상태를 보여주고, 처음 눌렀을 때
-  // "OS 설정을 명시적으로 끄기"로 바로 이어진다(위 applyFxReduced의 on===false 참고).
-  function isFxReduced() {
+  function applyFxReduced(on) { // 예전 이름(호환): true=끔, false=강, null=속성 없음
+    applyFxLevel(on === true ? "off" : on === false ? "full" : null);
+  }
+  function getFxLevel() {
     const attr = document.documentElement.getAttribute("data-fx");
-    if (attr === "reduced") return true;
-    if (attr === "normal") return false;
-    try { return window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) { return false; }
+    if (attr === "reduced") return "off";
+    if (attr === "lite") return "lite";
+    if (attr === "normal") return "full";
+    try { return window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "off" : "full"; } catch (e) { return "full"; }
   }
-  function setFxReduced(on) {
-    applyFxReduced(!!on);
-    try { localStorage.setItem(FX_KEY, on ? "1" : "0"); } catch (e) { /* 저장 실패해도 화면 전환은 그대로 동작 */ }
+  function isFxReduced() { return getFxLevel() === "off"; }
+  function setFxLevel(level, opts) {
+    applyFxLevel(level);
+    try { localStorage.setItem(FX_KEY, level === "off" ? "1" : level === "lite" ? "2" : "0"); } catch (e) { /* 저장 실패해도 화면 전환은 그대로 동작 */ }
+    // 사용자가 직접 고르면 "자동으로 낮춘 기기" 표시는 지운다(자동 감지가 고른 경우에만 auto:true).
+    if (!(opts && opts.auto)) { try { localStorage.removeItem(FX_AUTO_KEY); } catch (e) {} }
     renderNav();
   }
+  function setFxReduced(on) { setFxLevel(on ? "off" : "full"); }
   {
     const _fxRaw = getStoredFxRaw();
-    applyFxReduced(_fxRaw === "1" ? true : _fxRaw === "0" ? false : null);
+    applyFxLevel(_fxRaw === "1" ? "off" : _fxRaw === "2" ? "lite" : _fxRaw === "0" ? "full" : null);
   }
 
-  /* ---- 저사양 자동 감지: 토글이 있는 걸 몰라서 못 쓰는 사람들을 위해,
-     이 컴퓨터가 사양이 낮아 보이면 처음 한 번만 "그래픽 효과 줄이기를 켤까요?"
-     라고 안내한다. 이미 껐다 켰다 해본 사람(FX_KEY 존재)이나, 이미 한 번
-     안내를 봤던 브라우저(FX_SUGGEST_KEY)에는 다시 띄우지 않는다.
-     navigator.deviceMemory는 Safari 등 일부 브라우저엔 아예 없을 수 있어서,
-     hardwareConcurrency(코어 수)만으로도 판단하게 둔다. */
-  const FX_SUGGEST_KEY = "app-fx-suggested";
-  function _isLikelyLowSpecDevice() {
-    try {
-      const cores = navigator.hardwareConcurrency || 0;
-      const mem = navigator.deviceMemory; // 없으면 undefined
-      if (cores && cores <= 4) return true;
-      if (typeof mem === "number" && mem > 0 && mem <= 4) return true;
-      return false;
-    } catch (e) { return false; }
+  /* ---- 저사양 자동 감지(처음 실행 때 한 번): 코어 수 같은 스펙 추측 대신 "실제로 얼마나 부드럽게
+     그려지는지"를 재서 정한다. 화면 위에 눈에 안 띄는 반투명 유리판(backdrop-filter)을 1.5초 동안
+     움직이며 프레임 간격을 재고, 중앙값으로 단계를 정한다.
+       ≥45ms(약 22fps 이하) → 끔 / ≥28ms(약 36fps 이하) → 약 / 그 외 → 그대로(강)
+     이미 단계를 골라본 기기(FX_KEY), 이미 측정한 기기(FX_PROBED_KEY), OS "동작 줄이기" 사용자는 건너뛴다.
+     측정 중 탭이 가려지거나 사용자가 입력(클릭·키·스크롤)하면 결과를 버리고 다음 실행 때 다시 잰다. 자동으로 낮췄을 땐 안내 배너로 알리고
+     "강으로 되돌리기" 버튼을 준다. */
+  function fxDecideLevel(deltas) {
+    const d = (deltas || []).slice(3).filter((x) => x > 0 && x < 1000); // 앞 몇 프레임은 시작 지연이라 버린다
+    if (d.length < 12) return null; // 표본 부족 → 판단 보류
+    const sorted = d.slice().sort((x, y) => x - y);
+    const median = sorted[Math.floor(sorted.length / 2)];
+    if (median >= 45) return "off";
+    if (median >= 28) return "lite";
+    // 중앙값이 정상이면 가끔 튀는 프레임(시작 직후 렌더링·GC·네트워크 응답 등)은 GPU 문제가 아니므로 무시한다.
+    // (예전엔 p90 >= 60ms만으로도 "약"으로 낮췄는데, 시작 직후 일시적 끊김에 빠른 PC까지 낮아질 수 있었다.)
+    return "full";
   }
-  function maybeSuggestLowGraphicsMode() {
-    if (isFxReduced()) return;
-    try { if (localStorage.getItem(FX_KEY) !== null) return; } catch (e) {} // 한 번이라도 직접 켜/꺼본 사람은 그 선택을 존중
-    try { if (localStorage.getItem(FX_SUGGEST_KEY)) return; } catch (e) {}
-    if (!_isLikelyLowSpecDevice()) return;
-    try { localStorage.setItem(FX_SUGGEST_KEY, "1"); } catch (e) {}
+  function fxRunProbe(done) {
+    const W = 520, H = 340, DURATION = 1500;
+    const probe = document.createElement("div");
+    probe.setAttribute("aria-hidden", "true");
+    probe.style.cssText = "position:fixed;left:0;top:0;width:" + W + "px;height:" + H + "px;pointer-events:none;z-index:99999;" +
+      "opacity:0.02;background:rgba(255,255,255,0.5);will-change:transform;" +
+      "-webkit-backdrop-filter:blur(16px) saturate(1.6);backdrop-filter:blur(16px) saturate(1.6);";
+    document.body.appendChild(probe);
+    const deltas = [];
+    let last = 0, start = 0, aborted = false, finished = false;
+    // 측정 중 사용자가 무언가 하면(클릭·키 입력·스크롤·터치) 그 순간의 렌더링 부담이 섞여 측정이 왜곡되고,
+    // 느린 PC에서는 측정용 유리판 때문에 클릭 반응도 둔해진다 → 즉시 중단하고(결과 버림) 다음 실행 때 다시 잰다.
+    const onVis = () => { if (document.hidden) aborted = true; };
+    const onInput = () => { aborted = true; if (probe.parentNode) probe.parentNode.removeChild(probe); };
+    const INPUT_EVENTS = ["pointerdown", "keydown", "wheel", "touchstart"];
+    document.addEventListener("visibilitychange", onVis);
+    INPUT_EVENTS.forEach((ev) => document.addEventListener(ev, onInput, true));
+    function finish(result) {
+      if (finished) return;
+      finished = true;
+      document.removeEventListener("visibilitychange", onVis);
+      INPUT_EVENTS.forEach((ev) => document.removeEventListener(ev, onInput, true));
+      if (probe.parentNode) probe.parentNode.removeChild(probe);
+      done(result);
+    }
+    function step(t) {
+      if (aborted) return finish(null);
+      if (!start) start = t;
+      if (last) deltas.push(t - last);
+      last = t;
+      const p = (t - start) / DURATION;
+      if (p >= 1) return finish(deltas);
+      const x = Math.max(0, window.innerWidth - W) * Math.abs(Math.sin(p * Math.PI * 2));
+      const y = Math.max(0, window.innerHeight - H) * Math.abs(Math.cos(p * Math.PI * 2));
+      probe.style.transform = "translate(" + Math.round(x) + "px," + Math.round(y) + "px)";
+      requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+  const FX_LEVEL_LABEL = { lite: "약", off: "끔" };
+  function _showFxAutoBanner(level) {
     const el = document.createElement("div");
     el.className = "cloud-live-banner";
     el.id = "fx-suggest-banner";
     el.innerHTML = `
       <div class="cloud-live-banner-body">
-        <div class="cloud-live-banner-title">그래픽 효과를 줄여볼까요?</div>
-        <div class="cloud-live-banner-desc">이 컴퓨터는 사양이 낮게 감지됐어요. "그래픽 효과 줄이기"를 켜면 화면이 더 부드럽게 움직일 수 있어요. (상태표시줄 → 모드 메뉴에서 언제든 다시 켜고 끌 수 있어요.)</div>
+        <div class="cloud-live-banner-title">그래픽 효과를 "${FX_LEVEL_LABEL[level]}"으로 낮췄어요</div>
+        <div class="cloud-live-banner-desc">이 컴퓨터에서 화면이 부드럽게 그려지지 않아 자동으로 조절했어요. 상태표시줄 → 모드 메뉴에서 끔/약/강을 언제든 바꿀 수 있어요.</div>
         <div class="cloud-live-banner-actions">
           <button type="button" class="ghost-btn" id="fx-suggest-dismiss">괜찮아요</button>
-          <button type="button" class="primary-btn" id="fx-suggest-enable">켜기</button>
+          <button type="button" class="primary-btn" id="fx-suggest-revert">강으로 되돌리기</button>
         </div>
       </div>
     `;
     _liveBannerWrap().appendChild(el);
     document.getElementById("fx-suggest-dismiss").onclick = () => el.remove();
-    document.getElementById("fx-suggest-enable").onclick = () => { setFxReduced(true); el.remove(); };
+    document.getElementById("fx-suggest-revert").onclick = () => { setFxLevel("full"); el.remove(); };
+  }
+  function maybeSuggestLowGraphicsMode() { // 이름은 예전 그대로(js/12-init.js가 호출): 이제 "자동 측정 후 조절"
+    try {
+      if (localStorage.getItem(FX_KEY) !== null) return;        // 직접 골라본 사람은 그 선택을 존중
+      if (localStorage.getItem(FX_PROBED_KEY)) return;          // 이 기기는 이미 측정함
+    } catch (e) { return; }                                     // 저장소를 못 쓰면 매번 재게 되므로 건너뜀
+    try { if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return; } catch (e) {}
+    if (document.hidden) {
+      const once = () => { if (!document.hidden) { document.removeEventListener("visibilitychange", once); maybeSuggestLowGraphicsMode(); } };
+      document.addEventListener("visibilitychange", once);
+      return;
+    }
+    fxRunProbe((deltas) => {
+      if (!deltas) return; // 중단됨 — 기록 안 남기고 다음 실행 때 다시 잰다
+      const level = fxDecideLevel(deltas);
+      if (!level) return;
+      try { localStorage.setItem(FX_PROBED_KEY, "1"); } catch (e) {}
+      if (level === "full") return; // 충분히 빠름: 아무것도 바꾸지 않는다
+      setFxLevel(level, { auto: true });
+      try { localStorage.setItem(FX_AUTO_KEY, "1"); } catch (e) {}
+      _showFxAutoBanner(level);
+    });
   }
 
   /* ===================== 데스크톱 독(Dock) 펼치기/닫기 =====================

@@ -916,11 +916,12 @@
     interviewListResizeObserver = null;
     if (!listArea || !_interviewsFitToHeight || typeof ResizeObserver === "undefined") return;
     let lastH = 0;
+    const settle = hdTrailing(() => measureAndSyncInterviewPageSize(), 120); // 창 크기를 끄는 동안엔 미루고 멈추면 한 번만 계산
     interviewListResizeObserver = new ResizeObserver((entries) => {
       const h = entries[0] && entries[0].contentRect ? entries[0].contentRect.height : 0;
       if (Math.abs(h - lastH) < 1) return;
       lastH = h;
-      measureAndSyncInterviewPageSize();
+      settle();
     });
     interviewListResizeObserver.observe(listArea);
   }

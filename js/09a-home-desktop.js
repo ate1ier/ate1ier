@@ -48,7 +48,7 @@
   // state[page] = { minimized, maximized, justOpened } — justOpened는 "방금 새로 연" 창에만 켜서(복원 때는
   // 켜지 않음) 팝 애니메이션을 돌리고 스크롤을 맨 위로 되돌린다. 복원(내려간 창을 다시 열기)은 이 플래그를
   // 켜지 않아서, 스크롤 위치 등 그 페이지 안에서 하던 작업 화면이 그대로 남아 있는다.
-  const hdWin = { order: [], state: {} };
+  const hdWin = { order: [], state: {}, dirty: {} }; // dirty[page]: 성능 3단계 — 데이터가 바뀌었지만 아직 다시 안 그린 창
   // 화면 좌/우 절반 붙이기(스냅) 관련 임시 상태: 어시스트 패널 DOM과 그 패널을 닫기 위한 문서 이벤트 핸들러.
   const hdSnap = { assistEl: null, onDown: null, onKey: null };
 
@@ -160,6 +160,7 @@
       }
     });
     hdSaveOpenWindowsState();
+    if (hdNeedsRender(page)) hdScheduleFlush(); // 성능 3단계: 낡은 창을 눌러 앞으로 올리면 곧(마우스를 뗀 뒤) 최신으로 그린다
   }
 
   // opts.minimized/opts.maximized를 넘기면(부팅 시 복원 전용) 그 상태로 접힌 채/최대화된 채
@@ -233,13 +234,15 @@
       const maxH = Math.max(minH, window.innerHeight - 55);
       frame.style.cursor = "nwse-resize";
       try { frame.setPointerCapture?.(e.pointerId); } catch (_) {}
-      const move = (v) => {
+      const moveNow = (v) => {
         const width = Math.min(maxW, Math.max(minW, startW + (v.clientX - startX)));
         const height = Math.min(maxH, Math.max(minH, startH + (v.clientY - startY)));
         frame.style.width = Math.round(width) + "px";
         frame.style.height = Math.round(height) + "px";
       };
+      const move = hdRafMove(moveNow);
       const up = () => {
+        move.flush();
         document.removeEventListener("pointermove", move, true);
         document.removeEventListener("pointerup", up, true);
         document.removeEventListener("pointercancel", up, true);
@@ -269,13 +272,15 @@
         const minW = 340, minH = 240;
         const maxW = Math.max(minW, window.innerWidth - 16);
         const maxH = Math.max(minH, window.innerHeight - 55);
-        const moveSE = (v) => {
+        const moveSENow = (v) => {
           const width = Math.min(maxW, Math.max(minW, startW + (v.clientX - startX)));
           const height = Math.min(maxH, Math.max(minH, startH + (v.clientY - startY)));
           frame.style.width = Math.round(width) + "px";
           frame.style.height = Math.round(height) + "px";
         };
+        const moveSE = hdRafMove(moveSENow);
         const upSE = () => {
+          moveSE.flush();
           document.removeEventListener("pointermove", moveSE);
           document.removeEventListener("pointerup", upSE);
           document.removeEventListener("pointercancel", upSE);
@@ -305,7 +310,7 @@
         const minW = 340, minH = 240;
         const maxW = Math.max(minW, window.innerWidth - 16);
         const maxH = Math.max(minH, window.innerHeight - 55);
-        const move = (v) => {
+        const moveNow = (v) => {
           const dx = v.clientX - startX, dy = v.clientY - startY;
           let left = start.left, top = start.top, width = start.width, height = start.height;
           if (dir.includes("e")) width = Math.min(maxW, Math.max(minW, start.width + dx));
@@ -323,7 +328,9 @@
           frame.style.left = Math.round(left) + "px"; frame.style.top = Math.round(top) + "px";
           frame.style.width = Math.round(width) + "px"; frame.style.height = Math.round(height) + "px";
         };
+        const move = hdRafMove(moveNow);
         const up = () => {
+          move.flush();
           document.removeEventListener("pointermove", move);
           document.removeEventListener("pointerup", up);
           document.removeEventListener("pointercancel", up);
@@ -383,7 +390,7 @@
       const origLeft = frame.style.left, origTop = frame.style.top;
       const topMin = 39;
       let side = null;
-      const move = (v) => {
+      const moveNow = (v) => {
         if (st.snap) {
           if (Math.abs(v.clientX - startX) < 6 && Math.abs(v.clientY - startY) < 6) return;
           // 붙어 있던 창을 끌어내는 순간: 인라인 left/top/width/height에는 붙이기 전 값이 그대로 남아 있으므로
@@ -404,7 +411,9 @@
         const next = hdSnapSideAt(v.clientX);
         if (next !== side) { side = next; hdShowSnapPreview(side); }
       };
+      const move = hdRafMove(moveNow);
       const up = () => {
+        move.flush();
         document.removeEventListener("pointermove", move);
         document.removeEventListener("pointerup", up);
         document.removeEventListener("pointercancel", up);
@@ -491,6 +500,7 @@
       setTimeout(() => frame.remove(), 230);
     }
     delete hdWin.state[page];
+    delete hdWin.dirty[page];
     const idx = hdWin.order.indexOf(page);
     if (idx !== -1) hdWin.order.splice(idx, 1);
     if (typeof _resetExpandedStateForPage === "function") _resetExpandedStateForPage(page);
@@ -510,26 +520,98 @@
     });
     hdWin.order = [];
     hdWin.state = {};
+    hdWin.dirty = {};
     document.body.classList.remove("hd-win-open"); // 창이 하나도 없으니 바탕화면 위젯 블러도 해제
     hdSaveOpenWindowsState();
   }
 
-  // renderApp()이 홈 위젯을 그린 뒤 불린다: 열려 있는 모든 창 각각에 그 페이지를 새로 그려서, 여러 창이
-  // 동시에 열려 있어도(다른 기기 동기화 등으로) 전부 최신 내용을 보여주게 한다. 실제로 화면에 없던 창을
-  // 새로 열 때는 appWin 상태가 이미 09a-home-desktop.js 쪽에서 만들어져 있다.
-  function renderHomeDesktopWindows() {
+  // ---- 성능 3단계: renderApp()이 불릴 때마다 열려 있는 창 "전부"를 HTML부터 다시 만들던 것을 줄인다.
+  //      - 지금 맨 앞(사용자가 만지고 있는) 창은 예전처럼 즉시 다시 그린다 → 클릭 직후 화면 반응은 그대로.
+  //      - 내려가(최소화) 있는 창은 그리지 않고 "바뀜(dirty)" 표시만 해둔다 → 다시 펼칠 때 그린다.
+  //      - 화면에 같이 떠 있는 뒤쪽 창(반쪽 붙이기 등)은 150ms 뒤로 미뤄서 그린다 → 클릭 처리와 같은 프레임에서 안 그린다.
+  //        (여러 번 불려도 한 번만 그림. 끌기/크기 조절 중이나 마우스를 누르고 있는 동안엔 놓을 때까지 기다림)
+  //      - 한 번도 안 그려본 창(새로고침 후 복원 등)은 내려가 있지 않은 한 바로 그린다.
+  function hdTopVisiblePageNow() {
+    for (let i = hdWin.order.length - 1; i >= 0; i--) {
+      const st = hdWin.state[hdWin.order[i]];
+      if (st && !st.minimized) return hdWin.order[i];
+    }
+    return null;
+  }
+
+  // 창 하나의 내용을 지금 다시 그린다.
+  function hdRenderWindow(page) {
+    const frame = document.getElementById("app-win-" + page);
+    const fn = hdPageRenderer(page);
+    if (!frame || !fn) return;
+    const inner = frame.querySelector(".page-inner");
+    if (!inner) return;
+    delete hdWin.dirty[page];
+    frame._hdRendered = true;
+    inner.classList.toggle("wide", page === "schedule" || page === "calendar");
+    fn(inner);
+    const st = hdWin.state[page];
+    if (st && st.justOpened) inner.scrollTop = 0;
+  }
+
+  // 보이는 창인데 내용이 낡았거나(dirty) 아직 한 번도 안 그렸는가
+  function hdNeedsRender(page) {
+    const st = hdWin.state[page];
+    if (!st || st.minimized || !hdPageRenderer(page)) return false;
+    const frame = document.getElementById("app-win-" + page);
+    if (!frame) return false;
+    return !frame._hdRendered || !!hdWin.dirty[page];
+  }
+
+  let hdFlushTimer = 0;
+  let hdPointerIsDown = false;
+  document.addEventListener("pointerdown", () => { hdPointerIsDown = true; }, true);
+  document.addEventListener("pointerup", () => { hdPointerIsDown = false; }, true);
+  document.addEventListener("pointercancel", () => { hdPointerIsDown = false; }, true);
+  window.addEventListener("blur", () => { hdPointerIsDown = false; });
+
+  function hdScheduleFlush(ms) {
+    if (hdFlushTimer) return;
+    hdFlushTimer = setTimeout(hdFlushDirtyWindows, ms == null ? 150 : ms);
+  }
+
+  // 미뤄 둔 창들을 그린다. 끌기/크기 조절 중이거나 마우스를 누르고 있으면(클릭이 도중에 끊기지 않게) 조금 뒤로 다시 미룬다.
+  function hdFlushDirtyWindows() {
+    hdFlushTimer = 0;
+    if (CURRENT_ACCOUNT_IS_MASTER) return;
+    if (hdPointerIsDown || document.body.classList.contains("hd-interacting")) { hdScheduleFlush(120); return; }
+    hdWin.order.slice().forEach((page) => { if (hdNeedsRender(page)) hdRenderWindow(page); });
+  }
+
+  // 성능 4단계: 창 안에서 셀 하나를 고친 뒤, 그 창은 호출한 쪽이 직접(바뀐 행만) 갱신했으니 renderApp() 대신 이걸 부른다.
+  // 다른 창은 낡음 표시(맨 앞이면 곧 그림), 뒤 바탕화면 위젯·폴더는 내용이 바뀐 경우에만 다시 그린다.
+  function hdRefreshAfterLocalEdit(exceptPage) {
     if (CURRENT_ACCOUNT_IS_MASTER) return;
     hdWin.order.forEach((page) => {
+      if (page === exceptPage || !hdPageRenderer(page)) return;
       const frame = document.getElementById("app-win-" + page);
-      const fn = hdPageRenderer(page);
-      if (!frame || !fn) return;
-      const inner = frame.querySelector(".page-inner");
-      if (!inner) return;
-      inner.classList.toggle("wide", page === "schedule" || page === "calendar");
-      fn(inner);
-      const st = hdWin.state[page];
-      if (st && st.justOpened) inner.scrollTop = 0;
+      if (frame && frame._hdRendered) hdWin.dirty[page] = true;
     });
+    refreshHomeWidgetsBehindWindow();
+    hdScheduleFlush();
+  }
+
+  // renderApp()이 홈 위젯을 그린 뒤 불린다. 예전엔 열려 있는 모든 창을 매번 새로 그렸지만, 이제는
+  // 맨 앞 창만 즉시 그리고 나머지는 위 규칙대로 미루거나 표시만 해 둔다(다른 기기 동기화로 바뀐 내용도 결국 전부 반영됨).
+  function renderHomeDesktopWindows() {
+    if (CURRENT_ACCOUNT_IS_MASTER) return;
+    const top = hdTopVisiblePageNow();
+    let deferred = false;
+    hdWin.order.forEach((page) => {
+      const frame = document.getElementById("app-win-" + page);
+      if (!frame || !hdPageRenderer(page)) return;
+      const st = hdWin.state[page];
+      const minimized = !!(st && st.minimized);
+      if (page === top || (!frame._hdRendered && !minimized)) { hdRenderWindow(page); return; }
+      hdWin.dirty[page] = true;
+      if (!minimized) deferred = true;
+    });
+    if (deferred) hdScheduleFlush();
     syncAppWindows();
   }
 
@@ -565,6 +647,8 @@
         frame.addEventListener("animationend", () => frame.classList.remove("aw-pop"), { once: true });
       }
     });
+    // 성능 3단계 안전망: 내려가 있다가 펼쳐졌거나 앞으로 올라온 창이 낡은 채로 남지 않게 한다.
+    if (hdWin.order.some(hdNeedsRender)) hdScheduleFlush();
   }
 
   // 페이지 창이 열려 있는 동안 뒤 바탕화면 위젯만 다시 그린다 (다른 기기에서 바뀐 내용 반영용 — 창 안 화면은 건드리지 않음)
@@ -735,4 +819,45 @@
   if (statusBarMasterReturnBtn && MASTER_ORIGIN_ACCOUNT) {
     statusBarMasterReturnBtn.hidden = false;
     statusBarMasterReturnBtn.onclick = (e) => { e.stopPropagation(); masterReturnToOrigin(); };
+  }
+
+  // ---- 성능 1단계: 창 이동/크기 조절/아이콘·위젯 끌기 중에는 body.hd-interacting을 붙여 남은 상시 유리질감(블러)을 잠깐 끈다
+  //      (css/99z-perf-step1.css). 놓으면(pointerup/pointercancel/창 포커스 이탈) 바로 뗀다. 클래스가 남아버리는 사고를 막으려고
+  //      버튼이 떼어진 채 움직이는 pointermove를 만나도 뗀다.
+  (function hdInteractingClass() {
+    const cls = "hd-interacting";
+    const on = (e) => {
+      if (e.button !== undefined && e.button !== 0) return;
+      const t = e.target;
+      if (!t || !t.closest) return;
+      if (t.closest(".aw-tb, [data-resize], .hd-fld, #wg .wd")) { document.body.classList.add(cls); return; }
+      // 우하단 모서리(창 안 내용 위에 겹쳐 있어 [data-resize]가 아닌 곳이 target일 수 있는 대각선 리사이즈 영역)
+      const win = t.closest(".app-win");
+      if (win) {
+        const r = win.getBoundingClientRect();
+        if (e.clientX >= r.right - 28 && e.clientY >= r.bottom - 28) document.body.classList.add(cls);
+      }
+    };
+    const off = () => document.body.classList.remove(cls);
+    document.addEventListener("pointerdown", on, true);
+    document.addEventListener("pointerup", off, true);
+    document.addEventListener("pointercancel", off, true);
+    document.addEventListener("pointermove", (e) => { if (e.buttons === 0 && document.body.classList.contains(cls)) off(); }, true);
+    window.addEventListener("blur", off);
+  })();
+
+  // ---- 성능 2단계: pointermove는 초당 수백 번도 들어오지만 화면은 프레임당 한 번만 그리면 된다.
+  //      창 이동/크기 조절 핸들러를 이 래퍼로 감싸 "프레임마다 마지막 좌표로 1번만" 적용한다.
+  //      놓을 때(up)는 flush()로 남은 마지막 좌표를 즉시 반영해서 최종 위치/크기가 어긋나지 않게 한다.
+  function hdRafMove(move) {
+    let last = null, id = 0;
+    const run = () => { id = 0; if (last) { const v = last; last = null; move(v); } };
+    const handler = (v) => { last = { clientX: v.clientX, clientY: v.clientY }; if (!id) id = requestAnimationFrame(run); };
+    handler.flush = () => { if (id) { cancelAnimationFrame(id); id = 0; } if (last) { const v = last; last = null; move(v); } };
+    return handler;
+  }
+  // 리사이즈 중 매 프레임 실행되던 무거운 측정(목록 페이지 크기 계산 등)을 "멈춘 뒤 한 번"으로 미룬다.
+  function hdTrailing(fn, ms) {
+    let t = 0;
+    return function () { clearTimeout(t); t = setTimeout(fn, ms); };
   }

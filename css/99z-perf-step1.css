@@ -1,0 +1,62 @@
+/* ==================== 성능 1단계: 항상 떠 있는 블러 제거 ====================
+   배경: backdrop-filter(블러)는 "뒤에 있는 화면이 조금이라도 바뀌면" 그 영역을 매번 다시
+   블러 처리한다. 창을 끌거나 크기를 바꾸거나 스크롤하는 동안에는 뒤 화면이 계속 바뀌므로,
+   상시 보이는 블러가 많을수록 그 프레임마다 GPU 비용이 쌓여 저사양에서 버벅였다.
+   그래서 (1) 창 안에 항상 보이는 블러는 없애고 거의 불투명한 배경으로 바꾸고,
+   (2) 창이 열렸을 때 뒤 위젯에 걸던 blur() + backdrop-filter 이중 블러는 "옅게 물러나 보이는"
+   불투명도 처리로 바꾸고, (3) 창/아이콘을 끄는 동안(body.hd-interacting)에는 남은 상시 유리질감도 잠깐 끈다.
+   모달·드롭다운·팝오버·토스트·홈 위젯(창이 안 떠 있을 때)의 유리 질감은 그대로 둔다.
+   이 파일은 css 번호순 맨 끝(99z)이라 앞선 규칙(!important 포함 아닌 것)을 덮어쓴다. */
+
+/* 1) 창 안 상시 노출 요소 — 블러 제거 (배경은 이미 .88~.92 불투명도라 모양 차이는 거의 없다) */
+.mac-calendar-window .mac-calendar-toolbar,
+.mac-calendar-window .mac-calendar-sidebar {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+.dfw-toolbar,
+.dfw-list-head {
+  background: var(--chrome-bg);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+/* 스크롤하면 계속 다시 블러되던 sticky 머리글(면담일지 월 라벨, QA 목록 머리글) */
+.iv-month-label,
+.qa-list-head {
+  background: color-mix(in srgb, var(--panel) 97%, transparent);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+/* 2) 창이 열려 있을 때 뒤 위젯: blur() + backdrop-filter 이중 블러 → 유리 질감을 끄고 살짝 흐리게(불투명도)만.
+      opacity는 합성기(GPU)가 처리해서 블러와 달리 거의 공짜다. 창이 다 닫히면 원래 유리 질감으로 돌아온다. */
+body.home-desktop #wg .wd { transition: opacity 0.35s cubic-bezier(.32, .72, 0, 1); }
+body.home-desktop.hd-win-open #wg .wd {
+  filter: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: var(--chrome-bg);
+  opacity: 0.62;
+}
+
+/* 3) 창 이동/크기 조절/아이콘·위젯 끌기 중에는 남은 상시 유리질감도 잠깐 끈다(놓으면 복구).
+      js/09a-home-desktop.js 맨 아래의 hd-interacting 토글이 붙였다 뗀다. */
+body.hd-interacting #wg .wd,
+body.hd-interacting .briefing-sidebar {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+/* ==================== 성능 2단계 ====================
+   (JS) js/09a-home-desktop.js: 창 이동/크기 조절은 프레임당 1번만 적용(hdRafMove), 상담사/면담일지 목록의
+        "창 높이에 맞춰 페이지 크기 계산"은 끄는 동안 미루고 멈춘 뒤 한 번만(hdTrailing).
+   (CSS) 아래 두 가지. */
+
+/* 1) 끄는 동안 창 안 내용은 마우스에 반응할 필요가 없다. 끄는 동안 표·목록 위를 지나갈 때마다 :hover 스타일이 다시 계산되는 걸 막는다.
+      (포인터 캡처로 끌기는 그대로 동작하고, 놓으면 body.hd-interacting이 빠지면서 바로 원래대로) */
+body.hd-interacting .app-win .page-inner { pointer-events: none; }
+
+/* 2) 화면 밖 QA 목록 행은 레이아웃·그리기를 건너뛴다(스크롤·크기 조절이 훨씬 가벼워짐).
+      auto 키워드가 한 번 그려진 행의 실제 높이를 기억하므로 스크롤바가 튀지 않는다.
+      상담사/면담일지 목록은 창 높이만큼만 그리고(페이지 나눔) 행 높이를 재서 계산하므로 건드리지 않는다. */
+.qa-list-wrap .qa-row { content-visibility: auto; contain-intrinsic-size: auto 52px; }

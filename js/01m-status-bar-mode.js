@@ -21,7 +21,7 @@
     anchorEl.setAttribute("aria-expanded", "true");
     const rect = anchorEl.getBoundingClientRect();
     const current = getCurrentTheme();
-    const fxOn = isFxReduced();
+    const fxLevel = getFxLevel();
     const themeItemsHtml = THEME_LIST.map((t) => `
       <button type="button" class="theme-menu-item ${t.id === current ? "active" : ""}" data-theme-id="${t.id}">
         <span class="theme-menu-dot" style="background:${t.bg};"></span>
@@ -29,13 +29,15 @@
         ${t.id === current ? '<span class="theme-menu-check">✓</span>' : ""}
       </button>
     `).join("");
-    // "그래픽 효과 줄이기": 사양이 낮은 컴퓨터에서 배경 블러를 끄는 토글(js/01d-undo-theme-dock.js의 setFxReduced)
+    // "그래픽 효과" 끔/약/강 3단계 스위치(js/01d-undo-theme-dock.js의 setFxLevel)
+    const fxSeg = [["off", "끔"], ["lite", "약"], ["full", "강"]].map(([id, label]) =>
+      `<button type="button" class="theme-menu-fx-opt ${id === fxLevel ? "active" : ""}" data-fx-level="${id}" aria-pressed="${id === fxLevel}">${label}</button>`).join("");
     const fxToggleHtml = `
       <div class="settings-menu-divider"></div>
-      <button type="button" class="theme-menu-item theme-menu-fx-item" data-fx-toggle="1" title="배경 블러를 줄여서 저사양 컴퓨터에서 더 가볍게 동작하게 합니다">
-        <span class="theme-menu-name">그래픽 효과 줄이기</span>
-        <span class="theme-menu-fx-switch ${fxOn ? "on" : ""}" aria-hidden="true"></span>
-      </button>
+      <div class="theme-menu-item theme-menu-fx-item" title="끔: 블러·그림자·애니메이션 제거 / 약: 블러 절반·그림자 작게 / 강: 모든 효과">
+        <span class="theme-menu-name">그래픽 효과</span>
+        <span class="theme-menu-fx-seg" role="group" aria-label="그래픽 효과 단계">${fxSeg}</span>
+      </div>
     `;
     const menu = document.createElement("div");
     menu.id = "status-bar-mode-menu";
@@ -55,17 +57,19 @@
         closeStatusBarModeMenu();
       };
     });
-    // 효과 줄이기 토글은 테마 선택과 달리 눌러도 메뉴를 닫지 않고 스위치만 바꿔서,
-    // 켜고 끄며 바로 화면(블러) 변화를 확인해볼 수 있게 한다.
-    const fxToggleBtn = menu.querySelector("[data-fx-toggle]");
-    if (fxToggleBtn) {
-      fxToggleBtn.onclick = (e) => {
+    // 효과 단계는 테마 선택과 달리 눌러도 메뉴를 닫지 않고 표시만 바꿔서,
+    // 단계를 바꿔가며 바로 화면 변화를 확인해볼 수 있게 한다.
+    menu.querySelectorAll("[data-fx-level]").forEach((btn) => {
+      btn.onclick = (e) => {
         e.stopPropagation();
-        setFxReduced(!isFxReduced());
-        const sw = fxToggleBtn.querySelector(".theme-menu-fx-switch");
-        if (sw) sw.classList.toggle("on", isFxReduced());
+        setFxLevel(btn.getAttribute("data-fx-level"));
+        menu.querySelectorAll("[data-fx-level]").forEach((b2) => {
+          const on = b2 === btn;
+          b2.classList.toggle("active", on);
+          b2.setAttribute("aria-pressed", on ? "true" : "false");
+        });
       };
-    }
+    });
     setTimeout(() => document.addEventListener("mousedown", statusBarModeMenuOutsideHandler, true), 0);
   }
   const statusBarModeBtn = document.getElementById("status-bar-mode-btn");

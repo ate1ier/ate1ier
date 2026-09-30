@@ -79,6 +79,8 @@
     const scale = Math.min(availW / naturalW, 1);
     const scaledW = naturalW * scale;
     const offsetX = Math.max(0, (availW - scaledW) / 2);
+    inner._fitNatW = naturalW; // 성능 4단계: 행만 바꿨을 때 크기가 그대로인지 비교하는 기준
+    inner._fitNatH = naturalH;
     inner.style.width = `${naturalW}px`;
     inner.style.height = `${naturalH}px`;
     inner.style.transform = `translateX(${offsetX}px) scale(${scale})`;
@@ -106,20 +108,92 @@
     _scheduleFitObserver.observe(wrap);
   }
 
+  // ---- 성능 4단계: 셀 하나를 고칠 때 표 전체(수천 개 칸)를 HTML로 다시 만들어 갈아끼우던 것을 "바뀐 행만 교체"로 줄인다.
+  //      표 HTML 문자열은 예전처럼 만들되(문자열 조립은 싸다), 지난번 문자열과 행(<tr>) 단위로 비교해서 달라진 행만
+  //      실제 DOM에서 바꾼다. 셀 하나를 고치면 보통 그 인원 행 + 날짜별 집계/필요인력 대비 행 몇 개만 달라진다.
+  //      구조가 달라졌으면(행 수·머리글·접기 상태 등) 예전처럼 통째로 다시 그린다.
+  function scheduleSplitRows(html) {
+    const parts = html.split("</tr>");
+    const tail = parts.pop();
+    const pre = [], rows = [];
+    for (let i = 0; i < parts.length; i++) {
+      const at = parts[i].lastIndexOf("<tr");
+      if (at < 0) return null;
+      pre.push(parts[i].slice(0, at));
+      rows.push(parts[i].slice(at) + "</tr>");
+    }
+    return { pre, rows, tail };
+  }
+  // 바뀐 행만 갈아끼웠으면 true, 구조가 달라 못 했으면 false(호출한 쪽이 통째로 다시 그린다)
+  function schedulePatchTableRows(tableArea, prev, next) {
+    if (!prev || !next || !tableArea.querySelector(".schedule-table-wrap")) return false;
+    if (prev.rows.length !== next.rows.length || prev.tail !== next.tail) return false;
+    for (let i = 0; i < next.pre.length; i++) if (prev.pre[i] !== next.pre[i]) return false;
+    const trs = tableArea.querySelectorAll("tr");
+    if (trs.length !== next.rows.length) return false;
+    const changed = new Set();
+    for (let i = 0; i < next.rows.length; i++) if (prev.rows[i] !== next.rows[i]) changed.add(i);
+    // 편집 중이던 칸은 입력창이 HTML이 아니라 DOM에 직접 끼워져 있어서 문자열로는 안 바뀐 것처럼 보인다 → 그 행도 교체
+    tableArea.querySelectorAll(".sch-cell--editing, .sch-cell-input").forEach((el) => {
+      const tr = el.closest("tr");
+      const idx = tr ? Array.prototype.indexOf.call(trs, tr) : -1;
+      if (idx >= 0) changed.add(idx);
+    });
+    // 필요인력 입력칸에 친 값이 저장되지 않고 거부됐을 때(잠긴 달 등) 문자열은 그대로라 안 바뀐 것처럼 보인다 → 그 행도 교체해 원래 값으로 되돌린다
+    tableArea.querySelectorAll(".sch-required-input").forEach((el) => {
+      if (el.value === el.defaultValue) return;
+      const tr = el.closest("tr");
+      const idx = tr ? Array.prototype.indexOf.call(trs, tr) : -1;
+      if (idx >= 0) changed.add(idx);
+    });
+    if (changed.size > next.rows.length * 0.6) return false; // 대부분 바뀌었으면 통째로 그리는 게 더 빠르다
+    const tpl = document.createElement("template");
+    changed.forEach((i) => {
+      tpl.innerHTML = "<table><tbody>" + next.rows[i] + "</tbody></table>";
+      const fresh = tpl.content.querySelector("tr");
+      if (!fresh) return;
+      trs[i].replaceWith(fresh);
+      attachScheduleElementHandlers(fresh);
+    });
+    // 통째로 다시 그릴 땐 사라지던 드래그 선택 표시를 똑같이 지운다(안 바뀐 행에 남아 있을 수 있음)
+    tableArea.querySelectorAll(".sch-cell--selected").forEach((el) => el.classList.remove("sch-cell--selected"));
+    scheduleApplyHeaderSelectionHighlight();
+    scheduleApplyCopiedOutline();
+    return true;
+  }
+
   function updateScheduleTableArea() {
     const tableArea = document.getElementById("schedule-table-area");
     const logArea = document.getElementById("schedule-log-area");
+    let needFit = true;
     if (tableArea) {
-      tableArea.innerHTML = `<div class="schedule-table-wrap"><div class="schedule-scale-inner">${buildScheduleTableHtml()}</div></div>`;
-      attachScheduleTableHandlers(tableArea);
+      const html = buildScheduleTableHtml();
+      const next = scheduleSplitRows(html);
+      if (schedulePatchTableRows(tableArea, tableArea._schParts, next)) {
+        // 표 크기(맞춤 배율 계산 기준)가 그대로면 강제 레이아웃이 두 번 도는 fitScheduleTable()을 건너뛴다.
+        const table = tableArea.querySelector("table");
+        const inner = tableArea.querySelector(".schedule-scale-inner");
+        const stable = !!(table && inner && inner._fitNatW && table.offsetWidth === inner._fitNatW && table.offsetHeight === inner._fitNatH);
+        needFit = !stable;
+      } else {
+        tableArea.innerHTML = `<div class="schedule-table-wrap"><div class="schedule-scale-inner">${html}</div></div>`;
+        attachScheduleTableHandlers(tableArea);
+      }
+      tableArea._schParts = next;
     }
     if (logArea) {
-      logArea.innerHTML = buildScheduleLogHtml();
-      attachScheduleLogHandlers(logArea);
+      const logHtml = buildScheduleLogHtml();
+      if (logArea._schLogHtml !== logHtml || !logArea.firstChild) {
+        logArea._schLogHtml = logHtml;
+        logArea.innerHTML = logHtml;
+        attachScheduleLogHandlers(logArea);
+      }
     }
-    fitScheduleTable();
-    syncScheduleLogWidth();
-    watchScheduleTableSize();
+    if (needFit) {
+      fitScheduleTable();
+      syncScheduleLogWidth();
+      watchScheduleTableSize();
+    }
   }
 
   // 월별 스케줄 표를 통째로 PNG 이미지로 캡처해서 다운로드한다.

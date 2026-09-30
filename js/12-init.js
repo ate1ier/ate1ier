@@ -37,7 +37,12 @@
   // 이 브라우저(컴퓨터)에서 처음으로 사양이 낮아 보이면, "그래픽 효과 줄이기" 토글의
   // 존재를 몰라서 못 쓰는 경우를 막기 위해 딱 한 번만 안내한다 (js/01d-undo-theme-dock.js).
   if (!CURRENT_ACCOUNT_IS_MASTER && typeof maybeSuggestLowGraphicsMode === "function") {
-    setTimeout(maybeSuggestLowGraphicsMode, 600);
+    // 시작 직후(부팅 로더 해제·첫 렌더·브리핑 토스트·클라우드 동기화)는 화면이 일시적으로 바빠서 측정하면 빠른 PC도
+    // 느리게 나올 수 있다. 그래서 충분히 가라앉은 뒤(3초 후, 브라우저가 한가할 때)에 잰다.
+    setTimeout(() => {
+      if (typeof requestIdleCallback === "function") requestIdleCallback(() => maybeSuggestLowGraphicsMode(), { timeout: 3000 });
+      else maybeSuggestLowGraphicsMode();
+    }, 3000);
   }
 
   // 로그인/계정 생성 직후 딱 한 번, 홈 화면 위에 팝업을 살짝 늦게(화면이 먼저 자리

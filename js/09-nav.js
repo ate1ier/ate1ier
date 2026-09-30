@@ -1,6 +1,6 @@
   function renderNav() {
     const nav = document.getElementById("nav");
-    nav.innerHTML = `
+    const navHtml = `
       ${!CURRENT_ACCOUNT_IS_MASTER ? `<div class="nav-label-top">메뉴</div>` : ""}
       ${MASTER_ORIGIN_ACCOUNT ? `
         <div class="nav-master-banner">
@@ -25,6 +25,10 @@
     `;
     renderUndoToggle();
     renderHomeDesktop();
+    // 성능 3단계: 메뉴 HTML이 지난번과 같으면(활성 페이지·마스터 배너가 그대로) 다시 만들지도, 이벤트를 다시 붙이지도 않는다.
+    if (nav._navHtml === navHtml && nav.firstChild) return;
+    nav._navHtml = navHtml;
+    nav.innerHTML = navHtml;
     nav.querySelectorAll("[data-nav]").forEach((btn) => {
       btn.onclick = () => { setPage(btn.getAttribute("data-nav")); closeDock(); };
     });

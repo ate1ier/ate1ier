@@ -198,6 +198,10 @@
     // 값인데 빠져 있어서, 15초마다 모든 사람의 탭에서 클라우드에 저장을 시도하고 있었다.
     // 그 하트비트는 계정 구분 없이 하나의 키를 공유해서, 다른 사람이 그냥 탭을 열어두기만
     // 해도 계속 클라우드 쓰기가 발생하는 원인 중 하나였다.
+    "app-fx-reduced", // 그래픽 효과 단계(끔/약/강). 이 컴퓨터의 사양에 맞춘 값이라 기기별로 따로 기억해야 한다
+    // (동기화되면 빠른 PC에서 고른 "강"이 느린 PC에 덮어써지거나 그 반대가 된다).
+    "app-fx-probed", // 처음 실행 때 프레임 속도를 재서 자동으로 효과 단계를 정했는지 여부(기기별).
+    "app-fx-auto", // 효과 단계를 자동으로 낮춘 기기인지 여부(기기별).
     "app-fx-suggested", // "그래픽 효과 줄이기 켤까요?" 안내를 이미 봤는지 여부. 이 컴퓨터의
     // 사양 얘기라 기기별로 따로 기억하면 되고, 굳이 클라우드로 보낼 필요가 없다.
     "personal-app:team-login-member", // 팀용 계정에서 "지금 이 브라우저에 로그인한 인원"
@@ -1067,94 +1071,152 @@
   }
   applyTheme(isValidTheme(getStoredTheme()) ? getStoredTheme() : "light");
 
-  /* ===================== 그래픽 효과(블러) 줄이기 =====================
-     사양이 낮은 컴퓨터에서 backdrop-filter 블러 계산 부담을 줄이기 위한 토글.
-     켜면 html[data-fx="reduced"]가 붙어 css/00-variables.css의 --fx-blur-scale이
-     0이 되고, 전체 backdrop-filter의 blur() 반경이 사실상 0으로 줄어든다
-     (레이아웃·색·모양은 그대로, 블러만 빠진다). 테마와 같은 방식으로 저장/적용한다. */
+  /* ===================== 그래픽 효과 단계(끔/약/강) =====================
+     사양이 낮은 컴퓨터에서 backdrop-filter 블러·그림자 계산 부담을 줄이는 3단계 스위치.
+       강(full)  : 모든 효과(기본)                        → data-fx="normal"
+       약(lite)  : 블러 반경 절반 + 그림자 작게, 전환은 유지 → data-fx="lite"
+       끔(off)   : 블러·그림자·전환 전부 제거              → data-fx="reduced"
+     저장값(localStorage "app-fx-reduced"): "0"=강, "2"=약, "1"=끔. "1"/"0"은 예전 토글
+     (켜면 끔, 끄면 강)과 같은 값이라 기존에 저장된 설정이 그대로 이어진다. null=한 번도 안 골랐음.
+     이 값은 기기별이다(js/01b-cloud-sync-core.js CLOUD_EXCLUDED_KEYS — 클라우드로 동기화하지 않는다). */
   const FX_KEY = "app-fx-reduced";
-  // localStorage 원본 값을 그대로 반환한다: "1"(명시적으로 켬) / "0"(명시적으로 끔) /
-  // null(한 번도 토글을 안 건드림). getStoredFxReduced()처럼 boolean으로 뭉개면 "한 번도
-  // 안 건드림"과 "명시적으로 끔"을 구분할 수 없어서, 아래 applyFxReduced가 OS
-  // "동작 줄이기" 설정보다 사용자의 명시적 선택을 우선시키지 못했다(버그 — 켜본 적 없는
-  // 상태와 꺼본 상태를 똑같이 취급해 data-fx 속성을 아예 안 남겼고, 그러면
-  // css/00-variables.css의 prefers-reduced-motion 미디어쿼리가 토글과 무관하게 계속
-  // 이겨서 "꺼도 안 돌아오는" 것처럼 보였다).
+  const FX_PROBED_KEY = "app-fx-probed"; // 처음 실행 프레임 측정을 이미 했는지(기기별)
+  const FX_AUTO_KEY = "app-fx-auto";     // 효과 단계를 자동으로 낮춘 기기인지(기기별)
   function getStoredFxRaw() {
     try { return localStorage.getItem(FX_KEY); } catch (e) { return null; }
   }
   function getStoredFxReduced() {
     return getStoredFxRaw() === "1";
   }
-  // on === true  → data-fx="reduced" (명시적으로 켬)
-  // on === false → data-fx="normal"  (명시적으로 끔 — OS가 "동작 줄이기"를 켜놨어도
-  //                이 선택이 항상 이긴다. css/00-variables.css의
-  //                "html:not([data-fx=\"normal\"])" 참고)
-  // on === null  → 속성 없음 (한 번도 안 건드림 — OS 설정이 있으면 그대로 따르고,
-  //                없으면 평소처럼 전체 효과가 보인다)
-  function applyFxReduced(on) {
-    if (on === true) document.documentElement.setAttribute("data-fx", "reduced");
-    else if (on === false) document.documentElement.setAttribute("data-fx", "normal");
-    else document.documentElement.removeAttribute("data-fx");
+  // level: "full" | "lite" | "off" | null(속성 없음 = 한 번도 안 건드림 → OS "동작 줄이기"가 있으면 따름)
+  function applyFxLevel(level) {
+    const el = document.documentElement;
+    if (level === "off") el.setAttribute("data-fx", "reduced");
+    else if (level === "lite") el.setAttribute("data-fx", "lite");
+    else if (level === "full") el.setAttribute("data-fx", "normal");
+    else el.removeAttribute("data-fx");
   }
-  // 메뉴의 스위치 표시·토글 클릭 판단 모두 이 함수를 쓰므로, 사용자가 한 번도
-  // 토글을 안 건드렸는데 OS "동작 줄이기"가 켜져 있어 실제로는 효과가 줄어든
-  // 상태라면 true를 돌려준다 — 그래야 스위치도 그 상태를 보여주고, 처음 눌렀을 때
-  // "OS 설정을 명시적으로 끄기"로 바로 이어진다(위 applyFxReduced의 on===false 참고).
-  function isFxReduced() {
+  function applyFxReduced(on) { // 예전 이름(호환): true=끔, false=강, null=속성 없음
+    applyFxLevel(on === true ? "off" : on === false ? "full" : null);
+  }
+  function getFxLevel() {
     const attr = document.documentElement.getAttribute("data-fx");
-    if (attr === "reduced") return true;
-    if (attr === "normal") return false;
-    try { return window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) { return false; }
+    if (attr === "reduced") return "off";
+    if (attr === "lite") return "lite";
+    if (attr === "normal") return "full";
+    try { return window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "off" : "full"; } catch (e) { return "full"; }
   }
-  function setFxReduced(on) {
-    applyFxReduced(!!on);
-    try { localStorage.setItem(FX_KEY, on ? "1" : "0"); } catch (e) { /* 저장 실패해도 화면 전환은 그대로 동작 */ }
+  function isFxReduced() { return getFxLevel() === "off"; }
+  function setFxLevel(level, opts) {
+    applyFxLevel(level);
+    try { localStorage.setItem(FX_KEY, level === "off" ? "1" : level === "lite" ? "2" : "0"); } catch (e) { /* 저장 실패해도 화면 전환은 그대로 동작 */ }
+    // 사용자가 직접 고르면 "자동으로 낮춘 기기" 표시는 지운다(자동 감지가 고른 경우에만 auto:true).
+    if (!(opts && opts.auto)) { try { localStorage.removeItem(FX_AUTO_KEY); } catch (e) {} }
     renderNav();
   }
+  function setFxReduced(on) { setFxLevel(on ? "off" : "full"); }
   {
     const _fxRaw = getStoredFxRaw();
-    applyFxReduced(_fxRaw === "1" ? true : _fxRaw === "0" ? false : null);
+    applyFxLevel(_fxRaw === "1" ? "off" : _fxRaw === "2" ? "lite" : _fxRaw === "0" ? "full" : null);
   }
 
-  /* ---- 저사양 자동 감지: 토글이 있는 걸 몰라서 못 쓰는 사람들을 위해,
-     이 컴퓨터가 사양이 낮아 보이면 처음 한 번만 "그래픽 효과 줄이기를 켤까요?"
-     라고 안내한다. 이미 껐다 켰다 해본 사람(FX_KEY 존재)이나, 이미 한 번
-     안내를 봤던 브라우저(FX_SUGGEST_KEY)에는 다시 띄우지 않는다.
-     navigator.deviceMemory는 Safari 등 일부 브라우저엔 아예 없을 수 있어서,
-     hardwareConcurrency(코어 수)만으로도 판단하게 둔다. */
-  const FX_SUGGEST_KEY = "app-fx-suggested";
-  function _isLikelyLowSpecDevice() {
-    try {
-      const cores = navigator.hardwareConcurrency || 0;
-      const mem = navigator.deviceMemory; // 없으면 undefined
-      if (cores && cores <= 4) return true;
-      if (typeof mem === "number" && mem > 0 && mem <= 4) return true;
-      return false;
-    } catch (e) { return false; }
+  /* ---- 저사양 자동 감지(처음 실행 때 한 번): 코어 수 같은 스펙 추측 대신 "실제로 얼마나 부드럽게
+     그려지는지"를 재서 정한다. 화면 위에 눈에 안 띄는 반투명 유리판(backdrop-filter)을 1.5초 동안
+     움직이며 프레임 간격을 재고, 중앙값으로 단계를 정한다.
+       ≥45ms(약 22fps 이하) → 끔 / ≥28ms(약 36fps 이하) → 약 / 그 외 → 그대로(강)
+     이미 단계를 골라본 기기(FX_KEY), 이미 측정한 기기(FX_PROBED_KEY), OS "동작 줄이기" 사용자는 건너뛴다.
+     측정 중 탭이 가려지거나 사용자가 입력(클릭·키·스크롤)하면 결과를 버리고 다음 실행 때 다시 잰다. 자동으로 낮췄을 땐 안내 배너로 알리고
+     "강으로 되돌리기" 버튼을 준다. */
+  function fxDecideLevel(deltas) {
+    const d = (deltas || []).slice(3).filter((x) => x > 0 && x < 1000); // 앞 몇 프레임은 시작 지연이라 버린다
+    if (d.length < 12) return null; // 표본 부족 → 판단 보류
+    const sorted = d.slice().sort((x, y) => x - y);
+    const median = sorted[Math.floor(sorted.length / 2)];
+    if (median >= 45) return "off";
+    if (median >= 28) return "lite";
+    // 중앙값이 정상이면 가끔 튀는 프레임(시작 직후 렌더링·GC·네트워크 응답 등)은 GPU 문제가 아니므로 무시한다.
+    // (예전엔 p90 >= 60ms만으로도 "약"으로 낮췄는데, 시작 직후 일시적 끊김에 빠른 PC까지 낮아질 수 있었다.)
+    return "full";
   }
-  function maybeSuggestLowGraphicsMode() {
-    if (isFxReduced()) return;
-    try { if (localStorage.getItem(FX_KEY) !== null) return; } catch (e) {} // 한 번이라도 직접 켜/꺼본 사람은 그 선택을 존중
-    try { if (localStorage.getItem(FX_SUGGEST_KEY)) return; } catch (e) {}
-    if (!_isLikelyLowSpecDevice()) return;
-    try { localStorage.setItem(FX_SUGGEST_KEY, "1"); } catch (e) {}
+  function fxRunProbe(done) {
+    const W = 520, H = 340, DURATION = 1500;
+    const probe = document.createElement("div");
+    probe.setAttribute("aria-hidden", "true");
+    probe.style.cssText = "position:fixed;left:0;top:0;width:" + W + "px;height:" + H + "px;pointer-events:none;z-index:99999;" +
+      "opacity:0.02;background:rgba(255,255,255,0.5);will-change:transform;" +
+      "-webkit-backdrop-filter:blur(16px) saturate(1.6);backdrop-filter:blur(16px) saturate(1.6);";
+    document.body.appendChild(probe);
+    const deltas = [];
+    let last = 0, start = 0, aborted = false, finished = false;
+    // 측정 중 사용자가 무언가 하면(클릭·키 입력·스크롤·터치) 그 순간의 렌더링 부담이 섞여 측정이 왜곡되고,
+    // 느린 PC에서는 측정용 유리판 때문에 클릭 반응도 둔해진다 → 즉시 중단하고(결과 버림) 다음 실행 때 다시 잰다.
+    const onVis = () => { if (document.hidden) aborted = true; };
+    const onInput = () => { aborted = true; if (probe.parentNode) probe.parentNode.removeChild(probe); };
+    const INPUT_EVENTS = ["pointerdown", "keydown", "wheel", "touchstart"];
+    document.addEventListener("visibilitychange", onVis);
+    INPUT_EVENTS.forEach((ev) => document.addEventListener(ev, onInput, true));
+    function finish(result) {
+      if (finished) return;
+      finished = true;
+      document.removeEventListener("visibilitychange", onVis);
+      INPUT_EVENTS.forEach((ev) => document.removeEventListener(ev, onInput, true));
+      if (probe.parentNode) probe.parentNode.removeChild(probe);
+      done(result);
+    }
+    function step(t) {
+      if (aborted) return finish(null);
+      if (!start) start = t;
+      if (last) deltas.push(t - last);
+      last = t;
+      const p = (t - start) / DURATION;
+      if (p >= 1) return finish(deltas);
+      const x = Math.max(0, window.innerWidth - W) * Math.abs(Math.sin(p * Math.PI * 2));
+      const y = Math.max(0, window.innerHeight - H) * Math.abs(Math.cos(p * Math.PI * 2));
+      probe.style.transform = "translate(" + Math.round(x) + "px," + Math.round(y) + "px)";
+      requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+  const FX_LEVEL_LABEL = { lite: "약", off: "끔" };
+  function _showFxAutoBanner(level) {
     const el = document.createElement("div");
     el.className = "cloud-live-banner";
     el.id = "fx-suggest-banner";
     el.innerHTML = `
       <div class="cloud-live-banner-body">
-        <div class="cloud-live-banner-title">그래픽 효과를 줄여볼까요?</div>
-        <div class="cloud-live-banner-desc">이 컴퓨터는 사양이 낮게 감지됐어요. "그래픽 효과 줄이기"를 켜면 화면이 더 부드럽게 움직일 수 있어요. (상태표시줄 → 모드 메뉴에서 언제든 다시 켜고 끌 수 있어요.)</div>
+        <div class="cloud-live-banner-title">그래픽 효과를 "${FX_LEVEL_LABEL[level]}"으로 낮췄어요</div>
+        <div class="cloud-live-banner-desc">이 컴퓨터에서 화면이 부드럽게 그려지지 않아 자동으로 조절했어요. 상태표시줄 → 모드 메뉴에서 끔/약/강을 언제든 바꿀 수 있어요.</div>
         <div class="cloud-live-banner-actions">
           <button type="button" class="ghost-btn" id="fx-suggest-dismiss">괜찮아요</button>
-          <button type="button" class="primary-btn" id="fx-suggest-enable">켜기</button>
+          <button type="button" class="primary-btn" id="fx-suggest-revert">강으로 되돌리기</button>
         </div>
       </div>
     `;
     _liveBannerWrap().appendChild(el);
     document.getElementById("fx-suggest-dismiss").onclick = () => el.remove();
-    document.getElementById("fx-suggest-enable").onclick = () => { setFxReduced(true); el.remove(); };
+    document.getElementById("fx-suggest-revert").onclick = () => { setFxLevel("full"); el.remove(); };
+  }
+  function maybeSuggestLowGraphicsMode() { // 이름은 예전 그대로(js/12-init.js가 호출): 이제 "자동 측정 후 조절"
+    try {
+      if (localStorage.getItem(FX_KEY) !== null) return;        // 직접 골라본 사람은 그 선택을 존중
+      if (localStorage.getItem(FX_PROBED_KEY)) return;          // 이 기기는 이미 측정함
+    } catch (e) { return; }                                     // 저장소를 못 쓰면 매번 재게 되므로 건너뜀
+    try { if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return; } catch (e) {}
+    if (document.hidden) {
+      const once = () => { if (!document.hidden) { document.removeEventListener("visibilitychange", once); maybeSuggestLowGraphicsMode(); } };
+      document.addEventListener("visibilitychange", once);
+      return;
+    }
+    fxRunProbe((deltas) => {
+      if (!deltas) return; // 중단됨 — 기록 안 남기고 다음 실행 때 다시 잰다
+      const level = fxDecideLevel(deltas);
+      if (!level) return;
+      try { localStorage.setItem(FX_PROBED_KEY, "1"); } catch (e) {}
+      if (level === "full") return; // 충분히 빠름: 아무것도 바꾸지 않는다
+      setFxLevel(level, { auto: true });
+      try { localStorage.setItem(FX_AUTO_KEY, "1"); } catch (e) {}
+      _showFxAutoBanner(level);
+    });
   }
 
   /* ===================== 데스크톱 독(Dock) 펼치기/닫기 =====================
@@ -3528,7 +3590,7 @@
     anchorEl.setAttribute("aria-expanded", "true");
     const rect = anchorEl.getBoundingClientRect();
     const current = getCurrentTheme();
-    const fxOn = isFxReduced();
+    const fxLevel = getFxLevel();
     const themeItemsHtml = THEME_LIST.map((t) => `
       <button type="button" class="theme-menu-item ${t.id === current ? "active" : ""}" data-theme-id="${t.id}">
         <span class="theme-menu-dot" style="background:${t.bg};"></span>
@@ -3536,13 +3598,15 @@
         ${t.id === current ? '<span class="theme-menu-check">✓</span>' : ""}
       </button>
     `).join("");
-    // "그래픽 효과 줄이기": 사양이 낮은 컴퓨터에서 배경 블러를 끄는 토글(js/01d-undo-theme-dock.js의 setFxReduced)
+    // "그래픽 효과" 끔/약/강 3단계 스위치(js/01d-undo-theme-dock.js의 setFxLevel)
+    const fxSeg = [["off", "끔"], ["lite", "약"], ["full", "강"]].map(([id, label]) =>
+      `<button type="button" class="theme-menu-fx-opt ${id === fxLevel ? "active" : ""}" data-fx-level="${id}" aria-pressed="${id === fxLevel}">${label}</button>`).join("");
     const fxToggleHtml = `
       <div class="settings-menu-divider"></div>
-      <button type="button" class="theme-menu-item theme-menu-fx-item" data-fx-toggle="1" title="배경 블러를 줄여서 저사양 컴퓨터에서 더 가볍게 동작하게 합니다">
-        <span class="theme-menu-name">그래픽 효과 줄이기</span>
-        <span class="theme-menu-fx-switch ${fxOn ? "on" : ""}" aria-hidden="true"></span>
-      </button>
+      <div class="theme-menu-item theme-menu-fx-item" title="끔: 블러·그림자·애니메이션 제거 / 약: 블러 절반·그림자 작게 / 강: 모든 효과">
+        <span class="theme-menu-name">그래픽 효과</span>
+        <span class="theme-menu-fx-seg" role="group" aria-label="그래픽 효과 단계">${fxSeg}</span>
+      </div>
     `;
     const menu = document.createElement("div");
     menu.id = "status-bar-mode-menu";
@@ -3562,17 +3626,19 @@
         closeStatusBarModeMenu();
       };
     });
-    // 효과 줄이기 토글은 테마 선택과 달리 눌러도 메뉴를 닫지 않고 스위치만 바꿔서,
-    // 켜고 끄며 바로 화면(블러) 변화를 확인해볼 수 있게 한다.
-    const fxToggleBtn = menu.querySelector("[data-fx-toggle]");
-    if (fxToggleBtn) {
-      fxToggleBtn.onclick = (e) => {
+    // 효과 단계는 테마 선택과 달리 눌러도 메뉴를 닫지 않고 표시만 바꿔서,
+    // 단계를 바꿔가며 바로 화면 변화를 확인해볼 수 있게 한다.
+    menu.querySelectorAll("[data-fx-level]").forEach((btn) => {
+      btn.onclick = (e) => {
         e.stopPropagation();
-        setFxReduced(!isFxReduced());
-        const sw = fxToggleBtn.querySelector(".theme-menu-fx-switch");
-        if (sw) sw.classList.toggle("on", isFxReduced());
+        setFxLevel(btn.getAttribute("data-fx-level"));
+        menu.querySelectorAll("[data-fx-level]").forEach((b2) => {
+          const on = b2 === btn;
+          b2.classList.toggle("active", on);
+          b2.setAttribute("aria-pressed", on ? "true" : "false");
+        });
       };
-    }
+    });
     setTimeout(() => document.addEventListener("mousedown", statusBarModeMenuOutsideHandler, true), 0);
   }
   const statusBarModeBtn = document.getElementById("status-bar-mode-btn");
@@ -6578,11 +6644,12 @@
     if (agentListResizeObserver) agentListResizeObserver.disconnect();
     if (typeof ResizeObserver === "undefined") return;
     let lastH = 0;
+    const settle = hdTrailing(() => measureAndSyncAgentPageSize(), 120); // 창 크기를 끄는 동안엔 미루고 멈추면 한 번만 계산
     agentListResizeObserver = new ResizeObserver((entries) => {
       const h = entries[0] && entries[0].contentRect ? entries[0].contentRect.height : 0;
       if (Math.abs(h - lastH) < 1) return;
       lastH = h;
-      measureAndSyncAgentPageSize();
+      settle();
     });
     agentListResizeObserver.observe(listArea);
   }
@@ -8574,7 +8641,7 @@
           year, monthIndex,
           input.value
         );
-        renderApp();
+        qaRefreshAfterScoreEdit();
       };
       // 엑셀처럼 Enter/Tab으로 다음(아래) 칸, Shift+Enter/Shift+Tab으로 이전(위) 칸으로
       // 바로 이동한다. blur()를 호출하면 값이 바뀐 경우 change 이벤트가 이 안에서
@@ -8593,14 +8660,63 @@
     });
   }
 
+  // 통계 카드 묶음(전체 평균~야간 유선 평균). renderQAPage와 점수 한 칸 수정 후 갱신이 같이 쓴다.
+  function qaStatGridHtml(agentsList, year, monthIndex) {
+    const stats = qaComputeStats(agentsList, year, monthIndex);
+    const prevYm = qaPrevMonth(year, monthIndex);
+    const prevStats = qaComputeStats(agentsList, prevYm.year, prevYm.monthIndex);
+    return `
+          ${qaStatItemHtml("전체 평균", stats.total, prevStats.total, true)}
+          ${qaStatItemHtml("유선 점수 평균", stats.voice, prevStats.voice)}
+          ${qaStatItemHtml("채팅 점수 평균", stats.chat, prevStats.chat)}
+          ${qaStatItemHtml("주간 점수 평균", stats.day, prevStats.day)}
+          ${qaStatItemHtml("야간 점수 평균", stats.night, prevStats.night)}
+          ${qaStatItemHtml("주간 채팅 평균", stats.dayChat, prevStats.dayChat)}
+          ${qaStatItemHtml("주간 유선 평균", stats.dayVoice, prevStats.dayVoice)}
+          ${qaStatItemHtml("야간 채팅 평균", stats.nightChat, prevStats.nightChat)}
+          ${qaStatItemHtml("야간 유선 평균", stats.nightVoice, prevStats.nightVoice)}
+        `;
+  }
+
+  // 성능 4단계: 점수 한 칸을 고친 뒤 renderApp()(페이지 전체 + 다른 창까지) 대신 "통계 카드 + 바뀐 행"만 갱신한다.
+  // 행 구성(인원·순서)이 달라졌거나 표가 아직 없으면 표 영역만 통째로, 페이지가 없으면 renderApp()으로 물러선다.
+  function qaRefreshAfterScoreEdit() {
+    const tableArea = document.getElementById("qa-table-area");
+    const statGrid = document.querySelector(".qa-stat-grid");
+    if (!tableArea || !statGrid) { renderApp(); return; }
+    const { year, monthIndex } = qaUi;
+    const agentsList = qaWorkingAgents();
+    const filteredList = qaVisibleAgents();
+    const statHtml = qaStatGridHtml(agentsList, year, monthIndex);
+    if (statGrid._qaHtml !== statHtml) { statGrid._qaHtml = statHtml; statGrid.innerHTML = statHtml; }
+
+    const tpl = document.createElement("template");
+    tpl.innerHTML = buildQATableHtml(filteredList, year, monthIndex, false);
+    const freshRows = Array.from(tpl.content.querySelectorAll("[data-qa-row-agent]"));
+    const liveRows = Array.from(tableArea.querySelectorAll("[data-qa-row-agent]"));
+    const sameShape = freshRows.length === liveRows.length &&
+      freshRows.every((r, i) => r.getAttribute("data-qa-row-agent") === liveRows[i].getAttribute("data-qa-row-agent"));
+    if (sameShape) {
+      freshRows.forEach((fresh, i) => {
+        const live = liveRows[i];
+        const input = live.querySelector(".qa-score-input");
+        // 친 값이 거부돼(잠긴 달·숫자 아님) 저장 안 됐을 때는 문자열이 같아 보이므로 입력칸 값이 어긋난 행도 교체
+        const stale = input && input.value !== input.defaultValue;
+        if (!stale && fresh.outerHTML === live.outerHTML) return;
+        live.replaceWith(fresh);
+        attachQATableAreaHandlers(fresh, filteredList, year, monthIndex);
+      });
+    } else {
+      updateQATableArea();
+    }
+    if (typeof hdRefreshAfterLocalEdit === "function") hdRefreshAfterLocalEdit("qa");
+  }
+
   function renderQAPage(root) {
     const agentsList = qaWorkingAgents();
     const filteredList = qaVisibleAgents();
     const { year, monthIndex } = qaUi;
     // 통계(평균)는 검색어와 무관하게 항상 재직중인 전체 인원 기준으로 보여준다.
-    const stats = qaComputeStats(agentsList, year, monthIndex);
-    const prevYm = qaPrevMonth(year, monthIndex);
-    const prevStats = qaComputeStats(agentsList, prevYm.year, prevYm.monthIndex);
     const locked = qaIsMonthLocked(year, monthIndex);
 
     root.innerHTML = `
@@ -8624,17 +8740,7 @@
       </div>
       <div class="status" id="qa-status"></div>
       <div class="qa-stat-row">
-        <div class="qa-stat-grid">
-          ${qaStatItemHtml("전체 평균", stats.total, prevStats.total, true)}
-          ${qaStatItemHtml("유선 점수 평균", stats.voice, prevStats.voice)}
-          ${qaStatItemHtml("채팅 점수 평균", stats.chat, prevStats.chat)}
-          ${qaStatItemHtml("주간 점수 평균", stats.day, prevStats.day)}
-          ${qaStatItemHtml("야간 점수 평균", stats.night, prevStats.night)}
-          ${qaStatItemHtml("주간 채팅 평균", stats.dayChat, prevStats.dayChat)}
-          ${qaStatItemHtml("주간 유선 평균", stats.dayVoice, prevStats.dayVoice)}
-          ${qaStatItemHtml("야간 채팅 평균", stats.nightChat, prevStats.nightChat)}
-          ${qaStatItemHtml("야간 유선 평균", stats.nightVoice, prevStats.nightVoice)}
-        </div>
+        <div class="qa-stat-grid">${qaStatGridHtml(agentsList, year, monthIndex)}</div>
       </div>
       ${qaFilterRowHtml()}
       <div id="qa-table-area">${buildQATableHtml(filteredList, year, monthIndex, false)}</div>
@@ -9797,11 +9903,12 @@
     interviewListResizeObserver = null;
     if (!listArea || !_interviewsFitToHeight || typeof ResizeObserver === "undefined") return;
     let lastH = 0;
+    const settle = hdTrailing(() => measureAndSyncInterviewPageSize(), 120); // 창 크기를 끄는 동안엔 미루고 멈추면 한 번만 계산
     interviewListResizeObserver = new ResizeObserver((entries) => {
       const h = entries[0] && entries[0].contentRect ? entries[0].contentRect.height : 0;
       if (Math.abs(h - lastH) < 1) return;
       lastH = h;
-      measureAndSyncInterviewPageSize();
+      settle();
     });
     interviewListResizeObserver.observe(listArea);
   }
@@ -12360,6 +12467,8 @@
     const scale = Math.min(availW / naturalW, 1);
     const scaledW = naturalW * scale;
     const offsetX = Math.max(0, (availW - scaledW) / 2);
+    inner._fitNatW = naturalW; // 성능 4단계: 행만 바꿨을 때 크기가 그대로인지 비교하는 기준
+    inner._fitNatH = naturalH;
     inner.style.width = `${naturalW}px`;
     inner.style.height = `${naturalH}px`;
     inner.style.transform = `translateX(${offsetX}px) scale(${scale})`;
@@ -12387,20 +12496,92 @@
     _scheduleFitObserver.observe(wrap);
   }
 
+  // ---- 성능 4단계: 셀 하나를 고칠 때 표 전체(수천 개 칸)를 HTML로 다시 만들어 갈아끼우던 것을 "바뀐 행만 교체"로 줄인다.
+  //      표 HTML 문자열은 예전처럼 만들되(문자열 조립은 싸다), 지난번 문자열과 행(<tr>) 단위로 비교해서 달라진 행만
+  //      실제 DOM에서 바꾼다. 셀 하나를 고치면 보통 그 인원 행 + 날짜별 집계/필요인력 대비 행 몇 개만 달라진다.
+  //      구조가 달라졌으면(행 수·머리글·접기 상태 등) 예전처럼 통째로 다시 그린다.
+  function scheduleSplitRows(html) {
+    const parts = html.split("</tr>");
+    const tail = parts.pop();
+    const pre = [], rows = [];
+    for (let i = 0; i < parts.length; i++) {
+      const at = parts[i].lastIndexOf("<tr");
+      if (at < 0) return null;
+      pre.push(parts[i].slice(0, at));
+      rows.push(parts[i].slice(at) + "</tr>");
+    }
+    return { pre, rows, tail };
+  }
+  // 바뀐 행만 갈아끼웠으면 true, 구조가 달라 못 했으면 false(호출한 쪽이 통째로 다시 그린다)
+  function schedulePatchTableRows(tableArea, prev, next) {
+    if (!prev || !next || !tableArea.querySelector(".schedule-table-wrap")) return false;
+    if (prev.rows.length !== next.rows.length || prev.tail !== next.tail) return false;
+    for (let i = 0; i < next.pre.length; i++) if (prev.pre[i] !== next.pre[i]) return false;
+    const trs = tableArea.querySelectorAll("tr");
+    if (trs.length !== next.rows.length) return false;
+    const changed = new Set();
+    for (let i = 0; i < next.rows.length; i++) if (prev.rows[i] !== next.rows[i]) changed.add(i);
+    // 편집 중이던 칸은 입력창이 HTML이 아니라 DOM에 직접 끼워져 있어서 문자열로는 안 바뀐 것처럼 보인다 → 그 행도 교체
+    tableArea.querySelectorAll(".sch-cell--editing, .sch-cell-input").forEach((el) => {
+      const tr = el.closest("tr");
+      const idx = tr ? Array.prototype.indexOf.call(trs, tr) : -1;
+      if (idx >= 0) changed.add(idx);
+    });
+    // 필요인력 입력칸에 친 값이 저장되지 않고 거부됐을 때(잠긴 달 등) 문자열은 그대로라 안 바뀐 것처럼 보인다 → 그 행도 교체해 원래 값으로 되돌린다
+    tableArea.querySelectorAll(".sch-required-input").forEach((el) => {
+      if (el.value === el.defaultValue) return;
+      const tr = el.closest("tr");
+      const idx = tr ? Array.prototype.indexOf.call(trs, tr) : -1;
+      if (idx >= 0) changed.add(idx);
+    });
+    if (changed.size > next.rows.length * 0.6) return false; // 대부분 바뀌었으면 통째로 그리는 게 더 빠르다
+    const tpl = document.createElement("template");
+    changed.forEach((i) => {
+      tpl.innerHTML = "<table><tbody>" + next.rows[i] + "</tbody></table>";
+      const fresh = tpl.content.querySelector("tr");
+      if (!fresh) return;
+      trs[i].replaceWith(fresh);
+      attachScheduleElementHandlers(fresh);
+    });
+    // 통째로 다시 그릴 땐 사라지던 드래그 선택 표시를 똑같이 지운다(안 바뀐 행에 남아 있을 수 있음)
+    tableArea.querySelectorAll(".sch-cell--selected").forEach((el) => el.classList.remove("sch-cell--selected"));
+    scheduleApplyHeaderSelectionHighlight();
+    scheduleApplyCopiedOutline();
+    return true;
+  }
+
   function updateScheduleTableArea() {
     const tableArea = document.getElementById("schedule-table-area");
     const logArea = document.getElementById("schedule-log-area");
+    let needFit = true;
     if (tableArea) {
-      tableArea.innerHTML = `<div class="schedule-table-wrap"><div class="schedule-scale-inner">${buildScheduleTableHtml()}</div></div>`;
-      attachScheduleTableHandlers(tableArea);
+      const html = buildScheduleTableHtml();
+      const next = scheduleSplitRows(html);
+      if (schedulePatchTableRows(tableArea, tableArea._schParts, next)) {
+        // 표 크기(맞춤 배율 계산 기준)가 그대로면 강제 레이아웃이 두 번 도는 fitScheduleTable()을 건너뛴다.
+        const table = tableArea.querySelector("table");
+        const inner = tableArea.querySelector(".schedule-scale-inner");
+        const stable = !!(table && inner && inner._fitNatW && table.offsetWidth === inner._fitNatW && table.offsetHeight === inner._fitNatH);
+        needFit = !stable;
+      } else {
+        tableArea.innerHTML = `<div class="schedule-table-wrap"><div class="schedule-scale-inner">${html}</div></div>`;
+        attachScheduleTableHandlers(tableArea);
+      }
+      tableArea._schParts = next;
     }
     if (logArea) {
-      logArea.innerHTML = buildScheduleLogHtml();
-      attachScheduleLogHandlers(logArea);
+      const logHtml = buildScheduleLogHtml();
+      if (logArea._schLogHtml !== logHtml || !logArea.firstChild) {
+        logArea._schLogHtml = logHtml;
+        logArea.innerHTML = logHtml;
+        attachScheduleLogHandlers(logArea);
+      }
     }
-    fitScheduleTable();
-    syncScheduleLogWidth();
-    watchScheduleTableSize();
+    if (needFit) {
+      fitScheduleTable();
+      syncScheduleLogWidth();
+      watchScheduleTableSize();
+    }
   }
 
   // 월별 스케줄 표를 통째로 PNG 이미지로 캡처해서 다운로드한다.
@@ -13249,7 +13430,9 @@
     }
   }
 
-  function attachScheduleTableHandlers(root) {
+  // 성능 4단계: 이벤트 핸들러 중 "요소마다 붙는" 부분(셀·입력칸·머리글). 표 전체를 다시 그릴 때뿐 아니라
+  // 바뀐 행만 교체할 때(js/07a5-schedule-log-capture.js updateScheduleTableArea)도 새 행에 이것만 붙인다.
+  function attachScheduleElementHandlers(root) {
     root.querySelectorAll(".sch-cell").forEach((cell) => {
       // 왼쪽 클릭(드래그 없이 눌렀다 뗌)은 이제 메뉴를 열지 않는다 — 셀 선택/드래그 선택
       // 용도로만 쓰고, 그 칸 하나의 메뉴(상태 변경/메모/이력 등)는 오른쪽 클릭(우클릭)
@@ -13294,7 +13477,7 @@
           Number(input.getAttribute("data-required-day")),
           input.value
         );
-        renderApp();
+        updateScheduleTableArea(); // 성능 4단계: 필요인력은 표(집계·대비 행)에만 영향 → 바뀐 행만 갱신 (예전: renderApp() 전체)
       };
       input.onkeydown = (e) => { if (e.key === "Enter") input.blur(); };
     });
@@ -13328,6 +13511,10 @@
         scheduleHeaderDragStart("row", td.getAttribute("data-row-key"), e);
       };
     });
+  }
+  // 표 영역(#schedule-table-area) 자체에 한 번 붙는 핸들러 + 요소 핸들러 + 표시 복원.
+  function attachScheduleTableHandlers(root) {
+    attachScheduleElementHandlers(root);
     root.onmouseover = scheduleHeaderDragOver;
     // 헤더가 아닌 다른 곳을 클릭하면 열/행 선택을 해제한다.
     root.onclick = (e) => {
@@ -17499,6 +17686,8 @@
             Array.from(col.querySelectorAll(".wd[data-home-card]")).map((c) => c.getAttribute("data-home-card"))
           );
           saveHomeLayout(newLayout);
+          const hr = document.getElementById("home-root");
+          if (hr) hr._hwHtml = null; // DOM이 직접 옮겨졌으니 다음 renderHomePage는 반드시 새로 그린다
         }
         document.addEventListener("pointermove", onMove);
         document.addEventListener("pointerup", onUp);
@@ -17690,7 +17879,13 @@
       [remainingCount, "남은 할 일", "ac"],
       [totalAgents, "전체 상담사", ""],
     ];
-    root.innerHTML = `<div id="wg"><div class="wd hero"><div class="wh"><span style="color:var(--t)">${m + 1}월 ${d}일 <span>${wd}요일</span></span>${holiday ? `<small>${esc(holiday)}</small>` : ""}</div><div class="st">${stats.map((x) => `<div class="${x[2]}"><b>${x[0]}</b><small>${x[1]}</small></div>`).join("")}</div></div><div class="cols" id="home-card-grid">${homeColumnsHtml}</div></div>`;
+    const homeWidgetHtml = `<div id="wg"><div class="wd hero"><div class="wh"><span style="color:var(--t)">${m + 1}월 ${d}일 <span>${wd}요일</span></span>${holiday ? `<small>${esc(holiday)}</small>` : ""}</div><div class="st">${stats.map((x) => `<div class="${x[2]}"><b>${x[0]}</b><small>${x[1]}</small></div>`).join("")}</div></div><div class="cols" id="home-card-grid">${homeColumnsHtml}</div></div>`;
+    // 성능 3단계: 위젯 내용이 지난번과 똑같으면(다른 창에서 뭔가 고쳤지만 위젯에 보이는 값은 그대로일 때 등)
+    // DOM을 통째로 갈아엎지 않는다 — 유리(블러) 위젯을 매번 새로 그려 다시 합성하는 비용이 사라진다.
+    // (카드를 끌어 옮긴 직후엔 DOM만 바뀌어 있으므로 아래 드롭 처리에서 이 값을 비워 다시 그리게 한다)
+    if (root._hwHtml === homeWidgetHtml && root.firstChild) return;
+    root._hwHtml = homeWidgetHtml;
+    root.innerHTML = homeWidgetHtml;
 
     root.querySelectorAll("[data-a]").forEach((el) => {
       el.onclick = () => setPage(el.getAttribute("data-a"));
@@ -17918,7 +18113,7 @@
 
   function renderNav() {
     const nav = document.getElementById("nav");
-    nav.innerHTML = `
+    const navHtml = `
       ${!CURRENT_ACCOUNT_IS_MASTER ? `<div class="nav-label-top">메뉴</div>` : ""}
       ${MASTER_ORIGIN_ACCOUNT ? `
         <div class="nav-master-banner">
@@ -17943,6 +18138,10 @@
     `;
     renderUndoToggle();
     renderHomeDesktop();
+    // 성능 3단계: 메뉴 HTML이 지난번과 같으면(활성 페이지·마스터 배너가 그대로) 다시 만들지도, 이벤트를 다시 붙이지도 않는다.
+    if (nav._navHtml === navHtml && nav.firstChild) return;
+    nav._navHtml = navHtml;
+    nav.innerHTML = navHtml;
     nav.querySelectorAll("[data-nav]").forEach((btn) => {
       btn.onclick = () => { setPage(btn.getAttribute("data-nav")); closeDock(); };
     });
@@ -18004,7 +18203,7 @@
   // state[page] = { minimized, maximized, justOpened } — justOpened는 "방금 새로 연" 창에만 켜서(복원 때는
   // 켜지 않음) 팝 애니메이션을 돌리고 스크롤을 맨 위로 되돌린다. 복원(내려간 창을 다시 열기)은 이 플래그를
   // 켜지 않아서, 스크롤 위치 등 그 페이지 안에서 하던 작업 화면이 그대로 남아 있는다.
-  const hdWin = { order: [], state: {} };
+  const hdWin = { order: [], state: {}, dirty: {} }; // dirty[page]: 성능 3단계 — 데이터가 바뀌었지만 아직 다시 안 그린 창
   // 화면 좌/우 절반 붙이기(스냅) 관련 임시 상태: 어시스트 패널 DOM과 그 패널을 닫기 위한 문서 이벤트 핸들러.
   const hdSnap = { assistEl: null, onDown: null, onKey: null };
 
@@ -18116,6 +18315,7 @@
       }
     });
     hdSaveOpenWindowsState();
+    if (hdNeedsRender(page)) hdScheduleFlush(); // 성능 3단계: 낡은 창을 눌러 앞으로 올리면 곧(마우스를 뗀 뒤) 최신으로 그린다
   }
 
   // opts.minimized/opts.maximized를 넘기면(부팅 시 복원 전용) 그 상태로 접힌 채/최대화된 채
@@ -18189,13 +18389,15 @@
       const maxH = Math.max(minH, window.innerHeight - 55);
       frame.style.cursor = "nwse-resize";
       try { frame.setPointerCapture?.(e.pointerId); } catch (_) {}
-      const move = (v) => {
+      const moveNow = (v) => {
         const width = Math.min(maxW, Math.max(minW, startW + (v.clientX - startX)));
         const height = Math.min(maxH, Math.max(minH, startH + (v.clientY - startY)));
         frame.style.width = Math.round(width) + "px";
         frame.style.height = Math.round(height) + "px";
       };
+      const move = hdRafMove(moveNow);
       const up = () => {
+        move.flush();
         document.removeEventListener("pointermove", move, true);
         document.removeEventListener("pointerup", up, true);
         document.removeEventListener("pointercancel", up, true);
@@ -18225,13 +18427,15 @@
         const minW = 340, minH = 240;
         const maxW = Math.max(minW, window.innerWidth - 16);
         const maxH = Math.max(minH, window.innerHeight - 55);
-        const moveSE = (v) => {
+        const moveSENow = (v) => {
           const width = Math.min(maxW, Math.max(minW, startW + (v.clientX - startX)));
           const height = Math.min(maxH, Math.max(minH, startH + (v.clientY - startY)));
           frame.style.width = Math.round(width) + "px";
           frame.style.height = Math.round(height) + "px";
         };
+        const moveSE = hdRafMove(moveSENow);
         const upSE = () => {
+          moveSE.flush();
           document.removeEventListener("pointermove", moveSE);
           document.removeEventListener("pointerup", upSE);
           document.removeEventListener("pointercancel", upSE);
@@ -18261,7 +18465,7 @@
         const minW = 340, minH = 240;
         const maxW = Math.max(minW, window.innerWidth - 16);
         const maxH = Math.max(minH, window.innerHeight - 55);
-        const move = (v) => {
+        const moveNow = (v) => {
           const dx = v.clientX - startX, dy = v.clientY - startY;
           let left = start.left, top = start.top, width = start.width, height = start.height;
           if (dir.includes("e")) width = Math.min(maxW, Math.max(minW, start.width + dx));
@@ -18279,7 +18483,9 @@
           frame.style.left = Math.round(left) + "px"; frame.style.top = Math.round(top) + "px";
           frame.style.width = Math.round(width) + "px"; frame.style.height = Math.round(height) + "px";
         };
+        const move = hdRafMove(moveNow);
         const up = () => {
+          move.flush();
           document.removeEventListener("pointermove", move);
           document.removeEventListener("pointerup", up);
           document.removeEventListener("pointercancel", up);
@@ -18339,7 +18545,7 @@
       const origLeft = frame.style.left, origTop = frame.style.top;
       const topMin = 39;
       let side = null;
-      const move = (v) => {
+      const moveNow = (v) => {
         if (st.snap) {
           if (Math.abs(v.clientX - startX) < 6 && Math.abs(v.clientY - startY) < 6) return;
           // 붙어 있던 창을 끌어내는 순간: 인라인 left/top/width/height에는 붙이기 전 값이 그대로 남아 있으므로
@@ -18360,7 +18566,9 @@
         const next = hdSnapSideAt(v.clientX);
         if (next !== side) { side = next; hdShowSnapPreview(side); }
       };
+      const move = hdRafMove(moveNow);
       const up = () => {
+        move.flush();
         document.removeEventListener("pointermove", move);
         document.removeEventListener("pointerup", up);
         document.removeEventListener("pointercancel", up);
@@ -18447,6 +18655,7 @@
       setTimeout(() => frame.remove(), 230);
     }
     delete hdWin.state[page];
+    delete hdWin.dirty[page];
     const idx = hdWin.order.indexOf(page);
     if (idx !== -1) hdWin.order.splice(idx, 1);
     if (typeof _resetExpandedStateForPage === "function") _resetExpandedStateForPage(page);
@@ -18466,26 +18675,98 @@
     });
     hdWin.order = [];
     hdWin.state = {};
+    hdWin.dirty = {};
     document.body.classList.remove("hd-win-open"); // 창이 하나도 없으니 바탕화면 위젯 블러도 해제
     hdSaveOpenWindowsState();
   }
 
-  // renderApp()이 홈 위젯을 그린 뒤 불린다: 열려 있는 모든 창 각각에 그 페이지를 새로 그려서, 여러 창이
-  // 동시에 열려 있어도(다른 기기 동기화 등으로) 전부 최신 내용을 보여주게 한다. 실제로 화면에 없던 창을
-  // 새로 열 때는 appWin 상태가 이미 09a-home-desktop.js 쪽에서 만들어져 있다.
-  function renderHomeDesktopWindows() {
+  // ---- 성능 3단계: renderApp()이 불릴 때마다 열려 있는 창 "전부"를 HTML부터 다시 만들던 것을 줄인다.
+  //      - 지금 맨 앞(사용자가 만지고 있는) 창은 예전처럼 즉시 다시 그린다 → 클릭 직후 화면 반응은 그대로.
+  //      - 내려가(최소화) 있는 창은 그리지 않고 "바뀜(dirty)" 표시만 해둔다 → 다시 펼칠 때 그린다.
+  //      - 화면에 같이 떠 있는 뒤쪽 창(반쪽 붙이기 등)은 150ms 뒤로 미뤄서 그린다 → 클릭 처리와 같은 프레임에서 안 그린다.
+  //        (여러 번 불려도 한 번만 그림. 끌기/크기 조절 중이나 마우스를 누르고 있는 동안엔 놓을 때까지 기다림)
+  //      - 한 번도 안 그려본 창(새로고침 후 복원 등)은 내려가 있지 않은 한 바로 그린다.
+  function hdTopVisiblePageNow() {
+    for (let i = hdWin.order.length - 1; i >= 0; i--) {
+      const st = hdWin.state[hdWin.order[i]];
+      if (st && !st.minimized) return hdWin.order[i];
+    }
+    return null;
+  }
+
+  // 창 하나의 내용을 지금 다시 그린다.
+  function hdRenderWindow(page) {
+    const frame = document.getElementById("app-win-" + page);
+    const fn = hdPageRenderer(page);
+    if (!frame || !fn) return;
+    const inner = frame.querySelector(".page-inner");
+    if (!inner) return;
+    delete hdWin.dirty[page];
+    frame._hdRendered = true;
+    inner.classList.toggle("wide", page === "schedule" || page === "calendar");
+    fn(inner);
+    const st = hdWin.state[page];
+    if (st && st.justOpened) inner.scrollTop = 0;
+  }
+
+  // 보이는 창인데 내용이 낡았거나(dirty) 아직 한 번도 안 그렸는가
+  function hdNeedsRender(page) {
+    const st = hdWin.state[page];
+    if (!st || st.minimized || !hdPageRenderer(page)) return false;
+    const frame = document.getElementById("app-win-" + page);
+    if (!frame) return false;
+    return !frame._hdRendered || !!hdWin.dirty[page];
+  }
+
+  let hdFlushTimer = 0;
+  let hdPointerIsDown = false;
+  document.addEventListener("pointerdown", () => { hdPointerIsDown = true; }, true);
+  document.addEventListener("pointerup", () => { hdPointerIsDown = false; }, true);
+  document.addEventListener("pointercancel", () => { hdPointerIsDown = false; }, true);
+  window.addEventListener("blur", () => { hdPointerIsDown = false; });
+
+  function hdScheduleFlush(ms) {
+    if (hdFlushTimer) return;
+    hdFlushTimer = setTimeout(hdFlushDirtyWindows, ms == null ? 150 : ms);
+  }
+
+  // 미뤄 둔 창들을 그린다. 끌기/크기 조절 중이거나 마우스를 누르고 있으면(클릭이 도중에 끊기지 않게) 조금 뒤로 다시 미룬다.
+  function hdFlushDirtyWindows() {
+    hdFlushTimer = 0;
+    if (CURRENT_ACCOUNT_IS_MASTER) return;
+    if (hdPointerIsDown || document.body.classList.contains("hd-interacting")) { hdScheduleFlush(120); return; }
+    hdWin.order.slice().forEach((page) => { if (hdNeedsRender(page)) hdRenderWindow(page); });
+  }
+
+  // 성능 4단계: 창 안에서 셀 하나를 고친 뒤, 그 창은 호출한 쪽이 직접(바뀐 행만) 갱신했으니 renderApp() 대신 이걸 부른다.
+  // 다른 창은 낡음 표시(맨 앞이면 곧 그림), 뒤 바탕화면 위젯·폴더는 내용이 바뀐 경우에만 다시 그린다.
+  function hdRefreshAfterLocalEdit(exceptPage) {
     if (CURRENT_ACCOUNT_IS_MASTER) return;
     hdWin.order.forEach((page) => {
+      if (page === exceptPage || !hdPageRenderer(page)) return;
       const frame = document.getElementById("app-win-" + page);
-      const fn = hdPageRenderer(page);
-      if (!frame || !fn) return;
-      const inner = frame.querySelector(".page-inner");
-      if (!inner) return;
-      inner.classList.toggle("wide", page === "schedule" || page === "calendar");
-      fn(inner);
-      const st = hdWin.state[page];
-      if (st && st.justOpened) inner.scrollTop = 0;
+      if (frame && frame._hdRendered) hdWin.dirty[page] = true;
     });
+    refreshHomeWidgetsBehindWindow();
+    hdScheduleFlush();
+  }
+
+  // renderApp()이 홈 위젯을 그린 뒤 불린다. 예전엔 열려 있는 모든 창을 매번 새로 그렸지만, 이제는
+  // 맨 앞 창만 즉시 그리고 나머지는 위 규칙대로 미루거나 표시만 해 둔다(다른 기기 동기화로 바뀐 내용도 결국 전부 반영됨).
+  function renderHomeDesktopWindows() {
+    if (CURRENT_ACCOUNT_IS_MASTER) return;
+    const top = hdTopVisiblePageNow();
+    let deferred = false;
+    hdWin.order.forEach((page) => {
+      const frame = document.getElementById("app-win-" + page);
+      if (!frame || !hdPageRenderer(page)) return;
+      const st = hdWin.state[page];
+      const minimized = !!(st && st.minimized);
+      if (page === top || (!frame._hdRendered && !minimized)) { hdRenderWindow(page); return; }
+      hdWin.dirty[page] = true;
+      if (!minimized) deferred = true;
+    });
+    if (deferred) hdScheduleFlush();
     syncAppWindows();
   }
 
@@ -18521,6 +18802,8 @@
         frame.addEventListener("animationend", () => frame.classList.remove("aw-pop"), { once: true });
       }
     });
+    // 성능 3단계 안전망: 내려가 있다가 펼쳐졌거나 앞으로 올라온 창이 낡은 채로 남지 않게 한다.
+    if (hdWin.order.some(hdNeedsRender)) hdScheduleFlush();
   }
 
   // 페이지 창이 열려 있는 동안 뒤 바탕화면 위젯만 다시 그린다 (다른 기기에서 바뀐 내용 반영용 — 창 안 화면은 건드리지 않음)
@@ -18691,6 +18974,47 @@
   if (statusBarMasterReturnBtn && MASTER_ORIGIN_ACCOUNT) {
     statusBarMasterReturnBtn.hidden = false;
     statusBarMasterReturnBtn.onclick = (e) => { e.stopPropagation(); masterReturnToOrigin(); };
+  }
+
+  // ---- 성능 1단계: 창 이동/크기 조절/아이콘·위젯 끌기 중에는 body.hd-interacting을 붙여 남은 상시 유리질감(블러)을 잠깐 끈다
+  //      (css/99z-perf-step1.css). 놓으면(pointerup/pointercancel/창 포커스 이탈) 바로 뗀다. 클래스가 남아버리는 사고를 막으려고
+  //      버튼이 떼어진 채 움직이는 pointermove를 만나도 뗀다.
+  (function hdInteractingClass() {
+    const cls = "hd-interacting";
+    const on = (e) => {
+      if (e.button !== undefined && e.button !== 0) return;
+      const t = e.target;
+      if (!t || !t.closest) return;
+      if (t.closest(".aw-tb, [data-resize], .hd-fld, #wg .wd")) { document.body.classList.add(cls); return; }
+      // 우하단 모서리(창 안 내용 위에 겹쳐 있어 [data-resize]가 아닌 곳이 target일 수 있는 대각선 리사이즈 영역)
+      const win = t.closest(".app-win");
+      if (win) {
+        const r = win.getBoundingClientRect();
+        if (e.clientX >= r.right - 28 && e.clientY >= r.bottom - 28) document.body.classList.add(cls);
+      }
+    };
+    const off = () => document.body.classList.remove(cls);
+    document.addEventListener("pointerdown", on, true);
+    document.addEventListener("pointerup", off, true);
+    document.addEventListener("pointercancel", off, true);
+    document.addEventListener("pointermove", (e) => { if (e.buttons === 0 && document.body.classList.contains(cls)) off(); }, true);
+    window.addEventListener("blur", off);
+  })();
+
+  // ---- 성능 2단계: pointermove는 초당 수백 번도 들어오지만 화면은 프레임당 한 번만 그리면 된다.
+  //      창 이동/크기 조절 핸들러를 이 래퍼로 감싸 "프레임마다 마지막 좌표로 1번만" 적용한다.
+  //      놓을 때(up)는 flush()로 남은 마지막 좌표를 즉시 반영해서 최종 위치/크기가 어긋나지 않게 한다.
+  function hdRafMove(move) {
+    let last = null, id = 0;
+    const run = () => { id = 0; if (last) { const v = last; last = null; move(v); } };
+    const handler = (v) => { last = { clientX: v.clientX, clientY: v.clientY }; if (!id) id = requestAnimationFrame(run); };
+    handler.flush = () => { if (id) { cancelAnimationFrame(id); id = 0; } if (last) { const v = last; last = null; move(v); } };
+    return handler;
+  }
+  // 리사이즈 중 매 프레임 실행되던 무거운 측정(목록 페이지 크기 계산 등)을 "멈춘 뒤 한 번"으로 미룬다.
+  function hdTrailing(fn, ms) {
+    let t = 0;
+    return function () { clearTimeout(t); t = setTimeout(fn, ms); };
   }
 
   // ==================== 바탕화면 폴더: 빈 바탕화면 우클릭 → "새 폴더", 누르면 폴더 창 ====================
@@ -18880,7 +19204,7 @@
     if (dfUi.renamingId || dfUi.dragging) return;
     const list = Object.values(desktopFoldersData.folders).sort((a, b) => String(a.createdAt || "").localeCompare(String(b.createdAt || "")));
     let migrated = false;
-    layer.innerHTML = list.map((f) => {
+    const foldersHtml = list.map((f) => {
       // 저장된 픽셀 좌표(x,y)가 아니라 그리드 칸(col,row)을 기준으로 매번 새로 좌표를 계산한다.
       // 그래야 모니터 해상도·창 크기가 달라져(화면 오른쪽 기준선이 움직여) 있어도 항상 같은 칸에 놓인다.
       // 옛 데이터(칸 정보 없이 x,y만 있던 폴더)는 지금 화면 기준으로 칸을 한 번 계산해 그 자리에 고정한다.
@@ -18895,6 +19219,11 @@
       const p = desktopFolderCellToPos(f.col, f.row);
       return `<div class="hd-fld" role="button" tabindex="0" data-fld-id="${esc(f.id)}" style="left:${p.x}px;top:${p.y}px" title="${esc(f.name)}">${DESKTOP_FOLDER_SVG}<span class="hd-fld-name">${esc(f.name)}</span></div>`;
     }).join("");
+    // 성능 3단계: 폴더 목록·위치가 지난번과 같으면 아이콘을 다시 만들지 않는다(이름 바꾸기/끌기는 DOM을 직접 건드리므로 시작할 때 이 값을 비운다)
+    if (layer._dfHtml !== foldersHtml || !layer.firstChild && list.length) {
+      layer._dfHtml = foldersHtml;
+      layer.innerHTML = foldersHtml;
+    }
     if (migrated) saveDesktopFoldersData();
     syncDesktopFolderStates();
   }
@@ -18929,6 +19258,7 @@
     const el = layer && layer.querySelector(`.hd-fld[data-fld-id="${id}"]`);
     if (!f || !el || dfUi.renamingId) return;
     dfUi.renamingId = id;
+    if (dfLayer()) dfLayer()._dfHtml = null; // 성능 3단계: 이름 입력칸이 DOM에 끼어들므로 끝나면 반드시 새로 그리게
     el.classList.add("renaming");
     const nameEl = el.querySelector(".hd-fld-name");
     nameEl.innerHTML = `<input type="text" class="hd-fld-input" maxlength="${DESKTOP_FOLDER_NAME_MAX}" spellcheck="false" aria-label="폴더 이름" value="${esc(f.name)}">`;
@@ -19083,6 +19413,7 @@
         if (!moved && Math.abs(v.clientX - startX) < 5 && Math.abs(v.clientY - startY) < 5) return;
         moved = true;
         dfUi.dragging = true;
+        if (dfLayer()) dfLayer()._dfHtml = null; // 성능 3단계: 끄는 동안 DOM 위치를 직접 바꾸므로 놓은 뒤 반드시 새로 그리게
         el.classList.add("dragging");
         const p = desktopFolderClampPos(v.clientX - offX, v.clientY - offY);
         el.style.left = p.x + "px";
@@ -20317,7 +20648,12 @@
   // 이 브라우저(컴퓨터)에서 처음으로 사양이 낮아 보이면, "그래픽 효과 줄이기" 토글의
   // 존재를 몰라서 못 쓰는 경우를 막기 위해 딱 한 번만 안내한다 (js/01d-undo-theme-dock.js).
   if (!CURRENT_ACCOUNT_IS_MASTER && typeof maybeSuggestLowGraphicsMode === "function") {
-    setTimeout(maybeSuggestLowGraphicsMode, 600);
+    // 시작 직후(부팅 로더 해제·첫 렌더·브리핑 토스트·클라우드 동기화)는 화면이 일시적으로 바빠서 측정하면 빠른 PC도
+    // 느리게 나올 수 있다. 그래서 충분히 가라앉은 뒤(3초 후, 브라우저가 한가할 때)에 잰다.
+    setTimeout(() => {
+      if (typeof requestIdleCallback === "function") requestIdleCallback(() => maybeSuggestLowGraphicsMode(), { timeout: 3000 });
+      else maybeSuggestLowGraphicsMode();
+    }, 3000);
   }
 
   // 로그인/계정 생성 직후 딱 한 번, 홈 화면 위에 팝업을 살짝 늦게(화면이 먼저 자리

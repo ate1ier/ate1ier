@@ -173,7 +173,7 @@
           year, monthIndex,
           input.value
         );
-        renderApp();
+        qaRefreshAfterScoreEdit();
       };
       // 엑셀처럼 Enter/Tab으로 다음(아래) 칸, Shift+Enter/Shift+Tab으로 이전(위) 칸으로
       // 바로 이동한다. blur()를 호출하면 값이 바뀐 경우 change 이벤트가 이 안에서
@@ -192,14 +192,63 @@
     });
   }
 
+  // 통계 카드 묶음(전체 평균~야간 유선 평균). renderQAPage와 점수 한 칸 수정 후 갱신이 같이 쓴다.
+  function qaStatGridHtml(agentsList, year, monthIndex) {
+    const stats = qaComputeStats(agentsList, year, monthIndex);
+    const prevYm = qaPrevMonth(year, monthIndex);
+    const prevStats = qaComputeStats(agentsList, prevYm.year, prevYm.monthIndex);
+    return `
+          ${qaStatItemHtml("전체 평균", stats.total, prevStats.total, true)}
+          ${qaStatItemHtml("유선 점수 평균", stats.voice, prevStats.voice)}
+          ${qaStatItemHtml("채팅 점수 평균", stats.chat, prevStats.chat)}
+          ${qaStatItemHtml("주간 점수 평균", stats.day, prevStats.day)}
+          ${qaStatItemHtml("야간 점수 평균", stats.night, prevStats.night)}
+          ${qaStatItemHtml("주간 채팅 평균", stats.dayChat, prevStats.dayChat)}
+          ${qaStatItemHtml("주간 유선 평균", stats.dayVoice, prevStats.dayVoice)}
+          ${qaStatItemHtml("야간 채팅 평균", stats.nightChat, prevStats.nightChat)}
+          ${qaStatItemHtml("야간 유선 평균", stats.nightVoice, prevStats.nightVoice)}
+        `;
+  }
+
+  // 성능 4단계: 점수 한 칸을 고친 뒤 renderApp()(페이지 전체 + 다른 창까지) 대신 "통계 카드 + 바뀐 행"만 갱신한다.
+  // 행 구성(인원·순서)이 달라졌거나 표가 아직 없으면 표 영역만 통째로, 페이지가 없으면 renderApp()으로 물러선다.
+  function qaRefreshAfterScoreEdit() {
+    const tableArea = document.getElementById("qa-table-area");
+    const statGrid = document.querySelector(".qa-stat-grid");
+    if (!tableArea || !statGrid) { renderApp(); return; }
+    const { year, monthIndex } = qaUi;
+    const agentsList = qaWorkingAgents();
+    const filteredList = qaVisibleAgents();
+    const statHtml = qaStatGridHtml(agentsList, year, monthIndex);
+    if (statGrid._qaHtml !== statHtml) { statGrid._qaHtml = statHtml; statGrid.innerHTML = statHtml; }
+
+    const tpl = document.createElement("template");
+    tpl.innerHTML = buildQATableHtml(filteredList, year, monthIndex, false);
+    const freshRows = Array.from(tpl.content.querySelectorAll("[data-qa-row-agent]"));
+    const liveRows = Array.from(tableArea.querySelectorAll("[data-qa-row-agent]"));
+    const sameShape = freshRows.length === liveRows.length &&
+      freshRows.every((r, i) => r.getAttribute("data-qa-row-agent") === liveRows[i].getAttribute("data-qa-row-agent"));
+    if (sameShape) {
+      freshRows.forEach((fresh, i) => {
+        const live = liveRows[i];
+        const input = live.querySelector(".qa-score-input");
+        // 친 값이 거부돼(잠긴 달·숫자 아님) 저장 안 됐을 때는 문자열이 같아 보이므로 입력칸 값이 어긋난 행도 교체
+        const stale = input && input.value !== input.defaultValue;
+        if (!stale && fresh.outerHTML === live.outerHTML) return;
+        live.replaceWith(fresh);
+        attachQATableAreaHandlers(fresh, filteredList, year, monthIndex);
+      });
+    } else {
+      updateQATableArea();
+    }
+    if (typeof hdRefreshAfterLocalEdit === "function") hdRefreshAfterLocalEdit("qa");
+  }
+
   function renderQAPage(root) {
     const agentsList = qaWorkingAgents();
     const filteredList = qaVisibleAgents();
     const { year, monthIndex } = qaUi;
     // 통계(평균)는 검색어와 무관하게 항상 재직중인 전체 인원 기준으로 보여준다.
-    const stats = qaComputeStats(agentsList, year, monthIndex);
-    const prevYm = qaPrevMonth(year, monthIndex);
-    const prevStats = qaComputeStats(agentsList, prevYm.year, prevYm.monthIndex);
     const locked = qaIsMonthLocked(year, monthIndex);
 
     root.innerHTML = `
@@ -223,17 +272,7 @@
       </div>
       <div class="status" id="qa-status"></div>
       <div class="qa-stat-row">
-        <div class="qa-stat-grid">
-          ${qaStatItemHtml("전체 평균", stats.total, prevStats.total, true)}
-          ${qaStatItemHtml("유선 점수 평균", stats.voice, prevStats.voice)}
-          ${qaStatItemHtml("채팅 점수 평균", stats.chat, prevStats.chat)}
-          ${qaStatItemHtml("주간 점수 평균", stats.day, prevStats.day)}
-          ${qaStatItemHtml("야간 점수 평균", stats.night, prevStats.night)}
-          ${qaStatItemHtml("주간 채팅 평균", stats.dayChat, prevStats.dayChat)}
-          ${qaStatItemHtml("주간 유선 평균", stats.dayVoice, prevStats.dayVoice)}
-          ${qaStatItemHtml("야간 채팅 평균", stats.nightChat, prevStats.nightChat)}
-          ${qaStatItemHtml("야간 유선 평균", stats.nightVoice, prevStats.nightVoice)}
-        </div>
+        <div class="qa-stat-grid">${qaStatGridHtml(agentsList, year, monthIndex)}</div>
       </div>
       ${qaFilterRowHtml()}
       <div id="qa-table-area">${buildQATableHtml(filteredList, year, monthIndex, false)}</div>

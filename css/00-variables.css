@@ -141,6 +141,29 @@
     transition-delay: 0s !important;
     animation-duration: 0.01ms !important;
   }
+  /* ---- 성능 5단계: "약" 단계 (html[data-fx="lite"]) ----
+     끔(reduced)은 블러·그림자·전환을 전부 없애 화면이 밋밋해지고, 강(기본)은 저사양에서 버겁다.
+     그 사이 단계: 블러 반경을 절반 이하로 줄이고(--fx-blur-scale) 큰 그림자 토큰을 작은 값으로 바꾼다.
+     전환/애니메이션은 그대로 둬서 "동작"은 살리고 "GPU가 무거운 부분"만 덜어낸다. */
+  html[data-fx="lite"] {
+    --fx-blur-scale: 0.45;
+    --mac-shadow: 0 8px 22px rgba(0, 0, 0, 0.26), 0 1px 0 rgba(255, 255, 255, 0.04) inset;
+    --mac-shadow-sm: 0 3px 8px rgba(0, 0, 0, 0.18);
+    --mac-shadow-float: 0 6px 16px rgba(0, 0, 0, 0.30), 0 1px 0 rgba(255, 255, 255, 0.08) inset;
+  }
+  html[data-fx="lite"][data-theme="light"] {
+    --mac-shadow: 0 8px 22px rgba(60, 60, 67, 0.10), 0 1px 0 rgba(255, 255, 255, 0.6) inset;
+    --mac-shadow-sm: 0 3px 8px rgba(60, 60, 67, 0.07);
+    --mac-shadow-float: 0 6px 16px rgba(60, 60, 67, 0.14), 0 1px 0 rgba(255, 255, 255, 0.6) inset;
+  }
+  /* 끔: box-shadow는 위에서 지우지만 filter: drop-shadow()(폴더 아이콘·문서 아이콘)는 그대로 남아
+     아이콘마다 별도 그리기 층을 만든다 → 끔 단계에서는 함께 없앤다. */
+  html[data-fx="reduced"] .hd-fld-svg,
+  html[data-fx="reduced"] .dfw-doc { filter: none; }
+  @media (prefers-reduced-motion: reduce) {
+    html:not([data-fx="normal"]):not([data-fx="lite"]) .hd-fld-svg,
+    html:not([data-fx="normal"]):not([data-fx="lite"]) .dfw-doc { filter: none; }
+  }
   /* ---- OS "동작 줄이기"(prefers-reduced-motion) 자동 대응 ----
      위 data-fx="reduced"는 사용자가 앱 안에서 직접 토글을 눌러야 켜진다.
      OS/브라우저 설정에서 이미 "동작 줄이기"를 켜둔 사용자는 굳이 앱 안에서
@@ -156,12 +179,12 @@
      동작한다. (반대로 명시적으로 "켰을" 때는 위 html[data-fx="reduced"] 규칙이
      이미 OS 설정과 무관하게 항상 적용된다.) */
   @media (prefers-reduced-motion: reduce) {
-    html:not([data-fx="normal"]) {
+    html:not([data-fx="normal"]):not([data-fx="lite"]) {
       --fx-blur-scale: 0;
     }
-    html:not([data-fx="normal"]) *,
-    html:not([data-fx="normal"]) *::before,
-    html:not([data-fx="normal"]) *::after {
+    html:not([data-fx="normal"]):not([data-fx="lite"]) *,
+    html:not([data-fx="normal"]):not([data-fx="lite"]) *::before,
+    html:not([data-fx="normal"]):not([data-fx="lite"]) *::after {
       box-shadow: none !important;
       transition-duration: 0.01ms !important;
       transition-delay: 0s !important;

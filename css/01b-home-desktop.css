@@ -36,6 +36,16 @@
   html[data-theme="light"] body.home-desktop {
     background: #eaf3fb url("home-wallpaper-light.jpg") center/cover no-repeat fixed;
   }
+  /* 성능 5단계: 배경화면을 WebP(1600px)로 교체 — 다크 207KB→9KB, 라이트 226KB→98KB. 첫 로딩 다운로드/디코딩이
+     줄어든다. image-set(type())을 지원하는 브라우저에서만 적용하고, 그 외에는 위 JPG 규칙이 그대로 쓰인다. */
+  @supports (background-image: image-set(url("a.webp") type("image/webp"))) {
+    body.home-desktop {
+      background: #050813 image-set(url("home-wallpaper.webp") type("image/webp")) center/cover no-repeat fixed;
+    }
+    html[data-theme="light"] body.home-desktop {
+      background: #eaf3fb image-set(url("home-wallpaper-light.webp") type("image/webp")) center/cover no-repeat fixed;
+    }
+  }
 
   /* 오른쪽 데스크톱 아이콘 (목업 #icons / .di) */
   #home-icons {

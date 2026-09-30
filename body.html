@@ -16,6 +16,7 @@
     var _fxRaw = localStorage.getItem("app-fx-reduced");
     if (_fxRaw === "1") document.documentElement.setAttribute("data-fx", "reduced");
     else if (_fxRaw === "0") document.documentElement.setAttribute("data-fx", "normal");
+    else if (_fxRaw === "2") document.documentElement.setAttribute("data-fx", "lite");
   } catch (e) {}
   window.__bootStart = Date.now();
   // 방금 로그인/계정 생성으로 들어온 경우(로그인 화면이 새로고침을 거쳐 앱으로 넘어가는 중)에는

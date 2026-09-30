@@ -723,7 +723,9 @@
     }
   }
 
-  function attachScheduleTableHandlers(root) {
+  // 성능 4단계: 이벤트 핸들러 중 "요소마다 붙는" 부분(셀·입력칸·머리글). 표 전체를 다시 그릴 때뿐 아니라
+  // 바뀐 행만 교체할 때(js/07a5-schedule-log-capture.js updateScheduleTableArea)도 새 행에 이것만 붙인다.
+  function attachScheduleElementHandlers(root) {
     root.querySelectorAll(".sch-cell").forEach((cell) => {
       // 왼쪽 클릭(드래그 없이 눌렀다 뗌)은 이제 메뉴를 열지 않는다 — 셀 선택/드래그 선택
       // 용도로만 쓰고, 그 칸 하나의 메뉴(상태 변경/메모/이력 등)는 오른쪽 클릭(우클릭)
@@ -768,7 +770,7 @@
           Number(input.getAttribute("data-required-day")),
           input.value
         );
-        renderApp();
+        updateScheduleTableArea(); // 성능 4단계: 필요인력은 표(집계·대비 행)에만 영향 → 바뀐 행만 갱신 (예전: renderApp() 전체)
       };
       input.onkeydown = (e) => { if (e.key === "Enter") input.blur(); };
     });
@@ -802,6 +804,10 @@
         scheduleHeaderDragStart("row", td.getAttribute("data-row-key"), e);
       };
     });
+  }
+  // 표 영역(#schedule-table-area) 자체에 한 번 붙는 핸들러 + 요소 핸들러 + 표시 복원.
+  function attachScheduleTableHandlers(root) {
+    attachScheduleElementHandlers(root);
     root.onmouseover = scheduleHeaderDragOver;
     // 헤더가 아닌 다른 곳을 클릭하면 열/행 선택을 해제한다.
     root.onclick = (e) => {

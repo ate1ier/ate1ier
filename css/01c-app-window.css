@@ -32,7 +32,7 @@
     min-width: 340px; min-height: 240px;
     padding: 0; border-radius: 12px;
     background: var(--bg); color: var(--text);
-    box-shadow: 0 0 0 1px var(--hairline-strong), 0 24px 64px rgba(0, 0, 0, 0.6);
+    box-shadow: 0 0 0 1px var(--hairline-strong), 0 16px 40px rgba(0, 0, 0, 0.6);
     overflow: hidden; resize: none;
     /* 접힌 창을 펼칠 때(win-min 클래스가 빠질 때)는 이 기본 규칙이 "돌아갈 목표 상태"가 되므로,
        여기에도 transform/opacity 트랜지션을 넣어둬야 펼쳐지는 쪽도 접히는 쪽과 똑같이 부드럽다
@@ -42,7 +42,7 @@
     transition: transform 0.5s cubic-bezier(.32, .72, 0, 1), opacity 0.3s ease-out;
   }
   html[data-theme="light"] .app-win {
-    box-shadow: 0 0 0 1px var(--hairline-strong), 0 24px 64px rgba(0, 0, 0, 0.28);
+    box-shadow: 0 0 0 1px var(--hairline-strong), 0 16px 40px rgba(0, 0, 0, 0.28);
   }
   /* 부드러움 조정(2026-09): 모든 창 모션을 "처음엔 빠르게 → 끝에서 천천히 잦아드는" 감속 곡선(.32,.72,0,1 / expo-out)으로
      통일하고, 시간을 조금씩 늘렸다(열기 .3→.42s, 접기/펴기 .32→.5s, 크게/작게 .32→.45s, 닫기 .16→.23s).
@@ -137,13 +137,13 @@
     box-shadow:
       0 0 0 1px var(--hairline-strong),
       0 0 0 5px var(--aw-focus-glow),
-      0 24px 64px rgba(0, 0, 0, 0.6);
+      0 16px 40px rgba(0, 0, 0, 0.6);
   }
   html[data-theme="light"] .app-win.aw-focus {
     box-shadow:
       0 0 0 1px var(--hairline-strong),
       0 0 0 5px var(--aw-focus-glow),
-      0 24px 64px rgba(0, 0, 0, 0.28);
+      0 16px 40px rgba(0, 0, 0, 0.28);
   }
   .app-win.win-max, .app-win.win-max.aw-focus { outline: 0; }
   .app-win:not(.aw-focus) .aw-tt { opacity: 0.55; }
@@ -205,7 +205,7 @@
     position: fixed; z-index: 58; display: flex; flex-direction: column; padding: 84px 22px; /* 위아래 같은 여백 → 카드 묶음이 패널 정가운데에 온다(머리글은 아래에서 절대 위치) */
     border-radius: 12px; overflow: auto; color: var(--hd-t);
     background: var(--hd-bar); background: color-mix(in srgb, var(--hd-w2) 80%, transparent); /* 뒤에 비치는 바탕화면 아이콘이 어수선해 보이지 않게 독보다 조금 더 진하게 */
-    box-shadow: 0 0 0 1px var(--hd-ln), 0 24px 64px rgba(0, 0, 0, 0.45);
+    box-shadow: 0 0 0 1px var(--hd-ln), 0 16px 40px rgba(0, 0, 0, 0.45);
     backdrop-filter: blur(var(--fx-blur-lg)) saturate(1.8); -webkit-backdrop-filter: blur(var(--fx-blur-lg)) saturate(1.8);
     /* 창이 반쪽 자리로 미끄러져 들어가는 동안(.6s)에는 아직 안 보이다가, 거의 자리 잡을 즈음(.18s 뒤) 천천히 떠오른다 */
     animation: hd-sa-in 0.55s cubic-bezier(.22, 1, .36, 1) 0.18s backwards;

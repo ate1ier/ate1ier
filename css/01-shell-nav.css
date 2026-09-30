@@ -160,7 +160,18 @@
   .theme-menu-check { color: var(--accent); font-weight: 700; flex-shrink: 0; }
 
   /* "그래픽 효과 줄이기" 토글(테마 메뉴 맨 아래): 저사양 컴퓨터에서 배경 블러를 끄는 스위치 */
-  .theme-menu-fx-item { cursor: pointer; }
+  .theme-menu-fx-item { cursor: default; }
+  /* 성능 5단계: 스위치 → 끔/약/강 3단계 세그먼트 */
+  .theme-menu-fx-seg {
+    flex-shrink: 0; display: inline-flex; padding: 2px; gap: 2px; border-radius: 8px;
+    background: var(--mac-track);
+  }
+  .theme-menu-fx-opt {
+    border: 0; margin: 0; padding: 3px 10px; border-radius: 6px; font: inherit; font-size: 12px;
+    color: var(--text-dim, inherit); background: transparent; cursor: pointer;
+  }
+  .theme-menu-fx-opt:hover { color: var(--text); }
+  .theme-menu-fx-opt.active { background: var(--accent); color: #fff; }
   .theme-menu-fx-switch {
     flex-shrink: 0; width: 30px; height: 18px; border-radius: 999px;
     background: var(--hairline-strong); position: relative;

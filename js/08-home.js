@@ -93,6 +93,8 @@
             Array.from(col.querySelectorAll(".wd[data-home-card]")).map((c) => c.getAttribute("data-home-card"))
           );
           saveHomeLayout(newLayout);
+          const hr = document.getElementById("home-root");
+          if (hr) hr._hwHtml = null; // DOM이 직접 옮겨졌으니 다음 renderHomePage는 반드시 새로 그린다
         }
         document.addEventListener("pointermove", onMove);
         document.addEventListener("pointerup", onUp);
@@ -284,7 +286,13 @@
       [remainingCount, "남은 할 일", "ac"],
       [totalAgents, "전체 상담사", ""],
     ];
-    root.innerHTML = `<div id="wg"><div class="wd hero"><div class="wh"><span style="color:var(--t)">${m + 1}월 ${d}일 <span>${wd}요일</span></span>${holiday ? `<small>${esc(holiday)}</small>` : ""}</div><div class="st">${stats.map((x) => `<div class="${x[2]}"><b>${x[0]}</b><small>${x[1]}</small></div>`).join("")}</div></div><div class="cols" id="home-card-grid">${homeColumnsHtml}</div></div>`;
+    const homeWidgetHtml = `<div id="wg"><div class="wd hero"><div class="wh"><span style="color:var(--t)">${m + 1}월 ${d}일 <span>${wd}요일</span></span>${holiday ? `<small>${esc(holiday)}</small>` : ""}</div><div class="st">${stats.map((x) => `<div class="${x[2]}"><b>${x[0]}</b><small>${x[1]}</small></div>`).join("")}</div></div><div class="cols" id="home-card-grid">${homeColumnsHtml}</div></div>`;
+    // 성능 3단계: 위젯 내용이 지난번과 똑같으면(다른 창에서 뭔가 고쳤지만 위젯에 보이는 값은 그대로일 때 등)
+    // DOM을 통째로 갈아엎지 않는다 — 유리(블러) 위젯을 매번 새로 그려 다시 합성하는 비용이 사라진다.
+    // (카드를 끌어 옮긴 직후엔 DOM만 바뀌어 있으므로 아래 드롭 처리에서 이 값을 비워 다시 그리게 한다)
+    if (root._hwHtml === homeWidgetHtml && root.firstChild) return;
+    root._hwHtml = homeWidgetHtml;
+    root.innerHTML = homeWidgetHtml;
 
     root.querySelectorAll("[data-a]").forEach((el) => {
       el.onclick = () => setPage(el.getAttribute("data-a"));
