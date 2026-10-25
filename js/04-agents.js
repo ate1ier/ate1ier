@@ -155,7 +155,8 @@
   function toggleAgentStatus(id) {
     const agent = agentsData.find((a) => a.id === id);
     if (!agent) return;
-    if (agent.status === "RESIGNED") {
+    // 이미 퇴사했거나 "퇴사예정"인 사람은 취소(근무중 복귀) 쪽으로 처리한다.
+    if (agent.status === "RESIGNED" || isAgentScheduledResign(agent)) {
       if (typeof clearResignedScheduleFrom === "function" && agent.resignDate) {
         clearResignedScheduleFrom(agent.id, agent.resignDate);
       }
@@ -911,6 +912,7 @@
           <button type="button" class="agent-popover-act" data-pv-act="edit"><b>✎</b>수정</button>
           <button type="button" class="agent-popover-act" data-pv-act="pin"><b>${agent.pinned ? "★" : "☆"}</b>고정</button>
           <button type="button" class="agent-popover-act" data-pv-act="qa"><b>▤</b>QA</button>
+          <button type="button" class="agent-popover-act ${(isResigned || scheduledResign) ? "" : "dg"}" data-pv-act="resign" title="${(isResigned || scheduledResign) ? "퇴사 처리를 취소하고 근무중으로 되돌려요" : "퇴사일자를 입력해 퇴사 처리해요"}"><b>${(isResigned || scheduledResign) ? "↺" : "⎋"}</b>${(isResigned || scheduledResign) ? "퇴사취소" : "퇴사"}</button>
           <button type="button" class="agent-popover-act dg" data-pv-act="del"><b>🗑</b>삭제</button>
         </div>
       `;
@@ -996,6 +998,10 @@
           renderApp();
         } else if (act === "pin") {
           togglePinAgent(agent.id);
+        } else if (act === "resign") {
+          // 퇴사 처리/취소는 리스트 배지와 같은 toggleAgentStatus()를 그대로 쓴다
+          // (퇴사일자 입력 → 상태 변경 → 월별 스케줄 자동 반영까지 한 번에 처리).
+          toggleAgentStatus(agent.id);
         } else if (act === "del") {
           if (window.confirm("이 상담사 정보를 삭제할까요?")) {
             deleteAgent(agent.id);
